@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bot, ArrowRight, Pill, BookOpen, FlaskConical, Video, MessageSquare, Settings, Sparkles, Shield, Zap, Users, Brain, BarChart3, FileText, CheckCircle2, DoorOpen } from "lucide-react";
+import { Bot, ArrowRight, Pill, BookOpen, FlaskConical, Video, MessageSquare, Settings, Sparkles, Shield, Zap, Users, Brain, BarChart3, FileText, CheckCircle2, DoorOpen, Wrench, Stethoscope, Smartphone } from "lucide-react";
 
 const FEATURES = [
   {
@@ -11,19 +11,29 @@ const FEATURES = [
     description: "IA treinada para farmácia clínica, educação em saúde, pesquisa acadêmica e produção de conteúdo.",
   },
   {
-    icon: Zap,
-    title: "Respostas Estruturadas",
-    description: "Outputs formatados com relatórios, protocolos e guias prontos para uso imediato.",
+    icon: Wrench,
+    title: "Crie Seus Próprios Agentes",
+    description: "Monte agentes personalizados com prompts, modelo de IA, temperatura e base de conhecimento própria.",
+  },
+  {
+    icon: Stethoscope,
+    title: "Pacientes Virtuais",
+    description: "Publique seus agentes como pacientes virtuais em salas acessíveis por PIN para treinamento de alunos.",
+  },
+  {
+    icon: Smartphone,
+    title: "Integração com WhatsApp",
+    description: "Conecte seus agentes ao WhatsApp e converse com eles como se fossem um contato real.",
   },
   {
     icon: Shield,
-    title: "Base de Conhecimento",
-    description: "Alimente seus agentes com documentos, sites e textos para respostas contextualizadas via RAG.",
+    title: "Base de Conhecimento (RAG)",
+    description: "Alimente seus agentes com documentos, sites e textos para respostas contextualizadas.",
   },
   {
-    icon: Users,
-    title: "Agentes Personalizados",
-    description: "Crie seus próprios agentes com prompts customizados, escolha de modelo e temperatura.",
+    icon: Zap,
+    title: "Respostas Estruturadas",
+    description: "Outputs formatados com relatórios, protocolos e guias prontos para uso imediato.",
   },
 ];
 
@@ -175,7 +185,7 @@ export default function Landing() {
           <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">Tudo que você precisa</h2>
           <p className="text-white/40 max-w-xl mx-auto">Uma plataforma completa para potencializar sua prática profissional com inteligência artificial.</p>
         </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <div key={f.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] p-6 hover:border-white/20 hover:bg-white/[0.04] transition-all duration-300">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl gradient-primary mb-4 group-hover:scale-110 transition-transform">
