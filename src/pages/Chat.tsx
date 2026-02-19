@@ -187,15 +187,24 @@ export default function Chat() {
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="container max-w-3xl space-y-4">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl gradient-primary">
-                <AgentIcon className="h-8 w-8 text-white" />
+            <div className="flex gap-3 animate-fade-in">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full gradient-primary">
+                <AgentIcon className="h-5 w-5 text-white" />
               </div>
-              <h3 className="mb-2 font-display text-xl font-semibold text-white">{agent.name}</h3>
-              <p className="max-w-md text-sm text-white/40">{agent.description}</p>
-              <p className="mt-4 text-sm text-white/40">
-                Digite sua solicitação abaixo e clique em Gerar.
-              </p>
+              <div className="max-w-[80%] rounded-2xl rounded-bl-md bg-white/[0.05] border border-white/10 px-5 py-4 text-sm text-white/80">
+                <p>
+                  Olá! Sou o <strong className="text-white">{agent.name}</strong>. {agent.description}
+                </p>
+                <p className="mt-3">
+                  <strong className="text-white">Como posso ajudá-lo hoje?</strong>{" "}
+                  {isAdmin
+                    ? "Você tem acesso ilimitado como administrador."
+                    : `Cada interação custará ${agent.credit_cost} crédito${agent.credit_cost > 1 ? "s" : ""}.`}
+                </p>
+                <p className="mt-2 text-xs text-white/30">
+                  {new Date().toLocaleTimeString("pt-BR")}
+                </p>
+              </div>
             </div>
           )}
           {messages.map((msg) => (
