@@ -52,6 +52,7 @@ export default function VirtualRoomChat() {
           agentId: room.agent_id,
           input: userMsg.content,
           isCustomAgent: true,
+          isVirtualRoom: true,
           conversationHistory: messages.map((m) => ({ role: m.role, content: m.content })),
         },
       });

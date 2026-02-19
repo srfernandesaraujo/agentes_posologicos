@@ -495,38 +495,67 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const body = await req.json();
+    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory } = body;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const userId = claimsData.claims.sub;
-    const { agentId, input } = await req.json();
     if (!agentId || !input) {
       return new Response(JSON.stringify({ error: "agentId and input are required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+
+    // For virtual room requests, auth is optional
+    if (isVirtualRoom) {
+      // Use service role client to fetch the custom agent
+      if (authHeader?.startsWith("Bearer ")) {
+        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const token = authHeader.replace("Bearer ", "");
+        const { data: claimsData } = await supabase.auth.getClaims(token);
+        if (claimsData?.claims) {
+          userId = claimsData.claims.sub as string;
+        }
+      }
+    } else {
+      // Normal requests require auth
+      if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error: claimsError } = await tempClient.auth.getClaims(token);
+      if (claimsError || !claimsData?.claims) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      userId = claimsData.claims.sub as string;
+    }
+
+    // Create a supabase client (service role for virtual rooms, user-scoped otherwise)
+    const supabase = isVirtualRoom
+      ? createClient(supabaseUrl, serviceRoleKey)
+      : createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: authHeader! } },
+        });
 
     // Special case: prompt generation
     if (agentId === "__generate_prompt__") {
@@ -630,12 +659,17 @@ Deno.serve(async (req) => {
 
     // Check if it's a custom agent
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: customAgent, error: customError } = await serviceClient
+    const customAgentQuery = serviceClient
       .from("custom_agents")
       .select("*")
-      .eq("id", agentId)
-      .eq("user_id", userId)
-      .single();
+      .eq("id", agentId);
+    
+    // For virtual room, don't filter by user_id
+    if (!isVirtualRoom && userId) {
+      customAgentQuery.eq("user_id", userId);
+    }
+    
+    const { data: customAgent, error: customError } = await customAgentQuery.single();
 
     if (customError || !customAgent) {
       return new Response(JSON.stringify({ error: "Agent not found" }), {
