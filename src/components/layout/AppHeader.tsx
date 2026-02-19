@@ -2,8 +2,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Coins, User, LogOut, Pill, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +19,7 @@ export function AppHeader() {
   const { balance } = useCredits();
   const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[hsl(220,25%,5%)]/80 backdrop-blur-xl">
@@ -29,6 +32,8 @@ export function AppHeader() {
         </Link>
 
         <div className="flex items-center gap-3">
+          <LanguageSelector />
+
           {isAdmin && (
             <Link to="/admin">
               <Button variant="outline" size="sm" className="gap-2 font-medium border-[hsl(14,90%,58%)]/40 bg-[hsl(14,90%,58%)]/10 text-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,58%)]/20 hover:text-[hsl(14,90%,58%)]">
@@ -56,25 +61,25 @@ export function AppHeader() {
             <DropdownMenuContent align="end" className="w-48 border-white/10 bg-[hsl(220,25%,10%)] text-white">
               <DropdownMenuItem onClick={() => navigate("/conta")} className="text-white/80 focus:bg-white/10 focus:text-white">
                 <User className="mr-2 h-4 w-4" />
-                Minha Conta
+                {t("nav.account")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/creditos")} className="text-white/80 focus:bg-white/10 focus:text-white">
                 <Coins className="mr-2 h-4 w-4" />
-                Créditos
+                {t("nav.credits")}
               </DropdownMenuItem>
               {isAdmin && (
                 <>
                   <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem onClick={() => navigate("/admin")} className="text-[hsl(14,90%,58%)] focus:bg-white/10 focus:text-[hsl(14,90%,58%)]">
                     <Shield className="mr-2 h-4 w-4" />
-                    Painel Admin
+                    {t("nav.admin")}
                   </DropdownMenuItem>
                 </>
               )}
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem onClick={() => signOut()} className="text-white/80 focus:bg-white/10 focus:text-white">
                 <LogOut className="mr-2 h-4 w-4" />
-                Sair
+                {t("nav.logout")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

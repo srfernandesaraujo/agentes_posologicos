@@ -1,187 +1,85 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "sonner";
-import { ArrowLeft, Copy, Check } from "lucide-react";
-
-const SERVICE_TYPES = [
-  { id: "official", name: "API Oficial do WhatsApp", needsToken: true, needsPhoneId: true },
-  { id: "evolution", name: "Evolution API", needsToken: false, needsPhoneId: false },
-  { id: "zapi", name: "Z-API", needsToken: false, needsPhoneId: false },
-];
+import { ArrowLeft, Smartphone, ExternalLink } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Props {
   agentId: string;
+  agentName?: string;
   onBack: () => void;
 }
 
-export function WhatsAppConnect({ agentId, onBack }: Props) {
-  const { user } = useAuth();
-  const [serviceType, setServiceType] = useState("official");
-  const [token, setToken] = useState("");
-  const [phoneNumberId, setPhoneNumberId] = useState("");
-  const [step, setStep] = useState<"select" | "webhook">("select");
-  const [webhookUrl, setWebhookUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+export function WhatsAppConnect({ agentId, agentName, onBack }: Props) {
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [waLink, setWaLink] = useState("");
+  const { t } = useLanguage();
 
-  const selectedService = SERVICE_TYPES.find((s) => s.id === serviceType)!;
-
-  const handleGenerateWebhook = async () => {
-    setLoading(true);
-    try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat?agentId=${agentId}&source=whatsapp`;
-
-      const { error } = await supabase
-        .from("whatsapp_connections" as any)
-        .upsert({
-          user_id: user!.id,
-          agent_id: agentId,
-          service_type: serviceType,
-          token: token || null,
-          phone_number_id: phoneNumberId || null,
-          webhook_url: url,
-          status: "active",
-        } as any, { onConflict: "agent_id" as any });
-
-      if (error) throw error;
-
-      setWebhookUrl(url);
-      setStep("webhook");
-      toast.success("Webhook gerado com sucesso!");
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao gerar webhook");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerify = async () => {
-    if (selectedService.needsToken && !token) {
-      toast.error("Preencha o Token do Usuário do Sistema");
-      return;
-    }
-    if (selectedService.needsPhoneId && !phoneNumberId) {
-      toast.error("Preencha o ID do Número de Telefone");
-      return;
-    }
-    await handleGenerateWebhook();
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(webhookUrl);
-    setCopied(true);
-    toast.success("Webhook copiado!");
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleFinish = async () => {
-    toast.success("Configuração do WhatsApp finalizada!");
-    onBack();
-  };
-
-  const serviceMessages: Record<string, string> = {
-    official: "",
-    evolution: 'Para a Evolution API, você só precisa gerar o webhook. Clique em "Gerar Webhook" para continuar.',
-    zapi: 'Para a Z-API, você só precisa gerar o webhook. Clique em "Gerar Webhook" para continuar.',
-  };
-
-  const webhookInstructions: Record<string, string> = {
-    official: "Configure este webhook nas configurações do seu App no Meta for Developers e ative o recebimento de mensagens.",
-    evolution: "Configure este webhook na sua instância da Evolution API e ative os eventos base64 para receber mensagens.",
-    zapi: "Configure este webhook no painel da Z-API para receber mensagens do WhatsApp.",
+  const handleGenerate = () => {
+    if (!phoneNumber.trim()) return;
+    const cleanPhone = phoneNumber.replace(/\D/g, "");
+    const message = encodeURIComponent(
+      `Olá! Gostaria de conversar com o agente "${agentName || "IA"}". [ID: ${agentId}]`
+    );
+    const link = `https://wa.me/${cleanPhone}?text=${message}`;
+    setWaLink(link);
   };
 
   return (
     <div className="space-y-6">
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-white/50 hover:text-white transition-colors">
-        <ArrowLeft className="h-4 w-4" /> Voltar
+        <ArrowLeft className="h-4 w-4" /> {t("whatsapp.back")}
       </button>
-      <h3 className="text-xl font-bold text-white">Conectar WhatsApp</h3>
 
-      {step === "select" && (
-        <div className="space-y-5">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-white/70">Tipo de Serviço</label>
-            <Select value={serviceType} onValueChange={setServiceType}>
-              <SelectTrigger className="border-white/10 bg-white/[0.05] text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
-                {SERVICE_TYPES.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedService.needsToken && (
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/70">Token do Usuário do Sistema</label>
-              <Input
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                className="border-white/10 bg-white/[0.05] text-white"
-                placeholder="Cole seu token aqui..."
-              />
-            </div>
-          )}
-
-          {selectedService.needsPhoneId && (
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/70">ID do Número de Telefone</label>
-              <Input
-                value={phoneNumberId}
-                onChange={(e) => setPhoneNumberId(e.target.value)}
-                className="border-white/10 bg-white/[0.05] text-white"
-                placeholder="Ex: 123456789..."
-              />
-            </div>
-          )}
-
-          {serviceMessages[serviceType] && (
-            <p className="text-sm text-white/50">{serviceMessages[serviceType]}</p>
-          )}
-
-          <div className="flex justify-end">
-            {selectedService.needsToken ? (
-              <Button onClick={handleVerify} disabled={loading} className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white">
-                {loading ? "Verificando..." : "Verificar"}
-              </Button>
-            ) : (
-              <Button onClick={handleGenerateWebhook} disabled={loading} className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white">
-                {loading ? "Gerando..." : "Gerar Webhook"}
-              </Button>
-            )}
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(142,70%,45%)]/20">
+          <Smartphone className="h-6 w-6 text-[hsl(142,70%,45%)]" />
         </div>
-      )}
+        <div>
+          <h3 className="text-xl font-bold text-white">{t("whatsapp.title")}</h3>
+          <p className="text-sm text-white/50">{t("whatsapp.desc")}</p>
+        </div>
+      </div>
 
-      {step === "webhook" && (
-        <div className="space-y-5">
+      {!waLink ? (
+        <div className="space-y-4">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-white/70">
-              Webhook para configurar na {selectedService.name}
+              {t("whatsapp.phoneLabel")}
             </label>
-            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.05] p-3">
-              <span className="flex-1 text-sm text-white/80 truncate">{webhookUrl}</span>
-              <button onClick={handleCopy} className="shrink-0 text-white/50 hover:text-white transition-colors">
-                {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-              </button>
-            </div>
+            <Input
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder={t("whatsapp.phonePlaceholder")}
+              className="border-white/10 bg-white/[0.05] text-white font-mono text-lg"
+              onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
+            />
           </div>
-
-          <p className="text-sm text-white/50">{webhookInstructions[serviceType]}</p>
-
-          <div className="flex justify-end">
-            <Button onClick={handleFinish} className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white">
-              Finalizar
+          <Button
+            onClick={handleGenerate}
+            disabled={!phoneNumber.trim()}
+            className="w-full bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,38%)] text-white border-0 gap-2"
+          >
+            <Smartphone className="h-4 w-4" />
+            {t("whatsapp.generate")}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-6">
+          <div className="rounded-2xl bg-white p-6">
+            <QRCodeSVG value={waLink} size={220} level="H" />
+          </div>
+          <p className="text-sm text-white/50 text-center">{t("whatsapp.scanDesc")}</p>
+          <a href={waLink} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" className="gap-2 border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
+              <ExternalLink className="h-4 w-4" />
+              {t("whatsapp.openLink")}
             </Button>
-          </div>
+          </a>
+          <Button variant="ghost" onClick={() => setWaLink("")} className="text-white/40 hover:text-white hover:bg-white/10">
+            {t("whatsapp.back")}
+          </Button>
         </div>
       )}
     </div>
