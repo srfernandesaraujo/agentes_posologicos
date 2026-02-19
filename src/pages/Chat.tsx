@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -115,12 +116,17 @@ export default function Chat() {
           });
       }
 
-      await new Promise((r) => setTimeout(r, 1500));
-      const mockResponse = `[Mock] Resposta do agente "${agent.name}" para: "${text.slice(0, 50)}...".\n\nEsta é uma resposta simulada. A integração real com o n8n será configurada posteriormente.`;
+      const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
+        body: { agentId, input: text },
+      });
+
+      if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
+
+      const assistantContent = data?.output || "Sem resposta do agente.";
 
       await supabase
         .from("messages")
-        .insert({ session_id: sessionId, role: "assistant", content: mockResponse });
+        .insert({ session_id: sessionId, role: "assistant", content: assistantContent });
     },
     onSuccess: () => {
       setInput("");
@@ -218,13 +224,17 @@ export default function Chat() {
                 </div>
               )}
               <div
-                className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${
+                className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${
                   msg.role === "user"
-                    ? "gradient-primary text-white rounded-br-md"
-                    : "bg-white/[0.05] border border-white/10 text-white/80 rounded-bl-md"
+                    ? "gradient-primary text-white rounded-br-md whitespace-pre-wrap"
+                    : "bg-white/[0.05] border border-white/10 text-white/80 rounded-bl-md prose prose-invert prose-sm max-w-none"
                 }`}
               >
-                {msg.content}
+                {msg.role === "assistant" ? (
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                ) : (
+                  msg.content
+                )}
               </div>
               {msg.role === "user" && (
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
