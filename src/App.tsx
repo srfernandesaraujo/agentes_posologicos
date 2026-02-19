@@ -20,6 +20,8 @@ import AgentEditor from "./pages/AgentEditor";
 import Conversations from "./pages/Conversations";
 import Knowledge from "./pages/Knowledge";
 import KnowledgeDetail from "./pages/KnowledgeDetail";
+import VirtualRooms from "./pages/VirtualRooms";
+import VirtualRoomChat from "./pages/VirtualRoomChat";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/sala/:pin" element={<VirtualRoomChat />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
@@ -51,6 +54,7 @@ const App = () => (
               <Route path="/conversas" element={<Conversations />} />
               <Route path="/conteudos" element={<Knowledge />} />
               <Route path="/conteudos/:kbId" element={<KnowledgeDetail />} />
+              <Route path="/salas-virtuais" element={<VirtualRooms />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

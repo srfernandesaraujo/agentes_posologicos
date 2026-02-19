@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { WhatsAppConnect } from "@/components/agents/WhatsAppConnect";
 
 export default function AgentEditor() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -43,6 +44,10 @@ export default function AgentEditor() {
   const [simplePrompt, setSimplePrompt] = useState("");
   const [generating, setGenerating] = useState(false);
 
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [publishWhatsApp, setPublishWhatsApp] = useState(false);
+  const [publishVirtualPatient, setPublishVirtualPatient] = useState(false);
+
   // Prompt simple fields
   const [whoIs, setWhoIs] = useState("");
   const [whatDoes, setWhatDoes] = useState("");
@@ -64,6 +69,8 @@ export default function AgentEditor() {
     setRestrictContent(agent.restrict_content);
     setMarkdownResponse(agent.markdown_response);
     setSystemPrompt(agent.system_prompt);
+    setPublishWhatsApp((agent as any).publish_whatsapp || false);
+    setPublishVirtualPatient((agent as any).publish_virtual_patient || false);
     setInitialized(true);
   }
 
@@ -541,37 +548,97 @@ export default function AgentEditor() {
 
         {/* PUBLISH TAB */}
         <TabsContent value="publish">
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-white">Publicar Agente</h3>
-            <p className="text-sm text-white/50">
-              Ao publicar, o agente ficará disponível na sua área de agentes personalizados para uso.
-            </p>
-            <div className="flex items-center gap-3">
-              <span className={`rounded-full px-3 py-1 text-sm font-medium ${
-                agent.status === "published"
-                  ? "bg-[hsl(152,60%,42%)]/20 text-[hsl(152,60%,42%)]"
-                  : "bg-white/10 text-white/50"
-              }`}>
-                {agent.status === "published" ? "✅ Publicado" : "Rascunho"}
-              </span>
+          {showWhatsApp ? (
+            <WhatsAppConnect agentId={agentId!} onBack={() => setShowWhatsApp(false)} />
+          ) : (
+            <div className="space-y-6">
+              {/* Internal publish */}
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-4">
+                <h3 className="text-lg font-semibold text-white">Publicação Interna</h3>
+                <p className="text-sm text-white/50">
+                  Ao publicar, o agente ficará disponível na sua área de agentes personalizados para uso.
+                </p>
+                <div className="flex items-center gap-3">
+                  <span className={`rounded-full px-3 py-1 text-sm font-medium ${
+                    agent.status === "published"
+                      ? "bg-[hsl(152,60%,42%)]/20 text-[hsl(152,60%,42%)]"
+                      : "bg-white/10 text-white/50"
+                  }`}>
+                    {agent.status === "published" ? "✅ Publicado" : "Rascunho"}
+                  </span>
+                </div>
+                {agent.status !== "published" ? (
+                  <Button onClick={handlePublish} disabled={updateAgent.isPending} className="bg-[hsl(152,60%,42%)] hover:bg-[hsl(152,60%,36%)] text-white">
+                    Publicar Agente
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={async () => {
+                      await updateAgent.mutateAsync({ id: agentId!, status: "draft" });
+                      toast.success("Agente despublicado");
+                    }}
+                    variant="outline"
+                    className="border-white/20 text-white hover:bg-white/10"
+                  >
+                    Despublicar
+                  </Button>
+                )}
+              </div>
+
+              {/* WhatsApp checkbox */}
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-green-400" />
+                      Publicar no WhatsApp
+                    </h3>
+                    <p className="text-sm text-white/50 mt-1">Conecte seu agente ao WhatsApp para receber mensagens</p>
+                  </div>
+                  <Switch
+                    checked={publishWhatsApp}
+                    onCheckedChange={async (v) => {
+                      setPublishWhatsApp(v);
+                      await updateAgent.mutateAsync({ id: agentId!, publish_whatsapp: v } as any);
+                      toast.success(v ? "WhatsApp habilitado" : "WhatsApp desabilitado");
+                    }}
+                  />
+                </div>
+                {publishWhatsApp && (
+                  <Button onClick={() => setShowWhatsApp(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Configurar WhatsApp
+                  </Button>
+                )}
+              </div>
+
+              {/* Virtual Patient checkbox */}
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Bot className="h-5 w-5 text-[hsl(174,62%,47%)]" />
+                      Publicar como Paciente Virtual
+                    </h3>
+                    <p className="text-sm text-white/50 mt-1">O agente ficará disponível em uma sala virtual acessível por PIN</p>
+                  </div>
+                  <Switch
+                    checked={publishVirtualPatient}
+                    onCheckedChange={async (v) => {
+                      setPublishVirtualPatient(v);
+                      await updateAgent.mutateAsync({ id: agentId!, publish_virtual_patient: v } as any);
+                      toast.success(v ? "Paciente virtual habilitado" : "Paciente virtual desabilitado");
+                    }}
+                  />
+                </div>
+                {publishVirtualPatient && (
+                  <p className="text-sm text-white/40">
+                    Gerencie as salas virtuais em <button onClick={() => navigate("/salas-virtuais")} className="text-[hsl(14,90%,58%)] hover:underline">Salas Virtuais</button>.
+                  </p>
+                )}
+              </div>
             </div>
-            {agent.status !== "published" ? (
-              <Button onClick={handlePublish} disabled={updateAgent.isPending} className="bg-[hsl(152,60%,42%)] hover:bg-[hsl(152,60%,36%)] text-white">
-                Publicar Agente
-              </Button>
-            ) : (
-              <Button
-                onClick={async () => {
-                  await updateAgent.mutateAsync({ id: agentId!, status: "draft" });
-                  toast.success("Agente despublicado");
-                }}
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10"
-              >
-                Despublicar
-              </Button>
-            )}
-          </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
