@@ -13,6 +13,7 @@ import Agents from "./pages/Agents";
 import Chat from "./pages/Chat";
 import Credits from "./pages/Credits";
 import Account from "./pages/Account";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
               <Route path="/chat/:agentId" element={<Chat />} />
               <Route path="/creditos" element={<Credits />} />
               <Route path="/conta" element={<Account />} />
+              <Route path="/admin" element={<Admin />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

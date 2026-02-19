@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +22,7 @@ export default function Chat() {
   const { agentId } = useParams<{ agentId: string }>();
   const { user } = useAuth();
   const { balance, refetch: refetchCredits } = useCredits();
+  const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
@@ -42,11 +44,11 @@ export default function Chat() {
   });
 
   useEffect(() => {
-    if (!agentLoading && agent && balance < agent.credit_cost) {
+    if (!agentLoading && agent && !isAdmin && balance < agent.credit_cost) {
       toast.error("Créditos insuficientes!");
       navigate("/creditos");
     }
-  }, [agent, balance, agentLoading]);
+  }, [agent, balance, agentLoading, isAdmin]);
 
   useEffect(() => {
     if (!user || !agentId) return;
@@ -101,14 +103,17 @@ export default function Chat() {
         .from("messages")
         .insert({ session_id: sessionId, role: "user", content: text });
 
-      await supabase
-        .from("credits_ledger")
-        .insert({
-          user_id: user.id,
-          amount: -agent.credit_cost,
-          type: "usage",
-          description: `Uso: ${agent.name}`,
-        });
+      // Debit credits only for non-admin users
+      if (!isAdmin) {
+        await supabase
+          .from("credits_ledger")
+          .insert({
+            user_id: user.id,
+            amount: -agent.credit_cost,
+            type: "usage",
+            description: `Uso: ${agent.name}`,
+          });
+      }
 
       await new Promise((r) => setTimeout(r, 1500));
       const mockResponse = `[Mock] Resposta do agente "${agent.name}" para: "${text.slice(0, 50)}...".\n\nEsta é uma resposta simulada. A integração real com o n8n será configurada posteriormente.`;
@@ -130,7 +135,7 @@ export default function Chat() {
   const handleSend = () => {
     const text = input.trim();
     if (!text) return;
-    if (balance < (agent?.credit_cost || 1)) {
+    if (!isAdmin && balance < (agent?.credit_cost || 1)) {
       toast.error("Créditos insuficientes!");
       navigate("/creditos");
       return;

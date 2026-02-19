@@ -1,18 +1,21 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
-import { Coins, User, LogOut, Pill } from "lucide-react";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { Coins, User, LogOut, Pill, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 export function AppHeader() {
   const { user, signOut } = useAuth();
   const { balance } = useCredits();
+  const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
 
   return (
@@ -26,10 +29,19 @@ export function AppHeader() {
         </Link>
 
         <div className="flex items-center gap-3">
+          {isAdmin && (
+            <Link to="/admin">
+              <Button variant="outline" size="sm" className="gap-2 font-medium border-[hsl(14,90%,58%)]/40 bg-[hsl(14,90%,58%)]/10 text-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,58%)]/20 hover:text-[hsl(14,90%,58%)]">
+                <Shield className="h-4 w-4" />
+                Admin
+              </Button>
+            </Link>
+          )}
+
           <Link to="/creditos">
             <Button variant="outline" size="sm" className="gap-2 font-medium border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
               <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
-              <span>{balance}</span>
+              <span>{isAdmin ? "∞" : balance}</span>
             </Button>
           </Link>
 
@@ -50,6 +62,16 @@ export function AppHeader() {
                 <Coins className="mr-2 h-4 w-4" />
                 Créditos
               </DropdownMenuItem>
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem onClick={() => navigate("/admin")} className="text-[hsl(14,90%,58%)] focus:bg-white/10 focus:text-[hsl(14,90%,58%)]">
+                    <Shield className="mr-2 h-4 w-4" />
+                    Painel Admin
+                  </DropdownMenuItem>
+                </>
+              )}
+              <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem onClick={() => signOut()} className="text-white/80 focus:bg-white/10 focus:text-white">
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
