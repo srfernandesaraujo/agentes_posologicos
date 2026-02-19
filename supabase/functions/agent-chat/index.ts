@@ -665,6 +665,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Build system prompt with extras
+    let finalSystemPrompt = customAgent.system_prompt || DEFAULT_PROMPT;
+    if (ragContext) {
+      finalSystemPrompt += ragContext;
+    }
+    if (customAgent.markdown_response) {
+      finalSystemPrompt += "\n\nSempre formate suas respostas em Markdown para melhor legibilidade.";
+    }
+
     // Get user's API key for the provider
     const { data: apiKeyRow } = await serviceClient
       .from("user_api_keys")
@@ -673,9 +682,54 @@ Deno.serve(async (req) => {
       .eq("provider", customAgent.provider)
       .single();
 
+    // If no API key configured, fallback to Lovable AI Gateway
     if (!apiKeyRow) {
-      return new Response(JSON.stringify({ error: `Chave API do provedor "${customAgent.provider}" não configurada.` }), {
-        status: 400,
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          temperature: Number(customAgent.temperature),
+          messages: [
+            { role: "system", content: finalSystemPrompt },
+            { role: "user", content: input },
+          ],
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const status = aiResponse.status;
+        if (status === 429) {
+          return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (status === 402) {
+          return new Response(JSON.stringify({ error: "Créditos esgotados." }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const errText = await aiResponse.text();
+        console.error("AI gateway error (custom fallback):", status, errText);
+        return new Response(JSON.stringify({ error: "Erro ao consultar o modelo de IA." }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const aiData = await aiResponse.json();
+      const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
+      return new Response(JSON.stringify({ output }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -688,15 +742,6 @@ Deno.serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
-
-    // Build system prompt with extras
-    let finalSystemPrompt = customAgent.system_prompt || DEFAULT_PROMPT;
-    if (ragContext) {
-      finalSystemPrompt += ragContext;
-    }
-    if (customAgent.markdown_response) {
-      finalSystemPrompt += "\n\nSempre formate suas respostas em Markdown para melhor legibilidade.";
     }
 
     // Handle Anthropic separately (different API format)
@@ -735,13 +780,8 @@ Deno.serve(async (req) => {
     // OpenAI-compatible API (OpenAI, Groq, OpenRouter, Google)
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "Authorization": `Bearer ${userApiKey}`,
     };
-
-    if (customAgent.provider === "google") {
-      headers["Authorization"] = `Bearer ${userApiKey}`;
-    } else {
-      headers["Authorization"] = `Bearer ${userApiKey}`;
-    }
 
     const aiResponse = await fetch(endpoint, {
       method: "POST",
