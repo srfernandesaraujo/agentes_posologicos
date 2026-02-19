@@ -1,6 +1,8 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bot, ArrowRight, Pill, BookOpen, FlaskConical, Video, MessageSquare, Settings, Sparkles, Shield, Zap, Users, Brain, BarChart3, FileText, CheckCircle2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Bot, ArrowRight, Pill, BookOpen, FlaskConical, Video, MessageSquare, Settings, Sparkles, Shield, Zap, Users, Brain, BarChart3, FileText, CheckCircle2, DoorOpen } from "lucide-react";
 
 const FEATURES = [
   {
@@ -56,6 +58,15 @@ const STATS = [
 ];
 
 export default function Landing() {
+  const navigate = useNavigate();
+  const [pin, setPin] = useState("");
+
+  const handlePinAccess = () => {
+    if (pin.trim().length >= 4) {
+      navigate(`/sala/${pin.trim()}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[hsl(220,25%,5%)] text-white">
       {/* Nav */}
@@ -129,6 +140,31 @@ export default function Landing() {
                 <p className="mt-1 text-sm text-white/40">{s.label}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* PIN Access */}
+      <section className="border-b border-white/10 bg-white/[0.02]">
+        <div className="container py-12">
+          <div className="mx-auto max-w-md text-center">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <DoorOpen className="h-6 w-6 text-[hsl(174,62%,47%)]" />
+              <h2 className="font-display text-xl font-bold text-white">Acesso à Sala Virtual</h2>
+            </div>
+            <p className="text-sm text-white/40 mb-4">Digite o PIN da sala para acessar o paciente virtual</p>
+            <div className="flex gap-2">
+              <Input
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="Digite o PIN da sala..."
+                className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 text-center font-mono text-lg tracking-widest"
+                onKeyDown={(e) => { if (e.key === "Enter") handlePinAccess(); }}
+              />
+              <Button onClick={handlePinAccess} disabled={pin.trim().length < 4} className="bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,40%)] text-white shrink-0">
+                Acessar
+              </Button>
+            </div>
           </div>
         </div>
       </section>

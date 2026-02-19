@@ -122,6 +122,8 @@ export type Database = {
           model: string
           name: string
           provider: string
+          publish_virtual_patient: boolean
+          publish_whatsapp: boolean
           restrict_content: boolean
           status: string
           system_prompt: string
@@ -138,6 +140,8 @@ export type Database = {
           model?: string
           name: string
           provider?: string
+          publish_virtual_patient?: boolean
+          publish_whatsapp?: boolean
           restrict_content?: boolean
           status?: string
           system_prompt?: string
@@ -154,6 +158,8 @@ export type Database = {
           model?: string
           name?: string
           provider?: string
+          publish_virtual_patient?: boolean
+          publish_whatsapp?: boolean
           restrict_content?: boolean
           status?: string
           system_prompt?: string
@@ -363,6 +369,97 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      virtual_rooms: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          name: string
+          pin: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          pin: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          pin?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "virtual_rooms_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "custom_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_connections: {
+        Row: {
+          agent_id: string
+          created_at: string
+          id: string
+          phone_number_id: string | null
+          service_type: string
+          status: string
+          token: string | null
+          updated_at: string
+          user_id: string
+          webhook_url: string | null
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          id?: string
+          phone_number_id?: string | null
+          service_type?: string
+          status?: string
+          token?: string | null
+          updated_at?: string
+          user_id: string
+          webhook_url?: string | null
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          id?: string
+          phone_number_id?: string | null
+          service_type?: string
+          status?: string
+          token?: string | null
+          updated_at?: string
+          user_id?: string
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_connections_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "custom_agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
