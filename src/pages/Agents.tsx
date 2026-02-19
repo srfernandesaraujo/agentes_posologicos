@@ -21,7 +21,7 @@ export default function Agents() {
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(174,62%,47%)] border-t-transparent" />
       </div>
     );
   }
@@ -29,20 +29,20 @@ export default function Agents() {
   return (
     <div className="container py-8">
       <div className="mb-8 animate-slide-up">
-        <h1 className="mb-2 font-display text-3xl font-bold">Agentes de IA</h1>
-        <p className="text-muted-foreground">
+        <h1 className="mb-2 font-display text-3xl font-bold text-white">Agentes de IA</h1>
+        <p className="text-white/50">
           Escolha um agente especializado para começar
         </p>
       </div>
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
           <Input
             placeholder="Buscar agentes..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
+            className="pl-10 border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 focus-visible:ring-white/20"
           />
         </div>
       </div>
@@ -52,8 +52,8 @@ export default function Agents() {
           onClick={() => setSelectedCat(null)}
           className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
             !selectedCat
-              ? "gradient-primary text-primary-foreground"
-              : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              ? "gradient-primary text-white"
+              : "bg-white/5 border border-white/10 text-white/60 hover:bg-white/10"
           }`}
         >
           Todos
@@ -64,8 +64,8 @@ export default function Agents() {
             onClick={() => setSelectedCat(selectedCat === cat ? null : cat)}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               selectedCat === cat
-                ? "gradient-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                ? "gradient-primary text-white"
+                : "bg-white/5 border border-white/10 text-white/60 hover:bg-white/10"
             }`}
           >
             {cat}
@@ -74,7 +74,7 @@ export default function Agents() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center py-20 text-white/40">
           <Bot className="mb-4 h-12 w-12" />
           <p>Nenhum agente encontrado</p>
         </div>
