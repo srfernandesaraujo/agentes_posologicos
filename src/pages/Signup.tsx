@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Bot, ArrowRight, Gift } from "lucide-react";
+import { Pill, ArrowRight, Gift } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Signup() {
@@ -39,9 +39,9 @@ export default function Signup() {
       <div className="hidden lg:flex lg:w-1/2 gradient-primary items-center justify-center p-12">
         <div className="max-w-md text-center">
           <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-foreground/20 backdrop-blur-sm">
-            <Bot className="h-10 w-10 text-primary-foreground" />
+            <Pill className="h-10 w-10 text-primary-foreground" />
           </div>
-          <h2 className="mb-4 font-display text-4xl font-bold text-primary-foreground">FarmAI</h2>
+          <h2 className="mb-4 font-display text-4xl font-bold text-primary-foreground">Agentes Posológicos</h2>
           <div className="mt-8 inline-flex items-center gap-2 rounded-full bg-primary-foreground/20 px-4 py-2 text-primary-foreground">
             <Gift className="h-5 w-5" />
             <span className="font-medium">5 créditos grátis no cadastro!</span>
@@ -53,9 +53,9 @@ export default function Signup() {
         <div className="w-full max-w-md animate-fade-in">
           <div className="mb-8 lg:hidden flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary">
-              <Bot className="h-5 w-5 text-primary-foreground" />
+            <Pill className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="font-display text-xl font-bold gradient-text">FarmAI</span>
+            <span className="font-display text-xl font-bold gradient-text">Agentes Posológicos</span>
           </div>
 
           <h1 className="mb-2 font-display text-3xl font-bold">Criar Conta</h1>
