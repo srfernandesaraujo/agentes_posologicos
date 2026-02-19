@@ -18,6 +18,8 @@ import Settings from "./pages/Settings";
 import MyAgents from "./pages/MyAgents";
 import AgentEditor from "./pages/AgentEditor";
 import Conversations from "./pages/Conversations";
+import Knowledge from "./pages/Knowledge";
+import KnowledgeDetail from "./pages/KnowledgeDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +49,8 @@ const App = () => (
               <Route path="/meus-agentes" element={<MyAgents />} />
               <Route path="/meus-agentes/:agentId" element={<AgentEditor />} />
               <Route path="/conversas" element={<Conversations />} />
+              <Route path="/conteudos" element={<Knowledge />} />
+              <Route path="/conteudos/:kbId" element={<KnowledgeDetail />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

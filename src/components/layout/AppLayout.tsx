@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
-import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid } from "lucide-react";
+import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
+import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 
 function SidebarLink({ to, icon: Icon, label, count }: { to: string; icon: any; label: string; count?: number }) {
   return (
@@ -32,6 +33,7 @@ function SidebarLink({ to, icon: Icon, label, count }: { to: string; icon: any; 
 export function AppLayout() {
   const { user } = useAuth();
   const { data: customAgents = [] } = useCustomAgents();
+  const { data: knowledgeBases = [] } = useKnowledgeBases();
 
   const { data: conversationCount = 0 } = useQuery({
     queryKey: ["conversation-count", user?.id],
@@ -55,6 +57,7 @@ export function AppLayout() {
           <nav className="space-y-1">
             <SidebarLink to="/agentes" icon={LayoutGrid} label="Agentes" />
             <SidebarLink to="/meus-agentes" icon={Bot} label="Meus Agentes" count={customAgents.length} />
+            <SidebarLink to="/conteudos" icon={Database} label="Conteúdos" count={knowledgeBases.length} />
             <SidebarLink to="/conversas" icon={MessageSquare} label="Conversas" count={conversationCount} />
           </nav>
           <div className="mt-8 space-y-1">
