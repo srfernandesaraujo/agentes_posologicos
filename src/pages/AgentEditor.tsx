@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCustomAgent, useCustomAgents } from "@/hooks/useCustomAgents";
 import { useApiKeys, LLM_PROVIDERS } from "@/hooks/useApiKeys";
+import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +24,7 @@ export default function AgentEditor() {
   const { data: agent, isLoading } = useCustomAgent(agentId);
   const { updateAgent, deleteAgent } = useCustomAgents();
   const { data: apiKeys = [] } = useApiKeys();
+  const { data: knowledgeBases = [] } = useKnowledgeBases();
 
   // Local state for editing
   const [tab, setTab] = useState("config");
@@ -382,6 +384,26 @@ export default function AgentEditor() {
                       </div>
                       <Switch checked={markdownResponse} onCheckedChange={setMarkdownResponse} />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-white/70">Base de Conhecimento (RAG)</label>
+                    <Select value={(agent as any).knowledge_base_id || "none"} onValueChange={async (v) => {
+                      const kbId = v === "none" ? null : v;
+                      await updateAgent.mutateAsync({ id: agentId!, knowledge_base_id: kbId } as any);
+                      toast.success("Base de conhecimento atualizada!");
+                    }}>
+                      <SelectTrigger className="border-white/10 bg-white/[0.05] text-white">
+                        <SelectValue placeholder="Nenhuma" />
+                      </SelectTrigger>
+                      <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {knowledgeBases.map((kb) => (
+                          <SelectItem key={kb.id} value={kb.id}>{kb.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-xs text-white/30">Vincule uma base de conhecimento para o agente usar como contexto (RAG).</p>
                   </div>
 
                   <Button onClick={handleSaveModel} disabled={updateAgent.isPending} className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white">

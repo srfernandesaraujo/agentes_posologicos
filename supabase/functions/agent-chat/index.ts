@@ -644,6 +644,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // RAG: Fetch knowledge base context if linked
+    let ragContext = "";
+    if (customAgent.knowledge_base_id) {
+      const { data: sources } = await serviceClient
+        .from("knowledge_sources")
+        .select("name, type, content")
+        .eq("knowledge_base_id", customAgent.knowledge_base_id)
+        .eq("status", "ready")
+        .limit(20);
+
+      if (sources && sources.length > 0) {
+        const chunks = sources.map((s: any) => {
+          let content = s.content || "";
+          // Limit each source to ~2000 chars to fit context
+          if (content.length > 2000) content = content.substring(0, 2000) + "...";
+          return `[Fonte: ${s.name} (${s.type})]\n${content}`;
+        });
+        ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhecimento para embasar suas respostas quando relevante:\n\n" + chunks.join("\n\n---\n\n") + "\n</CONTEXTO_BASE_CONHECIMENTO>";
+      }
+    }
+
     // Get user's API key for the provider
     const { data: apiKeyRow } = await serviceClient
       .from("user_api_keys")
@@ -671,6 +692,9 @@ Deno.serve(async (req) => {
 
     // Build system prompt with extras
     let finalSystemPrompt = customAgent.system_prompt || DEFAULT_PROMPT;
+    if (ragContext) {
+      finalSystemPrompt += ragContext;
+    }
     if (customAgent.markdown_response) {
       finalSystemPrompt += "\n\nSempre formate suas respostas em Markdown para melhor legibilidade.";
     }

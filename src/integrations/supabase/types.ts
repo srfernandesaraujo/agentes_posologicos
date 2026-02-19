@@ -117,6 +117,7 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          knowledge_base_id: string | null
           markdown_response: boolean
           model: string
           name: string
@@ -132,6 +133,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          knowledge_base_id?: string | null
           markdown_response?: boolean
           model?: string
           name: string
@@ -147,6 +149,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          knowledge_base_id?: string | null
           markdown_response?: boolean
           model?: string
           name?: string
@@ -158,7 +161,98 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "custom_agents_knowledge_base_id_fkey"
+            columns: ["knowledge_base_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_bases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_bases: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          is_public: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_public?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          is_public?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: []
+      }
+      knowledge_sources: {
+        Row: {
+          content: string
+          created_at: string
+          file_path: string | null
+          id: string
+          knowledge_base_id: string
+          metadata: Json | null
+          name: string
+          status: string
+          type: string
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          file_path?: string | null
+          id?: string
+          knowledge_base_id: string
+          metadata?: Json | null
+          name: string
+          status?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          file_path?: string | null
+          id?: string
+          knowledge_base_id?: string
+          metadata?: Json | null
+          name?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_sources_knowledge_base_id_fkey"
+            columns: ["knowledge_base_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_bases"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
