@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { useAgents, CATEGORIES } from "@/hooks/useAgents";
+import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { AgentCard } from "@/components/agents/AgentCard";
-import { Bot, Search } from "lucide-react";
+import { Bot, Search, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useNavigate } from "react-router-dom";
 
 export default function Agents() {
   const { data: agents = [], isLoading } = useAgents();
+  const { data: customAgents = [] } = useCustomAgents();
   const [search, setSearch] = useState("");
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const filtered = agents.filter((a) => {
     const matchesSearch =
@@ -17,6 +21,14 @@ export default function Agents() {
     const matchesCat = !selectedCat || a.category === selectedCat;
     return matchesSearch && matchesCat;
   });
+
+  const publishedCustom = customAgents.filter(
+    (a) =>
+      a.status === "published" &&
+      (!search ||
+        a.name.toLowerCase().includes(search.toLowerCase()) ||
+        a.description.toLowerCase().includes(search.toLowerCase()))
+  );
 
   if (isLoading) {
     return (
@@ -72,6 +84,37 @@ export default function Agents() {
           </button>
         ))}
       </div>
+
+      {/* Published custom agents */}
+      {publishedCustom.length > 0 && !selectedCat && (
+        <div className="mb-8">
+          <h2 className="mb-4 font-display text-lg font-semibold text-white/80">Meus Agentes Personalizados</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {publishedCustom.map((agent) => (
+              <div
+                key={agent.id}
+                className="group rounded-xl border border-[hsl(14,90%,58%)]/30 bg-white/[0.03] p-6 transition-all hover:border-[hsl(14,90%,58%)]/50 hover:-translate-y-1 cursor-pointer"
+                onClick={() => navigate(`/chat/custom-${agent.id}`)}
+              >
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(14,90%,58%)]/20 text-[hsl(14,90%,58%)]">
+                    <Bot className="h-6 w-6" />
+                  </div>
+                  <span className="rounded-full bg-[hsl(14,90%,58%)]/10 border border-[hsl(14,90%,58%)]/30 px-2.5 py-1 text-xs font-medium text-[hsl(14,90%,58%)]">
+                    Personalizado
+                  </span>
+                </div>
+                <h3 className="mb-2 font-display text-lg font-semibold leading-tight text-white">{agent.name}</h3>
+                <p className="mb-5 text-sm text-white/40 line-clamp-3">{agent.description || "Sem descrição"}</p>
+                <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/20 bg-transparent px-4 py-2 text-sm font-medium text-white hover:bg-white/10 transition-colors">
+                  Iniciar Chat
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-white/40">

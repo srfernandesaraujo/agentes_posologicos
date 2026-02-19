@@ -112,6 +112,54 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_agents: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          markdown_response: boolean
+          model: string
+          name: string
+          provider: string
+          restrict_content: boolean
+          status: string
+          system_prompt: string
+          temperature: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          markdown_response?: boolean
+          model?: string
+          name: string
+          provider?: string
+          restrict_content?: boolean
+          status?: string
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          markdown_response?: boolean
+          model?: string
+          name?: string
+          provider?: string
+          restrict_content?: boolean
+          status?: string
+          system_prompt?: string
+          temperature?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -169,6 +217,33 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_api_keys: {
+        Row: {
+          api_key_encrypted: string
+          created_at: string
+          id: string
+          provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key_encrypted: string
+          created_at?: string
+          id?: string
+          provider: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key_encrypted?: string
+          created_at?: string
+          id?: string
+          provider?: string
           updated_at?: string
           user_id?: string
         }
