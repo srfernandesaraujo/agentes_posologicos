@@ -14,23 +14,23 @@ export function AgentCard({ agent }: AgentCardProps) {
   const catColor = CATEGORY_COLORS[agent.category] || "bg-primary";
 
   return (
-    <div className="group glass-card rounded-xl p-6 transition-all hover:shadow-xl hover:-translate-y-1 animate-fade-in">
+    <div className="group rounded-xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:border-white/20 hover:-translate-y-1 animate-fade-in">
       <div className="mb-4 flex items-start justify-between">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${catColor} text-primary-foreground`}>
+        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${catColor} text-white`}>
           <Icon className="h-6 w-6" />
         </div>
-        <div className="flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+        <div className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-xs font-medium text-white/50">
           <Coins className="h-3 w-3" />
           {agent.credit_cost}
         </div>
       </div>
 
-      <h3 className="mb-2 font-display text-lg font-semibold leading-tight">{agent.name}</h3>
-      <p className="mb-5 text-sm text-muted-foreground line-clamp-3">{agent.description}</p>
+      <h3 className="mb-2 font-display text-lg font-semibold leading-tight text-white">{agent.name}</h3>
+      <p className="mb-5 text-sm text-white/40 line-clamp-3">{agent.description}</p>
 
       <Button
         onClick={() => navigate(`/chat/${agent.id}`)}
-        className="w-full gap-2"
+        className="w-full gap-2 border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
         variant="outline"
       >
         Iniciar Chat

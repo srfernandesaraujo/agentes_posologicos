@@ -26,38 +26,40 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex lg:w-1/2 gradient-primary items-center justify-center p-12">
+    <div className="flex min-h-screen bg-[hsl(220,25%,5%)]">
+      {/* Left branding panel */}
+      <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-12 border-r border-white/10">
         <div className="max-w-md text-center">
-          <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary-foreground/20 backdrop-blur-sm">
-            <Pill className="h-10 w-10 text-primary-foreground" />
+          <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl gradient-primary">
+            <Pill className="h-10 w-10 text-white" />
           </div>
-          <h2 className="mb-4 font-display text-4xl font-bold text-primary-foreground">
+          <h2 className="mb-4 font-display text-4xl font-bold text-white">
             Agentes Posológicos
           </h2>
-          <p className="text-lg text-primary-foreground/80">
+          <p className="text-lg text-white/60">
             Agentes de IA especializados para profissionais de saúde, educadores e pesquisadores.
           </p>
         </div>
       </div>
 
+      {/* Right form panel */}
       <div className="flex w-full items-center justify-center p-8 lg:w-1/2">
         <div className="w-full max-w-md animate-fade-in">
           <div className="mb-8 lg:hidden flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary">
-            <Pill className="h-5 w-5 text-primary-foreground" />
+              <Pill className="h-5 w-5 text-white" />
             </div>
             <span className="font-display text-xl font-bold gradient-text">Agentes Posológicos</span>
           </div>
 
-          <h1 className="mb-2 font-display text-3xl font-bold">Entrar</h1>
-          <p className="mb-8 text-muted-foreground">
+          <h1 className="mb-2 font-display text-3xl font-bold text-white">Entrar</h1>
+          <p className="mb-8 text-white/50">
             Acesse sua conta para usar os agentes
           </p>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email" className="text-white/70">E-mail</Label>
               <Input
                 id="email"
                 type="email"
@@ -65,10 +67,11 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 focus-visible:ring-white/20"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor="password" className="text-white/70">Senha</Label>
               <Input
                 id="password"
                 type="password"
@@ -76,17 +79,18 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 focus-visible:ring-white/20"
               />
             </div>
-            <Button type="submit" className="w-full gap-2" disabled={loading}>
+            <Button type="submit" className="w-full gap-2 bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white border-0" disabled={loading}>
               {loading ? "Entrando..." : "Entrar"}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
+          <p className="mt-6 text-center text-sm text-white/40">
             Não tem conta?{" "}
-            <Link to="/signup" className="font-medium text-primary hover:underline">
+            <Link to="/signup" className="font-medium text-[hsl(174,62%,47%)] hover:underline">
               Criar conta gratuita
             </Link>
           </p>
