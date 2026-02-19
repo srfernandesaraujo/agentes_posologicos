@@ -708,11 +708,12 @@ Deno.serve(async (req) => {
       finalSystemPrompt += "\n\nSempre formate suas respostas em Markdown para melhor legibilidade.";
     }
 
-    // Get user's API key for the provider
+    // Get user's API key for the provider (use agent owner's key for virtual rooms)
+    const keyOwnerId = userId || customAgent.user_id;
     const { data: apiKeyRow } = await serviceClient
       .from("user_api_keys")
       .select("api_key_encrypted")
-      .eq("user_id", userId)
+      .eq("user_id", keyOwnerId)
       .eq("provider", customAgent.provider)
       .single();
 
@@ -733,10 +734,11 @@ Deno.serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-3-flash-preview",
           temperature: Number(customAgent.temperature),
           messages: [
             { role: "system", content: finalSystemPrompt },
+            ...(conversationHistory || []),
             { role: "user", content: input },
           ],
         }),
