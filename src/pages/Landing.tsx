@@ -209,7 +209,11 @@ export default function Landing() {
             </div>
             <span className="font-display font-semibold">Agentes Posológicos</span>
           </div>
-          <span>© {new Date().getFullYear()} {t("landing.footer.rights")}</span>
+          <div className="text-right">
+            <span>© {new Date().getFullYear()} {t("landing.footer.rights")}</span>
+            <br />
+            <span>Desenvolvido por Sérgio Araújo. Posologia Produções</span>
+          </div>
         </div>
       </footer>
     </div>
