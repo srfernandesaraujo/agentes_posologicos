@@ -590,7 +590,7 @@ export default function AgentEditor() {
                       toast.success("Agente despublicado");
                     }}
                     variant="outline"
-                    className="border-white/20 text-white hover:bg-white/10"
+                    className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
                   >
                     Despublicar
                   </Button>
@@ -672,7 +672,7 @@ export default function AgentEditor() {
                 <Button
                   onClick={() => navigate("/salas-virtuais")}
                   variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10 gap-2"
+                  className="border-[hsl(174,62%,47%)]/30 text-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,47%)]/10 gap-2"
                 >
                   <DoorOpen className="h-4 w-4" />
                   {linkedRooms.length > 0 ? "Gerenciar Salas Virtuais" : "Criar Sala Virtual"}
