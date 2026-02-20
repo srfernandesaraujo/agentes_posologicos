@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { useApiKeys } from "@/hooks/useApiKeys";
-import { Bot, Plus, AlertCircle, Settings } from "lucide-react";
+import { useCredits } from "@/hooks/useCredits";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { Bot, Plus, AlertCircle, Settings, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,22 +16,50 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+const AGENT_CREATION_COST = 5;
 
 export default function MyAgents() {
   const navigate = useNavigate();
   const { data: agents = [], createAgent } = useCustomAgents();
   const { hasAnyKey } = useApiKeys();
+  const { balance, refetch: refetchCredits } = useCredits();
+  const { isAdmin } = useIsAdmin();
+  const { user } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+    
+    // Check credits (admin is free)
+    if (!isAdmin && balance < AGENT_CREATION_COST) {
+      toast.error(`Créditos insuficientes. Criar um agente custa ${AGENT_CREATION_COST} créditos.`, {
+        action: { label: "Comprar", onClick: () => navigate("/creditos") },
+      });
+      return;
+    }
+
     try {
       const agent = await createAgent.mutateAsync({
         name: name.trim(),
         description: description.trim(),
       });
+
+      // Deduct credits for agent creation (admin is free)
+      if (!isAdmin && user) {
+        await supabase.from("credits_ledger").insert({
+          user_id: user.id,
+          amount: -AGENT_CREATION_COST,
+          type: "usage",
+          description: "Criação de agente personalizado",
+        });
+        refetchCredits();
+      }
+
       toast.success("Agente criado com sucesso!");
       setShowCreate(false);
       setName("");
@@ -54,10 +84,7 @@ export default function MyAgents() {
         onClick={() => {
           if (!hasAnyKey) {
             toast.error("Configure pelo menos uma chave API antes de criar agentes.", {
-              action: {
-                label: "Configurar",
-                onClick: () => navigate("/configuracoes"),
-              },
+              action: { label: "Configurar", onClick: () => navigate("/configuracoes") },
             });
             return;
           }
@@ -68,7 +95,12 @@ export default function MyAgents() {
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[hsl(14,90%,58%)]/20">
           <Bot className="h-5 w-5 text-[hsl(14,90%,58%)]" />
         </div>
-        <span className="text-sm font-medium text-white">Novo agente</span>
+        <div className="text-left">
+          <span className="text-sm font-medium text-white">Novo agente</span>
+          <span className="block text-xs text-white/40 flex items-center gap-1">
+            <Coins className="h-3 w-3" /> {AGENT_CREATION_COST} créditos
+          </span>
+        </div>
         <Plus className="ml-auto h-4 w-4 text-white/40" />
       </button>
 
@@ -131,6 +163,12 @@ export default function MyAgents() {
             <DialogTitle className="font-display">Novo agente</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+              <Coins className="h-4 w-4 text-amber-400" />
+              <span className="text-xs text-amber-300">
+                Criar um agente custa {AGENT_CREATION_COST} créditos. Seu saldo: {isAdmin ? "∞" : balance}
+              </span>
+            </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-white/70">Nome</label>
               <Input
@@ -152,10 +190,10 @@ export default function MyAgents() {
             </div>
             <Button
               onClick={handleCreate}
-              disabled={!name.trim() || createAgent.isPending}
+              disabled={!name.trim() || createAgent.isPending || (!isAdmin && balance < AGENT_CREATION_COST)}
               className="w-full bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white"
             >
-              {createAgent.isPending ? "Criando..." : "Criar o Agente"}
+              {createAgent.isPending ? "Criando..." : `Criar o Agente (${AGENT_CREATION_COST} créditos)`}
             </Button>
           </div>
         </DialogContent>

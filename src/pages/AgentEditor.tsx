@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2 } from "lucide-react";
+import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2, DoorOpen, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { WhatsAppConnect } from "@/components/agents/WhatsAppConnect";
@@ -73,6 +73,21 @@ export default function AgentEditor() {
     setPublishVirtualPatient((agent as any).publish_virtual_patient || false);
     setInitialized(true);
   }
+
+  // Fetch virtual rooms linked to this agent
+  const { data: linkedRooms = [] } = useQuery({
+    queryKey: ["agent-linked-rooms", agentId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("virtual_rooms" as any)
+        .select("*")
+        .eq("agent_id", agentId!)
+        .eq("user_id", user!.id);
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!agentId && !!user,
+  });
 
   // Conversations for this custom agent
   const { data: sessions = [] } = useQuery({
@@ -150,10 +165,7 @@ export default function AgentEditor() {
     setGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke("agent-chat", {
-        body: {
-          agentId: "__generate_prompt__",
-          input: simplePrompt,
-        },
+        body: { agentId: "__generate_prompt__", input: simplePrompt },
       });
       if (error) throw error;
       setSystemPrompt(data.output || "");
@@ -549,7 +561,7 @@ export default function AgentEditor() {
         {/* PUBLISH TAB */}
         <TabsContent value="publish">
           {showWhatsApp ? (
-            <WhatsAppConnect agentId={agentId!} onBack={() => setShowWhatsApp(false)} />
+            <WhatsAppConnect agentId={agentId!} agentName={agent.name} onBack={() => setShowWhatsApp(false)} />
           ) : (
             <div className="space-y-6">
               {/* Internal publish */}
@@ -585,7 +597,7 @@ export default function AgentEditor() {
                 )}
               </div>
 
-              {/* WhatsApp checkbox */}
+              {/* WhatsApp */}
               <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -593,7 +605,7 @@ export default function AgentEditor() {
                       <MessageSquare className="h-5 w-5 text-green-400" />
                       Publicar no WhatsApp
                     </h3>
-                    <p className="text-sm text-white/50 mt-1">Conecte seu agente ao WhatsApp para receber mensagens</p>
+                    <p className="text-sm text-white/50 mt-1">Conecte via Evolution API para receber mensagens no WhatsApp</p>
                   </div>
                   <Switch
                     checked={publishWhatsApp}
@@ -607,23 +619,27 @@ export default function AgentEditor() {
                 {publishWhatsApp && (
                   <Button onClick={() => setShowWhatsApp(true)} className="bg-green-600 hover:bg-green-700 text-white gap-2">
                     <MessageSquare className="h-4 w-4" />
-                    Configurar WhatsApp
+                    Configurar Webhook
                   </Button>
                 )}
               </div>
 
-              {/* Virtual Patient checkbox */}
+              {/* Virtual Patient */}
               <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                       <Bot className="h-5 w-5 text-[hsl(174,62%,47%)]" />
-                      Publicar como Paciente Virtual
+                      Paciente Virtual
                     </h3>
-                    <p className="text-sm text-white/50 mt-1">O agente ficará disponível em uma sala virtual acessível por PIN</p>
+                    <p className="text-sm text-white/50 mt-1">
+                      {linkedRooms.length > 0
+                        ? `Este agente está vinculado a ${linkedRooms.length} sala(s) virtual(is)`
+                        : "Vincule este agente a uma sala virtual para uso como paciente virtual"}
+                    </p>
                   </div>
                   <Switch
-                    checked={publishVirtualPatient}
+                    checked={publishVirtualPatient || linkedRooms.length > 0}
                     onCheckedChange={async (v) => {
                       setPublishVirtualPatient(v);
                       await updateAgent.mutateAsync({ id: agentId!, publish_virtual_patient: v } as any);
@@ -631,11 +647,37 @@ export default function AgentEditor() {
                     }}
                   />
                 </div>
-                {publishVirtualPatient && (
-                  <p className="text-sm text-white/40">
-                    Gerencie as salas virtuais em <button onClick={() => navigate("/salas-virtuais")} className="text-[hsl(14,90%,58%)] hover:underline">Salas Virtuais</button>.
-                  </p>
+
+                {/* Show linked rooms */}
+                {linkedRooms.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-white/70">Salas vinculadas:</h4>
+                    {linkedRooms.map((room: any) => (
+                      <div key={room.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          <DoorOpen className="h-4 w-4 text-white/40" />
+                          <span className="text-sm text-white">{room.name}</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            room.is_active ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/40"
+                          }`}>
+                            {room.is_active ? "Ativa" : "Inativa"}
+                          </span>
+                        </div>
+                        <span className="text-xs text-white/30 font-mono">PIN: {room.pin}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
+
+                <Button
+                  onClick={() => navigate("/salas-virtuais")}
+                  variant="outline"
+                  className="border-white/20 text-white hover:bg-white/10 gap-2"
+                >
+                  <DoorOpen className="h-4 w-4" />
+                  {linkedRooms.length > 0 ? "Gerenciar Salas Virtuais" : "Criar Sala Virtual"}
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
               </div>
             </div>
           )}

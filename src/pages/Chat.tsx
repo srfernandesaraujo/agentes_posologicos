@@ -13,6 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send, ArrowLeft, Coins, Bot, User } from "lucide-react";
 import { toast } from "sonner";
 
+const CUSTOM_AGENT_INTERACTION_COST = 0.5;
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -55,7 +57,7 @@ export default function Chat() {
 
   const agent = isCustom
     ? customAgent
-      ? { id: customAgent.id, name: customAgent.name, description: customAgent.description, category: "Personalizado", icon: "Bot", credit_cost: 0 }
+      ? { id: customAgent.id, name: customAgent.name, description: customAgent.description, category: "Personalizado", icon: "Bot", credit_cost: CUSTOM_AGENT_INTERACTION_COST }
       : null
     : builtInAgent;
 
@@ -71,10 +73,7 @@ export default function Chat() {
   useEffect(() => {
     if (!user || !actualAgentId) return;
 
-    // For custom agents, we still use chat_sessions but with the custom agent ID
-    // Custom agents don't have a foreign key to agents table, so we skip session creation for now
     if (isCustom) {
-      // Use a local session approach for custom agents
       setSessionId(null);
       return;
     }
@@ -131,7 +130,11 @@ export default function Chat() {
       if (!user || !agent) throw new Error("Sessão não encontrada");
 
       if (isCustom) {
-        // Custom agent: local messages + edge function
+        // Check credits for custom agent interaction
+        if (!isAdmin && balance < CUSTOM_AGENT_INTERACTION_COST) {
+          throw new Error("Créditos insuficientes!");
+        }
+
         const userMsg: Message = {
           id: crypto.randomUUID(),
           role: "user",
@@ -146,6 +149,16 @@ export default function Chat() {
 
         if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
 
+        // Deduct credits for custom agent interaction
+        if (!isAdmin) {
+          await supabase.from("credits_ledger").insert({
+            user_id: user.id,
+            amount: -CUSTOM_AGENT_INTERACTION_COST,
+            type: "usage",
+            description: `Uso: ${agent.name} (agente personalizado)`,
+          });
+        }
+
         const assistantMsg: Message = {
           id: crypto.randomUUID(),
           role: "assistant",
@@ -154,7 +167,6 @@ export default function Chat() {
         };
         setLocalMessages((prev) => [...prev, assistantMsg]);
       } else {
-        // Built-in agent: DB messages
         if (!sessionId) throw new Error("Sessão não encontrada");
 
         await supabase
@@ -189,8 +201,8 @@ export default function Chat() {
       setInput("");
       if (!isCustom) {
         queryClient.invalidateQueries({ queryKey: ["messages", sessionId] });
-        refetchCredits();
       }
+      refetchCredits();
     },
     onError: (err: any) => {
       toast.error(err.message || "Erro ao enviar mensagem");
@@ -200,10 +212,13 @@ export default function Chat() {
   const handleSend = () => {
     const text = input.trim();
     if (!text) return;
-    if (!isCustom && !isAdmin && balance < (builtInAgent?.credit_cost || 1)) {
-      toast.error("Créditos insuficientes!");
-      navigate("/creditos");
-      return;
+    if (!isAdmin) {
+      const cost = isCustom ? CUSTOM_AGENT_INTERACTION_COST : (builtInAgent?.credit_cost || 1);
+      if (balance < cost) {
+        toast.error("Créditos insuficientes!");
+        navigate("/creditos");
+        return;
+      }
     }
     sendMutation.mutate(text);
   };
@@ -241,12 +256,10 @@ export default function Chat() {
             <h2 className="font-display font-semibold truncate text-white">{agent.name}</h2>
             <p className="text-xs text-white/40 truncate">{agent.category}</p>
           </div>
-          {!isCustom && (
-            <div className="flex items-center gap-1 text-sm text-white/50">
-              <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
-              {agent.credit_cost} crédito/uso
-            </div>
-          )}
+          <div className="flex items-center gap-1 text-sm text-white/50">
+            <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
+            {isCustom ? `${CUSTOM_AGENT_INTERACTION_COST}` : agent.credit_cost} crédito/uso
+          </div>
         </div>
       </div>
 
@@ -264,11 +277,9 @@ export default function Chat() {
                 </p>
                 <p className="mt-3">
                   <strong className="text-white">Como posso ajudá-lo hoje?</strong>{" "}
-                  {isCustom
-                    ? "Este é um agente personalizado — sem custo de créditos."
-                    : isAdmin
+                  {isAdmin
                     ? "Você tem acesso ilimitado como administrador."
-                    : `Cada interação custará ${agent.credit_cost} crédito${agent.credit_cost > 1 ? "s" : ""}.`}
+                    : `Cada interação custará ${isCustom ? CUSTOM_AGENT_INTERACTION_COST : agent.credit_cost} crédito${(isCustom ? CUSTOM_AGENT_INTERACTION_COST : agent.credit_cost) !== 1 ? "s" : ""}.`}
                 </p>
               </div>
             </div>

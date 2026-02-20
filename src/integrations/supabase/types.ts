@@ -372,6 +372,7 @@ export type Database = {
       }
       virtual_rooms: {
         Row: {
+          agent_expires_at: string | null
           agent_id: string | null
           created_at: string
           description: string
@@ -379,10 +380,12 @@ export type Database = {
           is_active: boolean
           name: string
           pin: string
+          room_expires_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          agent_expires_at?: string | null
           agent_id?: string | null
           created_at?: string
           description?: string
@@ -390,10 +393,12 @@ export type Database = {
           is_active?: boolean
           name: string
           pin: string
+          room_expires_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          agent_expires_at?: string | null
           agent_id?: string | null
           created_at?: string
           description?: string
@@ -401,6 +406,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           pin?: string
+          room_expires_at?: string | null
           updated_at?: string
           user_id?: string
         }
