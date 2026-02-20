@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Bot, ArrowRight, Pill, BookOpen, FlaskConical, Video, MessageSquare, Settings, Sparkles, Shield, Zap, Users, Brain, BarChart3, FileText, CheckCircle2, DoorOpen, Wrench, Stethoscope, Smartphone } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
+import { FloatingAuth } from "@/components/auth/FloatingAuth";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -53,16 +54,7 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-3">
             <LanguageSelector />
-            <Link to="/login">
-              <Button variant="outline" size="sm" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                {t("landing.enter")}
-              </Button>
-            </Link>
-            <Link to="/signup">
-              <Button size="sm" className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white border-0">
-                {t("landing.signup")}
-              </Button>
-            </Link>
+            <FloatingAuth />
           </div>
         </div>
       </header>
