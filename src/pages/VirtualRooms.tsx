@@ -3,14 +3,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
+import { useCredits } from "@/hooks/useCredits";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit2, Copy, DoorOpen } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Trash2, Edit2, Copy, DoorOpen, Coins, Clock } from "lucide-react";
 import { toast } from "sonner";
+
+const ROOM_AGENT_COST = 1;
 
 interface VirtualRoom {
   id: string;
@@ -21,6 +25,8 @@ interface VirtualRoom {
   agent_id: string | null;
   is_active: boolean;
   created_at: string;
+  agent_expires_at: string | null;
+  room_expires_at: string | null;
 }
 
 function generatePin() {
@@ -31,6 +37,8 @@ export default function VirtualRooms() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: customAgents = [] } = useCustomAgents();
+  const { balance, refetch: refetchCredits } = useCredits();
+  const { isAdmin } = useIsAdmin();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<VirtualRoom | null>(null);
 
@@ -56,6 +64,15 @@ export default function VirtualRooms() {
 
   const createRoom = useMutation({
     mutationFn: async () => {
+      const hasAgent = agentId !== "none";
+
+      // Charge 1 credit if linking an agent (admin is free)
+      if (hasAgent && !isAdmin && balance < ROOM_AGENT_COST) {
+        throw new Error("Créditos insuficientes para vincular um agente à sala.");
+      }
+
+      const agentExpiresAt = hasAgent ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
+
       const { error } = await supabase
         .from("virtual_rooms" as any)
         .insert({
@@ -63,43 +80,82 @@ export default function VirtualRooms() {
           name,
           description,
           pin: generatePin(),
-          agent_id: agentId === "none" ? null : agentId,
+          agent_id: hasAgent ? agentId : null,
           is_active: isActive,
+          agent_expires_at: agentExpiresAt,
         } as any);
       if (error) throw error;
+
+      // Deduct credit for linking agent
+      if (hasAgent && !isAdmin) {
+        await supabase.from("credits_ledger").insert({
+          user_id: user!.id,
+          amount: -ROOM_AGENT_COST,
+          type: "usage",
+          description: "Vincular agente a sala virtual (24h)",
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["virtual-rooms"] });
+      refetchCredits();
       resetForm();
       setDialogOpen(false);
       toast.success("Sala criada!");
     },
-    onError: () => toast.error("Erro ao criar sala"),
+    onError: (err: any) => toast.error(err.message || "Erro ao criar sala"),
   });
 
   const updateRoom = useMutation({
     mutationFn: async () => {
       if (!editingRoom) return;
+      const hasNewAgent = agentId !== "none";
+      const hadAgent = !!editingRoom.agent_id;
+      const agentChanged = hasNewAgent && agentId !== editingRoom.agent_id;
+
+      // Charge 1 credit if linking a NEW agent (admin is free)
+      if (agentChanged && !isAdmin && balance < ROOM_AGENT_COST) {
+        throw new Error("Créditos insuficientes para vincular um novo agente.");
+      }
+
+      const updateData: any = {
+        name,
+        description,
+        agent_id: hasNewAgent ? agentId : null,
+        is_active: isActive,
+      };
+
+      // Set new expiration if agent changed
+      if (agentChanged) {
+        updateData.agent_expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      }
+
       const { error } = await supabase
         .from("virtual_rooms" as any)
-        .update({
-          name,
-          description,
-          agent_id: agentId === "none" ? null : agentId,
-          is_active: isActive,
-        } as any)
+        .update(updateData)
         .eq("id", editingRoom.id)
         .eq("user_id", user!.id);
       if (error) throw error;
+
+      // Deduct credit for new agent link
+      if (agentChanged && !isAdmin) {
+        await supabase.from("credits_ledger").insert({
+          user_id: user!.id,
+          amount: -ROOM_AGENT_COST,
+          type: "usage",
+          description: "Vincular agente a sala virtual (24h)",
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["virtual-rooms"] });
+      refetchCredits();
       resetForm();
       setDialogOpen(false);
       setEditingRoom(null);
       toast.success("Sala atualizada!");
     },
-    onError: () => toast.error("Erro ao atualizar sala"),
+    onError: (err: any) => toast.error(err.message || "Erro ao atualizar sala"),
   });
 
   const deleteRoom = useMutation({
@@ -142,6 +198,11 @@ export default function VirtualRooms() {
 
   const publishedAgents = customAgents.filter((a: any) => a.status === "published");
 
+  const isAgentExpired = (room: VirtualRoom) => {
+    if (!room.agent_expires_at) return false;
+    return new Date(room.agent_expires_at) < new Date();
+  };
+
   return (
     <div className="container max-w-4xl py-8">
       <div className="flex items-center justify-between mb-8">
@@ -167,6 +228,7 @@ export default function VirtualRooms() {
         <div className="grid gap-4">
           {rooms.map((room) => {
             const linkedAgent = customAgents.find((a: any) => a.id === room.agent_id);
+            const expired = isAgentExpired(room);
             return (
               <div key={room.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -177,14 +239,27 @@ export default function VirtualRooms() {
                     </span>
                   </div>
                   {room.description && <p className="text-sm text-white/50 mb-2 truncate">{room.description}</p>}
-                  <div className="flex items-center gap-4 text-xs text-white/40">
+                  <div className="flex items-center gap-4 text-xs text-white/40 flex-wrap">
                     <span className="flex items-center gap-1">
                       PIN: <span className="font-mono font-bold text-[hsl(14,90%,58%)]">{room.pin}</span>
                       <button onClick={() => { navigator.clipboard.writeText(room.pin); toast.success("PIN copiado!"); }}>
                         <Copy className="h-3 w-3" />
                       </button>
                     </span>
-                    {linkedAgent && <span>Agente: {linkedAgent.name}</span>}
+                    {linkedAgent && (
+                      <span className="flex items-center gap-1">
+                        Agente: {linkedAgent.name}
+                        {expired ? (
+                          <span className="text-red-400 flex items-center gap-0.5">
+                            <Clock className="h-3 w-3" /> Expirado
+                          </span>
+                        ) : room.agent_expires_at ? (
+                          <span className="text-amber-400 flex items-center gap-0.5">
+                            <Clock className="h-3 w-3" /> até {new Date(room.agent_expires_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        ) : null}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -233,6 +308,16 @@ export default function VirtualRooms() {
                   ))}
                 </SelectContent>
               </Select>
+              {agentId !== "none" && (
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <Coins className="h-3 w-3 text-amber-400" />
+                  <span className="text-amber-300">
+                    {editingRoom && agentId === editingRoom.agent_id
+                      ? "Mesmo agente – sem custo adicional"
+                      : `Vincular agente custa ${ROOM_AGENT_COST} crédito (ativo por 24h)`}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/70">Sala ativa</span>
