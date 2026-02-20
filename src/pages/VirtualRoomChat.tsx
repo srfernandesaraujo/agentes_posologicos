@@ -39,8 +39,16 @@ export default function VirtualRoomChat() {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Check if agent or room has expired
+  const agentExpired = room?.agent_expires_at && new Date(room.agent_expires_at) < new Date();
+  const roomExpired = room?.room_expires_at && new Date(room.room_expires_at) < new Date();
+
   const handleSend = async () => {
     if (!input.trim() || !room?.agent_id) return;
+    if (agentExpired) {
+      setMessages((prev) => [...prev, { role: "assistant", content: "O agente vinculado a esta sala expirou. Entre em contato com o professor." }]);
+      return;
+    }
     const userMsg: Message = { role: "user", content: input.trim() };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
@@ -73,10 +81,10 @@ export default function VirtualRoomChat() {
     );
   }
 
-  if (roomError || !room) {
+  if (roomError || !room || roomExpired) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[hsl(220,25%,5%)] text-white gap-4">
-        <p className="text-white/50">Sala não encontrada ou inativa.</p>
+        <p className="text-white/50">{roomExpired ? "Esta sala virtual foi encerrada." : "Sala não encontrada ou inativa."}</p>
         <Button onClick={() => navigate("/")} variant="outline" className="border-white/20 text-white hover:bg-white/10">
           Voltar ao início
         </Button>
