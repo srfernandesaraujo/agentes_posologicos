@@ -6,6 +6,9 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Coins, User, LogOut, Pill, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/LanguageSelector";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +23,15 @@ export function AppHeader() {
   const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
   const { t } = useLanguage();
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("avatar_url, display_name").eq("user_id", user!.id).single();
+      return data;
+    },
+    enabled: !!user,
+  });
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[hsl(220,25%,5%)]/80 backdrop-blur-xl">
@@ -53,9 +65,14 @@ export function AppHeader() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/10">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full gradient-primary">
-                  <User className="h-4 w-4 text-white" />
-                </div>
+                <Avatar className="h-8 w-8">
+                  {profile?.avatar_url ? (
+                    <AvatarImage src={profile.avatar_url} alt="Avatar" />
+                  ) : null}
+                  <AvatarFallback className="gradient-primary text-white text-sm font-bold">
+                    {user?.email?.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 border-white/10 bg-[hsl(220,25%,10%)] text-white">

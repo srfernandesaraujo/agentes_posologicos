@@ -1,24 +1,61 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { User, Coins, Clock, ArrowUpRight, ArrowDownRight, Gift, Mail, Lock, Check, Loader2 } from "lucide-react";
+import { User, Coins, Clock, ArrowUpRight, ArrowDownRight, Gift, Mail, Lock, Check, Loader2, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export default function Account() {
   const { user } = useAuth();
   const { balance } = useCredits();
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newEmail, setNewEmail] = useState("");
   const [emailLoading, setEmailLoading] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("*").eq("user_id", user!.id).single();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (!file.type.startsWith("image/")) { toast.error("Selecione uma imagem."); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error("Imagem deve ter no máximo 2MB."); return; }
+
+    setAvatarLoading(true);
+    const ext = file.name.split(".").pop();
+    const path = `${user.id}/avatar.${ext}`;
+
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (uploadError) { toast.error("Erro ao enviar imagem."); setAvatarLoading(false); return; }
+
+    const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+    const avatarUrl = `${publicUrl}?t=${Date.now()}`;
+
+    const { error: updateError } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("user_id", user.id);
+    if (updateError) { toast.error("Erro ao atualizar perfil."); } else {
+      toast.success("Foto atualizada!");
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    }
+    setAvatarLoading(false);
+  };
 
   const handleEmailChange = async () => {
     if (!newEmail) return;
@@ -62,11 +99,22 @@ export default function Account() {
 
       <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 animate-fade-in">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full gradient-primary">
-            <User className="h-7 w-7 text-white" />
+          <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+            <Avatar className="h-14 w-14 border-2 border-white/20">
+              {profile?.avatar_url ? (
+                <AvatarImage src={profile.avatar_url} alt="Avatar" />
+              ) : null}
+              <AvatarFallback className="gradient-primary text-white text-lg font-bold">
+                {user?.email?.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+              {avatarLoading ? <Loader2 className="h-5 w-5 text-white animate-spin" /> : <Camera className="h-5 w-5 text-white" />}
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
           </div>
           <div>
-            <p className="font-display text-lg font-semibold text-white">{user?.email}</p>
+            <p className="font-display text-lg font-semibold text-white">{profile?.display_name || user?.email}</p>
             <div className="flex items-center gap-2 text-sm text-white/50">
               <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
               {balance} {t("credits.credits")}
