@@ -25,8 +25,8 @@ export default function Admin() {
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<any>(null);
   const [roomAgentId, setRoomAgentId] = useState("none");
-  const [agentHours, setAgentHours] = useState("24");
-  const [roomHours, setRoomHours] = useState("");
+  const [agentExpiresAt, setAgentExpiresAt] = useState("");
+  const [roomExpiresAt, setRoomExpiresAt] = useState("");
   const [roomActive, setRoomActive] = useState(true);
 
   // Fetch all agents
@@ -116,21 +116,15 @@ export default function Admin() {
         is_active: roomActive,
       };
 
-      if (roomAgentId !== "none" && roomAgentId !== (editingRoom.agent_id || "none")) {
+      if (roomAgentId !== "none") {
         updateData.agent_id = roomAgentId;
-        const hours = parseInt(agentHours) || 24;
-        updateData.agent_expires_at = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-      } else if (roomAgentId === "none") {
+        updateData.agent_expires_at = agentExpiresAt ? new Date(agentExpiresAt).toISOString() : null;
+      } else {
         updateData.agent_id = null;
         updateData.agent_expires_at = null;
       }
 
-      if (roomHours) {
-        const hours = parseInt(roomHours);
-        if (hours > 0) {
-          updateData.room_expires_at = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-        }
-      }
+      updateData.room_expires_at = roomExpiresAt ? new Date(roomExpiresAt).toISOString() : null;
 
       const { error } = await supabase
         .from("virtual_rooms" as any)
@@ -150,8 +144,8 @@ export default function Admin() {
   const openRoomEdit = (room: any) => {
     setEditingRoom(room);
     setRoomAgentId(room.agent_id || "none");
-    setAgentHours("24");
-    setRoomHours("");
+    setAgentExpiresAt(room.agent_expires_at ? new Date(room.agent_expires_at).toISOString().slice(0, 16) : "");
+    setRoomExpiresAt(room.room_expires_at ? new Date(room.room_expires_at).toISOString().slice(0, 16) : "");
     setRoomActive(room.is_active);
     setRoomDialogOpen(true);
   };
@@ -365,33 +359,29 @@ export default function Admin() {
               {roomAgentId !== "none" && (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-white/70 flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" /> Tempo de atividade do agente (horas)
+                    <Clock className="h-3.5 w-3.5" /> Agente ativo até (data e hora)
                   </label>
                   <Input
-                    type="number"
-                    value={agentHours}
-                    onChange={(e) => setAgentHours(e.target.value)}
-                    min="1"
-                    className="border-white/10 bg-white/[0.05] text-white"
-                    placeholder="24"
+                    type="datetime-local"
+                    value={agentExpiresAt}
+                    onChange={(e) => setAgentExpiresAt(e.target.value)}
+                    className="border-white/10 bg-white/[0.05] text-white [color-scheme:dark]"
                   />
-                  <p className="mt-1 text-xs text-white/30">Defina por quantas horas o agente permanecerá ativo nesta sala</p>
+                  <p className="mt-1 text-xs text-white/30">Deixe vazio para manter o agente ativo indefinidamente</p>
                 </div>
               )}
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-white/70 flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" /> Tempo de abertura da sala (horas)
+                  <Clock className="h-3.5 w-3.5" /> Sala aberta até (data e hora)
                 </label>
                 <Input
-                  type="number"
-                  value={roomHours}
-                  onChange={(e) => setRoomHours(e.target.value)}
-                  min="1"
-                  className="border-white/10 bg-white/[0.05] text-white"
-                  placeholder="Deixe vazio para não definir"
+                  type="datetime-local"
+                  value={roomExpiresAt}
+                  onChange={(e) => setRoomExpiresAt(e.target.value)}
+                  className="border-white/10 bg-white/[0.05] text-white [color-scheme:dark]"
                 />
-                <p className="mt-1 text-xs text-white/30">Defina por quanto tempo a sala permanecerá aberta (deixe vazio para permanente)</p>
+                <p className="mt-1 text-xs text-white/30">Deixe vazio para manter a sala aberta permanentemente</p>
               </div>
 
               <div className="flex items-center justify-between">
