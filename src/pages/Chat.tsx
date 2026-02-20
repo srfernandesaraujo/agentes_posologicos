@@ -153,13 +153,29 @@ export default function Chat() {
     mutationFn: async (text: string) => {
       if (!user || !agent) throw new Error("Sessão não encontrada");
 
-      // Build file context
+      // Build file context - read text-based files content
       let fileContext = "";
       if (attachedFiles.length > 0) {
-        const fileDescriptions = attachedFiles.map((f) => `[Arquivo anexado: ${f.name} (${f.type})]`);
-        fileContext = "\n\n" + fileDescriptions.join("\n");
+        const fileContents: string[] = [];
+        for (const f of attachedFiles) {
+          if (f.type === "text/csv" || f.type === "text/plain" || f.name.endsWith(".csv") || f.name.endsWith(".txt")) {
+            const content = await f.text();
+            fileContents.push(`[Arquivo: ${f.name}]\n${content.substring(0, 15000)}`);
+          } else if (f.type.includes("spreadsheet") || f.type.includes("excel") || f.name.endsWith(".xlsx") || f.name.endsWith(".xls")) {
+            fileContents.push(`[Arquivo Excel anexado: ${f.name} - Conteúdo não pode ser lido diretamente. Peça ao usuário para copiar os dados como texto ou CSV.]`);
+          } else {
+            fileContents.push(`[Arquivo anexado: ${f.name} (${f.type})]`);
+          }
+        }
+        fileContext = "\n\n" + fileContents.join("\n\n");
       }
       const fullInput = text + fileContext;
+
+      // Build conversation history from current displayed messages
+      const conversationHistory = displayMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
       if (isCustom) {
         if (!isAdmin && balance < CUSTOM_AGENT_INTERACTION_COST) {
@@ -175,7 +191,7 @@ export default function Chat() {
         setLocalMessages((prev) => [...prev, userMsg]);
 
         const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
-          body: { agentId: actualAgentId, input: fullInput },
+          body: { agentId: actualAgentId, input: fullInput, conversationHistory },
         });
 
         if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
@@ -222,7 +238,7 @@ export default function Chat() {
         }
 
         const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
-          body: { agentId: actualAgentId, input: fullInput },
+          body: { agentId: actualAgentId, input: fullInput, conversationHistory },
         });
 
         if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
