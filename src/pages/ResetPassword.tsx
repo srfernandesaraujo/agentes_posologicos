@@ -30,40 +30,57 @@ export default function ResetPassword() {
     const invited = searchParams.get("invited") === "true";
     const isRecoveryFlow = hash.includes("type=recovery") || hash.includes("type=invite") || invited;
     
-    console.log("[ResetPassword] Init:", { hash: hash.substring(0, 50), invited, isRecoveryFlow });
-    
     if (isRecoveryFlow) {
       setMode("loading-session");
       setIsInvite(invited || hash.includes("type=invite"));
     }
 
+    // Explicitly extract and set session from hash tokens
+    const establishSession = async () => {
+      if (!isRecoveryFlow) return;
+
+      // Try to parse tokens directly from hash
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (!error) {
+          setSessionReady(true);
+          setMode("set-password");
+          // Clean hash from URL
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          return;
+        }
+      }
+
+      // Fallback: poll for session (Supabase client may process hash internally)
+      for (let i = 0; i < 20; i++) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setSessionReady(true);
+          setMode("set-password");
+          return;
+        }
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      // Timeout - show warning
+      setMode("set-password");
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[ResetPassword] Auth event:", event, "session:", !!session);
       if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && isRecoveryFlow)) {
         setSessionReady(true);
         setMode("set-password");
       }
     });
 
-    // Poll for session (handles case where event fired before mount)
-    if (isRecoveryFlow) {
-      const checkSession = async () => {
-        for (let i = 0; i < 30; i++) {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            console.log("[ResetPassword] Session found via polling");
-            setSessionReady(true);
-            setMode("set-password");
-            return;
-          }
-          await new Promise(r => setTimeout(r, 500));
-        }
-        console.log("[ResetPassword] Session not found after 15s");
-        // After 15s timeout, show form with warning
-        setMode("set-password");
-      };
-      checkSession();
-    }
+    establishSession();
 
     return () => subscription.unsubscribe();
   }, [searchParams]);
