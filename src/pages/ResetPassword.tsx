@@ -24,6 +24,7 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [isInvite, setIsInvite] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -34,10 +35,20 @@ export default function ResetPassword() {
       setIsInvite(invited || hash.includes("type=invite"));
     }
 
-    // Listen for auth events to detect recovery/invite
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+    // Listen for auth events to detect recovery/invite session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setMode("set-password");
+        if (session) {
+          setSessionReady(true);
+        }
+      }
+    });
+
+    // Check if session already exists
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setSessionReady(true);
       }
     });
 
@@ -69,6 +80,12 @@ export default function ResetPassword() {
       toast.error("A senha deve ter pelo menos 6 caracteres.");
       return;
     }
+
+    if (!sessionReady) {
+      toast.error("Aguarde a sessão ser carregada. Tente novamente em alguns segundos.");
+      return;
+    }
+
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
     setLoading(false);
