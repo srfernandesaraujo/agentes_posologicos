@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,10 +9,11 @@ import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-function SidebarLink({ to, icon: Icon, label, count }: { to: string; icon: any; label: string; count?: number }) {
+function SidebarLink({ to, icon: Icon, label, count, dataTour }: { to: string; icon: any; label: string; count?: number; dataTour?: string }) {
   return (
     <NavLink
       to={to}
+      data-tour={dataTour}
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
           isActive ? "bg-white/10 text-white" : "text-white/50 hover:bg-white/5 hover:text-white/70"
@@ -49,11 +51,12 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-[hsl(220,25%,5%)] text-white">
       <AppHeader />
+      <OnboardingTour />
       <div className="flex">
         <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-56 shrink-0 border-r border-white/10 bg-[hsl(220,25%,5%)] p-4 md:block overflow-y-auto">
           <nav className="space-y-1">
             <SidebarLink to="/agentes" icon={LayoutGrid} label={t("nav.agents")} />
-            <SidebarLink to="/meus-agentes" icon={Bot} label={t("nav.myAgents")} count={customAgents.length} />
+            <SidebarLink to="/meus-agentes" icon={Bot} label={t("nav.myAgents")} count={customAgents.length} dataTour="my-agents" />
             <SidebarLink to="/conteudos" icon={Database} label={t("nav.content")} count={knowledgeBases.length} />
             <SidebarLink to="/conversas" icon={MessageSquare} label={t("nav.conversations")} count={conversationCount} />
             <SidebarLink to="/salas-virtuais" icon={DoorOpen} label={t("nav.virtualRooms")} />
