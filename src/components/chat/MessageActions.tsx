@@ -32,59 +32,99 @@ export function MessageActions({ content, agentName, messageRef }: MessageAction
     }
     setExporting(true);
     try {
-      // Clone the message element to style it for PDF capture
       const original = messageRef.current;
 
-      // Create a wrapper for html2canvas with white background for better PDF
       const wrapper = document.createElement("div");
       wrapper.style.position = "fixed";
       wrapper.style.left = "-9999px";
       wrapper.style.top = "0";
       wrapper.style.width = "800px";
       wrapper.style.padding = "0";
-      wrapper.style.background = "#0f1219";
+      wrapper.style.background = "#ffffff";
       document.body.appendChild(wrapper);
 
-      // Build PDF header
+      // Header
       const header = document.createElement("div");
-      header.style.cssText = "background:#0f1219;padding:24px 32px 16px;border-bottom:3px solid #e65138;";
+      header.style.cssText = "background:#ffffff;padding:28px 36px 18px;border-bottom:3px solid #e65138;";
       header.innerHTML = `
-        <div style="font-family:Helvetica,Arial,sans-serif;color:#fff;font-size:20px;font-weight:bold;margin-bottom:6px;">RELATÓRIO</div>
+        <div style="font-family:Helvetica,Arial,sans-serif;color:#111;font-size:22px;font-weight:bold;margin-bottom:6px;">RELATÓRIO</div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-family:Helvetica,Arial,sans-serif;color:rgba(255,255,255,0.6);font-size:12px;">${agentName}</div>
-          <div style="font-family:Helvetica,Arial,sans-serif;color:rgba(255,255,255,0.6);font-size:12px;">${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
+          <div style="font-family:Helvetica,Arial,sans-serif;color:#555;font-size:12px;">${agentName}</div>
+          <div style="font-family:Helvetica,Arial,sans-serif;color:#555;font-size:12px;">${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
         </div>
-        <div style="font-family:Helvetica,Arial,sans-serif;color:rgba(255,255,255,0.35);font-size:9px;margin-top:4px;">Gerado por FarmaChat AI</div>
+        <div style="font-family:Helvetica,Arial,sans-serif;color:#999;font-size:9px;margin-top:4px;">Gerado por FarmaChat AI</div>
       `;
       wrapper.appendChild(header);
 
-      // Clone content
+      // Clone content and restyle for white background
       const contentClone = original.cloneNode(true) as HTMLElement;
-      contentClone.style.cssText = "padding:24px 32px;background:#0f1219;font-family:Helvetica,Arial,sans-serif;";
+      contentClone.style.cssText = "padding:24px 36px;background:#ffffff;font-family:Helvetica,Arial,sans-serif;color:#111;";
 
-      // Fix any SVG rendering issues in charts by ensuring they are visible
+      // Restyle all text elements to black
+      contentClone.querySelectorAll("*").forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.color = "#111";
+        // Remove dark backgrounds
+        if (htmlEl.style.background) htmlEl.style.background = "transparent";
+        if (htmlEl.style.backgroundColor) htmlEl.style.backgroundColor = "transparent";
+      });
+
+      // Restyle tables for PDF: solid black borders, white bg
+      contentClone.querySelectorAll("table").forEach((table) => {
+        table.style.cssText = "width:100%;border-collapse:collapse;border:2px solid #111;margin:12px 0;";
+      });
+      contentClone.querySelectorAll("th").forEach((th) => {
+        th.style.cssText = "border:2px solid #111;padding:8px 12px;text-align:left;font-weight:bold;font-size:13px;color:#111;background:#f0f0f0;";
+      });
+      contentClone.querySelectorAll("td").forEach((td) => {
+        td.style.cssText = "border:2px solid #111;padding:8px 12px;font-size:13px;color:#111;background:#ffffff;";
+      });
+      contentClone.querySelectorAll("thead").forEach((thead) => {
+        thead.style.cssText = "background:#f0f0f0;";
+      });
+
+      // Restyle headings
+      contentClone.querySelectorAll("h1,h2,h3,h4").forEach((h) => {
+        (h as HTMLElement).style.color = "#111";
+        (h as HTMLElement).style.borderColor = "#ddd";
+      });
+
+      // Restyle blockquotes
+      contentClone.querySelectorAll("blockquote").forEach((bq) => {
+        (bq as HTMLElement).style.borderLeftColor = "#e65138";
+        (bq as HTMLElement).style.color = "#555";
+      });
+
+      // Fix SVG charts - set explicit dimensions and make text black
       const svgs = contentClone.querySelectorAll("svg");
       svgs.forEach((svg) => {
-        svg.setAttribute("width", svg.getBoundingClientRect().width.toString() || "600");
-        svg.setAttribute("height", svg.getBoundingClientRect().height.toString() || "320");
+        const origSvg = original.querySelector(`svg`);
+        if (origSvg) {
+          const rect = origSvg.getBoundingClientRect();
+          svg.setAttribute("width", String(rect.width || 600));
+          svg.setAttribute("height", String(rect.height || 320));
+        }
+      });
+
+      // Make chart container backgrounds white
+      contentClone.querySelectorAll("[class*='chart'], [class*='Chart']").forEach((el) => {
+        (el as HTMLElement).style.background = "#ffffff";
       });
 
       wrapper.appendChild(contentClone);
 
       // Footer
       const footer = document.createElement("div");
-      footer.style.cssText = "background:#0f1219;padding:12px 32px;border-top:2px solid #e65138;";
+      footer.style.cssText = "background:#ffffff;padding:14px 36px;border-top:2px solid #e65138;";
       footer.innerHTML = `
-        <div style="font-family:Helvetica,Arial,sans-serif;color:rgba(255,255,255,0.35);font-size:9px;">Este relatório foi gerado automaticamente pela plataforma FarmaChat AI.</div>
+        <div style="font-family:Helvetica,Arial,sans-serif;color:#999;font-size:9px;">Este relatório foi gerado automaticamente pela plataforma FarmaChat AI.</div>
       `;
       wrapper.appendChild(footer);
 
-      // Wait a tick for rendering
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 300));
 
-      // Capture with html2canvas
       const canvas = await html2canvas(wrapper, {
-        backgroundColor: "#0f1219",
+        backgroundColor: "#ffffff",
         scale: 2,
         useCORS: true,
         logging: false,
@@ -94,16 +134,11 @@ export function MessageActions({ content, agentName, messageRef }: MessageAction
 
       document.body.removeChild(wrapper);
 
-      // Generate PDF from canvas
       const imgData = canvas.toDataURL("image/png");
       const imgW = canvas.width;
       const imgH = canvas.height;
 
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
       const pageW = 210;
       const pageH = 297;
@@ -111,11 +146,9 @@ export function MessageActions({ content, agentName, messageRef }: MessageAction
       const contentWidth = pageW - margin * 2;
       const contentHeight = (imgH * contentWidth) / imgW;
 
-      // If content fits in one page
       if (contentHeight <= pageH - margin * 2) {
         doc.addImage(imgData, "PNG", margin, margin, contentWidth, contentHeight);
       } else {
-        // Multi-page: slice the canvas
         const pxPerPage = (imgW * (pageH - margin * 2)) / contentWidth;
         let yOffset = 0;
         let pageNum = 0;
