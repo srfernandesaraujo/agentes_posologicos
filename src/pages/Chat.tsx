@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, createRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
@@ -19,8 +19,69 @@ import * as XLSX from "xlsx";
 
 const CUSTOM_AGENT_INTERACTION_COST = 0.5;
 
+const markdownComponents = {
+  table: ({ children, ...props }: any) => (
+    <div className="my-3 overflow-x-auto rounded-lg border border-white/10">
+      <table className="w-full text-sm" {...props}>{children}</table>
+    </div>
+  ),
+  thead: ({ children, ...props }: any) => (
+    <thead className="bg-white/[0.08] border-b border-white/10" {...props}>{children}</thead>
+  ),
+  tbody: ({ children, ...props }: any) => (
+    <tbody className="divide-y divide-white/5" {...props}>{children}</tbody>
+  ),
+  tr: ({ children, ...props }: any) => (
+    <tr className="hover:bg-white/[0.03] transition-colors" {...props}>{children}</tr>
+  ),
+  th: ({ children, ...props }: any) => (
+    <th className="px-3 py-2 text-left text-xs font-semibold text-white/70 uppercase tracking-wider whitespace-nowrap" {...props}>{children}</th>
+  ),
+  td: ({ children, ...props }: any) => (
+    <td className="px-3 py-2 text-sm text-white/60 whitespace-nowrap" {...props}>{children}</td>
+  ),
+  h1: ({ children, ...props }: any) => (
+    <h1 className="text-xl font-bold text-white mt-5 mb-2 border-b border-white/10 pb-2" {...props}>{children}</h1>
+  ),
+  h2: ({ children, ...props }: any) => (
+    <h2 className="text-lg font-bold text-[hsl(174,62%,47%)] mt-4 mb-2" {...props}>{children}</h2>
+  ),
+  h3: ({ children, ...props }: any) => (
+    <h3 className="text-base font-semibold text-white/90 mt-3 mb-1" {...props}>{children}</h3>
+  ),
+  h4: ({ children, ...props }: any) => (
+    <h4 className="text-sm font-semibold text-white/80 mt-3 mb-1" {...props}>{children}</h4>
+  ),
+  p: ({ children, ...props }: any) => (
+    <p className="text-sm text-white/70 leading-relaxed mb-2" {...props}>{children}</p>
+  ),
+  ul: ({ children, ...props }: any) => (
+    <ul className="list-disc list-inside space-y-1 text-sm text-white/70 ml-2 mb-2" {...props}>{children}</ul>
+  ),
+  ol: ({ children, ...props }: any) => (
+    <ol className="list-decimal list-inside space-y-1 text-sm text-white/70 ml-2 mb-2" {...props}>{children}</ol>
+  ),
+  strong: ({ children, ...props }: any) => (
+    <strong className="font-semibold text-white/90" {...props}>{children}</strong>
+  ),
+  em: ({ children, ...props }: any) => (
+    <em className="italic text-white/60" {...props}>{children}</em>
+  ),
+  blockquote: ({ children, ...props }: any) => (
+    <blockquote className="border-l-2 border-[hsl(174,62%,47%)] pl-3 my-2 text-white/50 italic" {...props}>{children}</blockquote>
+  ),
+  hr: (props: any) => (
+    <hr className="border-white/10 my-4" {...props} />
+  ),
+  code: ({ inline, children, ...props }: any) =>
+    inline ? (
+      <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs text-[hsl(174,62%,47%)]" {...props}>{children}</code>
+    ) : (
+      <code className="block bg-white/[0.05] rounded-lg p-3 text-xs text-white/70 overflow-x-auto my-2" {...props}>{children}</code>
+    ),
+};
+
 function ChatMessageContent({ content }: { content: string }) {
-  // Split content by ```chart ... ``` blocks
   const parts: Array<{ type: "text" | "chart"; content: string }> = [];
   const regex = /```chart\s*\n([\s\S]*?)```/g;
   let lastIndex = 0;
@@ -42,7 +103,7 @@ function ChatMessageContent({ content }: { content: string }) {
         part.type === "chart" ? (
           <ChartBlock key={i} jsonString={part.content} />
         ) : (
-          <ReactMarkdown key={i}>{part.content}</ReactMarkdown>
+          <ReactMarkdown key={i} components={markdownComponents}>{part.content}</ReactMarkdown>
         )
       )}
     </>
@@ -405,41 +466,45 @@ export default function Chat() {
                 </p>
               </div>
             )}
-            {displayMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex gap-3 animate-fade-in ${msg.role === "user" ? "justify-end" : ""}`}
-              >
-                {msg.role === "assistant" && (
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
-                    <Bot className={`h-4 w-4 ${isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
-                  </div>
-                )}
-                <div className={`relative group ${msg.role === "assistant" ? "max-w-[75%]" : ""}`}>
+            {displayMessages.map((msg) => {
+              const contentRef = createRef<HTMLDivElement>();
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex gap-3 animate-fade-in ${msg.role === "user" ? "justify-end" : ""}`}
+                >
                   {msg.role === "assistant" && (
-                    <MessageActions content={msg.content} agentName={agent?.name || "Agente"} messageRef={{ current: null }} />
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
+                      <Bot className={`h-4 w-4 ${isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
+                    </div>
                   )}
-                  <div
-                    className={`rounded-2xl px-4 py-3 text-sm ${
-                      msg.role === "user"
-                        ? "gradient-primary text-white rounded-br-md whitespace-pre-wrap max-w-[75%] ml-auto"
-                        : "bg-white/[0.05] border border-white/10 text-white/80 rounded-bl-md prose prose-invert prose-sm max-w-none"
-                    }`}
-                  >
-                    {msg.role === "assistant" ? (
-                      <ChatMessageContent content={msg.content} />
-                    ) : (
-                      msg.content
+                  <div className={`relative group ${msg.role === "assistant" ? "max-w-[85%]" : ""}`}>
+                    {msg.role === "assistant" && (
+                      <MessageActions content={msg.content} agentName={agent?.name || "Agente"} messageRef={contentRef} />
                     )}
+                    <div
+                      ref={msg.role === "assistant" ? contentRef : undefined}
+                      className={`rounded-2xl px-4 py-3 text-sm ${
+                        msg.role === "user"
+                          ? "gradient-primary text-white rounded-br-md whitespace-pre-wrap max-w-[75%] ml-auto"
+                          : "bg-white/[0.05] border border-white/10 text-white/80 rounded-bl-md max-w-none"
+                      }`}
+                    >
+                      {msg.role === "assistant" ? (
+                        <ChatMessageContent content={msg.content} />
+                      ) : (
+                        msg.content
+                      )}
+                    </div>
                   </div>
+                  {msg.role === "user" && (
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                      <User className="h-4 w-4 text-white/60" />
+                    </div>
+                  )}
                 </div>
-                {msg.role === "user" && (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
-                    <User className="h-4 w-4 text-white/60" />
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
         </div>
