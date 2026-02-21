@@ -3,12 +3,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { User, Coins, Clock, ArrowUpRight, ArrowDownRight, Gift, Mail, Lock, Check, Loader2, Camera } from "lucide-react";
+import { User, Coins, Clock, ArrowUpRight, ArrowDownRight, Gift, Mail, Lock, Check, Loader2, Camera, CreditCard, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useSubscription, SUBSCRIPTION_TIERS } from "@/hooks/useSubscription";
 
 export default function Account() {
   const { user } = useAuth();
@@ -16,6 +17,7 @@ export default function Account() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { subscribed, tier, tierInfo, subscriptionEnd } = useSubscription();
 
   const [newEmail, setNewEmail] = useState("");
   const [emailLoading, setEmailLoading] = useState(false);
@@ -23,6 +25,20 @@ export default function Account() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("customer-portal");
+      if (error) throw error;
+      if (data?.url) window.open(data.url, "_blank");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao abrir portal de gerenciamento.");
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -121,6 +137,40 @@ export default function Account() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Subscription Management */}
+      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6 animate-fade-in">
+        <h2 className="mb-4 flex items-center gap-2 font-display text-lg font-semibold text-white">
+          <CreditCard className="h-5 w-5 text-primary" /> Meu Plano
+        </h2>
+        {subscribed && tierInfo ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <div>
+                <p className="font-display font-semibold text-white">Plano {tierInfo.name}</p>
+                <p className="text-sm text-white/50">{tierInfo.credits} créditos/mês • {tierInfo.price}/mês</p>
+                {subscriptionEnd && (
+                  <p className="text-xs text-white/40 mt-1">
+                    Próxima renovação: {new Date(subscriptionEnd).toLocaleDateString("pt-BR")}
+                  </p>
+                )}
+              </div>
+              <span className="rounded-full bg-[hsl(152,60%,42%)]/20 px-3 py-1 text-xs font-medium text-[hsl(152,60%,42%)]">Ativo</span>
+            </div>
+            <Button onClick={handleManageSubscription} disabled={portalLoading} variant="outline" className="w-full gap-2 border-white/10 text-white hover:bg-white/5">
+              {portalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+              Gerenciar ou Cancelar Assinatura
+            </Button>
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <p className="text-white/50 text-sm mb-3">Você não possui uma assinatura ativa.</p>
+            <Button onClick={() => window.location.href = "/creditos"} variant="outline" className="gap-2 border-white/10 text-white hover:bg-white/5">
+              Ver Planos
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-6 animate-fade-in">
