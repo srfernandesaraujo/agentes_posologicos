@@ -6,6 +6,28 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const GLOBAL_TABLE_INSTRUCTION = `
+
+<REGRA_GLOBAL_FORMATACAO_TABELAS>
+INSTRUÇÃO CRÍTICA: Sempre que precisar apresentar dados tabulares, você DEVE usar a sintaxe correta de tabelas Markdown:
+1. Cada registro deve estar em sua PRÓPRIA LINHA separada.
+2. A segunda linha DEVE ser o separador de cabeçalho com |---|---|---|
+3. NUNCA coloque múltiplos registros na mesma linha.
+4. NUNCA use pipes (|) inline dentro de parágrafos de texto.
+
+FORMATO CORRETO (OBRIGATÓRIO):
+| Coluna 1 | Coluna 2 | Coluna 3 |
+|---|---|---|
+| Dado 1 | Dado 2 | Dado 3 |
+| Dado 4 | Dado 5 | Dado 6 |
+
+FORMATO ERRADO (PROIBIDO):
+| Coluna 1 | Coluna 2 | Coluna 3 | | Dado 1 | Dado 2 | Dado 3 | | Dado 4 | Dado 5 | Dado 6 |
+
+Isso se aplica a TODAS as tabelas, sem exceção.
+</REGRA_GLOBAL_FORMATACAO_TABELAS>
+`;
+
 const AGENT_PROMPTS: Record<string, string> = {
   "interacoes-cardiovascular": `Você é um Co-Piloto de Decisão Clínica em Cardiologia Preventiva e Farmacologia Clínica.
 
@@ -722,7 +744,7 @@ Deno.serve(async (req) => {
 
     if (builtInAgent) {
       // Use built-in agent with Lovable AI Gateway
-      const systemPrompt = AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT;
+      const systemPrompt = (AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) {
         return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
@@ -818,7 +840,7 @@ Deno.serve(async (req) => {
     }
 
     // Build system prompt with extras
-    let finalSystemPrompt = customAgent.system_prompt || DEFAULT_PROMPT;
+    let finalSystemPrompt = (customAgent.system_prompt || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
     if (ragContext) {
       finalSystemPrompt += ragContext;
     }
