@@ -54,7 +54,8 @@ serve(async (req) => {
     const isResend = !!existing;
 
     // Ensure user exists in auth - create if needed
-    const origin = req.headers.get("origin") || "https://learn-lead-engine.lovable.app";
+    // Always use the published/custom domain to ensure redirect URL is allowed by Supabase
+    const origin = "https://agentes-ai.posologia.app";
     
     // Try to create the user first (with a random password they'll reset)
     const tempPassword = crypto.randomUUID();
