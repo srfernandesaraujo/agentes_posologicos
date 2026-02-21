@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
 import { useCustomAgent } from "@/hooks/useCustomAgents";
 import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
@@ -196,6 +197,8 @@ export default function Chat() {
   const { user } = useAuth();
   const { balance, refetch: refetchCredits } = useCredits();
   const { isAdmin } = useIsAdmin();
+  const { hasUnlimitedAccess } = useUnlimitedAccess();
+  const hasFreeAccess = isAdmin || hasUnlimitedAccess;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
@@ -233,11 +236,11 @@ export default function Chat() {
   const agentLoading = isCustom ? customLoading : builtInLoading;
 
   useEffect(() => {
-    if (!agentLoading && builtInAgent && !isCustom && !isAdmin && balance < builtInAgent.credit_cost) {
+    if (!agentLoading && builtInAgent && !isCustom && !hasFreeAccess && balance < builtInAgent.credit_cost) {
       toast.error("Créditos insuficientes!");
       navigate("/creditos");
     }
-  }, [builtInAgent, balance, agentLoading, isAdmin, isCustom]);
+  }, [builtInAgent, balance, agentLoading, hasFreeAccess, isCustom]);
 
   const createNewSession = async () => {
     if (!user || !actualAgentId || isCustom) return null;
@@ -358,7 +361,7 @@ export default function Chat() {
       }));
 
       if (isCustom) {
-        if (!isAdmin && balance < CUSTOM_AGENT_INTERACTION_COST) {
+        if (!hasFreeAccess && balance < CUSTOM_AGENT_INTERACTION_COST) {
           throw new Error("Créditos insuficientes!");
         }
 
@@ -376,7 +379,7 @@ export default function Chat() {
 
         if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
 
-        if (!isAdmin) {
+        if (!hasFreeAccess) {
           await supabase.from("credits_ledger").insert({
             user_id: user.id,
             amount: -CUSTOM_AGENT_INTERACTION_COST,
@@ -406,7 +409,7 @@ export default function Chat() {
           .from("messages")
           .insert({ session_id: sid, role: "user", content: userContent });
 
-        if (!isAdmin && builtInAgent) {
+        if (!hasFreeAccess && builtInAgent) {
           await supabase
             .from("credits_ledger")
             .insert({
@@ -447,7 +450,7 @@ export default function Chat() {
   const handleSend = () => {
     const text = input.trim();
     if (!text && attachedFiles.length === 0) return;
-    if (!isAdmin) {
+    if (!hasFreeAccess) {
       const cost = isCustom ? CUSTOM_AGENT_INTERACTION_COST : (builtInAgent?.credit_cost || 1);
       if (balance < cost) {
         toast.error("Créditos insuficientes!");
@@ -534,8 +537,8 @@ export default function Chat() {
                 <h3 className="text-lg font-display font-semibold text-white mb-2">{agent.name}</h3>
                 <p className="text-sm text-white/40 max-w-md">{agent.description}</p>
                 <p className="mt-4 text-xs text-white/30">
-                  {isAdmin
-                    ? "Acesso ilimitado como administrador."
+                  {hasFreeAccess
+                    ? "Acesso ilimitado."
                     : `Cada interação custará ${isCustom ? CUSTOM_AGENT_INTERACTION_COST : agent.credit_cost} crédito(s).`}
                 </p>
                 <p className="mt-2 text-xs text-white/20">
