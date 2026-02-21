@@ -9,9 +9,9 @@ const corsHeaders = {
 
 // Map product IDs to monthly credits
 const SUBSCRIPTION_CREDITS: Record<string, number> = {
-  "prod_U1NAMzgnI39bqg": 30,   // Básico
-  "prod_U1NAL4KS56sUQA": 100,  // Pro
-  "prod_U1NAXoQ77GTGRU": 300,  // Institucional
+  "prod_U1QUUwFaiMvahz": 30,   // Básico
+  "prod_U1QUeqz6YtFUib": 100,  // Pro
+  "prod_U1QUXJ141hfnYw": 300,  // Institucional
 };
 
 serve(async (req) => {
