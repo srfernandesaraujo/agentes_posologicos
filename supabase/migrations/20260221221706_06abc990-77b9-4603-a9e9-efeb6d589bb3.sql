@@ -1,0 +1,1 @@
+DELETE FROM unlimited_users WHERE email = 'posologia.tech@gmail.com';
