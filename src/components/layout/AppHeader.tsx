@@ -4,6 +4,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Coins, User, LogOut, Pill, Shield, BarChart3 } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -56,15 +57,17 @@ export function AppHeader() {
           )}
 
           <Link to="/creditos">
-            <Button variant="outline" size="sm" className="gap-2 font-medium border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
+            <Button variant="outline" size="sm" className="gap-2 font-medium border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white" data-tour="credits">
               <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
               <span>{isAdmin ? "∞" : balance}</span>
             </Button>
           </Link>
 
+          <NotificationBell />
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/10">
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/10" data-tour="user-menu">
                 <Avatar className="h-8 w-8">
                   {profile?.avatar_url ? (
                     <AvatarImage src={profile.avatar_url} alt="Avatar" />
