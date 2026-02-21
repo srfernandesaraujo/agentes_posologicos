@@ -27,15 +27,10 @@ function sanitizeMarkdownTables(content: string): string {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Must contain pipe and a separator pattern like |---|---|
-    if (!trimmed.includes('|') || !trimmed.match(/\|[\s]*-{2,}/)) {
-      result.push(line);
-      continue;
-    }
+    // Check if line contains a separator pattern like |---|---|
+    const sepPattern = /\|\s*-{2,}\s*(\|\s*-{2,}\s*)+\|/;
+    const sepMatch = trimmed.match(sepPattern);
 
-    // Match the separator section: |---|---|---| (with optional spaces)
-    const sepRegex = /(\|[\s]*-{2,}[\s]*)+\|/;
-    const sepMatch = trimmed.match(sepRegex);
     if (!sepMatch) {
       result.push(line);
       continue;
@@ -46,22 +41,24 @@ function sanitizeMarkdownTables(content: string): string {
     const sepEnd = sepIndex + sepStr.length;
 
     // Count columns from separator
-    const numCols = sepStr.split('|').filter(s => s.trim().length > 0).length;
+    const numCols = sepStr.split('|').filter(s => s.trim().startsWith('-')).length;
     if (numCols < 2) {
       result.push(line);
       continue;
     }
 
-    // Extract ALL pipe-delimited cells from the entire line (excluding separator section)
-    const headerPart = trimmed.substring(0, sepIndex);
-    const dataPart = trimmed.substring(sepEnd);
+    // Extract text before and after separator
+    const beforeSep = trimmed.substring(0, sepIndex);
+    const afterSep = trimmed.substring(sepEnd);
 
+    // Extract all cells from a pipe-delimited string
     const extractCells = (text: string): string[] => {
-      return text.split('|').map(s => s.trim()).filter(s => s.length > 0);
+      // Split by | and filter out empty segments
+      return text.split('|').map(s => s.trim()).filter(s => s.length > 0 && !s.match(/^-+$/));
     };
 
-    const headerCells = extractCells(headerPart);
-    const dataCells = extractCells(dataPart);
+    const headerCells = extractCells(beforeSep);
+    const dataCells = extractCells(afterSep);
 
     if (headerCells.length < numCols) {
       result.push(line);
@@ -69,10 +66,9 @@ function sanitizeMarkdownTables(content: string): string {
     }
 
     // Build proper markdown table
-    // Header row
     result.push('| ' + headerCells.slice(0, numCols).join(' | ') + ' |');
-    // Separator row
     result.push('| ' + Array(numCols).fill('---').join(' | ') + ' |');
+
     // Data rows - group cells by numCols
     for (let i = 0; i < dataCells.length; i += numCols) {
       const row = dataCells.slice(i, i + numCols);
@@ -81,9 +77,7 @@ function sanitizeMarkdownTables(content: string): string {
         result.push('| ' + row.join(' | ') + ' |');
       }
     }
-    // Add empty line after table for proper markdown separation
     result.push('');
-    continue;
   }
 
   return result.join('\n');
