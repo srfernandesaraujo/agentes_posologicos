@@ -21,24 +21,24 @@ const CUSTOM_AGENT_INTERACTION_COST = 0.5;
 
 const markdownComponents = {
   table: ({ children, ...props }: any) => (
-    <div className="my-3 overflow-x-auto rounded-lg border border-white/10">
-      <table className="w-full text-sm" {...props}>{children}</table>
+    <div className="my-4 overflow-x-auto">
+      <table className="w-full text-sm border-collapse border border-white/20" {...props}>{children}</table>
     </div>
   ),
   thead: ({ children, ...props }: any) => (
-    <thead className="bg-white/[0.08] border-b border-white/10" {...props}>{children}</thead>
+    <thead className="bg-white/10" {...props}>{children}</thead>
   ),
   tbody: ({ children, ...props }: any) => (
-    <tbody className="divide-y divide-white/5" {...props}>{children}</tbody>
+    <tbody {...props}>{children}</tbody>
   ),
   tr: ({ children, ...props }: any) => (
-    <tr className="hover:bg-white/[0.03] transition-colors" {...props}>{children}</tr>
+    <tr className="hover:bg-white/[0.04] transition-colors" {...props}>{children}</tr>
   ),
   th: ({ children, ...props }: any) => (
-    <th className="px-3 py-2 text-left text-xs font-semibold text-white/70 uppercase tracking-wider whitespace-nowrap" {...props}>{children}</th>
+    <th className="border border-white/20 px-4 py-2.5 text-left text-sm font-bold text-white/90" {...props}>{children}</th>
   ),
   td: ({ children, ...props }: any) => (
-    <td className="px-3 py-2 text-sm text-white/60 whitespace-nowrap" {...props}>{children}</td>
+    <td className="border border-white/20 px-4 py-2 text-sm text-white/70" {...props}>{children}</td>
   ),
   h1: ({ children, ...props }: any) => (
     <h1 className="text-xl font-bold text-white mt-5 mb-2 border-b border-white/10 pb-2" {...props}>{children}</h1>
