@@ -30,12 +30,15 @@ export default function ResetPassword() {
     const invited = searchParams.get("invited") === "true";
     const isRecoveryFlow = hash.includes("type=recovery") || hash.includes("type=invite") || invited;
     
+    console.log("[ResetPassword] Init:", { hash: hash.substring(0, 50), invited, isRecoveryFlow });
+    
     if (isRecoveryFlow) {
       setMode("loading-session");
       setIsInvite(invited || hash.includes("type=invite"));
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[ResetPassword] Auth event:", event, "session:", !!session);
       if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && isRecoveryFlow)) {
         setSessionReady(true);
         setMode("set-password");
@@ -45,16 +48,18 @@ export default function ResetPassword() {
     // Poll for session (handles case where event fired before mount)
     if (isRecoveryFlow) {
       const checkSession = async () => {
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 30; i++) {
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
+            console.log("[ResetPassword] Session found via polling");
             setSessionReady(true);
             setMode("set-password");
             return;
           }
           await new Promise(r => setTimeout(r, 500));
         }
-        // After 10s timeout, show form with warning
+        console.log("[ResetPassword] Session not found after 15s");
+        // After 15s timeout, show form with warning
         setMode("set-password");
       };
       checkSession();
