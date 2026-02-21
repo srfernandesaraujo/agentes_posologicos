@@ -13,6 +13,12 @@ const CREDIT_PACKS: Record<string, { priceId: string; credits: number }> = {
   "100": { priceId: "price_1T3Jy0Hh9g12xuWogGfU5b7i", credits: 100 },
 };
 
+const SUBSCRIPTION_PRICES: Record<string, string> = {
+  "basico": "price_1T3KPxHh9g12xuWoHkcEz506",
+  "pro": "price_1T3KQ9Hh9g12xuWom6EryB9X",
+  "institucional": "price_1T3KQQHh9g12xuWo8fg1d2iD",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -30,10 +36,8 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
 
-    const { packKey } = await req.json();
-    const pack = CREDIT_PACKS[packKey];
-    if (!pack) throw new Error("Invalid pack");
-
+    const { packKey, planKey } = await req.json();
+    
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
@@ -45,6 +49,38 @@ serve(async (req) => {
     }
 
     const origin = req.headers.get("origin") || "https://learn-lead-engine.lovable.app";
+
+    // Handle subscription checkout
+    if (planKey) {
+      const priceId = SUBSCRIPTION_PRICES[planKey];
+      if (!priceId) throw new Error("Invalid plan");
+
+      // Check if already subscribed
+      if (customerId) {
+        const subs = await stripe.subscriptions.list({ customer: customerId, status: "active", limit: 1 });
+        if (subs.data.length > 0) {
+          throw new Error("Você já possui uma assinatura ativa. Gerencie-a pelo portal do cliente.");
+        }
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        customer_email: customerId ? undefined : user.email,
+        line_items: [{ price: priceId, quantity: 1 }],
+        mode: "subscription",
+        success_url: `${origin}/creditos?subscription=true`,
+        cancel_url: `${origin}/creditos?canceled=true`,
+        metadata: { user_id: user.id },
+      });
+
+      return new Response(JSON.stringify({ url: session.url }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle credit pack checkout
+    const pack = CREDIT_PACKS[packKey];
+    if (!pack) throw new Error("Invalid pack");
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -61,7 +97,6 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
