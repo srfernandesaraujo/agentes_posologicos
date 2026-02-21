@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import { ChartBlock } from "@/components/chat/ChartRenderer";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -16,6 +17,36 @@ import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import * as XLSX from "xlsx";
 
 const CUSTOM_AGENT_INTERACTION_COST = 0.5;
+
+function ChatMessageContent({ content }: { content: string }) {
+  // Split content by ```chart ... ``` blocks
+  const parts: Array<{ type: "text" | "chart"; content: string }> = [];
+  const regex = /```chart\s*\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: "text", content: content.slice(lastIndex, match.index) });
+    }
+    parts.push({ type: "chart", content: match[1].trim() });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < content.length) {
+    parts.push({ type: "text", content: content.slice(lastIndex) });
+  }
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.type === "chart" ? (
+          <ChartBlock key={i} jsonString={part.content} />
+        ) : (
+          <ReactMarkdown key={i}>{part.content}</ReactMarkdown>
+        )
+      )}
+    </>
+  );
+}
 
 interface Message {
   id: string;
@@ -391,7 +422,7 @@ export default function Chat() {
                   }`}
                 >
                   {msg.role === "assistant" ? (
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <ChatMessageContent content={msg.content} />
                   ) : (
                     msg.content
                   )}
