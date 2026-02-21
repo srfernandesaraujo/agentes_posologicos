@@ -322,6 +322,41 @@ export type Database = {
         }
         Relationships: []
       }
+      room_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          room_id: string
+          sender_name: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role?: string
+          room_id: string
+          sender_name?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          room_id?: string
+          sender_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_messages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_templates: {
         Row: {
           agent_id: string
