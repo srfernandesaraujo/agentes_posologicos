@@ -953,6 +953,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Map decommissioned models to replacements
+    const DECOMMISSIONED_MODELS: Record<string, string> = {
+      "mixtral-8x7b-32768": "gemma2-9b-it",
+    };
+    const resolvedModel = DECOMMISSIONED_MODELS[customAgent.model] || customAgent.model;
+
     // OpenAI-compatible API (OpenAI, Groq, OpenRouter, Google)
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -963,10 +969,11 @@ Deno.serve(async (req) => {
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: customAgent.model,
+        model: resolvedModel,
         temperature: Number(customAgent.temperature),
         messages: [
           { role: "system", content: finalSystemPrompt },
+          ...(conversationHistory || []),
           { role: "user", content: input },
         ],
       }),
@@ -975,7 +982,7 @@ Deno.serve(async (req) => {
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
       console.error(`${customAgent.provider} error:`, aiResponse.status, errText);
-      return new Response(JSON.stringify({ error: `Erro ao consultar ${customAgent.provider}` }), {
+      return new Response(JSON.stringify({ error: `Erro ao consultar ${customAgent.provider}: ${errText}` }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
