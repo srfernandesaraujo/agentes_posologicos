@@ -12,6 +12,7 @@ import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText } from "lucide-react";
+import { InputTemplates } from "@/components/chat/InputTemplates";
 import { MessageActions } from "@/components/chat/MessageActions";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
@@ -536,6 +537,9 @@ export default function Chat() {
                     ? "Acesso ilimitado como administrador."
                     : `Cada interação custará ${isCustom ? CUSTOM_AGENT_INTERACTION_COST : agent.credit_cost} crédito(s).`}
                 </p>
+                <p className="mt-2 text-xs text-white/20">
+                  💡 Dica: Salve inputs frequentes como templates usando o ícone de bookmark
+                </p>
               </div>
             )}
             {displayMessages.map((msg) => {
@@ -621,6 +625,11 @@ export default function Chat() {
             >
               <Paperclip className="h-5 w-5" />
             </Button>
+            <InputTemplates
+              agentId={rawAgentId || ""}
+              currentInput={input}
+              onSelectTemplate={(content) => setInput(content)}
+            />
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
