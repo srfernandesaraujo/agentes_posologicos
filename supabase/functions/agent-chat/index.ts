@@ -450,13 +450,33 @@ Apresente TODOS os resultados:
    - Tabela completa com: n, média, mediana, DP, mín, máx, Q1, Q3 para variáveis contínuas
    - Tabela de frequência absoluta e relativa (%) para variáveis categóricas
    
-2) 📈 GRÁFICOS (descritos em Markdown detalhado)
-   Para cada gráfico planejado:
-   - Título do gráfico
-   - Eixos (X e Y) com labels
-   - Dados representados em tabela para reprodução
-   - Descrição visual detalhada (ex: "O boxplot mostra que o grupo A tem mediana superior...")
-   - Se possível, representar com caracteres ASCII/texto
+2) 📈 GRÁFICOS (FORMATO OBRIGATÓRIO JSON)
+   Para CADA gráfico planejado, gere um bloco de código JSON com a tag \`\`\`chart seguido dos dados.
+   FORMATO OBRIGATÓRIO para cada gráfico:
+   \`\`\`chart
+   {
+     "type": "bar" | "pie" | "line" | "area",
+     "title": "Título do Gráfico",
+     "subtitle": "Subtítulo opcional",
+     "xLabel": "Label do eixo X (bar/line/area)",
+     "yLabel": "Label do eixo Y (bar/line/area)",
+     "data": [
+       { "name": "Categoria A", "value": 42, "group": "Grupo 1" },
+       { "name": "Categoria B", "value": 58, "group": "Grupo 1" }
+     ],
+     "colors": ["#2D9D78", "#E8A838", "#4A90D9", "#D95B5B", "#8B5CF6", "#F59E0B"],
+     "interpretation": "Texto descritivo interpretando o gráfico"
+   }
+   \`\`\`
+   
+   REGRAS para gráficos:
+   - Use "pie" para distribuições proporcionais e frequências relativas
+   - Use "bar" para comparações entre grupos
+   - Use "line" ou "area" para dados temporais ou tendências
+   - Use "group" no data para barras agrupadas (múltiplas séries)
+   - Sempre inclua cores profissionais harmônicas
+   - Sempre inclua interpretação textual após cada gráfico
+   - Dados numéricos devem ser arredondados (2 casas decimais max)
 
 3) 🧪 TESTES DE NORMALIDADE
    - Teste utilizado, estatística, p-valor
