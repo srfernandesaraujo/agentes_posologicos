@@ -322,6 +322,64 @@ export type Database = {
         }
         Relationships: []
       }
+      response_feedback: {
+        Row: {
+          agent_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          message_id: string | null
+          rating: string
+          room_id: string | null
+          session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          rating: string
+          room_id?: string | null
+          session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          rating?: string
+          room_id?: string | null
+          session_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "response_feedback_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "response_feedback_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "response_feedback_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_messages: {
         Row: {
           content: string
