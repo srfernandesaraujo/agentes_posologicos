@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface AuthContextType {
   session: Session | null;
@@ -24,9 +25,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setLoading(false);
+
+        // Detect invite/recovery callback and prompt to set password
+        if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+          const params = new URLSearchParams(window.location.search);
+          const hash = window.location.hash;
+          if (params.get("invited") === "true" || hash.includes("type=invite") || hash.includes("type=recovery")) {
+            setTimeout(() => {
+              toast.info("Defina sua senha abaixo para completar seu cadastro.", { duration: 8000 });
+            }, 500);
+          }
+        }
       }
     );
 

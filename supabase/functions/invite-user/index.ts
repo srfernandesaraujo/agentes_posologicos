@@ -58,7 +58,7 @@ serve(async (req) => {
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: "invite",
       email: normalizedEmail,
-      options: { redirectTo: `${origin}/agentes` },
+      options: { redirectTo: `${origin}/conta?invited=true` },
     });
 
     if (linkError) {
