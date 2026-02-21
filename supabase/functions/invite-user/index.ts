@@ -7,8 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// UPDATE THIS when you have a verified domain on Resend
-const FROM_EMAIL = "LearnLead <onboarding@resend.dev>";
+const FROM_EMAIL = "LearnLead <noreply@agentes-ai.posologia.app>";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
