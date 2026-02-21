@@ -53,20 +53,29 @@ serve(async (req) => {
       .single();
     if (existing) throw new Error("Este email já está cadastrado como usuário ilimitado.");
 
-    // Generate signup link via Supabase admin API
+    // Ensure user exists in auth - create if needed
     const origin = req.headers.get("origin") || "https://learn-lead-engine.lovable.app";
-    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: "invite",
+    
+    // Try to create the user first (with a random password they'll reset)
+    const tempPassword = crypto.randomUUID();
+    const { error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: normalizedEmail,
-      options: { redirectTo: `${origin}/conta?invited=true` },
+      password: tempPassword,
+      email_confirm: true,
+    });
+    
+    if (createError && !createError.message.includes("already been registered") && !createError.message.includes("already exists")) {
+      throw createError;
+    }
+
+    // Now generate a recovery link so user can set their own password
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: "recovery",
+      email: normalizedEmail,
+      options: { redirectTo: `${origin}/redefinir-senha?invited=true` },
     });
 
-    if (linkError) {
-      // If user already exists, just add to unlimited_users
-      if (!linkError.message.includes("already been registered")) {
-        throw linkError;
-      }
-    }
+    if (linkError) throw linkError;
 
     // Send email via Resend
     const resendKey = Deno.env.get("RESEND_API_KEY");

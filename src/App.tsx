@@ -25,6 +25,7 @@ import VirtualRooms from "./pages/VirtualRooms";
 import VirtualRoomChat from "./pages/VirtualRoomChat";
 import NotFound from "./pages/NotFound";
 import UserDashboard from "./pages/UserDashboard";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/redefinir-senha" element={<ResetPassword />} />
             <Route path="/sala/:pin" element={<VirtualRoomChat />} />
             <Route element={
               <ProtectedRoute>

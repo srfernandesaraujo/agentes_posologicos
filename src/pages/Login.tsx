@@ -95,6 +95,11 @@ export default function Login() {
               {loading ? t("login.loading") : t("login.submit")}
               <ArrowRight className="h-4 w-4" />
             </Button>
+            <div className="text-right">
+              <Link to="/redefinir-senha" className="text-sm font-medium text-[hsl(174,62%,47%)] hover:underline">
+                Esqueceu a senha?
+              </Link>
+            </div>
           </form>
 
           <p className="mt-6 text-center text-sm text-white/40">
