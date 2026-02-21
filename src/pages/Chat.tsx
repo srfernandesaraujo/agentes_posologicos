@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText } from "lucide-react";
 import { InputTemplates } from "@/components/chat/InputTemplates";
 import { MessageActions } from "@/components/chat/MessageActions";
+import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import * as XLSX from "xlsx";
@@ -567,7 +568,14 @@ export default function Chat() {
                       }`}
                     >
                       {msg.role === "assistant" ? (
-                        <ChatMessageContent content={msg.content} />
+                        <>
+                          <ChatMessageContent content={msg.content} />
+                          <ResponseFeedback
+                            messageId={msg.id}
+                            agentId={rawAgentId || ""}
+                            sessionId={sessionId}
+                          />
+                        </>
                       ) : (
                         msg.content
                       )}

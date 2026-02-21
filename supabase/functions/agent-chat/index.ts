@@ -920,6 +920,55 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Helper: fallback to Lovable AI Gateway
+    const fallbackToNative = async () => {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+      console.log("Falling back to native Lovable AI Gateway");
+      const nativeResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          temperature: Number(customAgent.temperature),
+          messages: [
+            { role: "system", content: finalSystemPrompt },
+            ...(conversationHistory || []),
+            { role: "user", content: input },
+          ],
+        }),
+      });
+
+      if (!nativeResponse.ok) {
+        const status = nativeResponse.status;
+        if (status === 429) {
+          return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (status === 402) {
+          return new Response(JSON.stringify({ error: "Créditos esgotados." }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const errText = await nativeResponse.text();
+        console.error("Native fallback error:", status, errText);
+        return new Response(JSON.stringify({ error: "Erro ao consultar o modelo de IA." }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const nativeData = await nativeResponse.json();
+      const nativeOutput = nativeData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
+      return new Response(JSON.stringify({ output: nativeOutput, fallback: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    };
+
     // Handle Anthropic separately (different API format)
     if (customAgent.provider === "anthropic") {
       const anthropicResponse = await fetch(endpoint, {
@@ -934,16 +983,17 @@ Deno.serve(async (req) => {
           max_tokens: 4096,
           temperature: Number(customAgent.temperature),
           system: finalSystemPrompt,
-          messages: [{ role: "user", content: input }],
+          messages: [
+            ...(conversationHistory || []),
+            { role: "user", content: input },
+          ],
         }),
       });
 
       if (!anthropicResponse.ok) {
         const errText = await anthropicResponse.text();
-        console.error("Anthropic error:", anthropicResponse.status, errText);
-        return new Response(JSON.stringify({ error: "Erro ao consultar Anthropic" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        console.error("Anthropic error:", anthropicResponse.status, errText, "- falling back to native");
+        return await fallbackToNative();
       }
 
       const anthropicData = await anthropicResponse.json();
@@ -952,13 +1002,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Map decommissioned models to replacements
-    const DECOMMISSIONED_MODELS: Record<string, string> = {
-      "mixtral-8x7b-32768": "llama-3.3-70b-versatile",
-      "gemma2-9b-it": "llama-3.3-70b-versatile",
-    };
-    const resolvedModel = DECOMMISSIONED_MODELS[customAgent.model] || customAgent.model;
 
     // OpenAI-compatible API (OpenAI, Groq, OpenRouter, Google)
     const headers: Record<string, string> = {
@@ -970,7 +1013,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: resolvedModel,
+        model: customAgent.model,
         temperature: Number(customAgent.temperature),
         messages: [
           { role: "system", content: finalSystemPrompt },
@@ -982,11 +1025,8 @@ Deno.serve(async (req) => {
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
-      console.error(`${customAgent.provider} error:`, aiResponse.status, errText);
-      return new Response(JSON.stringify({ error: `Erro ao consultar ${customAgent.provider}: ${errText}` }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error(`${customAgent.provider} error:`, aiResponse.status, errText, "- falling back to native");
+      return await fallbackToNative();
     }
 
     const aiData = await aiResponse.json();
