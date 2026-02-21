@@ -955,7 +955,8 @@ Deno.serve(async (req) => {
 
     // Map decommissioned models to replacements
     const DECOMMISSIONED_MODELS: Record<string, string> = {
-      "mixtral-8x7b-32768": "gemma2-9b-it",
+      "mixtral-8x7b-32768": "llama-3.3-70b-versatile",
+      "gemma2-9b-it": "llama-3.3-70b-versatile",
     };
     const resolvedModel = DECOMMISSIONED_MODELS[customAgent.model] || customAgent.model;
 
