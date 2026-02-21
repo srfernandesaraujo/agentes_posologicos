@@ -21,90 +21,72 @@ const CUSTOM_AGENT_INTERACTION_COST = 0.5;
 
 // Sanitize malformed markdown tables (multiple rows on single line)
 function sanitizeMarkdownTables(content: string): string {
-  // Strategy: find inline separator patterns like |---|---|---| embedded in a single line
-  // and use them to split the line into proper table rows
-  
   const lines = content.split('\n');
   const result: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
-    
-    // Skip lines that don't look like they contain table data
-    if (!trimmed.includes('|')) {
+
+    // Must contain pipe and a separator pattern like |---|---|
+    if (!trimmed.includes('|') || !trimmed.match(/\|[\s]*-{2,}/)) {
       result.push(line);
       continue;
     }
 
-    // Detect inline separator: e.g. "| Col1 | Col2 | |---|---| | Val1 | Val2 |"
-    const sepMatch = trimmed.match(/\|[-\s|]+\|/);
-    if (sepMatch && trimmed.startsWith('|')) {
-      const sepIndex = trimmed.indexOf(sepMatch[0]);
-      const sepEnd = sepIndex + sepMatch[0].length;
-      
-      // Count columns from separator
-      const sepCols = sepMatch[0].split('|').filter(s => s.trim() !== '' && /^[-\s]+$/.test(s.trim()));
-      const numCols = sepCols.length;
-      
-      if (numCols >= 2) {
-        // Get header part (before separator) and data part (after separator)
-        const headerPart = trimmed.substring(0, sepIndex);
-        const dataPart = trimmed.substring(sepEnd);
-        
-        // Extract all cell values from header
-        const headerCells = headerPart.split('|').map(s => s.trim()).filter(s => s !== '');
-        // Extract all cell values from data  
-        const dataCells = dataPart.split('|').map(s => s.trim()).filter(s => s !== '');
-        
-        // Only process if header has right number of columns
-        if (headerCells.length >= numCols) {
-          // Build proper header row
-          const headerRow = headerCells.slice(0, numCols);
-          result.push('| ' + headerRow.join(' | ') + ' |');
-          result.push('|' + headerRow.map(() => '---').join('|') + '|');
-          
-          // Split data cells into rows of numCols each
-          for (let i = 0; i < dataCells.length; i += numCols) {
-            const rowCells = dataCells.slice(i, i + numCols);
-            if (rowCells.length === numCols) {
-              result.push('| ' + rowCells.join(' | ') + ' |');
-            } else if (rowCells.length > 0 && rowCells.some(c => c !== '')) {
-              // Partial row - pad with empty cells
-              while (rowCells.length < numCols) rowCells.push('');
-              result.push('| ' + rowCells.join(' | ') + ' |');
-            }
-          }
-          continue;
-        }
+    // Match the separator section: |---|---|---| (with optional spaces)
+    const sepRegex = /(\|[\s]*-{2,}[\s]*)+\|/;
+    const sepMatch = trimmed.match(sepRegex);
+    if (!sepMatch) {
+      result.push(line);
+      continue;
+    }
+
+    const sepStr = sepMatch[0];
+    const sepIndex = trimmed.indexOf(sepStr);
+    const sepEnd = sepIndex + sepStr.length;
+
+    // Count columns from separator
+    const numCols = sepStr.split('|').filter(s => s.trim().length > 0).length;
+    if (numCols < 2) {
+      result.push(line);
+      continue;
+    }
+
+    // Extract ALL pipe-delimited cells from the entire line (excluding separator section)
+    const headerPart = trimmed.substring(0, sepIndex);
+    const dataPart = trimmed.substring(sepEnd);
+
+    const extractCells = (text: string): string[] => {
+      return text.split('|').map(s => s.trim()).filter(s => s.length > 0);
+    };
+
+    const headerCells = extractCells(headerPart);
+    const dataCells = extractCells(dataPart);
+
+    if (headerCells.length < numCols) {
+      result.push(line);
+      continue;
+    }
+
+    // Build proper markdown table
+    // Header row
+    result.push('| ' + headerCells.slice(0, numCols).join(' | ') + ' |');
+    // Separator row
+    result.push('| ' + Array(numCols).fill('---').join(' | ') + ' |');
+    // Data rows - group cells by numCols
+    for (let i = 0; i < dataCells.length; i += numCols) {
+      const row = dataCells.slice(i, i + numCols);
+      if (row.length > 0 && row.some(c => c !== '')) {
+        while (row.length < numCols) row.push('');
+        result.push('| ' + row.join(' | ') + ' |');
       }
     }
-    
-    result.push(line);
+    // Add empty line after table for proper markdown separation
+    result.push('');
+    continue;
   }
 
-  // Second pass: ensure table separator exists after header  
-  const finalLines: string[] = [];
-  for (let i = 0; i < result.length; i++) {
-    finalLines.push(result[i]);
-    const current = result[i].trim();
-    const next = result[i + 1]?.trim() || '';
-    
-    if (current.startsWith('|') && current.endsWith('|')) {
-      const isSep = /^\|[\s-|]+\|$/.test(current) && current.includes('---');
-      if (!isSep && next.startsWith('|') && next.endsWith('|')) {
-        const nextIsSep = /^\|[\s-|]+\|$/.test(next) && next.includes('---');
-        if (!nextIsSep) {
-          const prev = result[i - 1]?.trim() || '';
-          if (!prev.startsWith('|')) {
-            const cols = current.split('|').filter(s => s.trim() !== '');
-            finalLines.push('|' + cols.map(() => '---').join('|') + '|');
-          }
-        }
-      }
-    }
-  }
-
-  return finalLines.join('\n');
+  return result.join('\n');
 }
 
 let tableRowIndex = 0;
