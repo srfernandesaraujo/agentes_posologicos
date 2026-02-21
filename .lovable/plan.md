@@ -1,87 +1,62 @@
 
+# Corrigir Tabelas no Chat - Formatacao Profissional
 
-# Integrar Chat com Agentes n8n
+## Problema Identificado
 
-## Objetivo
-Substituir a resposta mock do chat por chamadas reais aos webhooks do n8n, roteando automaticamente pelo slug do agente selecionado.
+O agente esta retornando dados tabulares como texto corrido com pipes (`|`) em uma unica linha, em vez de usar a sintaxe correta de tabelas Markdown (uma linha por registro, com separador `|---|---|`). O ReactMarkdown nao consegue interpretar esse formato como tabela HTML, exibindo tudo como paragrafo de texto ilegivel.
 
-## Como funciona o roteamento
+## Solucao em 2 Frentes
 
-O chat ja carrega o agente completo (incluindo `slug`) pela URL `/chat/:agentId`. Uma Edge Function recebera o `agentId`, consultara o slug no banco e direcionara a chamada para o webhook correto no n8n.
+### Frente 1: Corrigir o prompt do agente (edge function)
 
-```text
-Usuario clica "Gerar"
-       |
-       v
-Chat.tsx envia POST para Edge Function
-  { agentId, input }
-       |
-       v
-Edge Function consulta agents.slug
-       |
-       v
-Mapeia slug -> webhook n8n
-  ex: "interacoes-cardiovascular" -> /Analisador_Interacoes
-       |
-       v
-POST para http://n8n-casaos.posologia.app/webhook/{path}
-  com Bearer token do usuario
-       |
-       v
-Retorna resposta do n8n para o frontend
-```
+Adicionar instrucao explicita em TODOS os prompts dos agentes para que SEMPRE formatem tabelas com:
+- Uma linha por registro
+- Linha separadora apos o cabecalho (`|---|---|---| `)
+- Nunca colocar multiplas linhas de dados na mesma linha de texto
 
-## Etapas
-
-### 1. Criar Edge Function `agent-chat`
-
-Arquivo: `supabase/functions/agent-chat/index.ts`
-
-- Recebe `{ agentId, input }` via POST
-- Valida autenticacao do usuario via `getClaims()`
-- Consulta a tabela `agents` para obter o `slug`
-- Usa um mapa interno para converter slug em caminho do webhook n8n:
-
-| Slug | Webhook |
-|------|---------|
-| interacoes-cardiovascular | /Analisador_Interacoes |
-| analisador-turma | /Analisador_dados_turma |
-| antibioticoterapia | /Consultor_antibioticoterapia |
-| editais-fomento | /Assistente_editais |
-| educador-cronicas | /Tradutor_Clinico |
-| analise-estatistica | /Analise_estatistica |
-| metodologias-ativas | /Arquiteto_de_metodologias_ativas |
-| fact-checker | /Checador_de_fatos |
-| simulador-clinico | /Simulador_de_casos_clinicos |
-| seo-youtube | /Conteudo_Youtube |
-
-- Faz POST para o webhook correspondente passando `{ input }` e o token do usuario no header Authorization
-- Retorna a resposta do n8n ao frontend
-
-### 2. Configurar `config.toml`
-
-Adicionar a funcao com `verify_jwt = false` (validacao sera feita em codigo).
-
-### 3. Atualizar `Chat.tsx`
-
-Substituir o bloco mock (linhas 118-123) por uma chamada real:
+Exemplo do formato correto que sera instruido:
 
 ```text
-Antes:  await new Promise(...) + mockResponse
-Depois: const { data } = await supabase.functions.invoke('agent-chat', {
-          body: { agentId, input: text }
-        })
+| Medicamento | n | % |
+|---|---|---|
+| Metformina | 14 | 11.67 |
+| Levotiroxina | 13 | 10.83 |
 ```
 
-A resposta do n8n sera salva como mensagem do assistente no banco.
+### Frente 2: Pre-processamento no frontend (Chat.tsx)
 
-### 4. Adicionar suporte a Markdown nas respostas
+Adicionar uma funcao de sanitizacao que detecta tabelas malformadas (multiplos `|...|` na mesma linha) e as reformata em markdown valido antes de passar para o ReactMarkdown. Isso garante compatibilidade mesmo que o modelo ocasionalmente retorne o formato antigo.
 
-Instalar `react-markdown` para renderizar as respostas dos agentes com formatacao rica (listas, negrito, titulos, etc.), ja que os agentes do n8n provavelmente retornam texto formatado.
+### Frente 3: Melhorar o estilo visual das tabelas no chat
 
-## Seguranca
+Atualizar o `markdownComponents` para um visual mais profissional:
+- Cabecalho com fundo de destaque solido (ex: `bg-[hsl(199,89%,48%)]/20`)
+- Bordas mais visiveis e consistentes
+- Zebra-striping (linhas alternadas com fundo ligeiramente diferente)
+- Padding mais generoso
+- Fonte monospacada para numeros/dados
+- Borda arredondada no container da tabela
 
-- As URLs dos webhooks ficam apenas na Edge Function (servidor), nunca expostas ao frontend
-- O token do usuario e repassado ao n8n para validacao
-- A Edge Function valida autenticacao antes de processar
+## Detalhes Tecnicos
 
+### Arquivos modificados
+
+1. **`supabase/functions/agent-chat/index.ts`**
+   - Adicionar bloco de instrucao global sobre formatacao de tabelas (aplicado a todos os agentes)
+   - Instrucao: "Sempre use tabelas Markdown com uma linha por registro e separador de cabecalho"
+
+2. **`src/pages/Chat.tsx`**
+   - Criar funcao `sanitizeMarkdownTables(content: string)` que:
+     - Detecta linhas com multiplos blocos `| valor |` concatenados
+     - Separa em linhas individuais
+     - Insere separador de cabecalho quando ausente
+   - Atualizar `markdownComponents` com estilos visuais melhorados para tabelas
+   - Aplicar `sanitizeMarkdownTables` no conteudo antes de passar ao ReactMarkdown
+
+### Estilo visual das tabelas
+
+- Container com `rounded-lg overflow-hidden border border-white/15`
+- Cabecalho: `bg-primary/15 text-white font-semibold`
+- Linhas alternadas: `even:bg-white/[0.03]`
+- Hover: `hover:bg-white/[0.06]`
+- Celulas com padding `px-4 py-2.5` e alinhamento consistente
