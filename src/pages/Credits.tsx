@@ -3,7 +3,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { useSubscription, SUBSCRIPTION_TIERS, TierKey } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Coins, Zap, Star, Crown, Loader2, Check, Settings, Sparkles } from "lucide-react";
+import { Coins, Zap, Star, Crown, Loader2, Check, Settings, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useEffect, useState } from "react";
@@ -117,6 +117,23 @@ export default function Credits() {
         <h1 className="mb-2 font-display text-3xl font-bold text-white">{t("credits.title")}</h1>
         <p className="text-white/50">{t("credits.desc")}</p>
       </div>
+
+      {/* Zero credits banner */}
+      {balance <= 0 && !subscribed && (
+        <div className="mb-8 rounded-2xl border border-[hsl(14,90%,58%)]/30 bg-[hsl(14,90%,58%)]/10 p-6 animate-fade-in">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[hsl(14,90%,58%)]/20">
+              <AlertTriangle className="h-6 w-6 text-[hsl(14,90%,58%)]" />
+            </div>
+            <div>
+              <p className="font-display text-lg font-bold text-white">Seus créditos acabaram!</p>
+              <p className="text-sm text-white/60">
+                Assine um plano mensal para receber créditos automaticamente ou compre um pacote avulso para continuar usando os agentes.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Balance */}
       <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 animate-fade-in">
