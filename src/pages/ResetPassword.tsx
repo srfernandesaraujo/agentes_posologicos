@@ -9,14 +9,13 @@ import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 
-type Mode = "request" | "set-password";
+type Mode = "request" | "set-password" | "loading-session";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t } = useLanguage();
 
-  // If URL has type=recovery or type=invite in hash, we're in set-password mode
   const [mode, setMode] = useState<Mode>("request");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,28 +28,37 @@ export default function ResetPassword() {
   useEffect(() => {
     const hash = window.location.hash;
     const invited = searchParams.get("invited") === "true";
+    const isRecoveryFlow = hash.includes("type=recovery") || hash.includes("type=invite") || invited;
     
-    if (hash.includes("type=recovery") || hash.includes("type=invite") || invited) {
-      setMode("set-password");
+    if (isRecoveryFlow) {
+      setMode("loading-session");
       setIsInvite(invited || hash.includes("type=invite"));
     }
 
-    // Listen for auth events to detect recovery/invite session
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && isRecoveryFlow)) {
+        setSessionReady(true);
         setMode("set-password");
-        if (session) {
-          setSessionReady(true);
-        }
       }
     });
 
-    // Check if session already exists
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true);
-      }
-    });
+    // Poll for session (handles case where event fired before mount)
+    if (isRecoveryFlow) {
+      const checkSession = async () => {
+        for (let i = 0; i < 20; i++) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            setSessionReady(true);
+            setMode("set-password");
+            return;
+          }
+          await new Promise(r => setTimeout(r, 500));
+        }
+        // After 10s timeout, show form with warning
+        setMode("set-password");
+      };
+      checkSession();
+    }
 
     return () => subscription.unsubscribe();
   }, [searchParams]);
@@ -125,7 +133,12 @@ export default function ResetPassword() {
             <LanguageSelector />
           </div>
 
-          {mode === "set-password" ? (
+          {mode === "loading-session" ? (
+            <div className="flex flex-col items-center gap-4 py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <p className="text-white/50">Verificando sessão de autenticação...</p>
+            </div>
+          ) : mode === "set-password" ? (
             <>
               <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
                 <Lock className="h-6 w-6 text-primary" />
@@ -138,6 +151,12 @@ export default function ResetPassword() {
                   ? "Defina uma senha para acessar sua conta com acesso ilimitado."
                   : "Digite sua nova senha abaixo."}
               </p>
+
+              {!sessionReady && (
+                <div className="mb-4 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+                  O link pode ter expirado. Solicite um novo link de redefinição de senha.
+                </div>
+              )}
 
               <form onSubmit={handleSetPassword} className="space-y-4">
                 <div className="space-y-2">
@@ -169,9 +188,9 @@ export default function ResetPassword() {
                 <Button
                   type="submit"
                   className="w-full gap-2 bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white border-0"
-                  disabled={loading}
+                  disabled={loading || !sessionReady}
                 >
-                  {loading ? "Salvando..." : "Definir senha"}
+                  {loading ? "Salvando..." : !sessionReady ? "Sessão expirada" : "Definir senha"}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </form>
