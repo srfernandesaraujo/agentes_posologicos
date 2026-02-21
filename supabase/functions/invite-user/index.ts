@@ -45,13 +45,13 @@ serve(async (req) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Check if already in unlimited_users
+    // Check if already in unlimited_users (allow resend)
     const { data: existing } = await supabaseAdmin
       .from("unlimited_users")
       .select("id")
       .eq("email", normalizedEmail)
       .single();
-    if (existing) throw new Error("Este email já está cadastrado como usuário ilimitado.");
+    const isResend = !!existing;
 
     // Ensure user exists in auth - create if needed
     const origin = req.headers.get("origin") || "https://learn-lead-engine.lovable.app";
@@ -118,11 +118,13 @@ serve(async (req) => {
 
     if (emailError) throw new Error(`Erro ao enviar email: ${JSON.stringify(emailError)}`);
 
-    // Add to unlimited_users table
-    const { error: insertError } = await supabaseAdmin
-      .from("unlimited_users")
-      .insert({ email: normalizedEmail, invited_by: callerId });
-    if (insertError) throw insertError;
+    // Add to unlimited_users table (skip if resend)
+    if (!isResend) {
+      const { error: insertError } = await supabaseAdmin
+        .from("unlimited_users")
+        .insert({ email: normalizedEmail, invited_by: callerId });
+      if (insertError) throw insertError;
+    }
 
     return new Response(JSON.stringify({ success: true, email: normalizedEmail }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
