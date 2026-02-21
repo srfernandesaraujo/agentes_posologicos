@@ -19,26 +19,106 @@ import * as XLSX from "xlsx";
 
 const CUSTOM_AGENT_INTERACTION_COST = 0.5;
 
+// Sanitize malformed markdown tables (multiple rows on single line)
+function sanitizeMarkdownTables(content: string): string {
+  // Split into lines
+  const lines = content.split('\n');
+  const result: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Check if line has multiple table rows concatenated (e.g., "| A | B | | C | D |")
+    // Pattern: detect lines with content between pipes that contain internal "| |" patterns
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      // Count the pipe-separated segments
+      const segments = trimmed.split('|').filter(s => s.trim() !== '');
+      
+      // Try to detect if multiple rows are on the same line
+      // Look for pattern: "| val | val | | val | val |" (double pipe with space = row separator)
+      const doubleBarPattern = /\|\s*\|\s*(?=[^|])/g;
+      if (doubleBarPattern.test(trimmed)) {
+        // Split on "| |" pattern to get individual rows
+        const rows = trimmed.split(/\|\s*\|/).filter(s => s.trim() !== '');
+        
+        if (rows.length > 1) {
+          // Determine columns from first row
+          const firstRowCols = rows[0].split('|').filter(s => s.trim() !== '');
+          const numCols = firstRowCols.length;
+          
+          // Build header row
+          result.push('| ' + firstRowCols.map(c => c.trim()).join(' | ') + ' |');
+          // Add separator
+          result.push('|' + firstRowCols.map(() => '---').join('|') + '|');
+          
+          // Add data rows
+          for (let i = 1; i < rows.length; i++) {
+            const cols = rows[i].split('|').filter(s => s.trim() !== '');
+            if (cols.length > 0) {
+              result.push('| ' + cols.map(c => c.trim()).join(' | ') + ' |');
+            }
+          }
+          continue;
+        }
+      }
+    }
+    
+    result.push(line);
+  }
+
+  // Second pass: ensure table separator exists after header
+  const finalLines: string[] = [];
+  for (let i = 0; i < result.length; i++) {
+    finalLines.push(result[i]);
+    const current = result[i].trim();
+    const next = result[i + 1]?.trim() || '';
+    
+    // If current line looks like a table row and next line is also a table row
+    // but NOT a separator, check if we need to insert one
+    if (current.startsWith('|') && current.endsWith('|') && current.includes('|')) {
+      if (next.startsWith('|') && next.endsWith('|') && !next.match(/^\|[\s-]+\|/)) {
+        // Check if there's no separator between header and first data row
+        // Only insert if this is the first table row (preceded by non-table content)
+        const prev = result[i - 1]?.trim() || '';
+        if (!prev.startsWith('|')) {
+          const cols = current.split('|').filter(s => s.trim() !== '');
+          finalLines.push('|' + cols.map(() => '---').join('|') + '|');
+        }
+      }
+    }
+  }
+
+  return finalLines.join('\n');
+}
+
+let tableRowIndex = 0;
+
 const markdownComponents = {
-  table: ({ children, ...props }: any) => (
-    <div className="my-4 overflow-x-auto">
-      <table className="w-full text-sm border-collapse border border-white/20" {...props}>{children}</table>
-    </div>
-  ),
+  table: ({ children, ...props }: any) => {
+    tableRowIndex = 0;
+    return (
+      <div className="my-4 overflow-x-auto rounded-lg border border-white/15">
+        <table className="w-full text-sm border-collapse" {...props}>{children}</table>
+      </div>
+    );
+  },
   thead: ({ children, ...props }: any) => (
-    <thead className="bg-white/10" {...props}>{children}</thead>
+    <thead className="bg-primary/15" {...props}>{children}</thead>
   ),
   tbody: ({ children, ...props }: any) => (
     <tbody {...props}>{children}</tbody>
   ),
-  tr: ({ children, ...props }: any) => (
-    <tr className="hover:bg-white/[0.04] transition-colors" {...props}>{children}</tr>
-  ),
+  tr: ({ children, ...props }: any) => {
+    const idx = tableRowIndex++;
+    return (
+      <tr className={`hover:bg-white/[0.06] transition-colors ${idx > 0 && idx % 2 === 0 ? 'bg-white/[0.03]' : ''}`} {...props}>{children}</tr>
+    );
+  },
   th: ({ children, ...props }: any) => (
-    <th className="border border-white/20 px-4 py-2.5 text-left text-sm font-bold text-white/90" {...props}>{children}</th>
+    <th className="border-b border-r border-white/15 last:border-r-0 px-4 py-2.5 text-left text-sm font-semibold text-white/90 whitespace-nowrap" {...props}>{children}</th>
   ),
   td: ({ children, ...props }: any) => (
-    <td className="border border-white/20 px-4 py-2 text-sm text-white/70" {...props}>{children}</td>
+    <td className="border-b border-r border-white/10 last:border-r-0 px-4 py-2.5 text-sm text-white/70 tabular-nums" {...props}>{children}</td>
   ),
   h1: ({ children, ...props }: any) => (
     <h1 className="text-xl font-bold text-white mt-5 mb-2 border-b border-white/10 pb-2" {...props}>{children}</h1>
@@ -103,7 +183,7 @@ function ChatMessageContent({ content }: { content: string }) {
         part.type === "chart" ? (
           <ChartBlock key={i} jsonString={part.content} />
         ) : (
-          <ReactMarkdown key={i} components={markdownComponents}>{part.content}</ReactMarkdown>
+          <ReactMarkdown key={i} components={markdownComponents}>{sanitizeMarkdownTables(part.content)}</ReactMarkdown>
         )
       )}
     </>
