@@ -24,6 +24,7 @@ import KnowledgeDetail from "./pages/KnowledgeDetail";
 import VirtualRooms from "./pages/VirtualRooms";
 import VirtualRoomChat from "./pages/VirtualRoomChat";
 import NotFound from "./pages/NotFound";
+import UserDashboard from "./pages/UserDashboard";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route path="/agentes" element={<Agents />} />
+              <Route path="/dashboard" element={<UserDashboard />} />
               <Route path="/chat/:agentId" element={<Chat />} />
               <Route path="/creditos" element={<Credits />} />
               <Route path="/conta" element={<Account />} />

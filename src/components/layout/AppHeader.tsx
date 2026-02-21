@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Coins, User, LogOut, Pill, Shield } from "lucide-react";
+import { Coins, User, LogOut, Pill, Shield, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -79,6 +79,10 @@ export function AppHeader() {
               <DropdownMenuItem onClick={() => navigate("/conta")} className="text-white/80 focus:bg-white/10 focus:text-white">
                 <User className="mr-2 h-4 w-4" />
                 {t("nav.account")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/dashboard")} className="text-white/80 focus:bg-white/10 focus:text-white">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Meu Dashboard
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/creditos")} className="text-white/80 focus:bg-white/10 focus:text-white">
                 <Coins className="mr-2 h-4 w-4" />
