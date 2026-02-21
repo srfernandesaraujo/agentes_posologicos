@@ -21,41 +21,57 @@ const CUSTOM_AGENT_INTERACTION_COST = 0.5;
 
 // Sanitize malformed markdown tables (multiple rows on single line)
 function sanitizeMarkdownTables(content: string): string {
-  // Split into lines
+  // Strategy: find inline separator patterns like |---|---|---| embedded in a single line
+  // and use them to split the line into proper table rows
+  
   const lines = content.split('\n');
   const result: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
     
-    // Check if line has multiple table rows concatenated (e.g., "| A | B | | C | D |")
-    // Pattern: detect lines with content between pipes that contain internal "| |" patterns
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      // Count the pipe-separated segments
-      const segments = trimmed.split('|').filter(s => s.trim() !== '');
+    // Skip lines that don't look like they contain table data
+    if (!trimmed.includes('|')) {
+      result.push(line);
+      continue;
+    }
+
+    // Detect inline separator: e.g. "| Col1 | Col2 | |---|---| | Val1 | Val2 |"
+    const sepMatch = trimmed.match(/\|[-\s|]+\|/);
+    if (sepMatch && trimmed.startsWith('|')) {
+      const sepIndex = trimmed.indexOf(sepMatch[0]);
+      const sepEnd = sepIndex + sepMatch[0].length;
       
-      // Try to detect if multiple rows are on the same line
-      // Look for pattern: "| val | val | | val | val |" (double pipe with space = row separator)
-      const doubleBarPattern = /\|\s*\|\s*(?=[^|])/g;
-      if (doubleBarPattern.test(trimmed)) {
-        // Split on "| |" pattern to get individual rows
-        const rows = trimmed.split(/\|\s*\|/).filter(s => s.trim() !== '');
+      // Count columns from separator
+      const sepCols = sepMatch[0].split('|').filter(s => s.trim() !== '' && /^[-\s]+$/.test(s.trim()));
+      const numCols = sepCols.length;
+      
+      if (numCols >= 2) {
+        // Get header part (before separator) and data part (after separator)
+        const headerPart = trimmed.substring(0, sepIndex);
+        const dataPart = trimmed.substring(sepEnd);
         
-        if (rows.length > 1) {
-          // Determine columns from first row
-          const firstRowCols = rows[0].split('|').filter(s => s.trim() !== '');
-          const numCols = firstRowCols.length;
+        // Extract all cell values from header
+        const headerCells = headerPart.split('|').map(s => s.trim()).filter(s => s !== '');
+        // Extract all cell values from data  
+        const dataCells = dataPart.split('|').map(s => s.trim()).filter(s => s !== '');
+        
+        // Only process if header has right number of columns
+        if (headerCells.length >= numCols) {
+          // Build proper header row
+          const headerRow = headerCells.slice(0, numCols);
+          result.push('| ' + headerRow.join(' | ') + ' |');
+          result.push('|' + headerRow.map(() => '---').join('|') + '|');
           
-          // Build header row
-          result.push('| ' + firstRowCols.map(c => c.trim()).join(' | ') + ' |');
-          // Add separator
-          result.push('|' + firstRowCols.map(() => '---').join('|') + '|');
-          
-          // Add data rows
-          for (let i = 1; i < rows.length; i++) {
-            const cols = rows[i].split('|').filter(s => s.trim() !== '');
-            if (cols.length > 0) {
-              result.push('| ' + cols.map(c => c.trim()).join(' | ') + ' |');
+          // Split data cells into rows of numCols each
+          for (let i = 0; i < dataCells.length; i += numCols) {
+            const rowCells = dataCells.slice(i, i + numCols);
+            if (rowCells.length === numCols) {
+              result.push('| ' + rowCells.join(' | ') + ' |');
+            } else if (rowCells.length > 0 && rowCells.some(c => c !== '')) {
+              // Partial row - pad with empty cells
+              while (rowCells.length < numCols) rowCells.push('');
+              result.push('| ' + rowCells.join(' | ') + ' |');
             }
           }
           continue;
@@ -66,23 +82,23 @@ function sanitizeMarkdownTables(content: string): string {
     result.push(line);
   }
 
-  // Second pass: ensure table separator exists after header
+  // Second pass: ensure table separator exists after header  
   const finalLines: string[] = [];
   for (let i = 0; i < result.length; i++) {
     finalLines.push(result[i]);
     const current = result[i].trim();
     const next = result[i + 1]?.trim() || '';
     
-    // If current line looks like a table row and next line is also a table row
-    // but NOT a separator, check if we need to insert one
-    if (current.startsWith('|') && current.endsWith('|') && current.includes('|')) {
-      if (next.startsWith('|') && next.endsWith('|') && !next.match(/^\|[\s-]+\|/)) {
-        // Check if there's no separator between header and first data row
-        // Only insert if this is the first table row (preceded by non-table content)
-        const prev = result[i - 1]?.trim() || '';
-        if (!prev.startsWith('|')) {
-          const cols = current.split('|').filter(s => s.trim() !== '');
-          finalLines.push('|' + cols.map(() => '---').join('|') + '|');
+    if (current.startsWith('|') && current.endsWith('|')) {
+      const isSep = /^\|[\s-|]+\|$/.test(current) && current.includes('---');
+      if (!isSep && next.startsWith('|') && next.endsWith('|')) {
+        const nextIsSep = /^\|[\s-|]+\|$/.test(next) && next.includes('---');
+        if (!nextIsSep) {
+          const prev = result[i - 1]?.trim() || '';
+          if (!prev.startsWith('|')) {
+            const cols = current.split('|').filter(s => s.trim() !== '');
+            finalLines.push('|' + cols.map(() => '---').join('|') + '|');
+          }
         }
       }
     }
