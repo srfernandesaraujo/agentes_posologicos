@@ -12,6 +12,7 @@ import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText } from "lucide-react";
+import { MessageActions } from "@/components/chat/MessageActions";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import * as XLSX from "xlsx";
@@ -414,18 +415,23 @@ export default function Chat() {
                     <Bot className={`h-4 w-4 ${isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
                   </div>
                 )}
-                <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${
-                    msg.role === "user"
-                      ? "gradient-primary text-white rounded-br-md whitespace-pre-wrap"
-                      : "bg-white/[0.05] border border-white/10 text-white/80 rounded-bl-md prose prose-invert prose-sm max-w-none"
-                  }`}
-                >
-                  {msg.role === "assistant" ? (
-                    <ChatMessageContent content={msg.content} />
-                  ) : (
-                    msg.content
+                <div className={`relative group ${msg.role === "assistant" ? "max-w-[75%]" : ""}`}>
+                  {msg.role === "assistant" && (
+                    <MessageActions content={msg.content} agentName={agent?.name || "Agente"} messageRef={{ current: null }} />
                   )}
+                  <div
+                    className={`rounded-2xl px-4 py-3 text-sm ${
+                      msg.role === "user"
+                        ? "gradient-primary text-white rounded-br-md whitespace-pre-wrap max-w-[75%] ml-auto"
+                        : "bg-white/[0.05] border border-white/10 text-white/80 rounded-bl-md prose prose-invert prose-sm max-w-none"
+                    }`}
+                  >
+                    {msg.role === "assistant" ? (
+                      <ChatMessageContent content={msg.content} />
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
                 </div>
                 {msg.role === "user" && (
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
