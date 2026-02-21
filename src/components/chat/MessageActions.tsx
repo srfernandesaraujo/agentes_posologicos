@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
-import { FileDown, Copy, Check, MoreHorizontal } from "lucide-react";
+import { useState } from "react";
+import { FileDown, Copy, Check } from "lucide-react";
 import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import { toast } from "sonner";
 
 interface MessageActionsProps {
@@ -9,39 +10,15 @@ interface MessageActionsProps {
   messageRef: React.RefObject<HTMLDivElement>;
 }
 
-function stripChartBlocks(text: string): string {
-  return text.replace(/```chart\s*\n[\s\S]*?```/g, "[Gráfico gerado — ver versão digital]");
-}
-
-function markdownToPlainLines(md: string): { text: string; style: "h1" | "h2" | "h3" | "bold" | "bullet" | "normal" }[] {
-  const lines: { text: string; style: "h1" | "h2" | "h3" | "bold" | "bullet" | "normal" }[] = [];
-  for (const raw of md.split("\n")) {
-    const line = raw.trimEnd();
-    if (/^### /.test(line)) {
-      lines.push({ text: line.replace(/^### /, "").replace(/\*\*/g, ""), style: "h3" });
-    } else if (/^## /.test(line)) {
-      lines.push({ text: line.replace(/^## /, "").replace(/\*\*/g, ""), style: "h2" });
-    } else if (/^# /.test(line)) {
-      lines.push({ text: line.replace(/^# /, "").replace(/\*\*/g, ""), style: "h1" });
-    } else if (/^[-*•]\s/.test(line)) {
-      lines.push({ text: line.replace(/^[-*•]\s/, "").replace(/\*\*/g, ""), style: "bullet" });
-    } else if (/^\d+\.\s/.test(line)) {
-      lines.push({ text: line.replace(/\*\*/g, ""), style: "bullet" });
-    } else if (/^\*\*.*\*\*$/.test(line.trim())) {
-      lines.push({ text: line.replace(/\*\*/g, ""), style: "bold" });
-    } else {
-      lines.push({ text: line.replace(/\*\*/g, ""), style: "normal" });
-    }
-  }
-  return lines;
-}
-
 export function MessageActions({ content, agentName, messageRef }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const handleCopy = async () => {
-    const plain = stripChartBlocks(content).replace(/\*\*/g, "").replace(/^#+\s/gm, "");
+    const plain = content
+      .replace(/```chart\s*\n[\s\S]*?```/g, "[Gráfico]")
+      .replace(/\*\*/g, "")
+      .replace(/^#+\s/gm, "");
     await navigator.clipboard.writeText(plain);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -49,164 +26,117 @@ export function MessageActions({ content, agentName, messageRef }: MessageAction
   };
 
   const handleExportPDF = async () => {
+    if (!messageRef.current) {
+      toast.error("Não foi possível capturar o conteúdo.");
+      return;
+    }
     setExporting(true);
     try {
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      // Clone the message element to style it for PDF capture
+      const original = messageRef.current;
+
+      // Create a wrapper for html2canvas with white background for better PDF
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "fixed";
+      wrapper.style.left = "-9999px";
+      wrapper.style.top = "0";
+      wrapper.style.width = "800px";
+      wrapper.style.padding = "0";
+      wrapper.style.background = "#0f1219";
+      document.body.appendChild(wrapper);
+
+      // Build PDF header
+      const header = document.createElement("div");
+      header.style.cssText = "background:#0f1219;padding:24px 32px 16px;border-bottom:3px solid #e65138;";
+      header.innerHTML = `
+        <div style="font-family:Helvetica,Arial,sans-serif;color:#fff;font-size:20px;font-weight:bold;margin-bottom:6px;">RELATÓRIO</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-family:Helvetica,Arial,sans-serif;color:rgba(255,255,255,0.6);font-size:12px;">${agentName}</div>
+          <div style="font-family:Helvetica,Arial,sans-serif;color:rgba(255,255,255,0.6);font-size:12px;">${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
+        </div>
+        <div style="font-family:Helvetica,Arial,sans-serif;color:rgba(255,255,255,0.35);font-size:9px;margin-top:4px;">Gerado por FarmaChat AI</div>
+      `;
+      wrapper.appendChild(header);
+
+      // Clone content
+      const contentClone = original.cloneNode(true) as HTMLElement;
+      contentClone.style.cssText = "padding:24px 32px;background:#0f1219;font-family:Helvetica,Arial,sans-serif;";
+
+      // Fix any SVG rendering issues in charts by ensuring they are visible
+      const svgs = contentClone.querySelectorAll("svg");
+      svgs.forEach((svg) => {
+        svg.setAttribute("width", svg.getBoundingClientRect().width.toString() || "600");
+        svg.setAttribute("height", svg.getBoundingClientRect().height.toString() || "320");
+      });
+
+      wrapper.appendChild(contentClone);
+
+      // Footer
+      const footer = document.createElement("div");
+      footer.style.cssText = "background:#0f1219;padding:12px 32px;border-top:2px solid #e65138;";
+      footer.innerHTML = `
+        <div style="font-family:Helvetica,Arial,sans-serif;color:rgba(255,255,255,0.35);font-size:9px;">Este relatório foi gerado automaticamente pela plataforma FarmaChat AI.</div>
+      `;
+      wrapper.appendChild(footer);
+
+      // Wait a tick for rendering
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Capture with html2canvas
+      const canvas = await html2canvas(wrapper, {
+        backgroundColor: "#0f1219",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: 800,
+        windowWidth: 800,
+      });
+
+      document.body.removeChild(wrapper);
+
+      // Generate PDF from canvas
+      const imgData = canvas.toDataURL("image/png");
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
       const pageW = 210;
       const pageH = 297;
-      const marginL = 20;
-      const marginR = 20;
-      const marginTop = 35;
-      const marginBottom = 25;
-      const contentW = pageW - marginL - marginR;
-      let y = 0;
+      const margin = 10;
+      const contentWidth = pageW - margin * 2;
+      const contentHeight = (imgH * contentWidth) / imgW;
 
-      const primaryColor: [number, number, number] = [230, 81, 56]; // hsl(14,90%,58%) approx
-      const darkBg: [number, number, number] = [18, 22, 30];
-      const white: [number, number, number] = [255, 255, 255];
-      const gray: [number, number, number] = [180, 185, 195];
-      const lightGray: [number, number, number] = [120, 128, 140];
+      // If content fits in one page
+      if (contentHeight <= pageH - margin * 2) {
+        doc.addImage(imgData, "PNG", margin, margin, contentWidth, contentHeight);
+      } else {
+        // Multi-page: slice the canvas
+        const pxPerPage = (imgW * (pageH - margin * 2)) / contentWidth;
+        let yOffset = 0;
+        let pageNum = 0;
 
-      // --- Header band ---
-      const drawHeader = () => {
-        doc.setFillColor(...darkBg);
-        doc.rect(0, 0, pageW, 28, "F");
-        // accent line
-        doc.setFillColor(...primaryColor);
-        doc.rect(0, 28, pageW, 1.2, "F");
+        while (yOffset < imgH) {
+          if (pageNum > 0) doc.addPage();
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.setTextColor(...white);
-        doc.text("RELATÓRIO", marginL, 12);
+          const sliceH = Math.min(pxPerPage, imgH - yOffset);
+          const sliceCanvas = document.createElement("canvas");
+          sliceCanvas.width = imgW;
+          sliceCanvas.height = sliceH;
+          const ctx = sliceCanvas.getContext("2d")!;
+          ctx.drawImage(canvas, 0, -yOffset);
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(...gray);
-        doc.text(agentName, marginL, 19);
+          const sliceImg = sliceCanvas.toDataURL("image/png");
+          const sliceMMH = (sliceH * contentWidth) / imgW;
+          doc.addImage(sliceImg, "PNG", margin, margin, contentWidth, sliceMMH);
 
-        const dateStr = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-        doc.text(dateStr, pageW - marginR, 19, { align: "right" });
-
-        doc.setFontSize(7);
-        doc.setTextColor(...lightGray);
-        doc.text("Gerado por FarmaChat AI", marginL, 24.5);
-      };
-
-      // --- Footer ---
-      const drawFooter = (pageNum: number) => {
-        doc.setFillColor(...darkBg);
-        doc.rect(0, pageH - 15, pageW, 15, "F");
-        doc.setFillColor(...primaryColor);
-        doc.rect(0, pageH - 15, pageW, 0.6, "F");
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(...lightGray);
-        doc.text("Este relatório foi gerado automaticamente pela plataforma FarmaChat AI.", marginL, pageH - 7);
-        doc.text(`Página ${pageNum}`, pageW - marginR, pageH - 7, { align: "right" });
-      };
-
-      let pageNum = 1;
-      drawHeader();
-      drawFooter(pageNum);
-      y = marginTop;
-
-      const addPage = () => {
-        doc.addPage();
-        pageNum++;
-        drawHeader();
-        drawFooter(pageNum);
-        y = marginTop;
-      };
-
-      const checkSpace = (needed: number) => {
-        if (y + needed > pageH - marginBottom) {
-          addPage();
+          yOffset += pxPerPage;
+          pageNum++;
         }
-      };
-
-      const cleaned = stripChartBlocks(content);
-      const parsed = markdownToPlainLines(cleaned);
-
-      for (const line of parsed) {
-        if (line.text.trim() === "" && line.style === "normal") {
-          y += 3;
-          continue;
-        }
-
-        let fontSize = 10;
-        let fontStyle: "normal" | "bold" = "normal";
-        let color: [number, number, number] = [50, 55, 65];
-        let extraSpaceBefore = 0;
-        let extraSpaceAfter = 0;
-        let indent = 0;
-        let drawAccent = false;
-
-        switch (line.style) {
-          case "h1":
-            fontSize = 16;
-            fontStyle = "bold";
-            color = [30, 33, 40];
-            extraSpaceBefore = 6;
-            extraSpaceAfter = 3;
-            drawAccent = true;
-            break;
-          case "h2":
-            fontSize = 13;
-            fontStyle = "bold";
-            color = primaryColor;
-            extraSpaceBefore = 5;
-            extraSpaceAfter = 2;
-            break;
-          case "h3":
-            fontSize = 11;
-            fontStyle = "bold";
-            color = [50, 55, 65];
-            extraSpaceBefore = 4;
-            extraSpaceAfter = 1.5;
-            break;
-          case "bold":
-            fontSize = 10;
-            fontStyle = "bold";
-            color = [40, 44, 52];
-            extraSpaceBefore = 2;
-            break;
-          case "bullet":
-            fontSize = 10;
-            indent = 5;
-            extraSpaceBefore = 1;
-            break;
-          default:
-            fontSize = 10;
-        }
-
-        y += extraSpaceBefore;
-        doc.setFont("helvetica", fontStyle);
-        doc.setFontSize(fontSize);
-        doc.setTextColor(...color);
-
-        const maxW = contentW - indent;
-        const splitLines = doc.splitTextToSize(line.text, maxW) as string[];
-        const lineH = fontSize * 0.45;
-
-        checkSpace(splitLines.length * lineH + extraSpaceAfter);
-
-        if (drawAccent) {
-          doc.setFillColor(...primaryColor);
-          doc.rect(marginL, y - 1, 3, splitLines.length * lineH + 2, "F");
-        }
-
-        if (line.style === "bullet") {
-          doc.setFillColor(...primaryColor);
-          doc.circle(marginL + indent - 2.5, y + lineH * 0.35, 0.8, "F");
-        }
-
-        for (const sl of splitLines) {
-          doc.text(sl, marginL + indent + (drawAccent ? 5 : 0), y + lineH * 0.8);
-          y += lineH;
-        }
-        y += extraSpaceAfter;
       }
 
       doc.save(`relatorio-${agentName.replace(/\s+/g, "-").toLowerCase()}-${Date.now()}.pdf`);
