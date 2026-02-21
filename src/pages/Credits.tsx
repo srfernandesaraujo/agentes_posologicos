@@ -2,31 +2,54 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Coins, Zap, Star, Crown } from "lucide-react";
+import { Coins, Zap, Star, Crown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 const CREDIT_PACKS = [
-  { amount: 10, price: "R$ 9,90", icon: Zap, popular: false },
-  { amount: 30, price: "R$ 24,90", icon: Star, popular: true },
-  { amount: 100, price: "R$ 69,90", icon: Crown, popular: false },
+  { amount: 10, packKey: "10", price: "R$ 9,90", icon: Zap, popular: false },
+  { amount: 30, packKey: "30", price: "R$ 24,90", icon: Star, popular: true },
+  { amount: 100, packKey: "100", price: "R$ 69,90", icon: Crown, popular: false },
 ];
 
 export default function Credits() {
   const { user } = useAuth();
   const { balance, refetch } = useCredits();
   const { t } = useLanguage();
+  const [loadingPack, setLoadingPack] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const handlePurchase = async (amount: number) => {
+  useEffect(() => {
+    if (searchParams.get("success") === "true") {
+      const credits = searchParams.get("credits");
+      toast.success(`${credits} créditos adicionados com sucesso!`);
+      refetch();
+      setSearchParams({}, { replace: true });
+    }
+    if (searchParams.get("canceled") === "true") {
+      toast.info("Compra cancelada.");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
+
+  const handlePurchase = async (packKey: string) => {
     if (!user) return;
-    await supabase.from("credits_ledger").insert({
-      user_id: user.id,
-      amount,
-      type: "purchase",
-      description: `Compra de ${amount} créditos`,
-    });
-    await refetch();
-    toast.success(`${amount} créditos adicionados!`);
+    setLoadingPack(packKey);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: { packKey },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, "_blank");
+      }
+    } catch (err: any) {
+      toast.error("Erro ao iniciar pagamento: " + (err.message || "Tente novamente"));
+    } finally {
+      setLoadingPack(null);
+    }
   };
 
   return (
@@ -68,17 +91,25 @@ export default function Credits() {
             <p className="mb-1 text-sm text-white/40">{t("credits.credits")}</p>
             <p className="mb-6 text-xl font-semibold text-white">{pack.price}</p>
             <Button
-              onClick={() => handlePurchase(pack.amount)}
+              onClick={() => handlePurchase(pack.packKey)}
+              disabled={loadingPack !== null}
               className={`w-full ${pack.popular ? "bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white border-0" : "border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"}`}
               variant={pack.popular ? "default" : "outline"}
             >
-              {t("credits.buy")}
+              {loadingPack === pack.packKey ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                t("credits.buy")
+              )}
             </Button>
           </div>
         ))}
       </div>
 
-      <p className="mt-6 text-center text-xs text-white/30">{t("credits.disclaimer")}</p>
+      <div className="mt-6 text-center">
+        <p className="text-xs text-white/30">{t("credits.disclaimer")}</p>
+        <p className="mt-2 text-xs text-white/20">Pagamento seguro via Stripe • Cartão de crédito/débito</p>
+      </div>
     </div>
   );
 }
