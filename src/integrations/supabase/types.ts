@@ -478,6 +478,30 @@ export type Database = {
         }
         Relationships: []
       }
+      unlimited_users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string
+          is_active: boolean
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invited_by: string
+          is_active?: boolean
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string
+          is_active?: boolean
+        }
+        Relationships: []
+      }
       user_api_keys: {
         Row: {
           api_key_encrypted: string

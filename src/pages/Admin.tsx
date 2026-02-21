@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Shield, Users, Bot, Coins, Search, Plus, ToggleLeft, DoorOpen, Clock, Edit2,
-  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2,
+  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
@@ -45,6 +45,8 @@ export default function Admin() {
   const [agentExpiresAt, setAgentExpiresAt] = useState("");
   const [roomExpiresAt, setRoomExpiresAt] = useState("");
   const [roomActive, setRoomActive] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   // Analytics data
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
@@ -121,6 +123,47 @@ export default function Admin() {
       return data as any[];
     },
     enabled: isAdmin,
+  });
+
+  const { data: unlimitedUsers = [] } = useQuery({
+    queryKey: ["admin-unlimited-users"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("unlimited_users" as any).select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: isAdmin,
+  });
+
+  const handleInviteUser = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviteLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("invite-user", {
+        body: { email: inviteEmail.trim() },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Convite enviado para ${inviteEmail}`);
+      setInviteEmail("");
+      queryClient.invalidateQueries({ queryKey: ["admin-unlimited-users"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao convidar usuário");
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const removeUnlimitedUser = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("unlimited_users" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-unlimited-users"] });
+      toast.success("Acesso ilimitado removido");
+    },
+    onError: () => toast.error("Erro ao remover"),
   });
 
   const toggleAgent = useMutation({
@@ -246,6 +289,9 @@ export default function Admin() {
           </TabsTrigger>
           <TabsTrigger value="rooms" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
             <DoorOpen className="h-4 w-4 mr-1.5" /> Salas
+          </TabsTrigger>
+          <TabsTrigger value="unlimited" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+            <Crown className="h-4 w-4 mr-1.5" /> Convidados
           </TabsTrigger>
         </TabsList>
 
@@ -487,6 +533,56 @@ export default function Admin() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        {/* UNLIMITED USERS TAB */}
+        <TabsContent value="unlimited" className="space-y-4">
+          <h2 className="font-display text-xl font-semibold text-white flex items-center gap-2">
+            <Crown className="h-5 w-5 text-[hsl(38,92%,50%)]" />
+            Usuários com Acesso Ilimitado
+          </h2>
+          <p className="text-sm text-white/40">Cadastre o email de um usuário para dar acesso ilimitado (sem créditos). Ele receberá um link para criar sua senha.</p>
+          <div className="flex gap-2 max-w-md">
+            <Input
+              type="email"
+              placeholder="email@exemplo.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleInviteUser()}
+              className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
+            />
+            <Button onClick={handleInviteUser} disabled={inviteLoading || !inviteEmail.trim()} className="gap-1.5">
+              {inviteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Convidar
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {unlimitedUsers.length === 0 ? (
+              <p className="text-sm text-white/30 py-4">Nenhum usuário convidado ainda.</p>
+            ) : (
+              unlimitedUsers.map((u: any) => (
+                <div key={u.id} className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(38,92%,50%)]/20">
+                    <Crown className="h-4 w-4 text-[hsl(38,92%,50%)]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{u.email}</p>
+                    <p className="text-xs text-white/30">
+                      Convidado em {new Date(u.created_at).toLocaleDateString("pt-BR")}
+                      {!u.is_active && " · Inativo"}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm" variant="ghost"
+                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    onClick={() => removeUnlimitedUser.mutate(u.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
         </TabsContent>
       </Tabs>
 
