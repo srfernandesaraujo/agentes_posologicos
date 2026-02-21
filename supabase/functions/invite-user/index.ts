@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { Resend } from "npm:resend@4.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+// UPDATE THIS when you have a verified domain on Resend
+const FROM_EMAIL = "LearnLead <onboarding@resend.dev>";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -29,7 +33,6 @@ serve(async (req) => {
     const callerId = userData.user?.id;
     if (!callerId) throw new Error("Not authenticated");
 
-    // Check admin role
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
@@ -51,17 +54,61 @@ serve(async (req) => {
       .single();
     if (existing) throw new Error("Este email já está cadastrado como usuário ilimitado.");
 
-    // Use Supabase admin to invite user by email
+    // Generate signup link via Supabase admin API
     const origin = req.headers.get("origin") || "https://learn-lead-engine.lovable.app";
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(normalizedEmail, {
-      redirectTo: `${origin}/agentes`,
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: "invite",
+      email: normalizedEmail,
+      options: { redirectTo: `${origin}/agentes` },
     });
-    if (inviteError) {
-      // User might already exist - that's ok, just add to unlimited_users
-      if (!inviteError.message.includes("already been registered")) {
-        throw inviteError;
+
+    if (linkError) {
+      // If user already exists, just add to unlimited_users
+      if (!linkError.message.includes("already been registered")) {
+        throw linkError;
       }
     }
+
+    // Send email via Resend
+    const resendKey = Deno.env.get("RESEND_API_KEY");
+    if (!resendKey) throw new Error("RESEND_API_KEY not configured");
+
+    const resend = new Resend(resendKey);
+
+    // Build the invite URL
+    const signupUrl = linkData?.properties?.action_link || `${origin}/signup`;
+
+    const { error: emailError } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [normalizedEmail],
+      subject: "Você foi convidado para o LearnLead! 🎉",
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto; background: #ffffff; padding: 40px 32px;">
+          <h1 style="color: #1a1a2e; font-size: 24px; margin-bottom: 8px;">Bem-vindo ao LearnLead!</h1>
+          <p style="color: #555; font-size: 15px; line-height: 1.6;">
+            Você foi convidado para ter <strong>acesso ilimitado</strong> à nossa plataforma de agentes inteligentes para farmácia, ensino e pesquisa.
+          </p>
+          <p style="color: #555; font-size: 15px; line-height: 1.6;">
+            Clique no botão abaixo para criar sua senha e começar a usar:
+          </p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${signupUrl}" 
+               style="display: inline-block; background: linear-gradient(135deg, #14b8a6, #0ea5e9); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-size: 16px; font-weight: 600;">
+              Criar minha conta
+            </a>
+          </div>
+          <p style="color: #999; font-size: 13px; line-height: 1.5;">
+            Se você não esperava este convite, pode ignorar este email com segurança.
+          </p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+          <p style="color: #bbb; font-size: 12px; text-align: center;">
+            LearnLead — Agentes inteligentes para profissionais de saúde e educadores
+          </p>
+        </div>
+      `,
+    });
+
+    if (emailError) throw new Error(`Erro ao enviar email: ${JSON.stringify(emailError)}`);
 
     // Add to unlimited_users table
     const { error: insertError } = await supabaseAdmin
