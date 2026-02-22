@@ -799,17 +799,13 @@ Deno.serve(async (req) => {
 
     // Check if it's a custom agent
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const customAgentQuery = serviceClient
+    
+    // First try to find the agent without user_id filter (supports marketplace agents)
+    const { data: customAgent, error: customError } = await serviceClient
       .from("custom_agents")
       .select("*")
-      .eq("id", agentId);
-    
-    // For virtual room, don't filter by user_id
-    if (!isVirtualRoom && userId) {
-      customAgentQuery.eq("user_id", userId);
-    }
-    
-    const { data: customAgent, error: customError } = await customAgentQuery.single();
+      .eq("id", agentId)
+      .single();
 
     if (customError || !customAgent) {
       return new Response(JSON.stringify({ error: "Agent not found" }), {
