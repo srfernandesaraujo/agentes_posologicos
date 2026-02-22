@@ -135,10 +135,17 @@ export default function Account() {
           </div>
           <div>
             <p className="font-display text-lg font-semibold text-white">{profile?.display_name || user?.email}</p>
-            <div className="flex items-center gap-2 text-sm text-white/50">
-              <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
-              {balance} {t("credits.credits")}
-            </div>
+              {isUnlimited ? (
+                <div className="flex items-center gap-2 text-sm text-[hsl(174,62%,47%)]">
+                  <Infinity className="h-4 w-4" />
+                  Acesso ilimitado
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-white/50">
+                  <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
+                  {balance} {t("credits.credits")}
+                </div>
+              )}
           </div>
         </div>
       </div>
@@ -169,10 +176,24 @@ export default function Account() {
           </div>
         ) : (
           <div className="text-center py-4">
-            <p className="text-white/50 text-sm mb-3">Você não possui uma assinatura ativa.</p>
-            <Button onClick={() => window.location.href = "/creditos"} variant="outline" className="gap-2 border-white/10 text-white hover:bg-white/5">
-              Ver Planos
-            </Button>
+            {isUnlimited ? (
+              <>
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <Infinity className="h-5 w-5 text-[hsl(174,62%,47%)]" />
+                  <p className="text-[hsl(174,62%,47%)] text-sm font-medium">Você possui acesso ilimitado à plataforma.</p>
+                </div>
+                <Button disabled variant="outline" className="gap-2 border-white/10 text-white/30 cursor-not-allowed">
+                  Ver Planos
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-white/50 text-sm mb-3">Você não possui uma assinatura ativa.</p>
+                <Button onClick={() => window.location.href = "/creditos"} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                  Ver Planos
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>
