@@ -4,7 +4,7 @@ import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { useApiKeys } from "@/hooks/useApiKeys";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
-import { Bot, Plus, AlertCircle, Settings, Coins } from "lucide-react";
+import { Bot, Plus, AlertCircle, Settings, Coins, Wand2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,13 +29,15 @@ export default function MyAgents() {
   const { isAdmin } = useIsAdmin();
   const { user } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
+  const [createMode, setCreateMode] = useState<"manual" | "ai">("manual");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
     
-    // Check credits (admin is free)
     if (!isAdmin && balance < AGENT_CREATION_COST) {
       toast.error(`Créditos insuficientes. Criar um agente custa ${AGENT_CREATION_COST} créditos.`, {
         action: { label: "Comprar", onClick: () => navigate("/creditos") },
@@ -49,7 +51,6 @@ export default function MyAgents() {
         description: description.trim(),
       });
 
-      // Deduct credits for agent creation (admin is free)
       if (!isAdmin && user) {
         await supabase.from("credits_ledger").insert({
           user_id: user.id,
@@ -64,9 +65,67 @@ export default function MyAgents() {
       setShowCreate(false);
       setName("");
       setDescription("");
+      setAiPrompt("");
       navigate(`/meus-agentes/${agent.id}`);
     } catch {
       toast.error("Erro ao criar agente");
+    }
+  };
+
+  const handleCreateWithAI = async () => {
+    if (!aiPrompt.trim()) {
+      toast.error("Descreva o que seu agente deve fazer");
+      return;
+    }
+
+    if (!isAdmin && balance < AGENT_CREATION_COST) {
+      toast.error(`Créditos insuficientes. Criar um agente custa ${AGENT_CREATION_COST} créditos.`, {
+        action: { label: "Comprar", onClick: () => navigate("/creditos") },
+      });
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      // Generate system prompt via AI
+      const { data: promptData, error: promptError } = await supabase.functions.invoke("agent-chat", {
+        body: { agentId: "__generate_prompt__", input: aiPrompt },
+      });
+      if (promptError) throw promptError;
+
+      const generatedPrompt = promptData?.output || "";
+
+      // Create agent with AI-generated content
+      const agent = await createAgent.mutateAsync({
+        name: aiPrompt.slice(0, 60).trim(),
+        description: aiPrompt.trim(),
+      });
+
+      // Update with generated system prompt
+      await supabase
+        .from("custom_agents" as any)
+        .update({ system_prompt: generatedPrompt })
+        .eq("id", agent.id)
+        .eq("user_id", user!.id);
+
+      if (!isAdmin && user) {
+        await supabase.from("credits_ledger").insert({
+          user_id: user.id,
+          amount: -AGENT_CREATION_COST,
+          type: "usage",
+          description: "Criação de agente personalizado (IA)",
+        });
+        refetchCredits();
+      }
+
+      toast.success("Agente criado com IA! Revise o prompt gerado.");
+      setShowCreate(false);
+      setAiPrompt("");
+      navigate(`/meus-agentes/${agent.id}`);
+    } catch {
+      toast.error("Erro ao criar agente com IA");
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -156,8 +215,7 @@ export default function MyAgents() {
         </div>
       )}
 
-      {/* Create dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) { setCreateMode("manual"); setAiPrompt(""); } }}>
         <DialogContent className="border-white/10 bg-[hsl(220,25%,8%)] text-white">
           <DialogHeader>
             <DialogTitle className="font-display">Novo agente</DialogTitle>
@@ -169,32 +227,90 @@ export default function MyAgents() {
                 Criar um agente custa {AGENT_CREATION_COST} créditos. Seu saldo: {isAdmin ? "∞" : balance}
               </span>
             </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/70">Nome</label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Escreva aqui o nome do agente"
-                className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
-              />
+
+            {/* Mode selector */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCreateMode("manual")}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  createMode === "manual" ? "bg-white/10 text-white border border-white/20" : "text-white/50 hover:bg-white/5 border border-transparent"
+                }`}
+              >
+                <Bot className="h-4 w-4" />
+                Manual
+              </button>
+              <button
+                onClick={() => setCreateMode("ai")}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  createMode === "ai" ? "bg-accent/20 text-accent border border-accent/30" : "text-white/50 hover:bg-white/5 border border-transparent"
+                }`}
+              >
+                <Sparkles className="h-4 w-4" />
+                Criar com IA
+              </button>
             </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/70">Descrição</label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Escreva aqui a descrição do agente"
-                rows={4}
-                className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
-              />
-            </div>
-            <Button
-              onClick={handleCreate}
-              disabled={!name.trim() || createAgent.isPending || (!isAdmin && balance < AGENT_CREATION_COST)}
-              className="w-full bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white"
-            >
-              {createAgent.isPending ? "Criando..." : `Criar o Agente (${AGENT_CREATION_COST} créditos)`}
-            </Button>
+
+            {createMode === "manual" ? (
+              <>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-white/70">Nome</label>
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Escreva aqui o nome do agente"
+                    className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-white/70">Descrição</label>
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Escreva aqui a descrição do agente"
+                    rows={4}
+                    className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
+                  />
+                </div>
+                <Button
+                  onClick={handleCreate}
+                  disabled={!name.trim() || createAgent.isPending || (!isAdmin && balance < AGENT_CREATION_COST)}
+                  className="w-full bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white"
+                >
+                  {createAgent.isPending ? "Criando..." : `Criar o Agente (${AGENT_CREATION_COST} créditos)`}
+                </Button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-white/70">Descreva o que seu agente deve fazer</label>
+                  <Textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="Ex: Um assistente que analisa bulas de medicamentos e resume as informações principais para o paciente..."
+                    rows={5}
+                    className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
+                  />
+                  <p className="mt-1 text-xs text-white/30">A IA vai gerar automaticamente o nome, descrição e prompt de sistema do seu agente.</p>
+                </div>
+                <Button
+                  onClick={handleCreateWithAI}
+                  disabled={!aiPrompt.trim() || generating || (!isAdmin && balance < AGENT_CREATION_COST)}
+                  className="w-full gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
+                >
+                  {generating ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Gerando com IA...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4" />
+                      Criar com IA ({AGENT_CREATION_COST} créditos)
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
