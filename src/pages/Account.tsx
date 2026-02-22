@@ -3,13 +3,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { User, Coins, Clock, ArrowUpRight, ArrowDownRight, Gift, Mail, Lock, Check, Loader2, Camera, CreditCard, ExternalLink } from "lucide-react";
+import { User, Coins, Clock, ArrowUpRight, ArrowDownRight, Gift, Mail, Lock, Check, Loader2, Camera, CreditCard, ExternalLink, Infinity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useSubscription, SUBSCRIPTION_TIERS } from "@/hooks/useSubscription";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
 
 export default function Account() {
   const { user } = useAuth();
@@ -18,7 +20,9 @@ export default function Account() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { subscribed, tier, tierInfo, subscriptionEnd } = useSubscription();
-
+  const { isAdmin } = useIsAdmin();
+  const { hasUnlimitedAccess } = useUnlimitedAccess();
+  const isUnlimited = isAdmin || hasUnlimitedAccess;
   const [newEmail, setNewEmail] = useState("");
   const [emailLoading, setEmailLoading] = useState(false);
   const [newPassword, setNewPassword] = useState("");
