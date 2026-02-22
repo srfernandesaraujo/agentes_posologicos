@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Coins, User, LogOut, Pill, Shield, BarChart3 } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -22,6 +23,8 @@ export function AppHeader() {
   const { user, signOut } = useAuth();
   const { balance } = useCredits();
   const { isAdmin } = useIsAdmin();
+  const { hasUnlimitedAccess } = useUnlimitedAccess();
+  const hasFreeAccess = isAdmin || hasUnlimitedAccess;
   const navigate = useNavigate();
   const { t } = useLanguage();
 
@@ -59,7 +62,7 @@ export function AppHeader() {
           <Link to="/creditos">
             <Button variant="outline" size="sm" className="gap-2 font-medium border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white" data-tour="credits">
               <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
-              <span>{isAdmin ? "∞" : balance}</span>
+              <span>{hasFreeAccess ? "∞" : balance}</span>
             </Button>
           </Link>
 

@@ -1,6 +1,8 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useSubscription, SUBSCRIPTION_TIERS, TierKey } from "@/hooks/useSubscription";
+import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Coins, Zap, Star, Crown, Loader2, Check, Settings, Sparkles, AlertTriangle } from "lucide-react";
@@ -40,6 +42,9 @@ export default function Credits() {
   const { user } = useAuth();
   const { balance, refetch } = useCredits();
   const { subscribed, tier, tierInfo, subscriptionEnd, refetch: refetchSub, isLoading: subLoading } = useSubscription();
+  const { hasUnlimitedAccess } = useUnlimitedAccess();
+  const { isAdmin } = useIsAdmin();
+  const hasFreeAccess = isAdmin || hasUnlimitedAccess;
   const { t } = useLanguage();
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
@@ -119,7 +124,7 @@ export default function Credits() {
       </div>
 
       {/* Zero credits banner */}
-      {balance <= 0 && !subscribed && (
+      {balance <= 0 && !subscribed && !hasFreeAccess && (
         <div className="mb-8 rounded-2xl border border-[hsl(14,90%,58%)]/30 bg-[hsl(14,90%,58%)]/10 p-6 animate-fade-in">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[hsl(14,90%,58%)]/20">
@@ -144,7 +149,7 @@ export default function Credits() {
             </div>
             <div>
               <p className="text-sm text-white/50">{t("credits.balance")}</p>
-              <p className="font-display text-4xl font-bold text-white">{balance}</p>
+              <p className="font-display text-4xl font-bold text-white">{hasFreeAccess ? "∞" : balance}</p>
             </div>
           </div>
           {subscribed && tierInfo && (
