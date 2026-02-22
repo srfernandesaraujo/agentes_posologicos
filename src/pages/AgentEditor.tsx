@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2, DoorOpen, ExternalLink } from "lucide-react";
+import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2, DoorOpen, ExternalLink, Store } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { WhatsAppConnect } from "@/components/agents/WhatsAppConnect";
@@ -47,6 +47,7 @@ export default function AgentEditor() {
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [publishWhatsApp, setPublishWhatsApp] = useState(false);
   const [publishVirtualPatient, setPublishVirtualPatient] = useState(false);
+  const [publishMarketplace, setPublishMarketplace] = useState(false);
 
   // Prompt simple fields
   const [whoIs, setWhoIs] = useState("");
@@ -71,6 +72,7 @@ export default function AgentEditor() {
     setSystemPrompt(agent.system_prompt);
     setPublishWhatsApp((agent as any).publish_whatsapp || false);
     setPublishVirtualPatient((agent as any).publish_virtual_patient || false);
+    setPublishMarketplace((agent as any).published_to_marketplace || false);
     setInitialized(true);
   }
 
@@ -594,6 +596,30 @@ export default function AgentEditor() {
                   >
                     Despublicar
                   </Button>
+                )}
+              </div>
+
+              {/* Marketplace */}
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Store className="h-5 w-5 text-accent" />
+                      Publicar no Marketplace
+                    </h3>
+                    <p className="text-sm text-white/50 mt-1">Compartilhe seu agente com toda a comunidade</p>
+                  </div>
+                  <Switch
+                    checked={publishMarketplace}
+                    onCheckedChange={async (v) => {
+                      setPublishMarketplace(v);
+                      await updateAgent.mutateAsync({ id: agentId!, published_to_marketplace: v } as any);
+                      toast.success(v ? "Agente publicado no Marketplace!" : "Agente removido do Marketplace");
+                    }}
+                  />
+                </div>
+                {publishMarketplace && (
+                  <p className="text-xs text-accent/80">✅ Seu agente está visível para todos os usuários no Marketplace.</p>
                 )}
               </div>
 

@@ -23,6 +23,7 @@ import Knowledge from "./pages/Knowledge";
 import KnowledgeDetail from "./pages/KnowledgeDetail";
 import VirtualRooms from "./pages/VirtualRooms";
 import VirtualRoomChat from "./pages/VirtualRoomChat";
+import Marketplace from "./pages/Marketplace";
 import NotFound from "./pages/NotFound";
 import UserDashboard from "./pages/UserDashboard";
 import ResetPassword from "./pages/ResetPassword";
@@ -61,6 +62,7 @@ const App = () => (
               <Route path="/conteudos" element={<Knowledge />} />
               <Route path="/conteudos/:kbId" element={<KnowledgeDetail />} />
               <Route path="/salas-virtuais" element={<VirtualRooms />} />
+              <Route path="/marketplace" element={<Marketplace />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
