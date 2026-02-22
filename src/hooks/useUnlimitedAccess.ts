@@ -10,12 +10,15 @@ export function useUnlimitedAccess() {
     queryFn: async () => {
       if (!user?.email) return false;
       const { data, error } = await supabase
-        .from("unlimited_users" as any)
+        .from("unlimited_users")
         .select("id, is_active")
         .eq("email", user.email.toLowerCase())
         .eq("is_active", true)
         .maybeSingle();
-      if (error) return false;
+      if (error) {
+        console.error("useUnlimitedAccess error:", error);
+        return false;
+      }
       return !!data;
     },
     enabled: !!user,
