@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_reviews: {
+        Row: {
+          agent_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          rating: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_reviews_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "custom_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           active: boolean
@@ -124,6 +162,7 @@ export type Database = {
           provider: string
           publish_virtual_patient: boolean
           publish_whatsapp: boolean
+          published_to_marketplace: boolean
           restrict_content: boolean
           status: string
           system_prompt: string
@@ -142,6 +181,7 @@ export type Database = {
           provider?: string
           publish_virtual_patient?: boolean
           publish_whatsapp?: boolean
+          published_to_marketplace?: boolean
           restrict_content?: boolean
           status?: string
           system_prompt?: string
@@ -160,6 +200,7 @@ export type Database = {
           provider?: string
           publish_virtual_patient?: boolean
           publish_whatsapp?: boolean
+          published_to_marketplace?: boolean
           restrict_content?: boolean
           status?: string
           system_prompt?: string

@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
-import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen } from "lucide-react";
+import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,6 +60,7 @@ export function AppLayout() {
             <SidebarLink to="/conteudos" icon={Database} label={t("nav.content")} count={knowledgeBases.length} />
             <SidebarLink to="/conversas" icon={MessageSquare} label={t("nav.conversations")} count={conversationCount} />
             <SidebarLink to="/salas-virtuais" icon={DoorOpen} label={t("nav.virtualRooms")} />
+            <SidebarLink to="/marketplace" icon={Store} label="Marketplace" />
           </nav>
           <div className="mt-8 space-y-1">
             <SidebarLink to="/configuracoes" icon={Settings} label={t("nav.settings")} />
