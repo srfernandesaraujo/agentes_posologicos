@@ -86,11 +86,10 @@ export function useCustomAgent(id: string | undefined) {
         .from("custom_agents" as any)
         .select("*")
         .eq("id", id!)
-        .eq("user_id", user!.id)
         .single();
       if (error) throw error;
       return data as unknown as CustomAgent;
     },
-    enabled: !!id && !!user,
+    enabled: !!id,
   });
 }
