@@ -106,7 +106,7 @@ export default function Conversations() {
             return (
               <button
                 key={session.id}
-                onClick={() => navigate(`/chat/${session.agent_id}`)}
+                onClick={() => navigate(`/chat/${session.agent_id}?session=${session.id}`)}
                 className="w-full text-left rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] transition-colors"
               >
                 <div className="flex items-center justify-between mb-1">

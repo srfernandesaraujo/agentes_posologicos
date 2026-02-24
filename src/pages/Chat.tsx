@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, createRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { ChartBlock } from "@/components/chat/ChartRenderer";
@@ -12,7 +12,8 @@ import { useCustomAgent } from "@/hooks/useCustomAgents";
 import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText } from "lucide-react";
+import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { InputTemplates } from "@/components/chat/InputTemplates";
 import { MessageActions } from "@/components/chat/MessageActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
@@ -194,6 +195,7 @@ interface Message {
 
 export default function Chat() {
   const { agentId: rawAgentId } = useParams<{ agentId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { balance, refetch: refetchCredits } = useCredits();
   const { isAdmin } = useIsAdmin();
@@ -235,10 +237,11 @@ export default function Chat() {
 
   const agentLoading = isCustom ? customLoading : builtInLoading;
 
+  const [showNoCreditsDialog, setShowNoCreditsDialog] = useState(false);
+
   useEffect(() => {
     if (!agentLoading && builtInAgent && !isCustom && !hasFreeAccess && balance < builtInAgent.credit_cost) {
-      toast.error("Créditos insuficientes!");
-      navigate("/creditos");
+      setShowNoCreditsDialog(true);
     }
   }, [builtInAgent, balance, agentLoading, hasFreeAccess, isCustom]);
 
@@ -259,7 +262,11 @@ export default function Chat() {
   useEffect(() => {
     if (!user || !actualAgentId) return;
     if (isCustom) { setSessionId(null); return; }
-    // Don't auto-load a session — start blank
+    const sessionFromUrl = searchParams.get("session");
+    if (sessionFromUrl) {
+      setSessionId(sessionFromUrl);
+      setSearchParams({}, { replace: true });
+    }
   }, [user, actualAgentId, isCustom]);
 
   const { data: messages = [] } = useQuery({
@@ -409,6 +416,13 @@ export default function Chat() {
           .from("messages")
           .insert({ session_id: sid, role: "user", content: userContent });
 
+        const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
+          body: { agentId: actualAgentId, input: fullInput, conversationHistory },
+        });
+
+        if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
+
+        // Debit credits AFTER successful response
         if (!hasFreeAccess && builtInAgent) {
           await supabase
             .from("credits_ledger")
@@ -419,12 +433,6 @@ export default function Chat() {
               description: `Uso: ${builtInAgent.name}`,
             });
         }
-
-        const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
-          body: { agentId: actualAgentId, input: fullInput, conversationHistory },
-        });
-
-        if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
 
         const assistantContent = data?.output || "Sem resposta do agente.";
 
@@ -492,6 +500,31 @@ export default function Chat() {
   const AgentIcon = getIcon(agent.icon || "Bot");
 
   return (
+    <>
+    {/* No credits dialog */}
+    <Dialog open={showNoCreditsDialog} onOpenChange={setShowNoCreditsDialog}>
+      <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-lg">
+            <AlertTriangle className="h-5 w-5 text-[hsl(38,92%,50%)]" />
+            Créditos insuficientes
+          </DialogTitle>
+          <DialogDescription className="text-white/50">
+            Você precisa de pelo menos {agent.credit_cost} crédito(s) para usar este agente. Seu saldo atual é {balance}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-3 mt-2">
+          <Button variant="outline" onClick={() => { setShowNoCreditsDialog(false); navigate("/agentes"); }} className="flex-1 border-white/20 bg-transparent text-white hover:bg-white/10">
+            Voltar
+          </Button>
+          <Button onClick={() => { setShowNoCreditsDialog(false); navigate("/creditos"); }} className="flex-1 bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white border-0">
+            <Coins className="h-4 w-4 mr-2" />
+            Comprar Créditos
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
     <div className="flex h-[calc(100vh-4rem)]">
       {/* Sidebar */}
       <ChatSidebar
@@ -669,5 +702,6 @@ export default function Chat() {
         </div>
       </div>
     </div>
+    </>
   );
 }

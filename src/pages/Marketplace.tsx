@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMarketplaceAgents, useAgentReviews, useSubmitReview, MarketplaceAgent } from "@/hooks/useMarketplace";
-import { Search, Bot, Star, ArrowRight, Store, MessageSquare, User } from "lucide-react";
+import { Search, Bot, Star, ArrowRight, Store, MessageSquare, User, Coins } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -196,6 +196,10 @@ export default function Marketplace() {
 
               <h3 className="mb-1 font-display text-lg font-semibold leading-tight text-white">{agent.name}</h3>
               <p className="mb-1 text-xs text-white/30">por {agent.creator_name}</p>
+              <div className="mb-3 flex items-center gap-1 text-xs text-white/40">
+                <Coins className="h-3 w-3 text-[hsl(38,92%,50%)]" />
+                0.5 crédito/uso
+              </div>
               <p className="mb-5 text-sm text-white/40 line-clamp-3">{agent.description}</p>
 
               <Button
