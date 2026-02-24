@@ -1,62 +1,137 @@
 
-# Corrigir Tabelas no Chat - Formatacao Profissional
 
-## Problema Identificado
+# Revisao Completa de UX e Fluxos do Sistema
 
-O agente esta retornando dados tabulares como texto corrido com pipes (`|`) em uma unica linha, em vez de usar a sintaxe correta de tabelas Markdown (uma linha por registro, com separador `|---|---|`). O ReactMarkdown nao consegue interpretar esse formato como tabela HTML, exibindo tudo como paragrafo de texto ilegivel.
+## Resumo Executivo
 
-## Solucao em 2 Frentes
+Analisei todos os fluxos do sistema de ponta a ponta. A base esta solida com boa identidade visual e arquitetura funcional. Identifiquei **15 problemas de UX** organizados por prioridade, com sugestoes concretas de melhoria.
 
-### Frente 1: Corrigir o prompt do agente (edge function)
+---
 
-Adicionar instrucao explicita em TODOS os prompts dos agentes para que SEMPRE formatem tabelas com:
-- Uma linha por registro
-- Linha separadora apos o cabecalho (`|---|---|---| `)
-- Nunca colocar multiplas linhas de dados na mesma linha de texto
+## 1. Onboarding e Primeiro Acesso
 
-Exemplo do formato correto que sera instruido:
+### Problema 1.1: Signup nao confirma email automaticamente
+- Apos o cadastro, o usuario e redirecionado para `/login` com uma mensagem generica de sucesso
+- Nao ha orientacao clara sobre verificacao de email (se habilitada no Supabase)
+- **Sugestao**: Mostrar uma tela intermediaria "Verifique seu email" com instrucoes claras antes de redirecionar ao login
 
-```text
-| Medicamento | n | % |
-|---|---|---|
-| Metformina | 14 | 11.67 |
-| Levotiroxina | 13 | 10.83 |
-```
+### Problema 1.2: Onboarding Tour limitado e fragil
+- O tour so aparece em `/agentes` e depende de `prefs === null`, o que pode falhar se o registro de preferencias for criado por outro motivo
+- Nao menciona o **Marketplace**, **Dashboard**, **Salas Virtuais** nem **Conteudos (Knowledge Bases)** -- funcionalidades importantes que o usuario pode nao descobrir sozinho
+- **Sugestao**: Adicionar passos do tour para Marketplace, Dashboard e Salas Virtuais. Considerar adicionar um botao "Repetir tour" nas configuracoes
 
-### Frente 2: Pre-processamento no frontend (Chat.tsx)
+### Problema 1.3: Bonus de boas-vindas sem feedback visual
+- Os 15 creditos de boas-vindas sao mencionados na tela de signup, mas apos o cadastro nao ha nenhum destaque visual (toast, banner, animacao) confirmando que os creditos foram recebidos
+- **Sugestao**: Adicionar uma notificacao ou banner animado no primeiro acesso mostrando "Voce recebeu 15 creditos de boas-vindas!"
 
-Adicionar uma funcao de sanitizacao que detecta tabelas malformadas (multiplos `|...|` na mesma linha) e as reformata em markdown valido antes de passar para o ReactMarkdown. Isso garante compatibilidade mesmo que o modelo ocasionalmente retorne o formato antigo.
+---
 
-### Frente 3: Melhorar o estilo visual das tabelas no chat
+## 2. Navegacao e Layout
 
-Atualizar o `markdownComponents` para um visual mais profissional:
-- Cabecalho com fundo de destaque solido (ex: `bg-[hsl(199,89%,48%)]/20`)
-- Bordas mais visiveis e consistentes
-- Zebra-striping (linhas alternadas com fundo ligeiramente diferente)
-- Padding mais generoso
-- Fonte monospacada para numeros/dados
-- Borda arredondada no container da tabela
+### Problema 2.1: Sidebar oculta no mobile -- sem navegacao alternativa
+- A sidebar (`md:block`) fica completamente oculta em telas menores que 768px
+- Nao existe hamburger menu, bottom navigation ou qualquer alternativa para mobile
+- O usuario mobile so consegue navegar pelo header dropdown (que tem apenas Conta, Dashboard, Creditos, Admin e Logout)
+- Paginas como Meus Agentes, Conversas, Conteudos, Salas Virtuais e Marketplace ficam **inacessiveis no mobile**
+- **Sugestao**: Implementar um bottom navigation bar para mobile com os itens principais, ou um hamburger menu que abre a sidebar
 
-## Detalhes Tecnicos
+### Problema 2.2: Dashboard nao esta na sidebar
+- O Dashboard (`/dashboard`) so e acessivel pelo dropdown do avatar no header
+- Nao aparece na sidebar, tornando-o pouco visivel
+- **Sugestao**: Adicionar link do Dashboard na sidebar, idealmente como primeiro item
 
-### Arquivos modificados
+---
 
-1. **`supabase/functions/agent-chat/index.ts`**
-   - Adicionar bloco de instrucao global sobre formatacao de tabelas (aplicado a todos os agentes)
-   - Instrucao: "Sempre use tabelas Markdown com uma linha por registro e separador de cabecalho"
+## 3. Fluxo dos Agentes e Chat
 
-2. **`src/pages/Chat.tsx`**
-   - Criar funcao `sanitizeMarkdownTables(content: string)` que:
-     - Detecta linhas com multiplos blocos `| valor |` concatenados
-     - Separa em linhas individuais
-     - Insere separador de cabecalho quando ausente
-   - Atualizar `markdownComponents` com estilos visuais melhorados para tabelas
-   - Aplicar `sanitizeMarkdownTables` no conteudo antes de passar ao ReactMarkdown
+### Problema 3.1: Redirecionamento agressivo por falta de creditos
+- Se o usuario sem creditos clica num agente nativo, o `useEffect` no Chat redireciona automaticamente para `/creditos` com um toast rapido
+- O usuario pode nao entender o que aconteceu, especialmente se for a primeira vez
+- **Sugestao**: Em vez de redirecionar automaticamente, mostrar um dialog/modal explicativo dentro do Chat com opcoes "Comprar creditos" ou "Voltar"
 
-### Estilo visual das tabelas
+### Problema 3.2: Conversas de agentes personalizados nao sao salvas
+- Agentes customizados (`isCustom`) usam `localMessages` em vez de salvar no banco (sem `session_id`)
+- Isso significa que recarregar a pagina perde toda a conversa
+- O usuario perde trabalho sem aviso
+- **Sugestao**: Salvar conversas de agentes personalizados no banco tambem, ou ao menos avisar o usuario que as mensagens nao serao persistidas
 
-- Container com `rounded-lg overflow-hidden border border-white/15`
-- Cabecalho: `bg-primary/15 text-white font-semibold`
-- Linhas alternadas: `even:bg-white/[0.03]`
-- Hover: `hover:bg-white/[0.06]`
-- Celulas com padding `px-4 py-2.5` e alinhamento consistente
+### Problema 3.3: Conversas mostra sessoes antigas mas nao carrega a conversa correta
+- Na pagina de Conversas, clicar numa sessao navega para `/chat/{agent_id}`, mas nao especifica qual sessao carregar
+- O chat abre em branco (nova conversa) em vez de abrir a sessao que o usuario clicou
+- **Sugestao**: Passar o `sessionId` como query param ou state para que o Chat carregue a sessao correta
+
+---
+
+## 4. Marketplace
+
+### Problema 4.1: Sem filtros de categoria ou ordenacao
+- O Marketplace so tem busca por texto, sem filtros por categoria ou ordenacao (mais recentes, melhor avaliados)
+- **Sugestao**: Adicionar filtros de ordenacao (rating, recentes) e eventualmente categorias
+
+### Problema 4.2: Usuario so pode avaliar depois de usar?
+- Nao ha verificacao se o usuario realmente usou o agente antes de avaliar
+- Qualquer usuario pode avaliar sem ter testado, o que pode prejudicar a confiabilidade das avaliacoes
+- **Sugestao**: Considerar permitir avaliacao somente apos pelo menos uma interacao com o agente
+
+---
+
+## 5. Creditos e Monetizacao
+
+### Problema 5.1: Custo de creditos cobrado ANTES da resposta da IA
+- No chat, os creditos sao debitados antes de receber a resposta do agente
+- Se a edge function falhar, o usuario perde creditos sem receber nenhuma resposta
+- **Sugestao**: Debitar creditos apenas apos receber resposta com sucesso, ou implementar sistema de reembolso automatico em caso de erro
+
+### Problema 5.2: Sem indicacao de custo antes de usar agente do Marketplace
+- No card do Marketplace nao aparece o custo em creditos (0.5 por uso de agente personalizado)
+- O usuario so descobre o custo quando ja esta no chat
+- **Sugestao**: Mostrar o custo (0.5 creditos) nos cards do Marketplace
+
+---
+
+## 6. Seguranca e Dados
+
+### Problema 6.1: API keys exibidas em texto plano
+- Na pagina de Configuracoes, o campo `api_key_encrypted` e exibido diretamente, sugerindo que a chave esta armazenada em texto plano (ou com criptografia reversivel exibida no client)
+- O botao "Mostrar" revela a chave completa
+- **Sugestao**: Nunca retornar a chave completa do backend. Mostrar apenas os ultimos 4 caracteres apos salvar
+
+---
+
+## 7. Experiencia Geral
+
+### Problema 7.1: Pagina de Configuracoes limitada
+- A pagina de Configuracoes so tem API Keys
+- Faltam opcoes como: tema, preferencias de notificacao, idioma (esta no header mas poderia estar aqui tambem), e opcao de repetir o onboarding tour
+- **Sugestao**: Expandir a pagina de Configuracoes com mais opcoes de preferencias
+
+### Problema 7.2: Landing page sem prova social real
+- Os stats mostram valores fixos hardcoded ("10+", "5", "infinito", "RAG") que nao transmitem credibilidade
+- Nao ha depoimentos de usuarios nem contadores reais
+- **Sugestao**: Adicionar uma secao de depoimentos/testimonials e, quando possivel, contadores dinamicos reais
+
+---
+
+## Plano de Implementacao Sugerido (por prioridade)
+
+### Alta Prioridade (impacto direto na usabilidade)
+1. **Navegacao mobile** -- Implementar bottom nav ou hamburger menu
+2. **Salvar conversas de agentes personalizados** ou avisar que nao persistem
+3. **Corrigir fluxo de Conversas** para carregar a sessao clicada
+4. **Debitar creditos apos sucesso** da resposta da IA
+
+### Media Prioridade (melhorias de experiencia)
+5. Expandir tour de onboarding com Marketplace, Dashboard e Salas
+6. Feedback visual do bonus de boas-vindas
+7. Modal de creditos insuficientes em vez de redirect
+8. Mostrar custo nos cards do Marketplace
+9. Adicionar Dashboard na sidebar
+
+### Baixa Prioridade (polimento)
+10. Filtros e ordenacao no Marketplace
+11. Verificacao de uso antes de avaliar
+12. Expandir pagina de Configuracoes
+13. Melhorar landing page com prova social
+14. Mascarar API keys no backend
+15. Tela de verificacao de email no signup
+
