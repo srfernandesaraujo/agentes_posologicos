@@ -69,10 +69,18 @@ export default function Settings() {
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5">
-                    <Key className="h-4 w-4 text-white/60" />
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${existing ? 'bg-emerald-500/15' : 'bg-white/5'}`}>
+                    <Key className={`h-4 w-4 ${existing ? 'text-emerald-400' : 'text-white/60'}`} />
                   </div>
-                  <h3 className="font-semibold text-white">{provider.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-white">{provider.name}</h3>
+                    {existing && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                        <Check className="h-3 w-3" />
+                        Configurada
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <a
                   href={provider.url}
