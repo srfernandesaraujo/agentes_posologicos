@@ -110,15 +110,7 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "chat_sessions_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "agents"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       credits_ledger: {
         Row: {

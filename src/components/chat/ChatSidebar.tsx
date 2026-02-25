@@ -44,7 +44,7 @@ export function ChatSidebar({
       if (error) throw error;
       return data;
     },
-    enabled: !!user && !isCustom,
+    enabled: !!user,
   });
 
   const getSessionTitle = (session: any) => {
@@ -103,12 +103,7 @@ export function ChatSidebar({
 
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
-          {isCustom ? (
-            <div className="px-3 py-6 text-center text-xs text-white/30">
-              <MessageSquare className="mx-auto mb-2 h-5 w-5" />
-              Histórico não disponível para agentes personalizados
-            </div>
-          ) : sessions.length === 0 ? (
+          {sessions.length === 0 ? (
             <div className="px-3 py-6 text-center text-xs text-white/30">
               <MessageSquare className="mx-auto mb-2 h-5 w-5" />
               Nenhuma conversa ainda
