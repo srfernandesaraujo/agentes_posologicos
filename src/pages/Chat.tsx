@@ -12,9 +12,11 @@ import { useCustomAgent } from "@/hooks/useCustomAgents";
 import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle } from "lucide-react";
+import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InputTemplates } from "@/components/chat/InputTemplates";
+import { ConversationPicker } from "@/components/chat/ConversationPicker";
 import { MessageActions } from "@/components/chat/MessageActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
 import { toast } from "sonner";
@@ -206,6 +208,9 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [attachedConversations, setAttachedConversations] = useState<{ title: string; content: string }[]>([]);
+  const [showConversationPicker, setShowConversationPicker] = useState(false);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -357,7 +362,14 @@ export default function Chat() {
         }
         fileContext = "\n\n" + fileContents.join("\n\n");
       }
-      const fullInput = text + fileContext;
+
+      // Add attached conversations as context
+      let conversationContext = "";
+      if (attachedConversations.length > 0) {
+        conversationContext = "\n\n" + attachedConversations.map(c => c.content).join("\n\n");
+      }
+
+      const fullInput = text + fileContext + conversationContext;
 
       // Build conversation history from current displayed messages
       const conversationHistory = displayMessages.map((m) => ({
@@ -376,7 +388,11 @@ export default function Chat() {
         throw new Error("Créditos insuficientes!");
       }
 
-      const userContent = text + (attachedFiles.length > 0 ? `\n\n📎 ${attachedFiles.map(f => f.name).join(", ")}` : "");
+      const attachmentLabels = [
+        ...attachedFiles.map(f => `📎 ${f.name}`),
+        ...attachedConversations.map(c => `💬 ${c.title}`),
+      ];
+      const userContent = text + (attachmentLabels.length > 0 ? `\n\n${attachmentLabels.join(", ")}` : "");
 
       await supabase
         .from("messages")
@@ -409,6 +425,7 @@ export default function Chat() {
     onSuccess: () => {
       setInput("");
       setAttachedFiles([]);
+      setAttachedConversations([]);
       queryClient.invalidateQueries({ queryKey: ["messages", sessionId] });
       queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
       refetchCredits();
@@ -420,7 +437,7 @@ export default function Chat() {
 
   const handleSend = () => {
     const text = input.trim();
-    if (!text && attachedFiles.length === 0) return;
+    if (!text && attachedFiles.length === 0 && attachedConversations.length === 0) return;
     if (!hasFreeAccess) {
       const cost = isCustom ? CUSTOM_AGENT_INTERACTION_COST : (builtInAgent?.credit_cost || 1);
       if (balance < cost) {
@@ -436,6 +453,7 @@ export default function Chat() {
     setSessionId(null);
     setInput("");
     setAttachedFiles([]);
+    setAttachedConversations([]);
   };
 
   const handleSelectSession = (sid: string) => {
@@ -590,18 +608,30 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Attached files preview */}
-        {attachedFiles.length > 0 && (
+        {/* Attached files & conversations preview */}
+        {(attachedFiles.length > 0 || attachedConversations.length > 0) && (
           <div className="border-t border-white/10 bg-[hsl(220,25%,8%)]/60 px-4 py-2">
             <div className="mx-auto max-w-3xl flex gap-2 flex-wrap">
               {attachedFiles.map((file, i) => (
                 <div
-                  key={i}
+                  key={`file-${i}`}
                   className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs text-white/70"
                 >
                   <FileText className="h-3.5 w-3.5 text-[hsl(174,62%,47%)]" />
                   <span className="max-w-[120px] truncate">{file.name}</span>
                   <button onClick={() => removeFile(i)} className="text-white/40 hover:text-white/80">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {attachedConversations.map((conv, i) => (
+                <div
+                  key={`conv-${i}`}
+                  className="flex items-center gap-2 rounded-lg border border-[hsl(174,62%,47%)]/20 bg-[hsl(174,62%,47%)]/10 px-3 py-1.5 text-xs text-white/70"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 text-[hsl(174,62%,47%)]" />
+                  <span className="max-w-[160px] truncate">{conv.title}</span>
+                  <button onClick={() => setAttachedConversations(prev => prev.filter((_, idx) => idx !== i))} className="text-white/40 hover:text-white/80">
                     <X className="h-3 w-3" />
                   </button>
                 </div>
@@ -621,15 +651,34 @@ export default function Chat() {
               onChange={handleFileSelect}
               className="hidden"
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              className="shrink-0 text-white/40 hover:text-white hover:bg-white/10"
-            >
-              <Paperclip className="h-5 w-5" />
-            </Button>
+            <Popover open={attachMenuOpen} onOpenChange={setAttachMenuOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-white/40 hover:text-white hover:bg-white/10"
+                >
+                  <Paperclip className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="start" className="w-48 p-1 border-white/10 bg-[hsl(220,25%,10%)]">
+                <button
+                  onClick={() => { fileInputRef.current?.click(); setAttachMenuOpen(false); }}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <FileText className="h-4 w-4" />
+                  Arquivos
+                </button>
+                <button
+                  onClick={() => { setShowConversationPicker(true); setAttachMenuOpen(false); }}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Conversas
+                </button>
+              </PopoverContent>
+            </Popover>
             <InputTemplates
               agentId={rawAgentId || ""}
               currentInput={input}
@@ -649,7 +698,7 @@ export default function Chat() {
             />
             <Button
               onClick={handleSend}
-              disabled={(!input.trim() && attachedFiles.length === 0) || sendMutation.isPending}
+              disabled={(!input.trim() && attachedFiles.length === 0 && attachedConversations.length === 0) || sendMutation.isPending}
               className="shrink-0 gap-2 bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white border-0"
             >
               {sendMutation.isPending ? (
@@ -663,6 +712,14 @@ export default function Chat() {
         </div>
       </div>
     </div>
+
+    {/* Conversation Picker */}
+    <ConversationPicker
+      open={showConversationPicker}
+      onClose={() => setShowConversationPicker(false)}
+      onSelect={(conv) => setAttachedConversations(prev => [...prev, conv])}
+      excludeAgentId={actualAgentId}
+    />
     </>
   );
 }
