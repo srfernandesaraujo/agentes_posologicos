@@ -50,7 +50,10 @@ export default function Settings() {
       <div className="mb-6">
         <h2 className="mb-1 text-lg font-semibold text-white">API Keys externas</h2>
         <p className="text-sm text-white/40">
-          Configure as API Keys das suas LLMs favoritas para criar agentes personalizados.
+          Configure as API Keys das suas LLMs favoritas. Elas serão usadas tanto nos seus agentes personalizados quanto nos agentes nativos da plataforma.
+        </p>
+        <p className="mt-1 text-xs text-white/30">
+          Se nenhuma chave estiver configurada, os agentes nativos usarão o modelo padrão da plataforma. Se a chamada com sua chave falhar, o sistema fará fallback automático.
         </p>
       </div>
 

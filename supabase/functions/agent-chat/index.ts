@@ -743,8 +743,98 @@ Deno.serve(async (req) => {
       .single();
 
     if (builtInAgent) {
-      // Use built-in agent with Lovable AI Gateway
       const systemPrompt = (AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
+      const messages = [
+        { role: "system", content: systemPrompt },
+        ...(conversationHistory || []),
+        { role: "user", content: input },
+      ];
+
+      // Check if user has their own API key configured
+      if (userId) {
+        const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const { data: userKeys } = await serviceClient
+          .from("user_api_keys")
+          .select("provider, api_key_encrypted")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(1);
+
+        if (userKeys && userKeys.length > 0) {
+          const userKey = userKeys[0];
+          const provider = userKey.provider;
+          const apiKey = userKey.api_key_encrypted;
+          const endpoint = PROVIDER_ENDPOINTS[provider];
+
+          // Default models per provider for native agents
+          const DEFAULT_MODELS: Record<string, string> = {
+            openai: "gpt-4o",
+            anthropic: "claude-sonnet-4-20250514",
+            groq: "llama-3.3-70b-versatile",
+            openrouter: "google/gemini-2.5-flash",
+            google: "gemini-2.5-flash",
+          };
+          const model = DEFAULT_MODELS[provider] || "gpt-4o";
+
+          if (endpoint) {
+            console.log(`Native agent: using user's ${provider} key`);
+            try {
+              if (provider === "anthropic") {
+                const anthropicResponse = await fetch(endpoint, {
+                  method: "POST",
+                  headers: {
+                    "x-api-key": apiKey,
+                    "Content-Type": "application/json",
+                    "anthropic-version": "2023-06-01",
+                  },
+                  body: JSON.stringify({
+                    model,
+                    max_tokens: 4096,
+                    system: systemPrompt,
+                    messages: [
+                      ...(conversationHistory || []),
+                      { role: "user", content: input },
+                    ],
+                  }),
+                });
+
+                if (anthropicResponse.ok) {
+                  const data = await anthropicResponse.json();
+                  const output = data.content?.[0]?.text || "Sem resposta.";
+                  return new Response(JSON.stringify({ output }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                  });
+                }
+                const errText = await anthropicResponse.text();
+                console.error(`User Anthropic key failed: ${anthropicResponse.status} ${errText} - falling back to native`);
+              } else {
+                const aiResponse = await fetch(endpoint, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${apiKey}`,
+                  },
+                  body: JSON.stringify({ model, messages }),
+                });
+
+                if (aiResponse.ok) {
+                  const data = await aiResponse.json();
+                  const output = data.choices?.[0]?.message?.content || "Sem resposta do modelo.";
+                  return new Response(JSON.stringify({ output }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                  });
+                }
+                const errText = await aiResponse.text();
+                console.error(`User ${provider} key failed: ${aiResponse.status} ${errText} - falling back to native`);
+              }
+            } catch (e) {
+              console.error(`User API key error (${provider}):`, e.message, "- falling back to native");
+            }
+          }
+        }
+      }
+
+      // Fallback: use Lovable AI Gateway
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) {
         return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
@@ -752,12 +842,6 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      const messages = [
-        { role: "system", content: systemPrompt },
-        ...(conversationHistory || []),
-        { role: "user", content: input },
-      ];
 
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
