@@ -246,7 +246,7 @@ export default function Chat() {
   }, [builtInAgent, balance, agentLoading, hasFreeAccess, isCustom]);
 
   const createNewSession = async () => {
-    if (!user || !actualAgentId || isCustom) return null;
+    if (!user || !actualAgentId) return null;
     const { data: newSession } = await supabase
       .from("chat_sessions")
       .insert({ user_id: user.id, agent_id: actualAgentId })
@@ -261,7 +261,6 @@ export default function Chat() {
 
   useEffect(() => {
     if (!user || !actualAgentId) return;
-    if (isCustom) { setSessionId(null); return; }
     const sessionFromUrl = searchParams.get("session");
     if (sessionFromUrl) {
       setSessionId(sessionFromUrl);
@@ -284,8 +283,7 @@ export default function Chat() {
     refetchInterval: false,
   });
 
-  const [localMessages, setLocalMessages] = useState<Message[]>([]);
-  const displayMessages = isCustom ? localMessages : messages;
+  const displayMessages = messages;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -367,87 +365,52 @@ export default function Chat() {
         content: m.content,
       }));
 
-      if (isCustom) {
-        if (!hasFreeAccess && balance < CUSTOM_AGENT_INTERACTION_COST) {
-          throw new Error("Créditos insuficientes!");
-        }
-
-        const userMsg: Message = {
-          id: crypto.randomUUID(),
-          role: "user",
-          content: text + (attachedFiles.length > 0 ? `\n\n📎 ${attachedFiles.map(f => f.name).join(", ")}` : ""),
-          created_at: new Date().toISOString(),
-        };
-        setLocalMessages((prev) => [...prev, userMsg]);
-
-        const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
-          body: { agentId: actualAgentId, input: fullInput, conversationHistory },
-        });
-
-        if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
-
-        if (!hasFreeAccess) {
-          await supabase.from("credits_ledger").insert({
-            user_id: user.id,
-            amount: -CUSTOM_AGENT_INTERACTION_COST,
-            type: "usage",
-            description: `Uso: ${agent.name} (agente personalizado)`,
-          });
-        }
-
-        const assistantMsg: Message = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: data?.output || "Sem resposta do agente.",
-          created_at: new Date().toISOString(),
-        };
-        setLocalMessages((prev) => [...prev, assistantMsg]);
-      } else {
-        // For built-in agents, create session if needed
-        let sid = sessionId;
-        if (!sid) {
-          sid = await createNewSession();
-          if (!sid) throw new Error("Erro ao criar sessão");
-        }
-
-        const userContent = text + (attachedFiles.length > 0 ? `\n\n📎 ${attachedFiles.map(f => f.name).join(", ")}` : "");
-
-        await supabase
-          .from("messages")
-          .insert({ session_id: sid, role: "user", content: userContent });
-
-        const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
-          body: { agentId: actualAgentId, input: fullInput, conversationHistory },
-        });
-
-        if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
-
-        // Debit credits AFTER successful response
-        if (!hasFreeAccess && builtInAgent) {
-          await supabase
-            .from("credits_ledger")
-            .insert({
-              user_id: user.id,
-              amount: -builtInAgent.credit_cost,
-              type: "usage",
-              description: `Uso: ${builtInAgent.name}`,
-            });
-        }
-
-        const assistantContent = data?.output || "Sem resposta do agente.";
-
-        await supabase
-          .from("messages")
-          .insert({ session_id: sid, role: "assistant", content: assistantContent });
+      // Create session if needed (both built-in and custom agents)
+      let sid = sessionId;
+      if (!sid) {
+        sid = await createNewSession();
+        if (!sid) throw new Error("Erro ao criar sessão");
       }
+
+      if (isCustom && !hasFreeAccess && balance < CUSTOM_AGENT_INTERACTION_COST) {
+        throw new Error("Créditos insuficientes!");
+      }
+
+      const userContent = text + (attachedFiles.length > 0 ? `\n\n📎 ${attachedFiles.map(f => f.name).join(", ")}` : "");
+
+      await supabase
+        .from("messages")
+        .insert({ session_id: sid, role: "user", content: userContent });
+
+      const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
+        body: { agentId: actualAgentId, input: fullInput, conversationHistory },
+      });
+
+      if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
+
+      // Debit credits AFTER successful response
+      if (!hasFreeAccess) {
+        const cost = isCustom ? CUSTOM_AGENT_INTERACTION_COST : (builtInAgent?.credit_cost || 1);
+        const desc = isCustom ? `Uso: ${agent.name} (agente personalizado)` : `Uso: ${agent.name}`;
+        await supabase.from("credits_ledger").insert({
+          user_id: user.id,
+          amount: -cost,
+          type: "usage",
+          description: desc,
+        });
+      }
+
+      const assistantContent = data?.output || "Sem resposta do agente.";
+
+      await supabase
+        .from("messages")
+        .insert({ session_id: sid, role: "assistant", content: assistantContent });
     },
     onSuccess: () => {
       setInput("");
       setAttachedFiles([]);
-      if (!isCustom) {
-        queryClient.invalidateQueries({ queryKey: ["messages", sessionId] });
-        queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
-      }
+      queryClient.invalidateQueries({ queryKey: ["messages", sessionId] });
+      queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
       refetchCredits();
     },
     onError: (err: any) => {
@@ -471,14 +434,12 @@ export default function Chat() {
 
   const handleNewConversation = () => {
     setSessionId(null);
-    setLocalMessages([]);
     setInput("");
     setAttachedFiles([]);
   };
 
   const handleSelectSession = (sid: string) => {
     setSessionId(sid);
-    setLocalMessages([]);
   };
 
   if (agentLoading) {

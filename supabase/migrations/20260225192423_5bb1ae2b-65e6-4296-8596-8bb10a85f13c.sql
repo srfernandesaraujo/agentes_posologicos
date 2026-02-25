@@ -1,0 +1,1 @@
+ALTER TABLE public.chat_sessions DROP CONSTRAINT IF EXISTS chat_sessions_agent_id_fkey;
