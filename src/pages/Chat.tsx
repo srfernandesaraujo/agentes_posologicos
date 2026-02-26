@@ -402,7 +402,10 @@ export default function Chat() {
         body: { agentId: actualAgentId, input: fullInput, conversationHistory },
       });
 
-      if (fnError) throw new Error(fnError.message || "Erro ao consultar o agente");
+      if (fnError) {
+        const errorMsg = data?.error || fnError.message || "Erro ao consultar o agente";
+        throw new Error(errorMsg);
+      }
 
       // Debit credits AFTER successful response
       if (!hasFreeAccess) {
