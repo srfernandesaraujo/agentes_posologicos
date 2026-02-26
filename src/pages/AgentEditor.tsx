@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useCustomAgent, useCustomAgents } from "@/hooks/useCustomAgents";
 import { useApiKeys, LLM_PROVIDERS } from "@/hooks/useApiKeys";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
+import { useAgentKnowledgeBases } from "@/hooks/useAgentKnowledgeBases";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2, DoorOpen, ExternalLink, Store } from "lucide-react";
+import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2, DoorOpen, ExternalLink, Store, Plus, X, Database } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { WhatsAppConnect } from "@/components/agents/WhatsAppConnect";
@@ -26,6 +27,7 @@ export default function AgentEditor() {
   const { updateAgent, deleteAgent } = useCustomAgents();
   const { data: apiKeys = [] } = useApiKeys();
   const { data: knowledgeBases = [] } = useKnowledgeBases();
+  const { data: agentKBs = [], linkKB, unlinkKB } = useAgentKnowledgeBases(agentId);
 
   // Local state for editing
   const [tab, setTab] = useState("config");
@@ -320,7 +322,84 @@ export default function AgentEditor() {
                     Salvar
                   </Button>
 
-                  <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                  {/* Knowledge Bases linked */}
+                  <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                    <h3 className="flex items-center gap-2 text-base font-semibold text-white mb-3">
+                      <Database className="h-4 w-4 text-[hsl(174,62%,47%)]" />
+                      Bases de Conhecimento Vinculadas
+                    </h3>
+
+                    {agentKBs.length === 0 ? (
+                      <p className="text-sm text-white/40">Nenhuma base vinculada a este agente.</p>
+                    ) : (
+                      <div className="space-y-2 mb-4">
+                        {agentKBs.map((link) => {
+                          const kb = knowledgeBases.find((k) => k.id === link.knowledge_base_id);
+                          return (
+                            <div key={link.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2">
+                              <div>
+                                <p className="text-sm font-medium text-white">{kb?.name || "Base removida"}</p>
+                                {kb?.description && <p className="text-xs text-white/40 truncate max-w-xs">{kb.description}</p>}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-white/40 hover:text-red-400 hover:bg-red-500/10"
+                                disabled={unlinkKB.isPending}
+                                onClick={async () => {
+                                  try {
+                                    await unlinkKB.mutateAsync(link.knowledge_base_id);
+                                    toast.success("Base desvinculada!");
+                                  } catch {
+                                    toast.error("Erro ao desvincular");
+                                  }
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Add new KB - only show ones not already linked */}
+                    {(() => {
+                      const linkedIds = new Set(agentKBs.map((l) => l.knowledge_base_id));
+                      const available = knowledgeBases.filter((kb) => !linkedIds.has(kb.id));
+                      if (available.length === 0) return (
+                        <p className="text-xs text-white/30 mt-2">
+                          {knowledgeBases.length === 0 ? "Crie uma base de conhecimento primeiro em Conteúdos." : "Todas as bases já estão vinculadas."}
+                        </p>
+                      );
+                      return (
+                        <Select onValueChange={async (v) => {
+                          try {
+                            await linkKB.mutateAsync(v);
+                            toast.success("Base vinculada!");
+                          } catch {
+                            toast.error("Erro ao vincular");
+                          }
+                        }}>
+                          <SelectTrigger className="border-white/10 bg-white/[0.05] text-white mt-2">
+                            <SelectValue placeholder="Adicionar base de conhecimento..." />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+                            {available.map((kb) => (
+                              <SelectItem key={kb.id} value={kb.id}>
+                                <div className="flex items-center gap-2">
+                                  <Plus className="h-3 w-3" />
+                                  {kb.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
                     <p className="text-xs text-white/40">ID do Agente: {agent.id}</p>
                   </div>
 
@@ -407,25 +486,7 @@ export default function AgentEditor() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-white/70">Base de Conhecimento (RAG)</label>
-                    <Select value={(agent as any).knowledge_base_id || "none"} onValueChange={async (v) => {
-                      const kbId = v === "none" ? null : v;
-                      await updateAgent.mutateAsync({ id: agentId!, knowledge_base_id: kbId } as any);
-                      toast.success("Base de conhecimento atualizada!");
-                    }}>
-                      <SelectTrigger className="border-white/10 bg-white/[0.05] text-white">
-                        <SelectValue placeholder="Nenhuma" />
-                      </SelectTrigger>
-                      <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
-                        <SelectItem value="none">Nenhuma</SelectItem>
-                        {knowledgeBases.map((kb) => (
-                          <SelectItem key={kb.id} value={kb.id}>{kb.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="mt-1 text-xs text-white/30">Vincule uma base de conhecimento para o agente usar como contexto (RAG).</p>
-                  </div>
+                  <p className="text-xs text-white/30">As bases de conhecimento podem ser gerenciadas na aba "Visão Geral".</p>
 
                   <Button onClick={handleSaveModel} disabled={updateAgent.isPending} className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white">
                     Salvar
