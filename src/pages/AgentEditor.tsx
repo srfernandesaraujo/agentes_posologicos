@@ -337,26 +337,37 @@ export default function AgentEditor() {
                           const kb = knowledgeBases.find((k) => k.id === link.knowledge_base_id);
                           return (
                             <div key={link.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2">
-                              <div>
+                              <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-white">{kb?.name || "Base removida"}</p>
                                 {kb?.description && <p className="text-xs text-white/40 truncate max-w-xs">{kb.description}</p>}
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-white/40 hover:text-red-400 hover:bg-red-500/10"
-                                disabled={unlinkKB.isPending}
-                                onClick={async () => {
-                                  try {
-                                    await unlinkKB.mutateAsync(link.knowledge_base_id);
-                                    toast.success("Base desvinculada!");
-                                  } catch {
-                                    toast.error("Erro ao desvincular");
-                                  }
-                                }}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs text-white/50 hover:text-white hover:bg-white/10"
+                                  onClick={() => navigate(`/conteudos/${link.knowledge_base_id}`)}
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  Gerenciar fontes
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-white/40 hover:text-red-400 hover:bg-red-500/10"
+                                  disabled={unlinkKB.isPending}
+                                  onClick={async () => {
+                                    try {
+                                      await unlinkKB.mutateAsync(link.knowledge_base_id);
+                                      toast.success("Base desvinculada!");
+                                    } catch {
+                                      toast.error("Erro ao desvincular");
+                                    }
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           );
                         })}
@@ -367,34 +378,42 @@ export default function AgentEditor() {
                     {(() => {
                       const linkedIds = new Set(agentKBs.map((l) => l.knowledge_base_id));
                       const available = knowledgeBases.filter((kb) => !linkedIds.has(kb.id));
-                      if (available.length === 0) return (
-                        <p className="text-xs text-white/30 mt-2">
-                          {knowledgeBases.length === 0 ? "Crie uma base de conhecimento primeiro em Conteúdos." : "Todas as bases já estão vinculadas."}
-                        </p>
-                      );
                       return (
-                        <Select onValueChange={async (v) => {
-                          try {
-                            await linkKB.mutateAsync(v);
-                            toast.success("Base vinculada!");
-                          } catch {
-                            toast.error("Erro ao vincular");
-                          }
-                        }}>
-                          <SelectTrigger className="border-white/10 bg-white/[0.05] text-white mt-2">
-                            <SelectValue placeholder="Adicionar base de conhecimento..." />
-                          </SelectTrigger>
-                          <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
-                            {available.map((kb) => (
-                              <SelectItem key={kb.id} value={kb.id}>
-                                <div className="flex items-center gap-2">
-                                  <Plus className="h-3 w-3" />
-                                  {kb.name}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <>
+                          {available.length > 0 && (
+                            <Select key={agentKBs.length} onValueChange={async (v) => {
+                              try {
+                                await linkKB.mutateAsync(v);
+                                toast.success("Base vinculada!");
+                              } catch {
+                                toast.error("Erro ao vincular");
+                              }
+                            }}>
+                              <SelectTrigger className="border-white/10 bg-white/[0.05] text-white mt-2">
+                                <SelectValue placeholder="Adicionar base de conhecimento..." />
+                              </SelectTrigger>
+                              <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+                                {available.map((kb) => (
+                                  <SelectItem key={kb.id} value={kb.id}>
+                                    <div className="flex items-center gap-2">
+                                      <Plus className="h-3 w-3" />
+                                      {kb.name}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+                            onClick={() => navigate("/conteudos")}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Criar nova base de conhecimento
+                          </Button>
+                        </>
                       );
                     })()}
                   </div>
