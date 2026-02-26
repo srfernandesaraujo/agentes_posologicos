@@ -696,41 +696,108 @@ Deno.serve(async (req) => {
 
     // Special case: prompt generation
     if (agentId === "__generate_prompt__") {
+      const promptMessages = [
+        { role: "system", content: PROMPT_GENERATOR_PROMPT },
+        { role: "user", content: input },
+      ];
+
+      // Helper to call OpenAI-compatible endpoint
+      const callOpenAICompatible = async (endpoint: string, apiKey: string, model: string, authPrefix = "Bearer") => {
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `${authPrefix} ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ model, messages: promptMessages }),
+        });
+        if (!resp.ok) throw new Error(`${resp.status} ${await resp.text()}`);
+        const data = await resp.json();
+        return data.choices?.[0]?.message?.content || "";
+      };
+
+      // Helper to call Anthropic
+      const callAnthropic = async (apiKey: string, model: string) => {
+        const resp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: 4096,
+            system: PROMPT_GENERATOR_PROMPT,
+            messages: [{ role: "user", content: input }],
+          }),
+        });
+        if (!resp.ok) throw new Error(`${resp.status} ${await resp.text()}`);
+        const data = await resp.json();
+        return data.content?.[0]?.text || "";
+      };
+
+      // Try Lovable AI Gateway first
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (LOVABLE_API_KEY) {
+        try {
+          const output = await callOpenAICompatible(
+            "https://ai.gateway.lovable.dev/v1/chat/completions",
+            LOVABLE_API_KEY,
+            "google/gemini-2.5-flash"
+          );
+          return new Response(JSON.stringify({ output }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (e) {
+          console.warn("Lovable AI gateway failed, trying user keys:", e.message);
+        }
       }
 
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: PROMPT_GENERATOR_PROMPT },
-            { role: "user", content: input },
-          ],
-        }),
-      });
+      // Fallback: try user's own API keys
+      if (userId) {
+        const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const { data: userKeys } = await serviceClient
+          .from("user_api_keys")
+          .select("provider, api_key_encrypted")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false });
 
-      if (!aiResponse.ok) {
-        const errText = await aiResponse.text();
-        console.error("AI gateway error:", aiResponse.status, errText);
-        return new Response(JSON.stringify({ error: "Erro ao gerar prompt" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        if (userKeys && userKeys.length > 0) {
+          for (const uk of userKeys) {
+            try {
+              const DEFAULT_MODELS: Record<string, string> = {
+                openai: "gpt-4o",
+                anthropic: "claude-sonnet-4-20250514",
+                groq: "llama-3.3-70b-versatile",
+                openrouter: "google/gemini-2.5-flash",
+                google: "gemini-2.5-flash",
+              };
+              const model = DEFAULT_MODELS[uk.provider] || "gpt-4o";
+              let output: string;
+
+              if (uk.provider === "anthropic") {
+                output = await callAnthropic(uk.api_key_encrypted, model);
+              } else {
+                const endpoint = PROVIDER_ENDPOINTS[uk.provider];
+                if (!endpoint) continue;
+                output = await callOpenAICompatible(endpoint, uk.api_key_encrypted, model);
+              }
+
+              console.log(`Prompt generation: used user's ${uk.provider} key`);
+              return new Response(JSON.stringify({ output }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            } catch (e) {
+              console.warn(`Prompt gen with ${uk.provider} failed:`, e.message);
+              continue;
+            }
+          }
+        }
       }
 
-      const aiData = await aiResponse.json();
-      const output = aiData.choices?.[0]?.message?.content || "";
-      return new Response(JSON.stringify({ output }), {
+      return new Response(JSON.stringify({ error: "Nenhum provedor de IA disponível. Configure uma chave API em Configurações." }), {
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
