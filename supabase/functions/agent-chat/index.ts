@@ -737,24 +737,7 @@ Deno.serve(async (req) => {
         return data.content?.[0]?.text || "";
       };
 
-      // Try Lovable AI Gateway first
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (LOVABLE_API_KEY) {
-        try {
-          const output = await callOpenAICompatible(
-            "https://ai.gateway.lovable.dev/v1/chat/completions",
-            LOVABLE_API_KEY,
-            "google/gemini-2.5-flash"
-          );
-          return new Response(JSON.stringify({ output }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        } catch (e) {
-          console.warn("Lovable AI gateway failed, trying user keys:", e.message);
-        }
-      }
-
-      // Fallback: try user's own API keys
+      // Try user's own API keys first
       if (userId) {
         const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         const { data: userKeys } = await serviceClient
@@ -793,6 +776,23 @@ Deno.serve(async (req) => {
               continue;
             }
           }
+        }
+      }
+
+      // Fallback: try Lovable AI Gateway
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (LOVABLE_API_KEY) {
+        try {
+          const output = await callOpenAICompatible(
+            "https://ai.gateway.lovable.dev/v1/chat/completions",
+            LOVABLE_API_KEY,
+            "google/gemini-2.5-flash"
+          );
+          return new Response(JSON.stringify({ output }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (e) {
+          console.warn("Lovable AI gateway also failed:", e.message);
         }
       }
 
