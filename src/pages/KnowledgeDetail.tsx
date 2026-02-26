@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useKnowledgeBase, useKnowledgeSources } from "@/hooks/useKnowledgeBases";
+import { useKnowledgeBase, useKnowledgeSources, useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +26,7 @@ export default function KnowledgeDetail() {
   const { user } = useAuth();
   const { data: kb, isLoading: kbLoading } = useKnowledgeBase(kbId);
   const { data: sources = [], isLoading: srcLoading, createSource, deleteSource } = useKnowledgeSources(kbId);
+  const { deleteKB } = useKnowledgeBases();
 
   const [addingSource, setAddingSource] = useState(false);
   const [sourceType, setSourceType] = useState<string | null>(null);
@@ -80,8 +81,30 @@ export default function KnowledgeDetail() {
 
       // Read file content for text-based files
       let content = "";
-      if (file.type.startsWith("text/") || file.name.endsWith(".csv") || file.name.endsWith(".json") || file.name.endsWith(".txt")) {
+      const lowerName = file.name.toLowerCase();
+      if (file.type.startsWith("text/") || lowerName.endsWith(".csv") || lowerName.endsWith(".json") || lowerName.endsWith(".txt")) {
         content = await file.text();
+      } else if (lowerName.endsWith(".pdf")) {
+        // For PDF, we store a reference - content will be the file metadata
+        content = `[PDF: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Arquivo armazenado para processamento]`;
+      } else if (lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) {
+        content = `[Word: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Arquivo armazenado para processamento]`;
+      } else if (lowerName.endsWith(".xls") || lowerName.endsWith(".xlsx")) {
+        // Try to extract text from Excel using xlsx library
+        try {
+          const XLSX = await import("xlsx");
+          const arrayBuffer = await file.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer, { type: "array" });
+          const sheets: string[] = [];
+          workbook.SheetNames.forEach((sheetName) => {
+            const sheet = workbook.Sheets[sheetName];
+            const csv = XLSX.utils.sheet_to_csv(sheet);
+            sheets.push(`--- ${sheetName} ---\n${csv}`);
+          });
+          content = sheets.join("\n\n");
+        } catch {
+          content = `[Excel: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`;
+        }
       } else {
         content = `[Arquivo: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`;
       }
@@ -356,12 +379,16 @@ export default function KnowledgeDetail() {
               <Button
                 variant="destructive"
                 className="mt-3"
+                disabled={deleteKB.isPending}
                 onClick={async () => {
-                  if (!confirm("Tem certeza?")) return;
+                  if (!confirm("Tem certeza que deseja excluir este conteúdo e todas as suas fontes?")) return;
                   try {
-                    await deleteSource; // just navigate
+                    await deleteKB.mutateAsync(kbId!);
+                    toast.success("Conteúdo excluído!");
                     navigate("/conteudos");
-                  } catch {}
+                  } catch {
+                    toast.error("Erro ao excluir conteúdo");
+                  }
                 }}
               >
                 <Trash2 className="mr-2 h-4 w-4" /> Excluir Conteúdo
