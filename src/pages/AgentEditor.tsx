@@ -14,10 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2, DoorOpen, ExternalLink, Store, Plus, X, Database } from "lucide-react";
+import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2, DoorOpen, ExternalLink, Store, Plus, X, Database, FileText } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { WhatsAppConnect } from "@/components/agents/WhatsAppConnect";
+import { DocumentManager } from "@/components/agents/DocumentManager";
 
 export default function AgentEditor() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -289,6 +290,7 @@ export default function AgentEditor() {
             <div className="w-48 shrink-0 space-y-1">
               {[
                 { id: "geral", label: "Visão Geral", icon: Bot },
+                { id: "documentos", label: "Documentos", icon: FileText },
                 { id: "modelo", label: "Modelo", icon: Bot },
                 { id: "prompt", label: "Prompt", icon: Bot },
               ].map((item) => (
@@ -433,6 +435,10 @@ export default function AgentEditor() {
                     </Button>
                   </div>
                 </>
+              )}
+
+              {configTab === "documentos" && (
+                <DocumentManager agentId={agentId!} />
               )}
 
               {configTab === "modelo" && (
