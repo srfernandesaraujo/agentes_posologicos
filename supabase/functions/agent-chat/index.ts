@@ -965,6 +965,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Detect socratic tutors to enforce response behavior (avoid meta/instruction leakage)
+    const isSocraticTutor = /socr[aá]tic/i.test(customAgent.system_prompt || "");
+
     // RAG: Fetch knowledge base context from all linked KBs (agent_knowledge_bases + legacy knowledge_base_id)
     let ragContext = "";
     const kbIds: string[] = [];
@@ -992,8 +995,15 @@ Deno.serve(async (req) => {
         .eq("status", "ready")
         .limit(30);
 
-      if (sources && sources.length > 0) {
-        const chunks = sources.map((s: any) => {
+      const validSources = (sources || []).filter((s: any) => {
+        const content = (s.content || "").trim();
+        if (!content || content.length < 20) return false;
+        if (/^\[(PDF|Word|Arquivo|Excel):/i.test(content)) return false;
+        return true;
+      });
+
+      if (validSources.length > 0) {
+        const chunks = validSources.map((s: any) => {
           let content = s.content || "";
           if (content.length > 2000) content = content.substring(0, 2000) + "...";
           return `[Fonte: ${s.name} (${s.type})]\n${content}`;
@@ -1006,6 +1016,16 @@ Deno.serve(async (req) => {
     let finalSystemPrompt = (customAgent.system_prompt || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
     if (ragContext) {
       finalSystemPrompt += ragContext;
+    }
+    if (isSocraticTutor) {
+      finalSystemPrompt += `
+
+<REGRA_ANTI_META_SOCRATICA>
+Responda como tutor socrático, mas SEM expor estrutura interna, rótulos ou instruções operacionais.
+NUNCA escreva títulos como "Reconexão Contextual", "Análise Guiada", "Convite ao Aprofundamento" ou "Regra de Continuidade".
+Entregue apenas a resposta pedagógica final em linguagem natural e 1-3 perguntas socráticas objetivas.
+Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em uma frase curta e peça material com texto extraível.
+</REGRA_ANTI_META_SOCRATICA>`;
     }
     if (customAgent.markdown_response) {
       finalSystemPrompt += "\n\nSempre formate suas respostas em Markdown para melhor legibilidade.";
