@@ -1150,6 +1150,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Remap model if incompatible with provider
+    const PROVIDER_SUPPORTED_MODELS: Record<string, string[]> = {
+      groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"],
+    };
+    let effectiveModel = customAgent.model;
+    const supportedList = PROVIDER_SUPPORTED_MODELS[customAgent.provider];
+    if (supportedList && !supportedList.includes(effectiveModel)) {
+      console.log(`Model "${effectiveModel}" not supported by ${customAgent.provider}, remapping to ${supportedList[0]}`);
+      effectiveModel = supportedList[0];
+    }
+
     // OpenAI-compatible API (OpenAI, Groq, OpenRouter, Google)
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -1160,7 +1171,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: customAgent.model,
+        model: effectiveModel,
         temperature: Number(customAgent.temperature),
         messages: [
           { role: "system", content: finalSystemPrompt },
