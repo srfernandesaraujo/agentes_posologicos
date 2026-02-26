@@ -201,14 +201,17 @@ export function DocumentManager({ agentId }: DocumentManagerProps) {
     }
   };
 
-  // Filter left panel sources
+  // Right panel: sources in agent's linked KBs
+  const agentSources = globalSources.filter((s) => linkedKBIds.includes(s.knowledge_base_id));
+  const agentSourceIds = new Set(agentSources.map((s) => s.id));
+
+  // Left panel: only sources NOT already in the agent's KBs (no duplicates)
   const filteredLeft = globalSources.filter((s) => {
+    if (agentSourceIds.has(s.id)) return false;
+    if (linkedKBIds.includes(s.knowledge_base_id)) return false;
     if (searchLeft && !s.name.toLowerCase().includes(searchLeft.toLowerCase())) return false;
     return true;
   });
-
-  // Right panel: sources in agent's linked KBs
-  const agentSources = globalSources.filter((s) => linkedKBIds.includes(s.knowledge_base_id));
 
   const getFileIcon = (source: KnowledgeSource) => {
     if (source.type === "webpage" || source.type === "website") return <Globe className="h-4 w-4 text-blue-400 shrink-0" />;
@@ -219,7 +222,7 @@ export function DocumentManager({ agentId }: DocumentManagerProps) {
     return <File className="h-4 w-4 text-white/40 shrink-0" />;
   };
 
-  const isLinkedToAgent = (source: KnowledgeSource) => linkedKBIds.includes(source.knowledge_base_id);
+  
 
   return (
     <div className="space-y-4">
@@ -254,9 +257,7 @@ export function DocumentManager({ agentId }: DocumentManagerProps) {
               filteredLeft.map((source) => (
                 <div
                   key={source.id}
-                  className={`flex items-center gap-2 px-3 py-2 hover:bg-white/[0.05] transition-colors group ${
-                    isLinkedToAgent(source) ? "bg-[hsl(174,62%,47%)]/5" : ""
-                  }`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-white/[0.05] transition-colors group"
                 >
                   {getFileIcon(source)}
                   <div className="flex-1 min-w-0">
@@ -265,19 +266,15 @@ export function DocumentManager({ agentId }: DocumentManagerProps) {
                       {knowledgeBases.find((kb) => kb.id === source.knowledge_base_id)?.name || "—"}
                     </p>
                   </div>
-                  {isLinkedToAgent(source) ? (
-                    <span className="text-[10px] text-[hsl(174,62%,47%)] font-medium shrink-0">Vinculado</span>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 text-white/40 hover:text-white hover:bg-white/10 shrink-0"
-                      onClick={() => moveToAgent(source)}
-                      title="Vincular ao agente"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 text-white/40 hover:text-white hover:bg-white/10 shrink-0"
+                    onClick={() => moveToAgent(source)}
+                    title="Vincular ao agente"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               ))
             )}
@@ -363,8 +360,8 @@ export function DocumentManager({ agentId }: DocumentManagerProps) {
         />
         <Button
           onClick={handleFetchUrl}
-          variant="outline"
-          className="shrink-0 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+          variant="default"
+          className="shrink-0"
           disabled={!urlInput.trim()}
         >
           <Globe className="h-4 w-4 mr-1" />

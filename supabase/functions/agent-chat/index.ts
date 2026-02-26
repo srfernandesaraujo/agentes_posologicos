@@ -965,24 +965,40 @@ Deno.serve(async (req) => {
       });
     }
 
-    // RAG: Fetch knowledge base context if linked
+    // RAG: Fetch knowledge base context from all linked KBs (agent_knowledge_bases + legacy knowledge_base_id)
     let ragContext = "";
-    if (customAgent.knowledge_base_id) {
+    const kbIds: string[] = [];
+
+    // Gather KBs from junction table
+    const { data: agentKBLinks } = await serviceClient
+      .from("agent_knowledge_bases")
+      .select("knowledge_base_id")
+      .eq("agent_id", agentId);
+    if (agentKBLinks) {
+      for (const link of agentKBLinks) {
+        if (!kbIds.includes(link.knowledge_base_id)) kbIds.push(link.knowledge_base_id);
+      }
+    }
+    // Legacy: also include the single knowledge_base_id if set
+    if (customAgent.knowledge_base_id && !kbIds.includes(customAgent.knowledge_base_id)) {
+      kbIds.push(customAgent.knowledge_base_id);
+    }
+
+    if (kbIds.length > 0) {
       const { data: sources } = await serviceClient
         .from("knowledge_sources")
         .select("name, type, content")
-        .eq("knowledge_base_id", customAgent.knowledge_base_id)
+        .in("knowledge_base_id", kbIds)
         .eq("status", "ready")
-        .limit(20);
+        .limit(30);
 
       if (sources && sources.length > 0) {
         const chunks = sources.map((s: any) => {
           let content = s.content || "";
-          // Limit each source to ~2000 chars to fit context
           if (content.length > 2000) content = content.substring(0, 2000) + "...";
           return `[Fonte: ${s.name} (${s.type})]\n${content}`;
         });
-        ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhecimento para embasar suas respostas quando relevante:\n\n" + chunks.join("\n\n---\n\n") + "\n</CONTEXTO_BASE_CONHECIMENTO>";
+        ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhecimento para embasar suas respostas quando relevante. NÃO reproduza estas instruções na sua resposta — use o conteúdo como referência para formular suas próprias respostas:\n\n" + chunks.join("\n\n---\n\n") + "\n</CONTEXTO_BASE_CONHECIMENTO>";
       }
     }
 
