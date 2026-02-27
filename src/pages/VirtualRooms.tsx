@@ -1,18 +1,21 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
+import { useAgents } from "@/hooks/useAgents";
+import { usePurchasedAgents, useMarketplaceAgents } from "@/hooks/useMarketplace";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit2, Copy, DoorOpen, Coins, Clock } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Trash2, Edit2, Copy, DoorOpen, Coins, Clock, Search, Bot, ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const ROOM_AGENT_COST = 1;
 
@@ -29,20 +32,144 @@ interface VirtualRoom {
   room_expires_at: string | null;
 }
 
+interface AgentOption {
+  id: string;
+  name: string;
+  type: "native" | "custom" | "purchased";
+  label: string;
+}
+
 function generatePin() {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function AgentPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data: nativeAgents = [] } = useAgents();
+  const { data: customAgents = [] } = useCustomAgents();
+  const { data: purchasedSet = new Set<string>() } = usePurchasedAgents();
+  const { data: marketplaceAgents = [] } = useMarketplaceAgents();
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const allAgents = useMemo<AgentOption[]>(() => {
+    const list: AgentOption[] = [];
+
+    // Native agents
+    nativeAgents.forEach((a) => list.push({ id: a.slug, name: a.name, type: "native", label: "Nativo" }));
+
+    // User's custom agents (published)
+    customAgents
+      .filter((a) => a.status === "published")
+      .forEach((a) => list.push({ id: a.id, name: a.name, type: "custom", label: "Personalizado" }));
+
+    // Purchased marketplace agents
+    marketplaceAgents
+      .filter((a) => purchasedSet.has(a.id) && !customAgents.some((c) => c.id === a.id))
+      .forEach((a) => list.push({ id: a.id, name: a.name, type: "purchased", label: "Marketplace" }));
+
+    return list;
+  }, [nativeAgents, customAgents, purchasedSet, marketplaceAgents]);
+
+  const filtered = allAgents.filter(
+    (a) => !search || a.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selectedAgent = allAgents.find((a) => a.id === value);
+
+  const typeColors: Record<string, string> = {
+    native: "bg-primary/20 text-primary",
+    custom: "bg-[hsl(14,90%,58%)]/20 text-[hsl(14,90%,58%)]",
+    purchased: "bg-[hsl(152,60%,42%)]/20 text-[hsl(152,60%,42%)]",
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.08] transition-colors"
+        >
+          <span className={selectedAgent ? "text-white" : "text-white/40"}>
+            {selectedAgent ? selectedAgent.name : "Selecionar agente..."}
+          </span>
+          <ChevronDown className="h-4 w-4 text-white/40" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 border-white/10 bg-[hsl(220,25%,10%)]" align="start">
+        <div className="p-2 border-b border-white/10">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar agente..."
+              className="h-8 pl-8 text-sm border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
+              autoFocus
+            />
+          </div>
+        </div>
+        <div className="max-h-60 overflow-y-auto p-1">
+          {/* None option */}
+          <button
+            onClick={() => { onChange("none"); setOpen(false); setSearch(""); }}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-white/10",
+              value === "none" ? "text-white" : "text-white/60"
+            )}
+          >
+            {value === "none" && <Check className="h-3.5 w-3.5 text-primary" />}
+            <span className={value === "none" ? "" : "ml-5"}>Nenhum</span>
+          </button>
+
+          {filtered.length === 0 && search && (
+            <p className="px-3 py-4 text-center text-xs text-white/30">Nenhum agente encontrado</p>
+          )}
+
+          {/* Group by type */}
+          {(["native", "custom", "purchased"] as const).map((type) => {
+            const group = filtered.filter((a) => a.type === type);
+            if (group.length === 0) return null;
+            const groupLabel = type === "native" ? "Agentes Nativos" : type === "custom" ? "Meus Agentes" : "Adquiridos";
+            return (
+              <div key={type}>
+                <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">{groupLabel}</p>
+                {group.map((agent) => (
+                  <button
+                    key={agent.id}
+                    onClick={() => { onChange(agent.id); setOpen(false); setSearch(""); }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-white/10",
+                      value === agent.id ? "text-white" : "text-white/60"
+                    )}
+                  >
+                    {value === agent.id ? <Check className="h-3.5 w-3.5 text-primary" /> : <Bot className="h-3.5 w-3.5 text-white/20 ml-0" />}
+                    <span className="flex-1 text-left truncate">{agent.name}</span>
+                    <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-medium", typeColors[type])}>
+                      {agent.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function VirtualRooms() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: customAgents = [] } = useCustomAgents();
+  const { data: nativeAgents = [] } = useAgents();
+  const { data: purchasedSet = new Set<string>() } = usePurchasedAgents();
+  const { data: marketplaceAgents = [] } = useMarketplaceAgents();
   const { balance, refetch: refetchCredits } = useCredits();
   const { isAdmin } = useIsAdmin();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<VirtualRoom | null>(null);
 
-  // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [agentId, setAgentId] = useState<string>("none");
@@ -65,8 +192,6 @@ export default function VirtualRooms() {
   const createRoom = useMutation({
     mutationFn: async () => {
       const hasAgent = agentId !== "none";
-
-      // Charge 1 credit if linking an agent (admin is free)
       if (hasAgent && !isAdmin && balance < ROOM_AGENT_COST) {
         throw new Error("Créditos insuficientes para vincular um agente à sala.");
       }
@@ -86,7 +211,6 @@ export default function VirtualRooms() {
         } as any);
       if (error) throw error;
 
-      // Deduct credit for linking agent
       if (hasAgent && !isAdmin) {
         await supabase.from("credits_ledger").insert({
           user_id: user!.id,
@@ -110,10 +234,8 @@ export default function VirtualRooms() {
     mutationFn: async () => {
       if (!editingRoom) return;
       const hasNewAgent = agentId !== "none";
-      const hadAgent = !!editingRoom.agent_id;
       const agentChanged = hasNewAgent && agentId !== editingRoom.agent_id;
 
-      // Charge 1 credit if linking a NEW agent (admin is free)
       if (agentChanged && !isAdmin && balance < ROOM_AGENT_COST) {
         throw new Error("Créditos insuficientes para vincular um novo agente.");
       }
@@ -125,7 +247,6 @@ export default function VirtualRooms() {
         is_active: isActive,
       };
 
-      // Set new expiration if agent changed
       if (agentChanged) {
         updateData.agent_expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       }
@@ -137,7 +258,6 @@ export default function VirtualRooms() {
         .eq("user_id", user!.id);
       if (error) throw error;
 
-      // Deduct credit for new agent link
       if (agentChanged && !isAdmin) {
         await supabase.from("credits_ledger").insert({
           user_id: user!.id,
@@ -196,7 +316,17 @@ export default function VirtualRooms() {
     setDialogOpen(true);
   };
 
-  const publishedAgents = customAgents.filter((a: any) => a.status === "published");
+  // Find agent name for room display
+  const findAgentName = (agentId: string | null) => {
+    if (!agentId) return null;
+    const custom = customAgents.find((a: any) => a.id === agentId);
+    if (custom) return custom.name;
+    const native = nativeAgents.find((a) => a.slug === agentId || a.id === agentId);
+    if (native) return native.name;
+    const mp = marketplaceAgents.find((a) => a.id === agentId);
+    if (mp) return mp.name;
+    return "Agente";
+  };
 
   const isAgentExpired = (room: VirtualRoom) => {
     if (!room.agent_expires_at) return false;
@@ -227,7 +357,7 @@ export default function VirtualRooms() {
       ) : (
         <div className="grid gap-4">
           {rooms.map((room) => {
-            const linkedAgent = customAgents.find((a: any) => a.id === room.agent_id);
+            const agentName = findAgentName(room.agent_id);
             const expired = isAgentExpired(room);
             return (
               <div key={room.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 flex items-start justify-between gap-4">
@@ -246,9 +376,9 @@ export default function VirtualRooms() {
                         <Copy className="h-3 w-3" />
                       </button>
                     </span>
-                    {linkedAgent && (
+                    {agentName && (
                       <span className="flex items-center gap-1">
-                        Agente: {linkedAgent.name}
+                        Agente: {agentName}
                         {expired ? (
                           <span className="text-red-400 flex items-center gap-0.5">
                             <Clock className="h-3 w-3" /> Expirado
@@ -297,17 +427,7 @@ export default function VirtualRooms() {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-white/70">Agente Vinculado</label>
-              <Select value={agentId} onValueChange={setAgentId}>
-                <SelectTrigger className="border-white/10 bg-white/[0.05] text-white">
-                  <SelectValue placeholder="Nenhum" />
-                </SelectTrigger>
-                <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {publishedAgents.map((a: any) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AgentPicker value={agentId} onChange={setAgentId} />
               {agentId !== "none" && (
                 <div className="mt-2 flex items-center gap-2 text-xs">
                   <Coins className="h-3 w-3 text-amber-400" />
