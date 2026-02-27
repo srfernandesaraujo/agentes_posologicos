@@ -41,12 +41,13 @@ export function AppLayout() {
   const { data: conversationCount = 0 } = useQuery({
     queryKey: ["conversation-count", user?.id],
     queryFn: async () => {
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from("chat_sessions")
-        .select("*", { count: "exact", head: true })
+        .select("id, messages(id)")
         .eq("user_id", user!.id);
       if (error) return 0;
-      return count || 0;
+      // Only count sessions that have at least 1 message
+      return (data || []).filter((s: any) => s.messages && s.messages.length > 0).length;
     },
     enabled: !!user,
   });
