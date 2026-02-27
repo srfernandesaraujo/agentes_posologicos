@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Database, FileText, Globe, Youtube, HelpCircle, Upload, Trash2, Search } from "lucide-react";
+import { ArrowLeft, Plus, Database, FileText, Globe, Youtube, HelpCircle, Upload, Trash2, Search, Save, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 const SOURCE_TYPES = [
@@ -26,7 +26,7 @@ export default function KnowledgeDetail() {
   const { user } = useAuth();
   const { data: kb, isLoading: kbLoading } = useKnowledgeBase(kbId);
   const { data: sources = [], isLoading: srcLoading, createSource, deleteSource } = useKnowledgeSources(kbId);
-  const { deleteKB } = useKnowledgeBases();
+  const { deleteKB, updateKB } = useKnowledgeBases();
 
   const [addingSource, setAddingSource] = useState(false);
   const [sourceType, setSourceType] = useState<string | null>(null);
@@ -39,7 +39,9 @@ export default function KnowledgeDetail() {
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [uploading, setUploading] = useState(false);
-
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const handleAddSource = async () => {
     if (!sourceName.trim()) { toast.error("Informe o nome"); return; }
     if (!kbId) return;
@@ -381,21 +383,76 @@ export default function KnowledgeDetail() {
           <div className="max-w-md space-y-6">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-white/70">Nome</label>
-              <Input value={kb?.name || ""} disabled className="border-white/10 bg-white/[0.05] text-white/50" />
+              {isEditing ? (
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="border-white/10 bg-white/[0.05] text-white"
+                />
+              ) : (
+                <p className="text-sm text-white py-2">{kb?.name}</p>
+              )}
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-white/70">Descrição</label>
-              <Textarea value={kb?.description || ""} disabled rows={3} className="border-white/10 bg-white/[0.05] text-white/50" />
+              {isEditing ? (
+                <Textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={3}
+                  className="border-white/10 bg-white/[0.05] text-white"
+                />
+              ) : (
+                <p className="text-sm text-white/60 py-2">{kb?.description || "Sem descrição"}</p>
+              )}
             </div>
+            <div className="flex gap-2">
+              {isEditing ? (
+                <>
+                  <Button
+                    onClick={async () => {
+                      if (!editName.trim()) { toast.error("Informe o nome"); return; }
+                      try {
+                        await updateKB.mutateAsync({ id: kbId!, name: editName, description: editDescription });
+                        toast.success("Conteúdo atualizado!");
+                        setIsEditing(false);
+                      } catch {
+                        toast.error("Erro ao atualizar");
+                      }
+                    }}
+                    disabled={updateKB.isPending}
+                    className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white"
+                  >
+                    <Save className="mr-2 h-4 w-4" /> Salvar
+                  </Button>
+                  <Button variant="ghost" onClick={() => setIsEditing(false)} className="text-white/50">
+                    Cancelar
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditName(kb?.name || "");
+                    setEditDescription(kb?.description || "");
+                    setIsEditing(true);
+                  }}
+                  className="border-white/10 text-white hover:bg-white/10"
+                >
+                  <Pencil className="mr-2 h-4 w-4" /> Editar
+                </Button>
+              )}
+            </div>
+
             <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5">
               <h3 className="text-lg font-semibold text-red-400">Excluir Conteúdo</h3>
-              <p className="mt-1 text-sm text-white/50">Todas as fontes serão removidas permanentemente.</p>
+              <p className="mt-1 text-sm text-white/50">Todas as fontes e vínculos com agentes serão removidos permanentemente.</p>
               <Button
                 variant="destructive"
                 className="mt-3"
                 disabled={deleteKB.isPending}
                 onClick={async () => {
-                  if (!confirm("Tem certeza que deseja excluir este conteúdo e todas as suas fontes?")) return;
+                  if (!confirm("Tem certeza que deseja excluir este conteúdo? Todas as fontes e vínculos com agentes serão removidos.")) return;
                   try {
                     await deleteKB.mutateAsync(kbId!);
                     toast.success("Conteúdo excluído!");
