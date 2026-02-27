@@ -8,15 +8,15 @@ const corsHeaders = {
 };
 
 const CREDIT_PACKS: Record<string, { priceId: string; credits: number }> = {
-  "10": { priceId: "price_1T5ElfHVhK7c22vOK419Q270", credits: 10 },
-  "30": { priceId: "price_1T5EmGHVhK7c22vO43jrwsCZ", credits: 30 },
-  "100": { priceId: "price_1T5EmmHVhK7c22vOXIm9mNNy", credits: 100 },
+  "10": { priceId: "price_1T3Nc6H3PPmnMq0WKVqviMX1", credits: 10 },
+  "30": { priceId: "price_1T3NcRH3PPmnMq0Wxbsrz4Or", credits: 30 },
+  "100": { priceId: "price_1T3NclH3PPmnMq0WD4Tiqang", credits: 100 },
 };
 
 const SUBSCRIPTION_PRICES: Record<string, string> = {
-  "basico": "price_1T5EkLHVhK7c22vOUtf1MJYO",
-  "pro": "price_1T5EjCHVhK7c22vOExlpcHoq",
-  "institucional": "price_1T5EktHVhK7c22vOcS5KZyuR",
+  "basico": "price_1T3NdEH3PPmnMq0Wo0LdJ2oY",
+  "pro": "price_1T3NdSH3PPmnMq0W163xWcVA",
+  "institucional": "price_1T3NdeH3PPmnMq0WSZg6PiQY",
 };
 
 serve(async (req) => {
