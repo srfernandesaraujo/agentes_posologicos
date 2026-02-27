@@ -12,6 +12,7 @@ interface RoomMessage {
   id: string;
   room_id: string;
   sender_name: string;
+  sender_email: string;
   role: "user" | "assistant";
   content: string;
   created_at: string;
@@ -24,6 +25,7 @@ export default function VirtualRoomChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [participantName, setParticipantName] = useState("");
+  const [participantEmail, setParticipantEmail] = useState("");
   const [nameConfirmed, setNameConfirmed] = useState(false);
   const [participantCount, setParticipantCount] = useState(1);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -142,6 +144,7 @@ export default function VirtualRoomChat() {
       await (supabase as any).from("room_messages").insert({
         room_id: room.id,
         sender_name: participantName || "Anônimo",
+        sender_email: participantEmail || "",
         role: "user",
         content: text,
       });
@@ -228,18 +231,29 @@ export default function VirtualRoomChat() {
               onChange={(e) => setParticipantName(e.target.value)}
               placeholder="Ex: João Silva"
               className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 focus-visible:ring-white/20"
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-white/70">Seu e-mail</label>
+            <Input
+              type="email"
+              value={participantEmail}
+              onChange={(e) => setParticipantEmail(e.target.value)}
+              placeholder="Ex: joao@email.com"
+              className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 focus-visible:ring-white/20"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && participantName.trim()) {
+                if (e.key === "Enter" && participantName.trim() && participantEmail.trim()) {
                   setNameConfirmed(true);
                 }
               }}
-              autoFocus
             />
           </div>
 
           <Button
             onClick={() => setNameConfirmed(true)}
-            disabled={!participantName.trim()}
+            disabled={!participantName.trim() || !participantEmail.trim()}
             className="w-full bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,42%)] text-white border-0"
           >
             Entrar na Sala

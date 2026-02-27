@@ -524,6 +524,7 @@ export type Database = {
           id: string
           role: string
           room_id: string
+          sender_email: string
           sender_name: string
         }
         Insert: {
@@ -532,6 +533,7 @@ export type Database = {
           id?: string
           role?: string
           room_id: string
+          sender_email?: string
           sender_name?: string
         }
         Update: {
@@ -540,6 +542,7 @@ export type Database = {
           id?: string
           role?: string
           room_id?: string
+          sender_email?: string
           sender_name?: string
         }
         Relationships: [

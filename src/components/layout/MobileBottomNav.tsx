@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, Bot, MessageSquare, Store, Settings } from "lucide-react";
+import { LayoutGrid, Bot, MessageSquare, Store, CreditCard } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const navItems = [
@@ -7,7 +7,7 @@ const navItems = [
   { to: "/meus-agentes", icon: Bot, label: "Meus" },
   { to: "/conversas", icon: MessageSquare, label: "Conversas" },
   { to: "/marketplace", icon: Store, label: "Market" },
-  { to: "/configuracoes", icon: Settings, label: "Config" },
+  { to: "/creditos", icon: CreditCard, label: "Créditos" },
 ];
 
 export function MobileBottomNav() {

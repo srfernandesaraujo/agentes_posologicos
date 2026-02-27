@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 function SidebarLink({ to, icon: Icon, label, count, dataTour }: { to: string; icon: any; label: string; count?: number; dataTour?: string }) {
   return (
@@ -35,6 +36,7 @@ export function AppLayout() {
   const { data: customAgents = [] } = useCustomAgents();
   const { data: knowledgeBases = [] } = useKnowledgeBases();
   const { t } = useLanguage();
+  const { isAdmin } = useIsAdmin();
 
   const { data: conversationCount = 0 } = useQuery({
     queryKey: ["conversation-count", user?.id],
@@ -65,7 +67,7 @@ export function AppLayout() {
             <SidebarLink to="/marketplace" icon={Store} label="Marketplace" />
           </nav>
           <div className="mt-8 space-y-1">
-            <SidebarLink to="/configuracoes" icon={Settings} label={t("nav.settings")} />
+            {isAdmin && <SidebarLink to="/configuracoes" icon={Settings} label={t("nav.settings")} />}
             <SidebarLink to="/creditos" icon={CreditCard} label={t("nav.credits")} />
             <SidebarLink to="/conta" icon={User} label={t("nav.account")} />
           </div>

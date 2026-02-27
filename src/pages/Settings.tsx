@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
 import { useApiKeys, LLM_PROVIDERS } from "@/hooks/useApiKeys";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Eye, EyeOff, Check, Trash2, Key } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
+  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
   const { data: keys = [], upsertKey, deleteKey } = useApiKeys();
   const [editing, setEditing] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
@@ -39,6 +42,18 @@ export default function Settings() {
     if (key.length <= 8) return "••••••••";
     return key.slice(0, 4) + "••••••••" + key.slice(-4);
   };
+
+  if (adminLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/agentes" replace />;
+  }
 
   return (
     <div className="container max-w-3xl py-8">

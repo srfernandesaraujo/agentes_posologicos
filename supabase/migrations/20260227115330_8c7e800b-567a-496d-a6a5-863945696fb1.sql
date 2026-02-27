@@ -1,0 +1,1 @@
+ALTER TABLE public.room_messages ADD COLUMN sender_email text NOT NULL DEFAULT '';
