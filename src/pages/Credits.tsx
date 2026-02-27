@@ -55,7 +55,10 @@ export default function Credits() {
     if (searchParams.get("success") === "true") {
       const credits = searchParams.get("credits");
       toast.success(`${credits} créditos adicionados com sucesso!`);
+      // Retry refetch with delays to wait for webhook processing
       refetch();
+      setTimeout(() => refetch(), 3000);
+      setTimeout(() => refetch(), 8000);
       setSearchParams({}, { replace: true });
     }
     if (searchParams.get("subscription") === "true") {

@@ -44,16 +44,33 @@ serve(async (req) => {
     );
 
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session;
+      const rawSession = event.data.object as Stripe.Checkout.Session;
+      console.log(`[STRIPE-WEBHOOK] checkout.session.completed - mode: ${rawSession.mode}, id: ${rawSession.id}`);
       
       // Only process one-time payment credit packs (mode=payment)
-      if (session.mode === "payment") {
+      if (rawSession.mode === "payment") {
+        // Retrieve full session from Stripe to ensure metadata is present
+        const session = await stripe.checkout.sessions.retrieve(rawSession.id);
+        console.log(`[STRIPE-WEBHOOK] Retrieved session metadata:`, JSON.stringify(session.metadata));
+        
         const userId = session.metadata?.user_id;
         const credits = parseInt(session.metadata?.credits || "0", 10);
 
         if (!userId || !credits) {
-          console.error("[STRIPE-WEBHOOK] Missing metadata", { userId, credits });
+          console.error("[STRIPE-WEBHOOK] Missing metadata", { userId, credits, metadata: session.metadata });
           return new Response(JSON.stringify({ error: "Missing metadata" }), { status: 400 });
+        }
+
+        // Check for duplicate reference_id to avoid double-crediting
+        const { data: existing } = await supabase
+          .from("credits_ledger")
+          .select("id")
+          .eq("reference_id", session.id)
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          console.log(`[STRIPE-WEBHOOK] Credits already granted for session ${session.id}, skipping`);
+          return new Response(JSON.stringify({ received: true }), { status: 200 });
         }
 
         console.log(`[STRIPE-WEBHOOK] Adding ${credits} credits to user ${userId}`);
@@ -70,6 +87,10 @@ serve(async (req) => {
           console.error("[STRIPE-WEBHOOK] DB error:", error);
           return new Response(JSON.stringify({ error: error.message }), { status: 500 });
         }
+
+        console.log(`[STRIPE-WEBHOOK] Successfully added ${credits} credits to user ${userId}`);
+      } else {
+        console.log(`[STRIPE-WEBHOOK] checkout.session.completed with mode=${rawSession.mode}, skipping credit insert`);
       }
       // For subscription checkouts, credits are granted via invoice.paid
     }
