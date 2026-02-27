@@ -314,7 +314,7 @@ export default function Marketplace() {
                     <Bot className="h-5 w-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm truncate">{agent.name}</h3>
+                    <h3 className="font-semibold text-sm truncate text-card-foreground">{agent.name}</h3>
                     <p className="text-xs text-muted-foreground truncate">{agent.creator_name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <Star className={`h-3 w-3 ${agent.avg_rating > 0 ? "fill-[hsl(var(--warning))] text-[hsl(var(--warning))]" : "text-muted-foreground/30"}`} />
@@ -372,9 +372,9 @@ export default function Marketplace() {
                     </div>
                   </div>
 
-                  <h3 className="mb-1 font-display text-base font-semibold leading-tight">{agent.name}</h3>
+                  <h3 className="mb-1 font-display text-base font-semibold leading-tight text-card-foreground">{agent.name}</h3>
                   <p className="mb-1 text-xs text-muted-foreground">por {agent.creator_name}</p>
-                  <p className="mb-4 text-sm text-muted-foreground line-clamp-2">{agent.description}</p>
+                  <p className="mb-4 text-sm text-muted-foreground line-clamp-2">{agent.description || "Sem descrição"}</p>
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 text-xs font-medium text-[hsl(var(--warning))]">
