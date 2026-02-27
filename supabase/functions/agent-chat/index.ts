@@ -1188,7 +1188,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
 
     // Remap model if incompatible with provider
     const PROVIDER_SUPPORTED_MODELS: Record<string, string[]> = {
-      groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"],
+      groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
     };
     let effectiveModel = customAgent.model;
     const supportedList = PROVIDER_SUPPORTED_MODELS[customAgent.provider];
