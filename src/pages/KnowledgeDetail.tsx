@@ -437,7 +437,7 @@ export default function KnowledgeDetail() {
                     setEditDescription(kb?.description || "");
                     setIsEditing(true);
                   }}
-                  className="border-white/10 text-white hover:bg-white/10"
+                  className="border-white/20 bg-white/10 text-white hover:bg-white/20"
                 >
                   <Pencil className="mr-2 h-4 w-4" /> Editar
                 </Button>
