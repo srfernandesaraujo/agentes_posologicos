@@ -50,13 +50,16 @@ export default function Conversations() {
 
   const getAgentName = (agentId: string) => agentNameMap.get(agentId) || "Agente";
 
+  // Only show sessions that have at least 1 message
+  const sessionsWithMessages = sessions.filter((s: any) => s.messages && s.messages.length > 0);
+
   const agents = Array.from(
     new Map(
-      sessions.map((s: any) => [s.agent_id, getAgentName(s.agent_id)])
+      sessionsWithMessages.map((s: any) => [s.agent_id, getAgentName(s.agent_id)])
     ).entries()
   );
 
-  const filtered = sessions.filter((s: any) => {
+  const filtered = sessionsWithMessages.filter((s: any) => {
     if (agentFilter !== "all" && s.agent_id !== agentFilter) return false;
     if (search) {
       const lastMsg = s.messages?.[s.messages.length - 1]?.content || "";
