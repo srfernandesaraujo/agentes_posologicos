@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useAgents, CATEGORIES } from "@/hooks/useAgents";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
+import { usePurchasedAgents, useMarketplaceAgents } from "@/hooks/useMarketplace";
 import { AgentCard } from "@/components/agents/AgentCard";
-import { Bot, Search, ArrowRight } from "lucide-react";
+import { Bot, Search, ArrowRight, ShoppingBag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -10,10 +11,19 @@ import { useLanguage } from "@/contexts/LanguageContext";
 export default function Agents() {
   const { data: agents = [], isLoading } = useAgents();
   const { data: customAgents = [] } = useCustomAgents();
+  const { data: purchasedSet = new Set<string>() } = usePurchasedAgents();
+  const { data: marketplaceAgents = [] } = useMarketplaceAgents();
   const [search, setSearch] = useState("");
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const navigate = useNavigate();
   const { t } = useLanguage();
+
+  // Agents purchased from marketplace (not owned by user)
+  const purchasedAgents = marketplaceAgents.filter(
+    (a) => purchasedSet.has(a.id) && !customAgents.some((c) => c.id === a.id)
+  ).filter(
+    (a) => !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.description.toLowerCase().includes(search.toLowerCase())
+  );
 
   const filtered = agents.filter((a) => {
     const matchesSearch = !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.description.toLowerCase().includes(search.toLowerCase());
@@ -57,6 +67,37 @@ export default function Agents() {
           </button>
         ))}
       </div>
+
+      {/* Purchased agents from marketplace */}
+      {purchasedAgents.length > 0 && !selectedCat && (
+        <div className="mb-8">
+          <h2 className="mb-4 font-display text-lg font-semibold text-white/80 flex items-center gap-2">
+            <ShoppingBag className="h-5 w-5 text-[hsl(152,60%,42%)]" />
+            Agentes Adquiridos
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {purchasedAgents.map((agent) => (
+              <div key={agent.id} className="group rounded-xl border border-[hsl(152,60%,42%)]/30 bg-white/[0.03] p-6 transition-all hover:border-[hsl(152,60%,42%)]/50 hover:-translate-y-1 cursor-pointer" onClick={() => navigate(`/chat/custom-${agent.id}`)}>
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[hsl(152,60%,42%)]/20 text-[hsl(152,60%,42%)]">
+                    <Bot className="h-6 w-6" />
+                  </div>
+                  <span className="rounded-full bg-[hsl(152,60%,42%)]/10 border border-[hsl(152,60%,42%)]/30 px-2.5 py-1 text-xs font-medium text-[hsl(152,60%,42%)]">
+                    Marketplace
+                  </span>
+                </div>
+                <h3 className="mb-1 font-display text-lg font-semibold leading-tight text-white">{agent.name}</h3>
+                <p className="mb-1 text-xs text-white/30">por {agent.creator_name}</p>
+                <p className="mb-5 text-sm text-white/40 line-clamp-3">{agent.description || "Sem descrição"}</p>
+                <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/20 bg-transparent px-4 py-2 text-sm font-medium text-white hover:bg-white/10 transition-colors">
+                  {t("agents.startChat")}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {publishedCustom.length > 0 && !selectedCat && (
         <div className="mb-8">
