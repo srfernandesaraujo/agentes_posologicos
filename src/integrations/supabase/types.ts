@@ -427,6 +427,38 @@ export type Database = {
         }
         Relationships: []
       }
+      purchased_agents: {
+        Row: {
+          agent_id: string
+          buyer_id: string
+          created_at: string
+          id: string
+          seller_id: string
+        }
+        Insert: {
+          agent_id: string
+          buyer_id: string
+          created_at?: string
+          id?: string
+          seller_id: string
+        }
+        Update: {
+          agent_id?: string
+          buyer_id?: string
+          created_at?: string
+          id?: string
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchased_agents_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "custom_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       response_feedback: {
         Row: {
           agent_id: string
