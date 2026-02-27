@@ -30,11 +30,12 @@ serve(async (req) => {
   );
 
   try {
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("Não autenticado. Faça login para continuar.");
     const token = authHeader.replace("Bearer ", "");
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
-    if (!user?.email) throw new Error("User not authenticated");
+    if (!user?.email) throw new Error("Usuário não autenticado ou e-mail indisponível");
 
     const { packKey, planKey } = await req.json();
     
