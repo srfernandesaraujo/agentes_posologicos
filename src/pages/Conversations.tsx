@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAgents } from "@/hooks/useAgents";
+import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { MessageSquare, Search, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +14,8 @@ export default function Conversations() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
+  const { data: nativeAgents = [] } = useAgents();
+  const { data: customAgents = [] } = useCustomAgents();
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ["all-conversations", user?.id],
@@ -23,7 +27,6 @@ export default function Conversations() {
           agent_id,
           created_at,
           status,
-          agents(name, icon),
           messages(content, role, created_at)
         `)
         .eq("user_id", user!.id)
@@ -34,11 +37,22 @@ export default function Conversations() {
     enabled: !!user,
   });
 
+  // Resolve agent names from native + custom agents
+  const agentNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    nativeAgents.forEach((a) => {
+      map.set(a.slug, a.name);
+      map.set(a.id, a.name);
+    });
+    customAgents.forEach((a: any) => map.set(a.id, a.name));
+    return map;
+  }, [nativeAgents, customAgents]);
+
+  const getAgentName = (agentId: string) => agentNameMap.get(agentId) || "Agente";
+
   const agents = Array.from(
     new Map(
-      sessions
-        .filter((s: any) => s.agents)
-        .map((s: any) => [s.agent_id, s.agents.name])
+      sessions.map((s: any) => [s.agent_id, getAgentName(s.agent_id)])
     ).entries()
   );
 
@@ -46,7 +60,7 @@ export default function Conversations() {
     if (agentFilter !== "all" && s.agent_id !== agentFilter) return false;
     if (search) {
       const lastMsg = s.messages?.[s.messages.length - 1]?.content || "";
-      const agentName = s.agents?.name || "";
+      const agentName = getAgentName(s.agent_id);
       const q = search.toLowerCase();
       return lastMsg.toLowerCase().includes(q) || agentName.toLowerCase().includes(q);
     }
@@ -56,7 +70,7 @@ export default function Conversations() {
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(174,62%,47%)] border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -110,8 +124,8 @@ export default function Conversations() {
                 className="w-full text-left rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] transition-colors"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-[hsl(174,62%,47%)]">
-                    {session.agents?.name || "Agente desconhecido"}
+                  <span className="text-sm font-medium text-primary">
+                    {getAgentName(session.agent_id)}
                   </span>
                   <span className="text-xs text-white/30">
                     {new Date(session.created_at).toLocaleDateString("pt-BR")}
