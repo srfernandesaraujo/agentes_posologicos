@@ -13,9 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Trash2, Edit2, Copy, DoorOpen, Coins, Clock, Search, Bot, ChevronDown, Check } from "lucide-react";
+import { Plus, Trash2, Edit2, Copy, DoorOpen, Coins, Clock, Search, Bot, ChevronDown, Check, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { RoomConversations } from "@/components/rooms/RoomConversations";
 
 const ROOM_AGENT_COST = 1;
 
@@ -169,6 +170,7 @@ export default function VirtualRooms() {
   const { isAdmin } = useIsAdmin();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<VirtualRoom | null>(null);
+  const [viewingRoom, setViewingRoom] = useState<VirtualRoom | null>(null);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -360,7 +362,7 @@ export default function VirtualRooms() {
             const agentName = findAgentName(room.agent_id);
             const expired = isAgentExpired(room);
             return (
-              <div key={room.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 flex items-start justify-between gap-4">
+              <div key={room.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 flex items-start justify-between gap-4 cursor-pointer hover:bg-white/[0.05] transition-colors" onClick={() => setViewingRoom(room)}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-white truncate">{room.name}</h3>
@@ -392,7 +394,10 @@ export default function VirtualRooms() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" onClick={() => setViewingRoom(room)} className="text-white/40 hover:text-white hover:bg-white/10">
+                    <MessageSquare className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => openEdit(room)} className="text-white/40 hover:text-white hover:bg-white/10">
                     <Edit2 className="h-4 w-4" />
                   </Button>
@@ -453,6 +458,15 @@ export default function VirtualRooms() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {viewingRoom && (
+        <RoomConversations
+          roomId={viewingRoom.id}
+          roomName={viewingRoom.name}
+          open={!!viewingRoom}
+          onOpenChange={(open) => { if (!open) setViewingRoom(null); }}
+        />
+      )}
     </div>
   );
 }
