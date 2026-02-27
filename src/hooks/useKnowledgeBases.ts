@@ -58,6 +58,24 @@ export function useKnowledgeBases() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] }),
   });
 
+  const updateKB = useMutation({
+    mutationFn: async ({ id, name, description, is_public }: { id: string; name: string; description: string; is_public?: boolean }) => {
+      const { data, error } = await supabase
+        .from("knowledge_bases" as any)
+        .update({ name, description, is_public: is_public ?? false })
+        .eq("id", id)
+        .eq("user_id", user!.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as unknown as KnowledgeBase;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+      queryClient.invalidateQueries({ queryKey: ["knowledge-base"] });
+    },
+  });
+
   const deleteKB = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -67,10 +85,13 @@ export function useKnowledgeBases() {
         .eq("user_id", user!.id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+      queryClient.invalidateQueries({ queryKey: ["agent-knowledge-bases"] });
+    },
   });
 
-  return { ...query, createKB, deleteKB };
+  return { ...query, createKB, updateKB, deleteKB };
 }
 
 export function useKnowledgeBase(id: string | undefined) {
