@@ -162,58 +162,13 @@ export function usePurchaseAgent() {
   return useMutation({
     mutationFn: async ({ agent }: { agent: MarketplaceAgent }) => {
       if (!user) throw new Error("Não autenticado");
-      if (agent.user_id === user.id) throw new Error("Você não pode comprar seu próprio agente");
 
-      // 1. Check if already purchased
-      const { data: existing } = await supabase
-        .from("purchased_agents" as any)
-        .select("id")
-        .eq("buyer_id", user.id)
-        .eq("agent_id", agent.id)
-        .maybeSingle();
-      if (existing) throw new Error("Você já adquiriu este agente");
+      const { data, error } = await supabase.functions.invoke("purchase-agent", {
+        body: { agentId: agent.id },
+      });
 
-      // 2. Check buyer credits
-      const { data: credits } = await supabase
-        .from("credits_ledger")
-        .select("amount")
-        .eq("user_id", user.id);
-      const balance = (credits || []).reduce((sum, r) => sum + r.amount, 0);
-      if (balance < 5) throw new Error("Créditos insuficientes. Você precisa de 5 créditos.");
-
-      // 3. Debit buyer 5 credits
-      const { error: debitError } = await supabase
-        .from("credits_ledger")
-        .insert({
-          user_id: user.id,
-          amount: -5,
-          type: "usage",
-          description: `Compra do agente "${agent.name}" no Marketplace`,
-          reference_id: `purchase-${agent.id}`,
-        });
-      if (debitError) throw debitError;
-
-      // 4. Credit seller 3 credits
-      const { error: creditError } = await supabase
-        .from("credits_ledger")
-        .insert({
-          user_id: agent.user_id,
-          amount: 3,
-          type: "bonus",
-          description: `Venda do agente "${agent.name}" no Marketplace`,
-          reference_id: `sale-${agent.id}-${user.id}`,
-        });
-      if (creditError) throw creditError;
-
-      // 5. Record purchase
-      const { error: purchaseError } = await supabase
-        .from("purchased_agents" as any)
-        .insert({
-          buyer_id: user.id,
-          agent_id: agent.id,
-          seller_id: agent.user_id,
-        });
-      if (purchaseError) throw purchaseError;
+      if (error) throw new Error(error.message || "Erro ao adquirir agente");
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchased-agents"] });
