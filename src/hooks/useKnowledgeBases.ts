@@ -87,6 +87,7 @@ export function useKnowledgeBases() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+      queryClient.invalidateQueries({ queryKey: ["knowledge-sources"] });
       queryClient.invalidateQueries({ queryKey: ["agent-knowledge-bases"] });
     },
   });

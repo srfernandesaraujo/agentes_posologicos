@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useKnowledgeBases, useKnowledgeSources, KnowledgeSource } from "@/hooks/useKnowledgeBases";
@@ -61,10 +61,10 @@ export function DocumentManager({ agentId }: DocumentManagerProps) {
     }
   }, [user]);
 
-  // Load on mount
-  useState(() => {
+  // Load on mount and when agent KB links change
+  useEffect(() => {
     loadGlobalSources();
-  });
+  }, [loadGlobalSources, agentKBs]);
 
   // Ensure agent has at least one KB
   const ensureKB = async (): Promise<string> => {
