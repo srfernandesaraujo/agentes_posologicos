@@ -5,22 +5,22 @@ import { useAuth } from "@/contexts/AuthContext";
 export const SUBSCRIPTION_TIERS = {
   basico: {
     name: "Básico",
-    price_id: "price_1T5EkLHVhK7c22vOUtf1MJYO",
-    product_id: "prod_U3LR5lqvuJhqxF",
+    price_id: "price_1T3NdEH3PPmnMq0Wo0LdJ2oY",
+    product_id: "prod_U1QUUwFaiMvahz",
     credits: 30,
     price: "R$ 29,90",
   },
   pro: {
     name: "Pro",
-    price_id: "price_1T5EjCHVhK7c22vOExlpcHoq",
-    product_id: "prod_U3LQJwX1iyo4FH",
+    price_id: "price_1T3NdSH3PPmnMq0W163xWcVA",
+    product_id: "prod_U1QUeqz6YtFUib",
     credits: 100,
     price: "R$ 59,90",
   },
   institucional: {
     name: "Institucional",
-    price_id: "price_1T5EktHVhK7c22vOcS5KZyuR",
-    product_id: "prod_U3LRmBcPJe3JYb",
+    price_id: "price_1T3NdeH3PPmnMq0WSZg6PiQY",
+    product_id: "prod_U1QUXJ141hfnYw",
     credits: 300,
     price: "R$ 149,90",
   },
