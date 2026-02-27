@@ -205,10 +205,14 @@ export function DocumentManager({ agentId }: DocumentManagerProps) {
   const agentSources = globalSources.filter((s) => linkedKBIds.includes(s.knowledge_base_id));
   const agentSourceIds = new Set(agentSources.map((s) => s.id));
 
+  // Names already in the agent's KBs (to prevent duplicates by name)
+  const agentSourceNames = new Set(agentSources.map((s) => s.name.toLowerCase()));
+
   // Left panel: only sources NOT already in the agent's KBs (no duplicates)
   const filteredLeft = globalSources.filter((s) => {
     if (agentSourceIds.has(s.id)) return false;
     if (linkedKBIds.includes(s.knowledge_base_id)) return false;
+    if (agentSourceNames.has(s.name.toLowerCase())) return false;
     if (searchLeft && !s.name.toLowerCase().includes(searchLeft.toLowerCase())) return false;
     return true;
   });
