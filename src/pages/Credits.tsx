@@ -167,7 +167,7 @@ export default function Credits() {
                 size="sm"
                 onClick={handleManageSubscription}
                 disabled={loadingPortal}
-                className="border-white/20 text-white hover:bg-white/10"
+                className="border-[hsl(174,62%,47%)]/30 bg-white text-gray-900 hover:bg-gray-100"
               >
                 {loadingPortal ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
                 <span className="ml-1">Gerenciar</span>
