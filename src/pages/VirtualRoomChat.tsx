@@ -51,28 +51,29 @@ export default function VirtualRoomChat() {
   const roomExpired = room?.room_expires_at && new Date(room.room_expires_at) < new Date();
   const agentExpired = room?.agent_expires_at && new Date(room.agent_expires_at) < new Date();
 
-  // Load existing messages when room is available
+  // Load existing messages for this participant only
   useEffect(() => {
-    if (!room?.id) return;
+    if (!room?.id || !nameConfirmed || !participantEmail) return;
     const loadMessages = async () => {
       const { data, error } = await (supabase as any)
         .from("room_messages")
         .select("*")
         .eq("room_id", room.id)
+        .eq("sender_email", participantEmail)
         .order("created_at", { ascending: true });
       if (!error && data) {
         setMessages(data);
       }
     };
     loadMessages();
-  }, [room?.id]);
+  }, [room?.id, nameConfirmed, participantEmail]);
 
-  // Subscribe to Realtime for new messages
+  // Subscribe to Realtime for new messages (only this participant's)
   useEffect(() => {
-    if (!room?.id) return;
+    if (!room?.id || !nameConfirmed || !participantEmail) return;
 
     const channel = supabase
-      .channel(`room-messages-${room.id}`)
+      .channel(`room-messages-${room.id}-${participantEmail}`)
       .on(
         "postgres_changes" as any,
         {
@@ -83,8 +84,9 @@ export default function VirtualRoomChat() {
         },
         (payload: any) => {
           const newMsg = payload.new as RoomMessage;
+          // Only show messages belonging to this participant
+          if (newMsg.sender_email !== participantEmail) return;
           setMessages((prev) => {
-            // Avoid duplicates
             if (prev.some((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
@@ -97,7 +99,7 @@ export default function VirtualRoomChat() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [room?.id]);
+  }, [room?.id, nameConfirmed, participantEmail]);
 
   // Presence tracking for participant count
   useEffect(() => {
@@ -168,10 +170,11 @@ export default function VirtualRoomChat() {
 
       if (error) throw error;
 
-      // Insert assistant response to DB
+      // Insert assistant response to DB (tagged with same email)
       await (supabase as any).from("room_messages").insert({
         room_id: room.id,
         sender_name: "Assistente",
+        sender_email: participantEmail,
         role: "assistant",
         content: data?.output || "Sem resposta.",
       });
@@ -179,6 +182,7 @@ export default function VirtualRoomChat() {
       await (supabase as any).from("room_messages").insert({
         room_id: room.id,
         sender_name: "Sistema",
+        sender_email: participantEmail,
         role: "assistant",
         content: "Erro ao processar a mensagem. Tente novamente.",
       });
