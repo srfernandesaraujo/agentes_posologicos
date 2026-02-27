@@ -146,18 +146,38 @@ export function DocumentManager({ agentId }: DocumentManagerProps) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const isYouTubeUrl = (url: string) => {
+    return /(?:youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts\/)/.test(url);
+  };
+
   const handleFetchUrl = async () => {
     if (!urlInput.trim()) return;
     if (!user) return;
     try {
       const kbId = await ensureKB();
-      await createSource.mutateAsync({
+      const isYT = isYouTubeUrl(urlInput);
+      const newSource = await createSource.mutateAsync({
         knowledge_base_id: kbId,
         name: urlInput,
-        type: "webpage",
+        type: isYT ? "youtube" : "webpage",
         content: "",
         url: urlInput,
       });
+
+      if (isYT) {
+        toast.info("Extraindo transcrição do YouTube...");
+        supabase.functions.invoke("youtube-transcript", {
+          body: { source_id: newSource.id, url: urlInput },
+        }).then(({ error }) => {
+          if (error) {
+            toast.error("Erro ao extrair transcrição do YouTube");
+          } else {
+            toast.success("Transcrição do YouTube extraída!");
+          }
+          loadGlobalSources();
+        });
+      }
+
       toast.success("URL adicionada!");
       setUrlInput("");
       loadGlobalSources();

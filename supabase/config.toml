@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.purchase-agent]
 verify_jwt = false
+
+[functions.youtube-transcript]
+verify_jwt = false

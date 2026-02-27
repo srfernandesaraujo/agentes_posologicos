@@ -51,13 +51,27 @@ export default function KnowledgeDetail() {
       }
 
       // For webpage/website/youtube, we store the URL and will process it later
-      await createSource.mutateAsync({
+      const newSource = await createSource.mutateAsync({
         knowledge_base_id: kbId,
         name: sourceName,
         type: sourceType || "text",
         content,
         url: sourceUrl || undefined,
       });
+
+      // Auto-extract YouTube transcript
+      if (sourceType === "youtube" && sourceUrl) {
+        toast.info("Extraindo transcrição do YouTube...");
+        supabase.functions.invoke("youtube-transcript", {
+          body: { source_id: newSource.id, url: sourceUrl },
+        }).then(({ error }) => {
+          if (error) {
+            toast.error("Erro ao extrair transcrição do YouTube");
+          } else {
+            toast.success("Transcrição do YouTube extraída com sucesso!");
+          }
+        });
+      }
 
       toast.success("Fonte adicionada!");
       resetForm();
