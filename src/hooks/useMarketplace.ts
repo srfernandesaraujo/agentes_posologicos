@@ -13,6 +13,7 @@ export interface MarketplaceAgent {
   avg_rating: number;
   review_count: number;
   creator_name?: string;
+  category?: string;
 }
 
 export interface AgentReview {
@@ -38,7 +39,6 @@ export function useMarketplaceAgents() {
         .order("created_at", { ascending: false });
       if (error) throw error;
 
-      // Fetch reviews stats and creator names
       const agentIds = (agents as any[]).map((a: any) => a.id);
       
       let reviewStats: Record<string, { avg: number; count: number }> = {};
@@ -60,7 +60,6 @@ export function useMarketplaceAgents() {
         }
       }
 
-      // Fetch creator profiles
       const userIds = [...new Set((agents as any[]).map((a: any) => a.user_id))];
       let creatorNames: Record<string, string> = {};
       if (userIds.length > 0) {
@@ -136,6 +135,89 @@ export function useSubmitReview() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["agent-reviews", vars.agentId] });
       queryClient.invalidateQueries({ queryKey: ["marketplace-agents"] });
+    },
+  });
+}
+
+export function usePurchasedAgents() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["purchased-agents", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchased_agents" as any)
+        .select("agent_id")
+        .eq("buyer_id", user!.id);
+      if (error) throw error;
+      return new Set((data as any[]).map((d: any) => d.agent_id));
+    },
+    enabled: !!user,
+  });
+}
+
+export function usePurchaseAgent() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ agent }: { agent: MarketplaceAgent }) => {
+      if (!user) throw new Error("Não autenticado");
+      if (agent.user_id === user.id) throw new Error("Você não pode comprar seu próprio agente");
+
+      // 1. Check if already purchased
+      const { data: existing } = await supabase
+        .from("purchased_agents" as any)
+        .select("id")
+        .eq("buyer_id", user.id)
+        .eq("agent_id", agent.id)
+        .maybeSingle();
+      if (existing) throw new Error("Você já adquiriu este agente");
+
+      // 2. Check buyer credits
+      const { data: credits } = await supabase
+        .from("credits_ledger")
+        .select("amount")
+        .eq("user_id", user.id);
+      const balance = (credits || []).reduce((sum, r) => sum + r.amount, 0);
+      if (balance < 5) throw new Error("Créditos insuficientes. Você precisa de 5 créditos.");
+
+      // 3. Debit buyer 5 credits
+      const { error: debitError } = await supabase
+        .from("credits_ledger")
+        .insert({
+          user_id: user.id,
+          amount: -5,
+          type: "usage",
+          description: `Compra do agente "${agent.name}" no Marketplace`,
+          reference_id: `purchase-${agent.id}`,
+        });
+      if (debitError) throw debitError;
+
+      // 4. Credit seller 3 credits
+      const { error: creditError } = await supabase
+        .from("credits_ledger")
+        .insert({
+          user_id: agent.user_id,
+          amount: 3,
+          type: "bonus",
+          description: `Venda do agente "${agent.name}" no Marketplace`,
+          reference_id: `sale-${agent.id}-${user.id}`,
+        });
+      if (creditError) throw creditError;
+
+      // 5. Record purchase
+      const { error: purchaseError } = await supabase
+        .from("purchased_agents" as any)
+        .insert({
+          buyer_id: user.id,
+          agent_id: agent.id,
+          seller_id: agent.user_id,
+        });
+      if (purchaseError) throw purchaseError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchased-agents"] });
+      queryClient.invalidateQueries({ queryKey: ["credits"] });
     },
   });
 }
