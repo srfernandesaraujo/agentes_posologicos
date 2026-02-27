@@ -189,21 +189,13 @@ export function DocumentManager({ agentId }: DocumentManagerProps) {
   const moveToAgent = async (source: KnowledgeSource) => {
     if (!user) return;
     try {
-      const kbId = await ensureKB();
       // If already in a linked KB, skip
       if (linkedKBIds.includes(source.knowledge_base_id)) {
         toast.info("Este documento já está vinculado ao agente.");
         return;
       }
-      // Copy source to agent's KB
-      await createSource.mutateAsync({
-        knowledge_base_id: kbId,
-        name: source.name,
-        type: source.type,
-        content: source.content,
-        url: source.url || undefined,
-        file_path: source.file_path || undefined,
-      });
+      // Link the source's KB to the agent (instead of copying)
+      await linkKB.mutateAsync(source.knowledge_base_id);
       toast.success(`"${source.name}" vinculado ao agente!`);
       loadGlobalSources();
     } catch {
