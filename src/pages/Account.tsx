@@ -169,7 +169,7 @@ export default function Account() {
               </div>
               <span className="rounded-full bg-[hsl(152,60%,42%)]/20 px-3 py-1 text-xs font-medium text-[hsl(152,60%,42%)]">Ativo</span>
             </div>
-            <Button onClick={handleManageSubscription} disabled={portalLoading} variant="outline" className="w-full gap-2 border-white/10 text-white hover:bg-white/5">
+            <Button onClick={handleManageSubscription} disabled={portalLoading} variant="outline" className="w-full gap-2 bg-white text-gray-900 hover:bg-gray-100 border-gray-200">
               {portalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
               Gerenciar ou Cancelar Assinatura
             </Button>
