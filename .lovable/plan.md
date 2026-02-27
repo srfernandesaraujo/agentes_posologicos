@@ -1,41 +1,41 @@
 
+## Corrigir Product IDs no stripe-webhook
 
-# Usar Chave de API do Usuario nos Agentes Nativos
+### Problema
+O arquivo `supabase/functions/stripe-webhook/index.ts` usa Product IDs antigos para mapear assinaturas aos creditos mensais. Isso faz com que, quando um pagamento de assinatura chega via webhook, o sistema nao reconheca o produto e nao credite os creditos ao usuario.
 
-## Situacao Atual
+### IDs atuais (errados) vs corretos
 
-Os agentes nativos (Interacoes Cardiovascular, Antibioticoterapia, etc.) sempre usam o Lovable AI Gateway com a `LOVABLE_API_KEY`. As chaves de API configuradas pelo usuario em `/settings` so funcionam para agentes personalizados.
+| Plano         | ID atual (errado)         | ID correto (novo)         | Creditos |
+|---------------|---------------------------|---------------------------|----------|
+| Basico        | prod_U1QUUwFaiMvahz       | prod_U3LR5lqvuJhqxF       | 30       |
+| Pro           | prod_U1QUeqz6YtFUib       | prod_U3LQJwX1iyo4FH       | 100      |
+| Institucional | prod_U1QUXJ141hfnYw       | prod_U3LRmBcPJe3JYb       | 300      |
 
-## Mudanca Proposta
+### Alteracao
 
-Adicionar logica na Edge Function `agent-chat` para que, ao processar um agente nativo, o sistema primeiro verifique se o usuario tem uma chave de API configurada para algum provedor. Se tiver, usa a chave do usuario com o provedor/modelo escolhido. Se nao tiver, continua usando o Lovable AI Gateway como fallback.
+Atualizar as 3 linhas do mapa `SUBSCRIPTION_CREDITS` em `supabase/functions/stripe-webhook/index.ts` (linhas 12-14) com os Product IDs corretos e fazer o redeploy da funcao.
 
-## Implementacao
+### Detalhes tecnicos
 
-### 1. Edge Function `agent-chat` (bloco de agentes nativos, linhas 745-798)
+Arquivo: `supabase/functions/stripe-webhook/index.ts`
 
-Antes de chamar o Lovable AI Gateway, verificar se o usuario tem uma chave de API configurada:
+Substituir:
+```typescript
+const SUBSCRIPTION_CREDITS: Record<string, number> = {
+  "prod_U1QUUwFaiMvahz": 30,   // Basico
+  "prod_U1QUeqz6YtFUib": 100,  // Pro
+  "prod_U1QUXJ141hfnYw": 300,  // Institucional
+};
+```
 
-- Buscar na tabela `user_api_keys` por qualquer chave do usuario
-- Se encontrar, usar o provedor e a chave do usuario para fazer a chamada
-- Reaproveitar a mesma logica de roteamento que ja existe para agentes personalizados (OpenAI, Anthropic, Groq, OpenRouter, Google)
-- Se a chamada com a chave do usuario falhar, fazer fallback automatico para o Lovable AI Gateway (mesmo padrao dos agentes personalizados)
+Por:
+```typescript
+const SUBSCRIPTION_CREDITS: Record<string, number> = {
+  "prod_U3LR5lqvuJhqxF": 30,   // Basico
+  "prod_U3LQJwX1iyo4FH": 100,  // Pro
+  "prod_U3LRmBcPJe3JYb": 300,  // Institucional
+};
+```
 
-### 2. Preferencia de Provedor
-
-Como o usuario pode ter varias chaves configuradas, sera necessario definir uma ordem de prioridade. A logica sera:
-
-- Usar a chave mais recentemente atualizada (`updated_at` mais recente)
-- Isso permite que o usuario controle qual provedor usar simplesmente atualizando/reconfigurando a chave desejada
-
-### 3. Pagina de Configuracoes (opcional, melhoria visual)
-
-Adicionar uma indicacao na pagina de Settings informando que a chave configurada sera usada tambem nos agentes nativos, nao apenas nos personalizados.
-
-## Detalhes Tecnicos
-
-- Arquivo principal: `supabase/functions/agent-chat/index.ts`
-- A funcao de roteamento para provedores externos ja existe no codigo (linhas 900+) e sera extraida/reutilizada
-- Mapeamento de modelos padrao por provedor (ex: OpenAI -> gpt-4o, Groq -> llama-3.3-70b-versatile) para quando o usuario nao especificar
-- Fallback para Lovable AI Gateway em caso de erro, mantendo a mesma resiliencia dos agentes personalizados
-
+Apos a edicao, a funcao sera redeployada automaticamente.
