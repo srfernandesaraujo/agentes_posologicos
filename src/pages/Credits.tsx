@@ -12,9 +12,9 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 const CREDIT_PACKS = [
-  { amount: 10, packKey: "10", price: "R$ 9,90", icon: Zap, popular: false },
-  { amount: 30, packKey: "30", price: "R$ 24,90", icon: Star, popular: true },
-  { amount: 100, packKey: "100", price: "R$ 69,90", icon: Crown, popular: false },
+  { name: "Essencial", amount: 10, packKey: "10", price: "R$ 9,90", icon: Zap, popular: false },
+  { name: "Avançado", amount: 30, packKey: "30", price: "R$ 24,90", icon: Star, popular: true },
+  { name: "Profissional", amount: 100, packKey: "100", price: "R$ 69,90", icon: Crown, popular: false },
 ];
 
 const PLANS: { key: TierKey; icon: typeof Zap; popular: boolean; features: string[] }[] = [
@@ -281,6 +281,7 @@ export default function Credits() {
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-white/5 border border-white/10">
                 <pack.icon className="h-7 w-7 text-[hsl(174,62%,47%)]" />
               </div>
+              <p className="mb-1 font-display text-lg font-bold text-[hsl(174,62%,47%)]">{pack.name}</p>
               <p className="mb-1 font-display text-3xl font-bold text-white">{pack.amount}</p>
               <p className="mb-1 text-sm text-white/40">{t("credits.credits")}</p>
               <p className="mb-6 text-xl font-semibold text-white">{pack.price}</p>
