@@ -783,6 +783,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      decrypt_api_key:
+        | { Args: { p_encrypted: string }; Returns: string }
+        | {
+            Args: { p_encrypted: string; p_encryption_key?: string }
+            Returns: string
+          }
+      encrypt_api_key:
+        | { Args: { p_key: string }; Returns: string }
+        | {
+            Args: { p_encryption_key?: string; p_key: string }
+            Returns: string
+          }
       get_current_user_email: { Args: never; Returns: string }
       get_room_by_pin: {
         Args: { p_pin: string }

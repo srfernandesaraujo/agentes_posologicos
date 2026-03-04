@@ -51,8 +51,10 @@ export function useApiKeys() {
   const query = useQuery({
     queryKey: ["api-keys", user?.id],
     queryFn: async () => {
+      // We can still READ keys (RLS SELECT is still allowed)
+      // But the encrypted value won't be readable plaintext anymore
       const { data, error } = await supabase
-        .from("user_api_keys" as any)
+        .from("user_api_keys")
         .select("*")
         .eq("user_id", user!.id);
       if (error) throw error;
@@ -63,25 +65,22 @@ export function useApiKeys() {
 
   const upsertKey = useMutation({
     mutationFn: async ({ provider, apiKey }: { provider: string; apiKey: string }) => {
-      const { error } = await supabase
-        .from("user_api_keys" as any)
-        .upsert(
-          { user_id: user!.id, provider, api_key_encrypted: apiKey },
-          { onConflict: "user_id,provider" }
-        );
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("manage-api-keys", {
+        body: { action: "upsert", provider, apiKey },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["api-keys"] }),
   });
 
   const deleteKey = useMutation({
     mutationFn: async (provider: string) => {
-      const { error } = await supabase
-        .from("user_api_keys" as any)
-        .delete()
-        .eq("user_id", user!.id)
-        .eq("provider", provider);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("manage-api-keys", {
+        body: { action: "delete", provider },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["api-keys"] }),
   });

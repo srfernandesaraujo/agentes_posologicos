@@ -717,6 +717,18 @@ Deno.serve(async (req) => {
           global: { headers: { Authorization: authHeader! } },
         });
 
+    // Helper to decrypt API keys (supports both encrypted and legacy plaintext)
+    const decryptApiKey = async (encryptedKey: string): Promise<string> => {
+      const encKey = Deno.env.get("API_ENCRYPTION_KEY");
+      if (!encKey) return encryptedKey; // No encryption key configured, assume plaintext
+      const svc = createClient(supabaseUrl, serviceRoleKey);
+      const { data, error } = await svc.rpc("decrypt_api_key", { p_encrypted: encryptedKey, p_encryption_key: encKey });
+      if (error) {
+        console.warn("Decrypt failed, using raw value:", error.message);
+        return encryptedKey;
+      }
+      return data as string;
+    };
     // Special case: prompt generation
     if (agentId === "__generate_prompt__") {
       const promptMessages = [
@@ -782,12 +794,13 @@ Deno.serve(async (req) => {
               const model = DEFAULT_MODELS[uk.provider] || "gpt-4o";
               let output: string;
 
+              const decryptedKey = await decryptApiKey(uk.api_key_encrypted);
               if (uk.provider === "anthropic") {
-                output = await callAnthropic(uk.api_key_encrypted, model);
+                output = await callAnthropic(decryptedKey, model);
               } else {
                 const endpoint = PROVIDER_ENDPOINTS[uk.provider];
                 if (!endpoint) continue;
-                output = await callOpenAICompatible(endpoint, uk.api_key_encrypted, model);
+                output = await callOpenAICompatible(endpoint, decryptedKey, model);
               }
 
               console.log(`Prompt generation: used user's ${uk.provider} key`);
@@ -853,7 +866,7 @@ Deno.serve(async (req) => {
         if (userKeys && userKeys.length > 0) {
           const userKey = userKeys[0];
           const provider = userKey.provider;
-          const apiKey = userKey.api_key_encrypted;
+          const apiKey = await decryptApiKey(userKey.api_key_encrypted);
           const endpoint = PROVIDER_ENDPOINTS[provider];
 
           // Default models per provider for native agents
@@ -1116,7 +1129,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
       });
     }
 
-    const userApiKey = apiKeyRow.api_key_encrypted;
+    const userApiKey = await decryptApiKey(apiKeyRow.api_key_encrypted);
     const endpoint = PROVIDER_ENDPOINTS[customAgent.provider];
 
     if (!endpoint) {

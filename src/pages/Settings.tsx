@@ -4,7 +4,7 @@ import { useApiKeys, LLM_PROVIDERS } from "@/hooks/useApiKeys";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Eye, EyeOff, Check, Trash2, Key } from "lucide-react";
+import { ExternalLink, Check, Trash2, Key } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -12,7 +12,6 @@ export default function Settings() {
   const { data: keys = [], upsertKey, deleteKey } = useApiKeys();
   const [editing, setEditing] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
-  const [showKey, setShowKey] = useState<string | null>(null);
 
   const handleSave = async (provider: string) => {
     if (!inputValue.trim()) return;
@@ -137,22 +136,12 @@ export default function Settings() {
               ) : existing ? (
                 <div className="flex items-center gap-2">
                   <div className="flex-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/50 font-mono">
-                    {showKey === provider.id
-                      ? existing.api_key_encrypted
-                      : maskKey(existing.api_key_encrypted)}
+                    ••••••••••••••••
                   </div>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => setShowKey(showKey === provider.id ? null : provider.id)}
-                    className="text-white/40 hover:text-white hover:bg-white/10"
-                  >
-                    {showKey === provider.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => { setEditing(provider.id); setInputValue(existing.api_key_encrypted); }}
+                    onClick={() => { setEditing(provider.id); setInputValue(""); }}
                     className="text-white/60 hover:text-white hover:bg-white/10"
                   >
                     Editar
