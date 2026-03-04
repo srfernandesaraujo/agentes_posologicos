@@ -36,14 +36,10 @@ export default function VirtualRoomChat() {
   const { data: room, isLoading: roomLoading, error: roomError } = useQuery({
     queryKey: ["virtual-room-pin", pin],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("virtual_rooms")
-        .select("*")
-        .eq("pin", pin!)
-        .eq("is_active", true)
-        .single();
+      const { data, error } = await supabase.rpc("get_room_by_pin", { p_pin: pin! });
       if (error) throw error;
-      return data as any;
+      if (!data || (data as any[]).length === 0) throw new Error("Room not found");
+      return (data as any[])[0];
     },
     enabled: !!pin,
   });
@@ -164,6 +160,7 @@ export default function VirtualRoomChat() {
           input: `[${participantName}]: ${text}`,
           isCustomAgent: true,
           isVirtualRoom: true,
+          roomId: room.id,
           conversationHistory: recentMessages,
         },
       });

@@ -784,6 +784,22 @@ export type Database = {
     }
     Functions: {
       get_current_user_email: { Args: never; Returns: string }
+      get_room_by_pin: {
+        Args: { p_pin: string }
+        Returns: {
+          agent_expires_at: string
+          agent_id: string
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          name: string
+          pin: string
+          room_expires_at: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
