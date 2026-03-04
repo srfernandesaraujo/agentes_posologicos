@@ -26,6 +26,7 @@ import VirtualRoomChat from "./pages/VirtualRoomChat";
 import Marketplace from "./pages/Marketplace";
 import NotFound from "./pages/NotFound";
 import UserDashboard from "./pages/UserDashboard";
+import Contact from "./pages/Contact";
 import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ const App = () => (
               <Route path="/conteudos/:kbId" element={<KnowledgeDetail />} />
               <Route path="/salas-virtuais" element={<VirtualRooms />} />
               <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/contato" element={<Contact />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -2,7 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { MobileBottomNav } from "./MobileBottomNav";
-import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3 } from "lucide-react";
+import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3, Mail } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -71,6 +71,7 @@ export function AppLayout() {
             {isAdmin && <SidebarLink to="/configuracoes" icon={Settings} label={t("nav.settings")} />}
             <SidebarLink to="/creditos" icon={CreditCard} label={t("nav.credits")} />
             <SidebarLink to="/conta" icon={User} label={t("nav.account")} />
+            <SidebarLink to="/contato" icon={Mail} label="Contato" />
           </div>
         </aside>
         <main className="flex-1 min-w-0 pb-16 md:pb-0">
