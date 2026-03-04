@@ -21,7 +21,7 @@ import { MessageActions } from "@/components/chat/MessageActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
-import * as XLSX from "xlsx";
+
 
 const CUSTOM_AGENT_INTERACTION_COST = 0.5;
 
@@ -343,19 +343,7 @@ export default function Chat() {
             const content = await f.text();
             fileContents.push(`[Arquivo: ${f.name}]\n${content.substring(0, 15000)}`);
           } else if (f.type.includes("spreadsheet") || f.type.includes("excel") || f.name.endsWith(".xlsx") || f.name.endsWith(".xls")) {
-            try {
-              const arrayBuffer = await f.arrayBuffer();
-              const workbook = XLSX.read(arrayBuffer, { type: "array" });
-              const allSheets: string[] = [];
-              for (const sheetName of workbook.SheetNames) {
-                const sheet = workbook.Sheets[sheetName];
-                const csv = XLSX.utils.sheet_to_csv(sheet);
-                allSheets.push(`[Planilha: ${sheetName}]\n${csv.substring(0, 15000)}`);
-              }
-              fileContents.push(`[Arquivo: ${f.name}]\n${allSheets.join("\n\n")}`);
-            } catch {
-              fileContents.push(`[Arquivo Excel anexado: ${f.name} - Erro ao ler o arquivo.]`);
-            }
+            fileContents.push(`[Arquivo Excel anexado: ${f.name} (${(f.size / 1024).toFixed(1)}KB) - Converta para CSV para melhor processamento]`);
           } else {
             fileContents.push(`[Arquivo anexado: ${f.name} (${f.type})]`);
           }

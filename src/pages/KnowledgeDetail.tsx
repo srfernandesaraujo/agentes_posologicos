@@ -106,21 +106,7 @@ export default function KnowledgeDetail() {
       } else if (lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) {
         content = `[Word: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Arquivo armazenado para processamento]`;
       } else if (lowerName.endsWith(".xls") || lowerName.endsWith(".xlsx")) {
-        // Try to extract text from Excel using xlsx library
-        try {
-          const XLSX = await import("xlsx");
-          const arrayBuffer = await file.arrayBuffer();
-          const workbook = XLSX.read(arrayBuffer, { type: "array" });
-          const sheets: string[] = [];
-          workbook.SheetNames.forEach((sheetName) => {
-            const sheet = workbook.Sheets[sheetName];
-            const csv = XLSX.utils.sheet_to_csv(sheet);
-            sheets.push(`--- ${sheetName} ---\n${csv}`);
-          });
-          content = sheets.join("\n\n");
-        } catch {
-          content = `[Excel: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`;
-        }
+        content = `[Excel: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Converta para CSV para melhor processamento]`;
       } else {
         content = `[Arquivo: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`;
       }
