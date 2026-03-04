@@ -633,13 +633,46 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId } = body;
+    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId, creditCost } = body;
 
     if (!agentId || !input) {
       return new Response(JSON.stringify({ error: "agentId and input are required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Input validation
+    if (typeof input !== "string" || input.length > 100000) {
+      return new Response(JSON.stringify({ error: "Input inválido ou muito longo (máx 100.000 caracteres)" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (typeof agentId !== "string" || agentId.length > 200) {
+      return new Response(JSON.stringify({ error: "agentId inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate conversationHistory if provided
+    if (conversationHistory !== undefined && conversationHistory !== null) {
+      if (!Array.isArray(conversationHistory) || conversationHistory.length > 200) {
+        return new Response(JSON.stringify({ error: "conversationHistory inválido" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      for (const msg of conversationHistory) {
+        if (!msg || typeof msg.role !== "string" || typeof msg.content !== "string" || msg.content.length > 100000) {
+          return new Response(JSON.stringify({ error: "Mensagem do histórico inválida" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -729,6 +762,70 @@ Deno.serve(async (req) => {
       }
       return data as string;
     };
+
+    // Server-side credit deduction helper
+    const deductCredits = async (output: string) => {
+      if (!userId || isVirtualRoom) return; // No deduction for virtual rooms or unauthenticated
+      if (typeof creditCost !== "number" || creditCost <= 0) return; // No cost specified
+
+      const svc = createClient(supabaseUrl, serviceRoleKey);
+      
+      // Check if user has admin role or unlimited access
+      const { data: roleData } = await svc
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "admin")
+        .maybeSingle();
+      if (roleData) return; // Admin - free access
+
+      // Check unlimited_users
+      const { data: userData } = await svc.auth.admin.getUserById(userId);
+      const userEmail = userData?.user?.email;
+      if (userEmail) {
+        const { data: unlimitedData } = await svc
+          .from("unlimited_users")
+          .select("id")
+          .eq("email", userEmail.toLowerCase())
+          .eq("is_active", true)
+          .maybeSingle();
+        if (unlimitedData) return; // Unlimited user - free access
+      }
+
+      // Check balance
+      const { data: balanceData } = await svc
+        .from("credits_ledger")
+        .select("amount")
+        .eq("user_id", userId);
+      const balance = (balanceData || []).reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+      if (balance < creditCost) {
+        console.warn(`User ${userId} has insufficient credits: ${balance} < ${creditCost}`);
+        // Still allow response since AI already ran, but log it
+        return;
+      }
+
+      // Deduct
+      await svc.from("credits_ledger").insert({
+        user_id: userId,
+        amount: -creditCost,
+        type: "usage",
+        description: `Uso de agente via servidor`,
+      });
+      console.log(`Credits deducted: ${creditCost} for user ${userId}`);
+    };
+
+    // Wrapper for successful AI responses - deducts credits server-side
+    const successResponse = async (output: string) => {
+      try {
+        await deductCredits(output);
+      } catch (e) {
+        console.error("Credit deduction failed:", e.message);
+      }
+      return new Response(JSON.stringify({ output }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    };
+
     // Special case: prompt generation
     if (agentId === "__generate_prompt__") {
       const promptMessages = [
@@ -904,9 +1001,7 @@ Deno.serve(async (req) => {
                 if (anthropicResponse.ok) {
                   const data = await anthropicResponse.json();
                   const output = data.content?.[0]?.text || "Sem resposta.";
-                  return new Response(JSON.stringify({ output }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                  });
+                  return await successResponse(output);
                 }
                 const errText = await anthropicResponse.text();
                 console.error(`User Anthropic key failed: ${anthropicResponse.status} ${errText} - falling back to native`);
@@ -923,9 +1018,7 @@ Deno.serve(async (req) => {
                 if (aiResponse.ok) {
                   const data = await aiResponse.json();
                   const output = data.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-                  return new Response(JSON.stringify({ output }), {
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                  });
+                  return await successResponse(output);
                 }
                 const errText = await aiResponse.text();
                 console.error(`User ${provider} key failed: ${aiResponse.status} ${errText} - falling back to native`);
@@ -979,9 +1072,7 @@ Deno.serve(async (req) => {
 
       const aiData = await aiResponse.json();
       const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-      return new Response(JSON.stringify({ output }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return await successResponse(output);
     }
 
     // Check if it's a custom agent
@@ -1124,9 +1215,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
 
       const aiData = await aiResponse.json();
       const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-      return new Response(JSON.stringify({ output }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return await successResponse(output);
     }
 
     const userApiKey = await decryptApiKey(apiKeyRow.api_key_encrypted);
@@ -1217,9 +1306,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
 
       const anthropicData = await anthropicResponse.json();
       const output = anthropicData.content?.[0]?.text || "Sem resposta.";
-      return new Response(JSON.stringify({ output }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return await successResponse(output);
     }
 
     // Remap model if incompatible with provider
@@ -1262,9 +1349,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
     const aiData = await aiResponse.json();
     const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
 
-    return new Response(JSON.stringify({ output }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return await successResponse(output);
   } catch (err) {
     console.error("agent-chat error:", err);
     return new Response(JSON.stringify({ error: err.message }), {

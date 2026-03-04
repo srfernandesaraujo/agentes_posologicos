@@ -398,25 +398,20 @@ export default function Chat() {
         .from("messages")
         .insert({ session_id: sid, role: "user", content: userContent });
 
+      const cost = isCustom ? CUSTOM_AGENT_INTERACTION_COST : (builtInAgent?.credit_cost || 1);
+      
       const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
-        body: { agentId: actualAgentId, input: fullInput, conversationHistory },
+        body: { 
+          agentId: actualAgentId, 
+          input: fullInput, 
+          conversationHistory,
+          creditCost: hasFreeAccess ? 0 : cost,
+        },
       });
 
       if (fnError) {
         const errorMsg = data?.error || fnError.message || "Erro ao consultar o agente";
         throw new Error(errorMsg);
-      }
-
-      // Debit credits AFTER successful response
-      if (!hasFreeAccess) {
-        const cost = isCustom ? CUSTOM_AGENT_INTERACTION_COST : (builtInAgent?.credit_cost || 1);
-        const desc = isCustom ? `Uso: ${agent.name} (agente personalizado)` : `Uso: ${agent.name}`;
-        await supabase.from("credits_ledger").insert({
-          user_id: user.id,
-          amount: -cost,
-          type: "usage",
-          description: desc,
-        });
       }
 
       const assistantContent = data?.output || "Sem resposta do agente.";

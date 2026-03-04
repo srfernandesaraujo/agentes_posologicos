@@ -10,6 +10,15 @@ const corsHeaders = {
 const TO_EMAIL = "sergio.araujo@ufrn.br";
 const FROM_EMAIL = "LearnLead <noreply@agentes-ai.posologia.app>";
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -53,10 +62,10 @@ serve(async (req) => {
       html: `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; padding: 32px;">
           <h2 style="color: #1a1a2e; margin-bottom: 16px;">Nova mensagem de contato</h2>
-          <p style="color: #555; font-size: 14px;"><strong>De:</strong> ${userEmail}</p>
-          <p style="color: #555; font-size: 14px;"><strong>Assunto:</strong> ${subject.trim()}</p>
+          <p style="color: #555; font-size: 14px;"><strong>De:</strong> ${escapeHtml(userEmail || '')}</p>
+          <p style="color: #555; font-size: 14px;"><strong>Assunto:</strong> ${escapeHtml(subject.trim())}</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 16px 0;" />
-          <p style="color: #333; font-size: 15px; line-height: 1.7; white-space: pre-wrap;">${message.trim()}</p>
+          <p style="color: #333; font-size: 15px; line-height: 1.7; white-space: pre-wrap;">${escapeHtml(message.trim())}</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
           <p style="color: #bbb; font-size: 12px;">Enviado via formulário de contato do LearnLead</p>
         </div>
