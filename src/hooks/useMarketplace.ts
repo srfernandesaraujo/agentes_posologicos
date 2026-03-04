@@ -31,12 +31,9 @@ export function useMarketplaceAgents() {
   return useQuery({
     queryKey: ["marketplace-agents"],
     queryFn: async () => {
-      const { data: agents, error } = await supabase
-        .from("custom_agents" as any)
-        .select("id, user_id, name, description, model, provider, created_at")
-        .eq("published_to_marketplace", true)
-        .eq("status", "published")
-        .order("created_at", { ascending: false });
+      // Use secure RPC that excludes system_prompt
+      const { data: agents, error } = await (supabase as any)
+        .rpc("get_marketplace_agents");
       if (error) throw error;
 
       const agentIds = (agents as any[]).map((a: any) => a.id);
