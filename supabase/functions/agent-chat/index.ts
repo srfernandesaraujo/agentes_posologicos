@@ -643,8 +643,8 @@ Deno.serve(async (req) => {
     }
 
     // Input validation
-    if (typeof input !== "string" || input.length > 100000) {
-      return new Response(JSON.stringify({ error: "Input inválido ou muito longo (máx 100.000 caracteres)" }), {
+    if (typeof input !== "string" || input.length > 10000) {
+      return new Response(JSON.stringify({ error: "Input inválido ou muito longo (máx 10.000 caracteres)" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -659,14 +659,14 @@ Deno.serve(async (req) => {
 
     // Validate conversationHistory if provided
     if (conversationHistory !== undefined && conversationHistory !== null) {
-      if (!Array.isArray(conversationHistory) || conversationHistory.length > 200) {
-        return new Response(JSON.stringify({ error: "conversationHistory inválido" }), {
+      if (!Array.isArray(conversationHistory) || conversationHistory.length > 50) {
+        return new Response(JSON.stringify({ error: "conversationHistory inválido (máx 50 mensagens)" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       for (const msg of conversationHistory) {
-        if (!msg || typeof msg.role !== "string" || typeof msg.content !== "string" || msg.content.length > 100000) {
+        if (!msg || typeof msg.role !== "string" || typeof msg.content !== "string" || msg.content.length > 10000) {
           return new Response(JSON.stringify({ error: "Mensagem do histórico inválida" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
