@@ -21,7 +21,7 @@ verify_jwt = false
 [functions.invite-user]
 verify_jwt = false
 
-[functions.send-metrics-to-hub]
+[functions.hub-metrics]
 verify_jwt = false
 
 [functions.purchase-agent]
