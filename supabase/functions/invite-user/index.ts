@@ -42,6 +42,8 @@ serve(async (req) => {
 
     const { email } = await req.json();
     if (!email || typeof email !== "string") throw new Error("Email is required");
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim()) || email.trim().length > 254) throw new Error("Formato de email inválido");
 
     const normalizedEmail = email.trim().toLowerCase();
 
