@@ -633,7 +633,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory } = body;
+    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId } = body;
 
     if (!agentId || !input) {
       return new Response(JSON.stringify({ error: "agentId and input are required" }), {
@@ -649,9 +649,32 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     let userId: string | null = null;
 
-    // For virtual room requests, auth is optional
+    // For virtual room requests, auth is optional but room must be validated
     if (isVirtualRoom) {
-      // Use service role client to fetch the custom agent
+      if (!roomId) {
+        return new Response(JSON.stringify({ error: "roomId is required for virtual room requests" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Validate room exists, is active, and has the correct agent
+      const roomCheckClient = createClient(supabaseUrl, serviceRoleKey);
+      const { data: roomData, error: roomErr } = await roomCheckClient
+        .from("virtual_rooms")
+        .select("id, agent_id, is_active")
+        .eq("id", roomId)
+        .eq("is_active", true)
+        .single();
+
+      if (roomErr || !roomData || roomData.agent_id !== agentId) {
+        return new Response(JSON.stringify({ error: "Invalid or inactive room" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Optionally extract user identity if auth header present
       if (authHeader?.startsWith("Bearer ")) {
         const supabase = createClient(supabaseUrl, supabaseAnonKey, {
           global: { headers: { Authorization: authHeader } },
