@@ -814,12 +814,62 @@ Deno.serve(async (req) => {
       console.log(`Credits deducted: ${creditCost} for user ${userId}`);
     };
 
-    // Wrapper for successful AI responses - deducts credits server-side
-    const successResponse = async (output: string) => {
+    // Cost estimation per 1M tokens (input/output) in USD
+    const COST_PER_MILLION: Record<string, { input: number; output: number }> = {
+      "gpt-4o": { input: 2.5, output: 10 },
+      "gpt-4o-mini": { input: 0.15, output: 0.6 },
+      "claude-sonnet-4-20250514": { input: 3, output: 15 },
+      "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 },
+      "gemini-2.5-flash": { input: 0.15, output: 0.6 },
+      "google/gemini-2.5-flash": { input: 0.15, output: 0.6 },
+      "google/gemini-3-flash-preview": { input: 0.15, output: 0.6 },
+      "google/gemini-2.5-pro": { input: 1.25, output: 10 },
+      "gemma2-9b-it": { input: 0.2, output: 0.2 },
+    };
+
+    // Log AI usage to ai_usage_log table
+    const logAiUsage = async (provider: string, model: string, tokensInput: number, tokensOutput: number, promptType = "chat") => {
+      if (!userId) return;
+      try {
+        const svc = createClient(supabaseUrl, serviceRoleKey);
+        const costEntry = COST_PER_MILLION[model] || { input: 0.5, output: 1.0 };
+        const estimatedCost = (tokensInput * costEntry.input + tokensOutput * costEntry.output) / 1_000_000;
+        await svc.from("ai_usage_log").insert({
+          user_id: userId,
+          provider,
+          model,
+          prompt_type: promptType,
+          tokens_input: tokensInput,
+          tokens_output: tokensOutput,
+          estimated_cost_usd: Math.round(estimatedCost * 1_000_000) / 1_000_000,
+        });
+        console.log(`AI usage logged: ${provider}/${model} in=${tokensInput} out=${tokensOutput} cost=$${estimatedCost.toFixed(6)}`);
+      } catch (e) {
+        console.warn("AI usage logging failed:", e.message);
+      }
+    };
+
+    // Extract usage from OpenAI-compatible response
+    const extractUsage = (data: any) => ({
+      tokensInput: data?.usage?.prompt_tokens ?? 0,
+      tokensOutput: data?.usage?.completion_tokens ?? 0,
+    });
+
+    // Extract usage from Anthropic response
+    const extractAnthropicUsage = (data: any) => ({
+      tokensInput: data?.usage?.input_tokens ?? 0,
+      tokensOutput: data?.usage?.output_tokens ?? 0,
+    });
+
+    // Wrapper for successful AI responses - deducts credits and logs usage server-side
+    const successResponse = async (output: string, usageMeta?: { provider: string; model: string; tokensInput: number; tokensOutput: number; promptType?: string }) => {
       try {
         await deductCredits(output);
       } catch (e) {
         console.error("Credit deduction failed:", e.message);
+      }
+      if (usageMeta) {
+        await logAiUsage(usageMeta.provider, usageMeta.model, usageMeta.tokensInput, usageMeta.tokensOutput, usageMeta.promptType || "chat");
       }
       return new Response(JSON.stringify({ output }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1001,7 +1051,8 @@ Deno.serve(async (req) => {
                 if (anthropicResponse.ok) {
                   const data = await anthropicResponse.json();
                   const output = data.content?.[0]?.text || "Sem resposta.";
-                  return await successResponse(output);
+                  const usage = extractAnthropicUsage(data);
+                  return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
                 }
                 const errText = await anthropicResponse.text();
                 console.error(`User Anthropic key failed: ${anthropicResponse.status} ${errText} - falling back to native`);
@@ -1018,7 +1069,8 @@ Deno.serve(async (req) => {
                 if (aiResponse.ok) {
                   const data = await aiResponse.json();
                   const output = data.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-                  return await successResponse(output);
+                  const usage = extractUsage(data);
+                  return await successResponse(output, { provider, model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
                 }
                 const errText = await aiResponse.text();
                 console.error(`User ${provider} key failed: ${aiResponse.status} ${errText} - falling back to native`);
@@ -1072,7 +1124,8 @@ Deno.serve(async (req) => {
 
       const aiData = await aiResponse.json();
       const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-      return await successResponse(output);
+      const usage = extractUsage(aiData);
+      return await successResponse(output, { provider: "lovable", model: "google/gemini-2.5-flash", tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
     }
 
     // Check if it's a custom agent
@@ -1215,7 +1268,8 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
 
       const aiData = await aiResponse.json();
       const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-      return await successResponse(output);
+      const usage = extractUsage(aiData);
+      return await successResponse(output, { provider: "lovable", model: "google/gemini-3-flash-preview", tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
     }
 
     const userApiKey = await decryptApiKey(apiKeyRow.api_key_encrypted);
@@ -1272,6 +1326,8 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
 
       const nativeData = await nativeResponse.json();
       const nativeOutput = nativeData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
+      const nativeUsage = extractUsage(nativeData);
+      await logAiUsage("lovable", "google/gemini-3-flash-preview", nativeUsage.tokensInput, nativeUsage.tokensOutput, "chat-fallback");
       return new Response(JSON.stringify({ output: nativeOutput, fallback: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -1306,7 +1362,8 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
 
       const anthropicData = await anthropicResponse.json();
       const output = anthropicData.content?.[0]?.text || "Sem resposta.";
-      return await successResponse(output);
+      const anthropicUsage = extractAnthropicUsage(anthropicData);
+      return await successResponse(output, { provider: "anthropic", model: customAgent.model, tokensInput: anthropicUsage.tokensInput, tokensOutput: anthropicUsage.tokensOutput });
     }
 
     // Remap model if incompatible with provider
@@ -1348,8 +1405,8 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
 
     const aiData = await aiResponse.json();
     const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-
-    return await successResponse(output);
+    const finalUsage = extractUsage(aiData);
+    return await successResponse(output, { provider: customAgent.provider, model: effectiveModel, tokensInput: finalUsage.tokensInput, tokensOutput: finalUsage.tokensOutput });
   } catch (err) {
     console.error("agent-chat error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
