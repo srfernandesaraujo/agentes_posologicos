@@ -1,68 +1,129 @@
 
 
-## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
+# Agente Especialista PubMed — Análise de Viabilidade e Plano
 
-### Problema
-Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
+## Resposta curta: Sim, é totalmente possível
 
-### Solucao
-Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
+A PubMed oferece APIs públicas e gratuitas (sem necessidade de chave de API) que permitem buscar, consultar e recuperar artigos científicos em tempo real. Combinado com a infraestrutura atual do projeto, é viável criar um agente completo com busca interativa e notificações proativas semanais.
 
-### Como vai funcionar (fluxo do usuario)
+---
 
-1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
-2. A fonte e criada com status "pending"
-3. O sistema chama automaticamente a Edge Function para extrair a transcricao
-4. A transcricao e salva no campo `content` e o status muda para "ready"
-5. O agente passa a usar o texto transcrito como contexto
+## Como funcionaria
 
-### Etapas de implementacao
+### Modo 1: Chat interativo com PubMed
+O usuário faz perguntas como *"Quais os últimos estudos sobre metformina e longevidade?"* e o agente:
+1. Converte a pergunta em termos de busca otimizados para PubMed
+2. Consulta a API E-utilities (ESearch + EFetch) em tempo real
+3. Recupera títulos, abstracts, autores, DOI e datas
+4. Sintetiza uma resposta em linguagem acessível citando os artigos encontrados
 
-**1. Criar Edge Function `youtube-transcript`**
+### Modo 2: Monitor proativo semanal
+O usuário cadastra seus interesses (ex: *"farmacogenômica", "resistência antimicrobiana"*). Semanalmente:
+1. Um cron job dispara a Edge Function
+2. A função busca artigos publicados nos últimos 7 dias para cada interesse
+3. Compara com artigos já notificados (evita duplicatas)
+4. Envia notificações na plataforma com resumo dos novos achados
 
-Arquivo: `supabase/functions/youtube-transcript/index.ts`
+---
 
-- Recebe `source_id` e `url` do YouTube
-- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
-- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
-- Extrai a transcrição em português (pt) ou inglês (en) como fallback
-- Limpa tags XML das legendas e formata como texto puro
-- Atualiza o `content` e `status` da fonte no banco usando service role
-- Trunca a 50.000 caracteres se necessário
-- Se nao houver legendas, salva mensagem informativa e marca status como "error"
+## Arquitetura técnica
 
-**2. Registrar funcao no `supabase/config.toml`**
+### APIs da PubMed (gratuitas, sem chave)
 
-Adicionar:
+- **ESearch**: `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=QUERY&retmode=json&retmax=10&sort=relevance`
+- **EFetch**: `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=PMID1,PMID2&rettype=abstract&retmode=xml`
+- **ESummary**: `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=PMID1,PMID2&retmode=json`
+
+Recomendação do NCBI: registrar um `api_key` gratuito para aumentar o rate limit de 3 para 10 requisições/segundo.
+
+### Componentes a criar
+
+| Componente | Descrição |
+|---|---|
+| **Agente na tabela `agents`** | Novo registro com slug `especialista-pubmed` |
+| **Prompt no `agent-chat`** | Prompt especializado que instrui o LLM a formular queries PubMed, chamar a API via fetch dentro da Edge Function, e sintetizar resultados |
+| **Tabela `user_research_interests`** | Armazena interesses do usuário (user_id, terms, created_at) |
+| **Tabela `pubmed_notifications_log`** | Registra PMIDs já notificados para evitar duplicatas |
+| **Edge Function `pubmed-monitor`** | Cron job semanal que busca novos artigos e cria notificações |
+| **UI de interesses** | Seção na página do agente ou em /conta para gerenciar interesses |
+
+### Fluxo no `agent-chat` (busca em tempo real)
+
 ```text
-[functions.youtube-transcript]
-verify_jwt = false
+Usuário envia pergunta
+       ↓
+agent-chat recebe { agentId: "especialista-pubmed", input }
+       ↓
+Edge Function faz fetch para ESearch API com query extraída
+       ↓
+Recebe PMIDs → faz fetch para ESummary/EFetch
+       ↓
+Monta contexto com títulos + abstracts
+       ↓
+Envia para LLM: system_prompt + contexto PubMed + pergunta do usuário
+       ↓
+LLM sintetiza resposta citando artigos com links
+       ↓
+Retorna ao frontend
 ```
 
-**3. Atualizar `KnowledgeDetail.tsx`**
+### Fluxo do monitor semanal
 
-Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
 ```text
-await supabase.functions.invoke("youtube-transcript", {
-  body: { source_id: newSource.id, url: sourceUrl }
-});
+Cron (pg_cron) → POST para pubmed-monitor Edge Function
+       ↓
+Busca todos os interesses ativos em user_research_interests
+       ↓
+Para cada interesse: ESearch com filtro datetype=pdat&mindate=7_dias_atrás
+       ↓
+Filtra PMIDs já notificados via pubmed_notifications_log
+       ↓
+Para novos artigos: ESummary para pegar título/autores
+       ↓
+Insere notificação na tabela notifications (já existente)
+       ↓
+Registra PMIDs em pubmed_notifications_log
 ```
 
-Mostrar toast informando que a transcrição esta sendo extraída.
+### Banco de dados (novas tabelas)
 
-**4. Atualizar `DocumentManager.tsx`**
+```sql
+-- Interesses de pesquisa do usuário
+CREATE TABLE user_research_interests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  terms text NOT NULL,          -- ex: "metformina longevidade"
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
 
-Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
+-- Log de PMIDs já notificados
+CREATE TABLE pubmed_notifications_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  pmid text NOT NULL,
+  interest_id uuid REFERENCES user_research_interests(id),
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(user_id, pmid)
+);
+```
 
-### Detalhes tecnicos da extracao
+### Diferencial competitivo
 
-A Edge Function vai:
-1. Fazer fetch da pagina do video YouTube
-2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
-3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
-4. Fazer fetch do XML de legendas
-5. Parsear as tags `<text>` removendo timestamps e tags HTML
-6. Concatenar todo o texto como conteudo limpo
+- Nenhuma plataforma de agentes de IA em português oferece busca em tempo real no PubMed integrada a chat com IA
+- O monitor proativo transforma o agente de reativo em **assistente de pesquisa contínuo**
+- Potencial de upsell: cobrar mais créditos pelo monitoramento semanal como feature premium
 
-Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
+---
+
+## Arquivos afetados
+
+| Arquivo | Mudança |
+|---|---|
+| Migration SQL | CREATE 2 tabelas + INSERT agente + RLS policies |
+| `supabase/functions/agent-chat/index.ts` | Novo prompt + lógica de fetch PubMed em tempo real |
+| `supabase/functions/pubmed-monitor/index.ts` | Nova Edge Function para cron semanal |
+| `supabase/config.toml` | Registrar `pubmed-monitor` |
+| `src/lib/icons.ts` | Adicionar ícone (ex: `BookOpen`) |
+| UI de interesses | Componente para gerenciar termos de pesquisa |
 
