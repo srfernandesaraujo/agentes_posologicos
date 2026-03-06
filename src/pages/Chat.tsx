@@ -13,7 +13,7 @@ import { useCustomAgent } from "@/hooks/useCustomAgents";
 import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File } from "lucide-react";
+import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File, Settings2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InputTemplates } from "@/components/chat/InputTemplates";
