@@ -10,6 +10,12 @@ import {
   Youtube,
   ShieldCheck,
   Bot,
+  ScanEye,
+  FileSearch,
+  UserRound,
+  ClipboardList,
+  ShieldAlert,
+  GitCompare,
   LucideIcon,
 } from "lucide-react";
 
@@ -25,6 +31,12 @@ const iconMap: Record<string, LucideIcon> = {
   Youtube,
   ShieldCheck,
   Bot,
+  ScanEye,
+  FileSearch,
+  UserRound,
+  ClipboardList,
+  ShieldAlert,
+  GitCompare,
 };
 
 export function getIcon(name: string): LucideIcon {
