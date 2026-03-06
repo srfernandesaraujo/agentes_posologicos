@@ -420,7 +420,18 @@ export default function Chat() {
       });
 
       if (fnError) {
-        const errorMsg = data?.error || fnError.message || "Erro ao consultar o agente";
+        // supabase-js may put the parsed body in data even on error
+        let errorMsg = "Erro ao consultar o agente";
+        if (data?.error) {
+          errorMsg = data.error;
+        } else if (typeof data === "string") {
+          try {
+            const parsed = JSON.parse(data);
+            errorMsg = parsed.error || errorMsg;
+          } catch { /* ignore */ }
+        } else if (fnError.message && !fnError.message.includes("non-2xx")) {
+          errorMsg = fnError.message;
+        }
         throw new Error(errorMsg);
       }
 
