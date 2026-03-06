@@ -552,9 +552,29 @@ export default function Chat() {
               <h2 className="font-display font-semibold truncate text-white">{agent.name}</h2>
               <p className="text-xs text-white/40 truncate">{agent.category}</p>
             </div>
-            <div className="flex items-center gap-1 text-sm text-white/50">
-              <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
-              {isCustom ? `${CUSTOM_AGENT_INTERACTION_COST}` : agent.credit_cost} crédito/uso
+            <div className="flex items-center gap-2">
+              {!isCustom && builtInAgent?.slug === "especialista-pubmed" && (
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-[hsl(174,62%,47%)] hover:bg-white/10 text-xs">
+                      <Settings2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Interesses de Pesquisa</span>
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent className="border-white/10 bg-[hsl(220,25%,10%)] w-full sm:max-w-lg overflow-y-auto">
+                    <SheetHeader>
+                      <SheetTitle className="text-white">Configurações do PubMed</SheetTitle>
+                    </SheetHeader>
+                    <div className="mt-4">
+                      <ResearchInterestsManager />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              )}
+              <div className="flex items-center gap-1 text-sm text-white/50">
+                <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
+                {isCustom ? `${CUSTOM_AGENT_INTERACTION_COST}` : agent.credit_cost} crédito/uso
+              </div>
             </div>
           </div>
         </div>
