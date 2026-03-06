@@ -28,6 +28,7 @@ import NotFound from "./pages/NotFound";
 import UserDashboard from "./pages/UserDashboard";
 import Contact from "./pages/Contact";
 import ResetPassword from "./pages/ResetPassword";
+import Documentation from "./pages/Documentation";
 
 const queryClient = new QueryClient();
 
