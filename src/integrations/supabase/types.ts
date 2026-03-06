@@ -463,6 +463,38 @@ export type Database = {
         }
         Relationships: []
       }
+      pubmed_notifications_log: {
+        Row: {
+          id: string
+          interest_id: string | null
+          notified_at: string
+          pmid: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          interest_id?: string | null
+          notified_at?: string
+          pmid: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          interest_id?: string | null
+          notified_at?: string
+          pmid?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pubmed_notifications_log_interest_id_fkey"
+            columns: ["interest_id"]
+            isOneToOne: false
+            referencedRelation: "user_research_interests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchased_agents: {
         Row: {
           agent_id: string
@@ -691,6 +723,33 @@ export type Database = {
           created_at?: string
           id?: string
           onboarding_completed?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_research_interests: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          terms: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          terms: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          terms?: string
           updated_at?: string
           user_id?: string
         }
