@@ -202,12 +202,18 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="border-t border-white/10 py-8">
-        <div className="container flex items-center justify-between text-sm text-white/30">
+        <div className="container flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-white/30">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded gradient-primary">
               <Pill className="h-3 w-3 text-white" />
             </div>
             <span className="font-display font-semibold">Agentes Posológicos</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link to="/documentacao" className="hover:text-white/60 transition-colors">
+              <BookOpen className="inline h-3.5 w-3.5 mr-1" />
+              Documentação
+            </Link>
           </div>
           <div className="text-right">
             <span>© {new Date().getFullYear()} {t("landing.footer.rights")}</span>

@@ -28,6 +28,7 @@ import NotFound from "./pages/NotFound";
 import UserDashboard from "./pages/UserDashboard";
 import Contact from "./pages/Contact";
 import ResetPassword from "./pages/ResetPassword";
+import Documentation from "./pages/Documentation";
 
 const queryClient = new QueryClient();
 
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="/salas-virtuais" element={<VirtualRooms />} />
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/contato" element={<Contact />} />
+              <Route path="/documentacao" element={<Documentation />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
