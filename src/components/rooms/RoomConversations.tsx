@@ -128,7 +128,7 @@ export function RoomConversations({ roomId, roomName, open, onOpenChange }: Prop
                   }`}>
                     {msg.role === "assistant" ? (
                       <div className="prose prose-sm prose-invert max-w-none">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
                     ) : msg.content}
                   </div>

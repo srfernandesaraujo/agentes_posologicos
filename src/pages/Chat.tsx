@@ -201,7 +201,7 @@ function ChatMessageContent({ content }: { content: string }) {
         part.type === "chart" ? (
           <ChartBlock key={i} jsonString={part.content} />
         ) : (
-          <ReactMarkdown key={i} components={markdownComponents}>{sanitizeMarkdownTables(part.content)}</ReactMarkdown>
+          <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={markdownComponents}>{sanitizeMarkdownTables(part.content)}</ReactMarkdown>
         )
       )}
     </>
