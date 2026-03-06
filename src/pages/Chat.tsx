@@ -13,7 +13,7 @@ import { useCustomAgent } from "@/hooks/useCustomAgents";
 import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File } from "lucide-react";
+import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File, Settings2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InputTemplates } from "@/components/chat/InputTemplates";
@@ -22,6 +22,8 @@ import { MessageActions } from "@/components/chat/MessageActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
 
 
 const CUSTOM_AGENT_INTERACTION_COST = 0.5;
@@ -550,9 +552,29 @@ export default function Chat() {
               <h2 className="font-display font-semibold truncate text-white">{agent.name}</h2>
               <p className="text-xs text-white/40 truncate">{agent.category}</p>
             </div>
-            <div className="flex items-center gap-1 text-sm text-white/50">
-              <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
-              {isCustom ? `${CUSTOM_AGENT_INTERACTION_COST}` : agent.credit_cost} crédito/uso
+            <div className="flex items-center gap-2">
+              {!isCustom && builtInAgent?.slug === "especialista-pubmed" && (
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-[hsl(174,62%,47%)] hover:bg-white/10 text-xs">
+                      <Settings2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Interesses de Pesquisa</span>
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent className="border-white/10 bg-[hsl(220,25%,10%)] w-full sm:max-w-lg overflow-y-auto">
+                    <SheetHeader>
+                      <SheetTitle className="text-white">Configurações do PubMed</SheetTitle>
+                    </SheetHeader>
+                    <div className="mt-4">
+                      <ResearchInterestsManager />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              )}
+              <div className="flex items-center gap-1 text-sm text-white/50">
+                <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
+                {isCustom ? `${CUSTOM_AGENT_INTERACTION_COST}` : agent.credit_cost} crédito/uso
+              </div>
             </div>
           </div>
         </div>
