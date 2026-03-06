@@ -72,6 +72,7 @@ export function AppLayout() {
             <SidebarLink to="/creditos" icon={CreditCard} label={t("nav.credits")} />
             <SidebarLink to="/conta" icon={User} label={t("nav.account")} />
             <SidebarLink to="/contato" icon={Mail} label="Contato" />
+            <SidebarLink to="/documentacao" icon={BookOpen} label="Documentação" />
           </div>
         </aside>
         <main className="flex-1 min-w-0 pb-16 md:pb-0">
