@@ -431,9 +431,10 @@ FASE 1 – PLANO DE ANÁLISE ESTATÍSTICA (SAP)
 Apresente OBRIGATORIAMENTE:
 
 1) RESUMO DOS DADOS RECEBIDOS
-   - Variáveis identificadas (nome, tipo: categórica/contínua/ordinal)
+   - Variáveis identificadas: apresente SEMPRE em formato de TABELA MARKDOWN com colunas: | Variável | Tipo | Descrição |
+   - NUNCA liste variáveis usando blocos de código (\`\`\`) ou listas com backticks isolados. Use APENAS tabela markdown.
    - Número de observações/linhas
-   - Dados faltantes identificados
+   - Dados faltantes identificados (se houver, apresente em tabela: | Variável | N Faltantes | % |)
 
 2) CLASSIFICAÇÃO DO ESTUDO
    - Tipo de delineamento inferido
