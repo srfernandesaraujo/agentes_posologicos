@@ -255,5 +255,9 @@ export default function Account() {
         )}
       </div>
     </div>
+
+      {/* PubMed Research Interests */}
+      <ResearchInterestsManager />
+    </div>
   );
 }
