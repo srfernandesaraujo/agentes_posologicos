@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.manage-api-keys]
 verify_jwt = false
+
+[functions.pubmed-monitor]
+verify_jwt = false
