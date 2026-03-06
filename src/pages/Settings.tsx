@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
 import { useApiKeys, LLM_PROVIDERS } from "@/hooks/useApiKeys";
-import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Check, Trash2, Key } from "lucide-react";
 import { toast } from "sonner";
+import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
 
 export default function Settings() {
-  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
   const { data: keys = [], upsertKey, deleteKey } = useApiKeys();
   const [editing, setEditing] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
@@ -37,41 +35,25 @@ export default function Settings() {
   const getExistingKey = (provider: string) =>
     keys.find((k) => k.provider === provider);
 
-  const maskKey = (key: string) => {
-    if (key.length <= 8) return "••••••••";
-    return key.slice(0, 4) + "••••••••" + key.slice(-4);
-  };
-
-  if (adminLoading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return <Navigate to="/agentes" replace />;
-  }
-
   return (
     <div className="container max-w-3xl py-8">
       <div className="mb-8 animate-slide-up">
-        <h1 className="mb-2 font-display text-3xl font-bold text-white">Configurações</h1>
-        <p className="text-white/50">Gerencie suas chaves de API</p>
+        <h1 className="mb-2 font-display text-3xl font-bold text-foreground">Configurações</h1>
+        <p className="text-muted-foreground">Gerencie suas chaves de API e preferências</p>
       </div>
 
+      {/* API Keys Section */}
       <div className="mb-6">
-        <h2 className="mb-1 text-lg font-semibold text-white">API Keys externas</h2>
-        <p className="text-sm text-white/40">
+        <h2 className="mb-1 text-lg font-semibold text-foreground">API Keys externas</h2>
+        <p className="text-sm text-muted-foreground">
           Configure as API Keys das suas LLMs favoritas. Elas serão usadas tanto nos seus agentes personalizados quanto nos agentes nativos da plataforma.
         </p>
-        <p className="mt-1 text-xs text-white/30">
+        <p className="mt-1 text-xs text-muted-foreground/60">
           Se nenhuma chave estiver configurada, os agentes nativos usarão o modelo padrão da plataforma. Se a chamada com sua chave falhar, o sistema fará fallback automático.
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 mb-10">
         {LLM_PROVIDERS.map((provider) => {
           const existing = getExistingKey(provider.id);
           const isEditing = editing === provider.id;
@@ -79,15 +61,15 @@ export default function Settings() {
           return (
             <div
               key={provider.id}
-              className="rounded-xl border border-white/10 bg-white/[0.03] p-5"
+              className="rounded-xl border border-border bg-card/50 p-5"
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${existing ? 'bg-emerald-500/15' : 'bg-white/5'}`}>
-                    <Key className={`h-4 w-4 ${existing ? 'text-emerald-400' : 'text-white/60'}`} />
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${existing ? 'bg-emerald-500/15' : 'bg-muted/50'}`}>
+                    <Key className={`h-4 w-4 ${existing ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                   </div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-white">{provider.name}</h3>
+                    <h3 className="font-semibold text-foreground">{provider.name}</h3>
                     {existing && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-400">
                         <Check className="h-3 w-3" />
@@ -100,7 +82,7 @@ export default function Settings() {
                   href={provider.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-[hsl(174,62%,47%)] hover:underline"
+                  className="flex items-center gap-1 text-xs text-primary hover:underline"
                 >
                   Adquira sua chave de API
                   <ExternalLink className="h-3 w-3" />
@@ -113,14 +95,13 @@ export default function Settings() {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder="Cole aqui sua API Key"
-                    className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
+                    className="border-border bg-background text-foreground placeholder:text-muted-foreground"
                     type="password"
                   />
                   <Button
                     size="sm"
                     onClick={() => handleSave(provider.id)}
                     disabled={upsertKey.isPending}
-                    className="bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,40%)] text-white"
                   >
                     <Check className="h-4 w-4" />
                   </Button>
@@ -128,21 +109,19 @@ export default function Settings() {
                     size="sm"
                     variant="ghost"
                     onClick={() => { setEditing(null); setInputValue(""); }}
-                    className="text-white/60 hover:text-white hover:bg-white/10"
                   >
                     Cancelar
                   </Button>
                 </div>
               ) : existing ? (
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/50 font-mono">
+                  <div className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground font-mono">
                     ••••••••••••••••
                   </div>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => { setEditing(provider.id); setInputValue(""); }}
-                    className="text-white/60 hover:text-white hover:bg-white/10"
                   >
                     Editar
                   </Button>
@@ -150,21 +129,20 @@ export default function Settings() {
                     size="sm"
                     variant="ghost"
                     onClick={() => handleDelete(provider.id)}
-                    className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                    className="text-destructive hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/30">
+                  <div className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
                     Cole aqui sua API Key
                   </div>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => { setEditing(provider.id); setInputValue(""); }}
-                    className="text-white/60 hover:text-white hover:bg-white/10"
                   >
                     Editar
                   </Button>
@@ -174,6 +152,9 @@ export default function Settings() {
           );
         })}
       </div>
+
+      {/* Research Interests Section */}
+      <ResearchInterestsManager />
     </div>
   );
 }
