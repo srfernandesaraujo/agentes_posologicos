@@ -249,7 +249,7 @@ export default function Documentation() {
 
           <div className="rounded-xl border border-[hsl(174,62%,47%)]/20 bg-[hsl(174,62%,47%)]/5 p-4">
             <p className="text-sm text-[hsl(174,62%,47%)]">
-              <strong>Dica:</strong> Marque a opção "Paciente Virtual" no agente para habilitar a publicação em salas virtuais. O agente precisa estar publicado e ter o modo Paciente Virtual ativado.
+              <strong>Dica:</strong> Marque a opção "Publicar na Sala Virtual" no agente para habilitar a publicação em salas virtuais.
             </p>
           </div>
         </div>

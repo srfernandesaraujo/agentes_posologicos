@@ -755,7 +755,7 @@ export default function AgentEditor() {
                     onCheckedChange={async (v) => {
                       setPublishVirtualPatient(v);
                       await updateAgent.mutateAsync({ id: agentId!, publish_virtual_patient: v } as any);
-                      toast.success(v ? "Paciente virtual habilitado" : "Paciente virtual desabilitado");
+                      toast.success(v ? "Publicação na sala virtual habilitada" : "Publicação na sala virtual desabilitada");
                     }}
                   />
                 </div>

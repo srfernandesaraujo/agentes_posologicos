@@ -220,7 +220,7 @@ export default function VirtualRoomChat() {
               <Users className="h-8 w-8 text-white" />
             </div>
             <h1 className="font-display text-2xl font-bold">{room.name}</h1>
-            <p className="mt-2 text-sm text-white/40">Sala Colaborativa • Paciente Virtual</p>
+            <p className="mt-2 text-sm text-white/40">Sala Colaborativa • Sala Virtual</p>
             {room.description && (
               <p className="mt-2 text-sm text-white/50">{room.description}</p>
             )}
