@@ -26,43 +26,55 @@ import { ChatSidebar } from "@/components/chat/ChatSidebar";
 
 const CUSTOM_AGENT_INTERACTION_COST = 0.5;
 
-// Sanitize malformed markdown tables (multiple rows on single line)
+// Sanitize malformed markdown tables — handles inline tables, missing separators, etc.
 function sanitizeMarkdownTables(content: string): string {
-  const lines = content.split('\n');
+  // Step 1: Fix tables that are all on one line (pipes without newlines)
+  // Pattern: | Header1 | Header2 | --- | --- | Data1 | Data2 | Data3 | Data4 |
+  // Or: | Header1 | Header2 | |---| ---| | Data1 | Data2 |
+  let text = content;
+
+  // Detect lines with separator patterns inline and split them
+  const lines = text.split('\n');
   const result: string[] = [];
 
-  for (const line of lines) {
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
     const trimmed = line.trim();
 
-    // Check if line contains a separator pattern like |---|---|
-    const sepPattern = /\|\s*-{2,}\s*(\|\s*-{2,}\s*)+\|/;
-    const sepMatch = trimmed.match(sepPattern);
-
-    if (!sepMatch) {
+    // Skip lines that don't look like table content
+    if (!trimmed.includes('|') || trimmed.split('|').length < 3) {
       result.push(line);
       continue;
     }
 
+    // Check if this line contains a separator pattern embedded inline
+    const sepPattern = /\|\s*-{2,}\s*(\|\s*-{2,}\s*)+\|/;
+    const sepMatch = trimmed.match(sepPattern);
+
+    if (!sepMatch) {
+      // It's a normal pipe line — check if it has too many cells for a single row
+      // (likely multiple rows crammed on one line)
+      // Just pass through; remark-gfm will handle well-formed tables
+      result.push(line);
+      continue;
+    }
+
+    // Line has an inline separator — split into header, separator, and data rows
     const sepStr = sepMatch[0];
     const sepIndex = trimmed.indexOf(sepStr);
     const sepEnd = sepIndex + sepStr.length;
 
-    // Count columns from separator
     const numCols = sepStr.split('|').filter(s => s.trim().startsWith('-')).length;
     if (numCols < 2) {
       result.push(line);
       continue;
     }
 
-    // Extract text before and after separator
     const beforeSep = trimmed.substring(0, sepIndex);
     const afterSep = trimmed.substring(sepEnd);
 
-    // Extract all cells from a pipe-delimited string
-    const extractCells = (text: string): string[] => {
-      // Split by | and filter out empty segments
-      return text.split('|').map(s => s.trim()).filter(s => s.length > 0 && !s.match(/^-+$/));
-    };
+    const extractCells = (t: string): string[] =>
+      t.split('|').map(s => s.trim()).filter(s => s.length > 0 && !s.match(/^-+$/));
 
     const headerCells = extractCells(beforeSep);
     const dataCells = extractCells(afterSep);
@@ -72,11 +84,11 @@ function sanitizeMarkdownTables(content: string): string {
       continue;
     }
 
-    // Build proper markdown table
+    // Rebuild as proper multi-line markdown table
+    result.push('');
     result.push('| ' + headerCells.slice(0, numCols).join(' | ') + ' |');
     result.push('| ' + Array(numCols).fill('---').join(' | ') + ' |');
 
-    // Data rows - group cells by numCols
     for (let i = 0; i < dataCells.length; i += numCols) {
       const row = dataCells.slice(i, i + numCols);
       if (row.length > 0 && row.some(c => c !== '')) {
@@ -87,7 +99,14 @@ function sanitizeMarkdownTables(content: string): string {
     result.push('');
   }
 
-  return result.join('\n');
+  let output = result.join('\n');
+
+  // Step 2: Ensure blank lines around tables so remark-gfm recognizes them
+  // Find table blocks (consecutive lines starting with |) and add blank lines before/after
+  output = output.replace(/([^\n])\n(\|[^\n]+\|)/g, '$1\n\n$2');
+  output = output.replace(/(\|[^\n]+\|)\n([^\n|])/g, '$1\n\n$2');
+
+  return output;
 }
 
 let tableRowIndex = 0;
