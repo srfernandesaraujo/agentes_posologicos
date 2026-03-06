@@ -210,7 +210,7 @@ export default function Landing() {
             <span className="font-display font-semibold">Agentes Posológicos</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/login" className="hover:text-white/60 transition-colors">
+            <Link to="/signup" className="hover:text-white/60 transition-colors">
               <BookOpen className="inline h-3.5 w-3.5 mr-1" />
               Documentação
             </Link>
