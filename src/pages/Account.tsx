@@ -254,7 +254,6 @@ export default function Account() {
           })
         )}
       </div>
-    </div>
 
       <ResearchInterestsManager />
     </div>
