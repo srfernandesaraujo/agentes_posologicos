@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
