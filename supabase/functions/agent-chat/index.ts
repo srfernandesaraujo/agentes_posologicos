@@ -1571,11 +1571,66 @@ Deno.serve(async (req) => {
       .single();
 
     if (builtInAgent) {
-      const systemPrompt = (AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
+      let systemPrompt = (AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
+      let enrichedInput = input;
+
+      // PubMed real-time search for especialista-pubmed
+      if (builtInAgent.slug === "especialista-pubmed") {
+        try {
+          // Extract search terms from user input (use input directly as query)
+          const searchQuery = encodeURIComponent(input.substring(0, 300));
+          const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${searchQuery}&retmode=json&retmax=8&sort=relevance`;
+          
+          console.log("PubMed ESearch:", esearchUrl);
+          const esearchResp = await fetch(esearchUrl);
+          const esearchData = await esearchResp.json();
+          const pmids: string[] = esearchData?.esearchresult?.idlist || [];
+
+          if (pmids.length > 0) {
+            // Fetch summaries for found PMIDs
+            const esummaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmids.join(",")}&retmode=json`;
+            const esummaryResp = await fetch(esummaryUrl);
+            const esummaryData = await esummaryResp.json();
+
+            // Also fetch abstracts via EFetch (XML)
+            const efetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmids.join(",")}&rettype=abstract&retmode=text`;
+            const efetchResp = await fetch(efetchUrl);
+            const abstractsText = await efetchResp.text();
+
+            // Build context from summaries
+            let pubmedContext = "\n\n<PUBMED_ARTICLES_CONTEXT>\nArtigos encontrados na busca PubMed em tempo real:\n\n";
+            
+            for (const pmid of pmids) {
+              const article = esummaryData?.result?.[pmid];
+              if (!article) continue;
+              const authors = (article.authors || []).map((a: any) => a.name).slice(0, 3).join(", ");
+              const authorsStr = article.authors?.length > 3 ? `${authors} et al.` : authors;
+              pubmedContext += `---\nPMID: ${pmid}\nTítulo: ${article.title || "N/A"}\nAutores: ${authorsStr}\nRevista: ${article.fulljournalname || article.source || "N/A"}\nAno: ${(article.pubdate || "").substring(0, 4)}\nDOI: ${(article.elocationid || "N/A")}\nLink: https://pubmed.ncbi.nlm.nih.gov/${pmid}/\n\n`;
+            }
+
+            // Add abstracts text (truncated)
+            if (abstractsText.length > 100) {
+              pubmedContext += "\n\nRESUMOS DOS ARTIGOS:\n" + abstractsText.substring(0, 8000);
+            }
+
+            pubmedContext += "\n</PUBMED_ARTICLES_CONTEXT>";
+            systemPrompt += pubmedContext;
+
+            console.log(`PubMed: found ${pmids.length} articles for query`);
+          } else {
+            systemPrompt += "\n\n<PUBMED_ARTICLES_CONTEXT>\nNenhum artigo encontrado para esta busca. Informe ao usuário e sugira termos alternativos.\n</PUBMED_ARTICLES_CONTEXT>";
+            console.log("PubMed: no articles found");
+          }
+        } catch (pubmedError) {
+          console.error("PubMed API error:", pubmedError.message);
+          systemPrompt += "\n\n<PUBMED_ARTICLES_CONTEXT>\nErro ao consultar PubMed. Responda com base no seu conhecimento e informe que a busca em tempo real falhou temporariamente.\n</PUBMED_ARTICLES_CONTEXT>";
+        }
+      }
+
       const messages = [
         { role: "system", content: systemPrompt },
         ...(conversationHistory || []),
-        { role: "user", content: input },
+        { role: "user", content: enrichedInput },
       ];
 
       // Check if user has their own API key configured
