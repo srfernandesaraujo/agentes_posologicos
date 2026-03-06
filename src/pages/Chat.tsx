@@ -22,6 +22,8 @@ import { MessageActions } from "@/components/chat/MessageActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
 
 
 const CUSTOM_AGENT_INTERACTION_COST = 0.5;
