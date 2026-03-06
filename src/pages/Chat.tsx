@@ -26,87 +26,89 @@ import { ChatSidebar } from "@/components/chat/ChatSidebar";
 
 const CUSTOM_AGENT_INTERACTION_COST = 0.5;
 
-// Sanitize malformed markdown tables — handles inline tables, missing separators, etc.
+// Sanitize malformed markdown tables — handles concatenated rows, inline separators, missing spacing
 function sanitizeMarkdownTables(content: string): string {
-  // Step 1: Fix tables that are all on one line (pipes without newlines)
-  // Pattern: | Header1 | Header2 | --- | --- | Data1 | Data2 | Data3 | Data4 |
-  // Or: | Header1 | Header2 | |---| ---| | Data1 | Data2 |
-  let text = content;
+  const lines = content.split("\n");
+  const out: string[] = [];
 
-  // Detect lines with separator patterns inline and split them
-  const lines = text.split('\n');
-  const result: string[] = [];
+  const splitCells = (line: string) =>
+    line
+      .split("|")
+      .map((c) => c.trim())
+      .filter((c) => c.length > 0 && !/^:?-{2,}:?$/.test(c));
 
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
-    const trimmed = line.trim();
+  const isTableHeader = (line: string) => line.includes("|") && splitCells(line).length >= 2;
+  const isTableSeparator = (line: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line.trim());
 
-    // Skip lines that don't look like table content
-    if (!trimmed.includes('|') || trimmed.split('|').length < 3) {
-      result.push(line);
-      continue;
-    }
+  for (let i = 0; i < lines.length; i++) {
+    const current = lines[i];
+    const next = lines[i + 1] ?? "";
 
-    // Check if this line contains a separator pattern embedded inline
-    const sepPattern = /\|\s*-{2,}\s*(\|\s*-{2,}\s*)+\|/;
-    const sepMatch = trimmed.match(sepPattern);
+    // Detect table start (header + separator)
+    if (isTableHeader(current) && isTableSeparator(next)) {
+      const headerCells = splitCells(current);
+      const colCount = Math.max(2, headerCells.length);
 
-    if (!sepMatch) {
-      // It's a normal pipe line — check if it has too many cells for a single row
-      // (likely multiple rows crammed on one line)
-      // Just pass through; remark-gfm will handle well-formed tables
-      result.push(line);
-      continue;
-    }
+      // Ensure blank line before table
+      if (out.length > 0 && out[out.length - 1].trim() !== "") out.push("");
 
-    // Line has an inline separator — split into header, separator, and data rows
-    const sepStr = sepMatch[0];
-    const sepIndex = trimmed.indexOf(sepStr);
-    const sepEnd = sepIndex + sepStr.length;
+      out.push(`| ${headerCells.slice(0, colCount).join(" | ")} |`);
+      out.push(`| ${Array(colCount).fill("---").join(" | ")} |`);
 
-    const numCols = sepStr.split('|').filter(s => s.trim().startsWith('-')).length;
-    if (numCols < 2) {
-      result.push(line);
-      continue;
-    }
+      i += 2;
 
-    const beforeSep = trimmed.substring(0, sepIndex);
-    const afterSep = trimmed.substring(sepEnd);
+      // Consume data rows while lines still look like table-ish content
+      for (; i < lines.length; i++) {
+        const rowLine = lines[i];
+        const trimmed = rowLine.trim();
 
-    const extractCells = (t: string): string[] =>
-      t.split('|').map(s => s.trim()).filter(s => s.length > 0 && !s.match(/^-+$/));
+        if (!trimmed) break;
+        if (!trimmed.includes("|")) {
+          i -= 1;
+          break;
+        }
 
-    const headerCells = extractCells(beforeSep);
-    const dataCells = extractCells(afterSep);
+        // Handle concatenated rows with double pipes: ... | ... || ... | ...
+        const normalized = rowLine.replace(/\|\s*\|+/g, "||");
+        const rowSegments = normalized.includes("||")
+          ? normalized
+              .split("||")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [normalized.trim()];
 
-    if (headerCells.length < numCols) {
-      result.push(line);
-      continue;
-    }
+        let wroteAny = false;
 
-    // Rebuild as proper multi-line markdown table
-    result.push('');
-    result.push('| ' + headerCells.slice(0, numCols).join(' | ') + ' |');
-    result.push('| ' + Array(numCols).fill('---').join(' | ') + ' |');
+        for (const segment of rowSegments) {
+          const cells = splitCells(segment);
+          if (cells.length === 0) continue;
 
-    for (let i = 0; i < dataCells.length; i += numCols) {
-      const row = dataCells.slice(i, i + numCols);
-      if (row.length > 0 && row.some(c => c !== '')) {
-        while (row.length < numCols) row.push('');
-        result.push('| ' + row.join(' | ') + ' |');
+          // If still too many cells, chunk by header column count
+          for (let c = 0; c < cells.length; c += colCount) {
+            const chunk = cells.slice(c, c + colCount);
+            while (chunk.length < colCount) chunk.push("");
+            if (chunk.some((v) => v !== "")) {
+              out.push(`| ${chunk.join(" | ")} |`);
+              wroteAny = true;
+            }
+          }
+        }
+
+        if (!wroteAny) {
+          i -= 1;
+          break;
+        }
       }
+
+      // Ensure blank line after table
+      if (out[out.length - 1]?.trim() !== "") out.push("");
+      continue;
     }
-    result.push('');
+
+    out.push(current);
   }
 
-  let output = result.join('\n');
-
-  // Step 2: Ensure blank lines around tables so remark-gfm recognizes them
-  // Find table blocks (consecutive lines starting with |) and add blank lines before/after
-  output = output.replace(/([^\n])\n(\|[^\n]+\|)/g, '$1\n\n$2');
-  output = output.replace(/(\|[^\n]+\|)\n([^\n|])/g, '$1\n\n$2');
-
-  return output;
+  return out.join("\n");
 }
 
 let tableRowIndex = 0;
