@@ -257,6 +257,6 @@ export default function Account() {
     </div>
 
       <ResearchInterestsManager />
-    </>
+    </div>
   );
 }
