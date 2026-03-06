@@ -234,7 +234,7 @@ export default function Documentation() {
       content: (
         <div className="space-y-4">
           <p className="text-white/70 leading-relaxed">
-            As Salas Virtuais permitem que você crie ambientes de chat colaborativo vinculados a um agente personalizado. Ideal para professores que desejam usar agentes (como o Paciente Virtual) em sala de aula.
+            As Salas Virtuais permitem que você crie ambientes de chat colaborativo vinculados a um agente personalizado. Ideal para professores que desejam usar agentes em sala de aula.
           </p>
 
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
@@ -249,7 +249,7 @@ export default function Documentation() {
 
           <div className="rounded-xl border border-[hsl(174,62%,47%)]/20 bg-[hsl(174,62%,47%)]/5 p-4">
             <p className="text-sm text-[hsl(174,62%,47%)]">
-              <strong>Dica:</strong> Marque a opção "Paciente Virtual" no agente para habilitar a publicação em salas virtuais. O agente precisa estar publicado e ter o modo Paciente Virtual ativado.
+              <strong>Dica:</strong> Marque a opção "Publicar na Sala Virtual" no agente para habilitar a publicação em salas virtuais.
             </p>
           </div>
         </div>

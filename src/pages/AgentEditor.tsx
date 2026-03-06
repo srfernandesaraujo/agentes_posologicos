@@ -741,13 +741,13 @@ export default function AgentEditor() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                      <Bot className="h-5 w-5 text-[hsl(174,62%,47%)]" />
-                      Paciente Virtual
+                      <DoorOpen className="h-5 w-5 text-[hsl(174,62%,47%)]" />
+                      Publicar na Sala Virtual
                     </h3>
                     <p className="text-sm text-white/50 mt-1">
                       {linkedRooms.length > 0
                         ? `Este agente está vinculado a ${linkedRooms.length} sala(s) virtual(is)`
-                        : "Vincule este agente a uma sala virtual para uso como paciente virtual"}
+                        : "Vincule este agente a uma sala virtual"}
                     </p>
                   </div>
                   <Switch
@@ -755,7 +755,7 @@ export default function AgentEditor() {
                     onCheckedChange={async (v) => {
                       setPublishVirtualPatient(v);
                       await updateAgent.mutateAsync({ id: agentId!, publish_virtual_patient: v } as any);
-                      toast.success(v ? "Paciente virtual habilitado" : "Paciente virtual desabilitado");
+                      toast.success(v ? "Publicação na sala virtual habilitada" : "Publicação na sala virtual desabilitada");
                     }}
                   />
                 </div>
