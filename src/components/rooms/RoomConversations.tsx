@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Bot, User, Mail, MessageSquare, ChevronRight, ArrowLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface RoomMessage {
   id: string;
@@ -127,7 +128,7 @@ export function RoomConversations({ roomId, roomName, open, onOpenChange }: Prop
                   }`}>
                     {msg.role === "assistant" ? (
                       <div className="prose prose-sm prose-invert max-w-none">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
                     ) : msg.content}
                   </div>
