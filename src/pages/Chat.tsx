@@ -595,6 +595,54 @@ export default function Chat() {
       </DialogContent>
     </Dialog>
 
+    {/* Delete confirmation dialog */}
+    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-white">Excluir conversa</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="border-white/20 bg-transparent text-white hover:bg-white/10">
+            Cancelar
+          </Button>
+          <Button onClick={handleDeleteSession} className="bg-red-600 hover:bg-red-700 text-white border-0">
+            <Trash2 className="h-4 w-4 mr-2" />
+            Excluir
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Rename dialog */}
+    <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+      <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-white">Renomear conversa</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Digite o novo título para esta conversa.
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          placeholder="Novo título..."
+          className="border-white/20 bg-white/5 text-white placeholder:text-white/30"
+          onKeyDown={(e) => e.key === "Enter" && handleRenameSession()}
+        />
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setShowRenameDialog(false)} className="border-white/20 bg-transparent text-white hover:bg-white/10">
+            Cancelar
+          </Button>
+          <Button onClick={handleRenameSession} disabled={!renameValue.trim()} className="bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,40%)] text-white border-0">
+            Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     <div className="flex h-[calc(100vh-4rem)]">
       {/* Sidebar */}
       <ChatSidebar
