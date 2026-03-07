@@ -201,23 +201,57 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-8">
-        <div className="container flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-white/30">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded gradient-primary">
-              <Pill className="h-3 w-3 text-white" />
+      <footer className="border-t border-white/10 py-12">
+        <div className="container">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+            {/* Brand */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg gradient-primary">
+                  <Pill className="h-3.5 w-3.5 text-white" />
+                </div>
+                <span className="font-display font-semibold text-white text-base">Agentes Posológicos</span>
+              </div>
+              <p className="text-sm text-white/40 leading-relaxed">
+                Agentes de IA especializados para profissionais de saúde, educadores e pesquisadores.
+              </p>
             </div>
-            <span className="font-display font-semibold">Agentes Posológicos</span>
+
+            {/* Produto */}
+            <div className="flex flex-col gap-3">
+              <h4 className="font-semibold text-white/80 text-sm">Produto</h4>
+              <div className="flex flex-col gap-2 text-sm text-white/40">
+                <Link to="/signup" className="hover:text-white/70 transition-colors">Criar Conta</Link>
+                <Link to="/login" className="hover:text-white/70 transition-colors">Entrar</Link>
+                <Link to="/creditos" className="hover:text-white/70 transition-colors">Créditos</Link>
+                <Link to="/marketplace" className="hover:text-white/70 transition-colors">Marketplace</Link>
+              </div>
+            </div>
+
+            {/* Recursos */}
+            <div className="flex flex-col gap-3">
+              <h4 className="font-semibold text-white/80 text-sm">Recursos</h4>
+              <div className="flex flex-col gap-2 text-sm text-white/40">
+                <Link to="/documentacao" className="hover:text-white/70 transition-colors">Documentação</Link>
+                <Link to="/contato" className="hover:text-white/70 transition-colors">Contato</Link>
+                <Link to="/salas-virtuais" className="hover:text-white/70 transition-colors">Salas Virtuais</Link>
+              </div>
+            </div>
+
+            {/* Legal */}
+            <div className="flex flex-col gap-3">
+              <h4 className="font-semibold text-white/80 text-sm">Legal</h4>
+              <div className="flex flex-col gap-2 text-sm text-white/40">
+                <span className="cursor-default">Termos de Serviço</span>
+                <span className="cursor-default">Política de Privacidade</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Link to="/documentacao" className="hover:text-white/60 transition-colors">
-              <BookOpen className="inline h-3.5 w-3.5 mr-1" />
-              Documentação
-            </Link>
-          </div>
-          <div className="text-right">
-            <span>© {new Date().getFullYear()} {t("landing.footer.rights")}</span>
-            <br />
+
+          {/* Bottom bar */}
+          <div className="border-t border-white/10 pt-6 text-center text-sm text-white/30">
+            <span>© {new Date().getFullYear()} Agentes Posológicos. {t("landing.footer.rights")}</span>
+            <span className="mx-1">—</span>
             <span>Desenvolvido por Sérgio Araújo. Posologia Produções</span>
           </div>
         </div>
