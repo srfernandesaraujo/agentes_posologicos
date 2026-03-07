@@ -4,15 +4,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
-import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
-import { useAgentKnowledgeBases } from "@/hooks/useAgentKnowledgeBases";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bot, Wand2, Plus, X, Database, FileText, ExternalLink, MessageSquare, Settings2 } from "lucide-react";
+import { ArrowLeft, Bot, Wand2, FileText, MessageSquare, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { DocumentManager } from "@/components/agents/DocumentManager";
 
@@ -22,8 +20,6 @@ export default function NativeAgentEditor() {
   const { user } = useAuth();
   const { isAdmin } = useIsAdmin();
   const queryClient = useQueryClient();
-  const { data: knowledgeBases = [] } = useKnowledgeBases();
-  const { data: agentKBs = [], linkKB, unlinkKB } = useAgentKnowledgeBases(agentId);
 
   const [tab, setTab] = useState("config");
   const [configTab, setConfigTab] = useState("geral");
@@ -36,7 +32,6 @@ export default function NativeAgentEditor() {
   const [icon, setIcon] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [temperature, setTemperature] = useState(0.5);
-  const [promptMode, setPromptMode] = useState<"simple" | "advanced">("advanced");
   const [simplePrompt, setSimplePrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -263,68 +258,6 @@ export default function NativeAgentEditor() {
                   <Button onClick={handleSaveGeneral} disabled={updateMutation.isPending} className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white">
                     Salvar
                   </Button>
-
-                  {/* Knowledge Bases linked */}
-                  <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] p-5">
-                    <h3 className="flex items-center gap-2 text-base font-semibold text-white mb-3">
-                      <Database className="h-4 w-4 text-[hsl(174,62%,47%)]" />
-                      Bases de Conhecimento Vinculadas
-                    </h3>
-
-                    {agentKBs.length === 0 ? (
-                      <p className="text-sm text-white/40">Nenhuma base vinculada a este agente.</p>
-                    ) : (
-                      <div className="space-y-2 mb-4">
-                        {agentKBs.map((link) => {
-                          const kb = knowledgeBases.find((k) => k.id === link.knowledge_base_id);
-                          return (
-                            <div key={link.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-white">{kb?.name || "Base removida"}</p>
-                                {kb?.description && <p className="text-xs text-white/40 truncate max-w-xs">{kb.description}</p>}
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <Button variant="ghost" size="sm" className="h-7 text-xs text-white/50 hover:text-white hover:bg-white/10" onClick={() => navigate(`/conteudos/${link.knowledge_base_id}`)}>
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  Gerenciar fontes
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-white/40 hover:text-red-400 hover:bg-red-500/10" disabled={unlinkKB.isPending}
-                                  onClick={async () => {
-                                    try { await unlinkKB.mutateAsync(link.knowledge_base_id); toast.success("Base desvinculada!"); } catch { toast.error("Erro ao desvincular"); }
-                                  }}>
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {(() => {
-                      const linkedIds = new Set(agentKBs.map((l) => l.knowledge_base_id));
-                      const available = knowledgeBases.filter((kb) => !linkedIds.has(kb.id));
-                      return available.length > 0 ? (
-                        <Select key={agentKBs.length} onValueChange={async (v) => {
-                          try { await linkKB.mutateAsync(v); toast.success("Base vinculada!"); } catch { toast.error("Erro ao vincular"); }
-                        }}>
-                          <SelectTrigger className="border-white/10 bg-white/[0.05] text-white mt-2">
-                            <SelectValue placeholder="Adicionar base de conhecimento..." />
-                          </SelectTrigger>
-                          <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
-                            {available.map((kb) => (
-                              <SelectItem key={kb.id} value={kb.id}>
-                                <div className="flex items-center gap-2">
-                                  <Plus className="h-3 w-3" />
-                                  {kb.name}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : null;
-                    })()}
-                  </div>
 
                   <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
                     <p className="text-xs text-white/40">ID: {agent.id} | Slug: {agent.slug}</p>
