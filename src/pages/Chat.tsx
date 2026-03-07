@@ -239,6 +239,9 @@ export default function Chat() {
   const [showConversationPicker, setShowConversationPicker] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
