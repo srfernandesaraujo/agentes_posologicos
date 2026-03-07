@@ -1,0 +1,5 @@
+ALTER TABLE public.agents 
+ADD COLUMN IF NOT EXISTS system_prompt TEXT,
+ADD COLUMN IF NOT EXISTS temperature NUMERIC DEFAULT 0.5,
+ADD COLUMN IF NOT EXISTS model TEXT DEFAULT 'google/gemini-2.5-flash',
+ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'lovable';

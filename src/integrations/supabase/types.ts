@@ -100,8 +100,12 @@ export type Database = {
           description: string
           icon: string
           id: string
+          model: string | null
           name: string
+          provider: string | null
           slug: string
+          system_prompt: string | null
+          temperature: number | null
         }
         Insert: {
           active?: boolean
@@ -111,8 +115,12 @@ export type Database = {
           description?: string
           icon?: string
           id?: string
+          model?: string | null
           name: string
+          provider?: string | null
           slug: string
+          system_prompt?: string | null
+          temperature?: number | null
         }
         Update: {
           active?: boolean
@@ -122,8 +130,12 @@ export type Database = {
           description?: string
           icon?: string
           id?: string
+          model?: string | null
           name?: string
+          provider?: string | null
           slug?: string
+          system_prompt?: string | null
+          temperature?: number | null
         }
         Relationships: []
       }
