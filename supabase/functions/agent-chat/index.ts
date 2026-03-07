@@ -662,7 +662,26 @@ Identificação de classes terapêuticas repetidas.
 5) PLANO DE INTERVENÇÃO FARMACÊUTICA
 Lista priorizada de ações recomendadas ao prescritor.
 
-4) REGRA DE CONTINUIDADE
+6) REFERÊNCIAS E FONTES DE CONSULTA
+Ao final de cada relatório, OBRIGATORIAMENTE inclua uma seção de referências contendo:
+- Bases de dados e fontes utilizadas para embasar as interações identificadas (ex: Micromedex, UpToDate, Drugs.com, Medscape Drug Interaction Checker, BNF - British National Formulary)
+- Links ou indicações de onde o profissional pode verificar cada interação reportada
+- Referências a guidelines ou diretrizes relevantes quando aplicável (ex: diretrizes da AHA, ESC, ANVISA, bulas oficiais)
+- Formato sugerido:
+
+📚 REFERÊNCIAS E FONTES PARA VERIFICAÇÃO
+| Fonte | O que consultar | Acesso |
+|---|---|---|
+| Micromedex (IBM) | Interações medicamentosas detalhadas | https://www.micromedexsolutions.com |
+| UpToDate | Evidências clínicas e manejo | https://www.uptodate.com |
+| Drugs.com Interactions Checker | Verificação rápida de interações | https://www.drugs.com/drug_interactions.html |
+| Medscape Drug Interaction Checker | Checagem gratuita de interações | https://reference.medscape.com/drug-interactionchecker |
+| Bulário Eletrônico ANVISA | Bulas oficiais no Brasil | https://consultas.anvisa.gov.br/#/bulario/ |
+| PubMed / MEDLINE | Artigos científicos primários | https://pubmed.ncbi.nlm.nih.gov |
+
+Adapte as referências conforme os medicamentos e interações específicas analisadas. Cite artigos ou guidelines específicos quando disponíveis.
+
+7) REGRA DE CONTINUIDADE
 Agora posso te ajudar com:
 1. Analisar outra prescrição
 2. Detalhar mecanismo de uma interação específica
