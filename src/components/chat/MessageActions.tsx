@@ -117,7 +117,7 @@ export function MessageActions({ content, agentName, messageRef }: MessageAction
       const footer = document.createElement("div");
       footer.style.cssText = "background:#ffffff;padding:14px 36px;border-top:2px solid #e65138;";
       footer.innerHTML = `
-        <div style="font-family:Helvetica,Arial,sans-serif;color:#999;font-size:9px;">Este relatório foi gerado automaticamente pela plataforma FarmaChat AI.</div>
+        <div style="font-family:Helvetica,Arial,sans-serif;color:#999;font-size:9px;">Este relatório foi gerado automaticamente pela plataforma Agentes Posológicos.</div>
       `;
       wrapper.appendChild(footer);
 
