@@ -1240,11 +1240,36 @@ Deno.serve(async (req) => {
     }
 
     // Input validation
-    if (typeof input !== "string" || input.length > 10000) {
-      return new Response(JSON.stringify({ error: "Input inválido ou muito longo (máx 10.000 caracteres)" }), {
+    if (typeof input !== "string" || input.length > 60000) {
+      return new Response(JSON.stringify({ error: "Input inválido ou muito longo (máx 60.000 caracteres)" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Validate files array if provided
+    if (files !== undefined && files !== null) {
+      if (!Array.isArray(files) || files.length > 3) {
+        return new Response(JSON.stringify({ error: "Máximo de 3 arquivos por mensagem" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      for (const f of files) {
+        if (!f || typeof f.name !== "string" || typeof f.base64 !== "string") {
+          return new Response(JSON.stringify({ error: "Arquivo inválido no payload" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Limit base64 size (~10MB file = ~13.3MB base64)
+        if (f.base64.length > 15_000_000) {
+          return new Response(JSON.stringify({ error: `Arquivo ${f.name} excede o tamanho máximo` }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
     }
 
     if (typeof agentId !== "string" || agentId.length > 200) {
