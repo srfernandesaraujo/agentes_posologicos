@@ -22,7 +22,7 @@ export function exportConversationPdf(
     doc.setFontSize(8);
     doc.setTextColor(160, 160, 160);
     doc.text(`Página ${pageNum}`, pageWidth / 2, pageHeight - 10, { align: "center" });
-    doc.text("Gerado por Pharma.AI", margin, pageHeight - 10);
+    doc.text("Gerado por Agentes Posológicos", margin, pageHeight - 10);
     doc.setDrawColor(220, 220, 220);
     doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
   };
