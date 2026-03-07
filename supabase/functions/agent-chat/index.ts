@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { unzipSync, strFromU8 } from "npm:fflate@0.8.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
