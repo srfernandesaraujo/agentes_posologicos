@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { MessageSquare, Plus, PanelLeftClose, PanelLeft, Trash2, FileDown, MoreVertical } from "lucide-react";
+import { MessageSquare, Plus, PanelLeftClose, PanelLeft, Trash2, FileDown, MoreVertical, Pencil, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,8 @@ export function ChatSidebar({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   const { data: sessions = [] } = useQuery({
     queryKey: ["chat-sessions", agentId, user?.id],
@@ -45,6 +48,7 @@ export function ChatSidebar({
           id,
           created_at,
           status,
+          title,
           messages(content, role, created_at)
         `)
         .eq("user_id", user!.id)
@@ -57,6 +61,7 @@ export function ChatSidebar({
   });
 
   const getSessionTitle = (session: any) => {
+    if (session.title) return session.title;
     const firstUserMsg = session.messages?.find((m: any) => m.role === "user");
     if (firstUserMsg) {
       return firstUserMsg.content.length > 40
@@ -91,6 +96,29 @@ export function ChatSidebar({
     );
     exportConversationPdf(agentName, sorted);
     toast.success("PDF exportado com sucesso");
+  };
+
+  const startEditing = (session: any) => {
+    setEditingId(session.id);
+    setEditTitle(getSessionTitle(session));
+  };
+
+  const saveTitle = async () => {
+    if (!editingId || !editTitle.trim()) {
+      setEditingId(null);
+      return;
+    }
+    try {
+      await supabase
+        .from("chat_sessions")
+        .update({ title: editTitle.trim() } as any)
+        .eq("id", editingId);
+      queryClient.invalidateQueries({ queryKey: ["chat-sessions", agentId, user?.id] });
+      toast.success("Título atualizado");
+    } catch {
+      toast.error("Erro ao atualizar título");
+    }
+    setEditingId(null);
   };
 
   if (collapsed) {
@@ -141,41 +169,68 @@ export function ChatSidebar({
                       : "hover:bg-white/[0.05]"
                   )}
                 >
-                  <button
-                    onClick={() => onSelectSession(session.id)}
-                    className={cn(
-                      "flex-1 text-left px-3 py-2.5 text-xs min-w-0",
-                      session.id === currentSessionId
-                        ? "text-white"
-                        : "text-white/50 hover:text-white/70"
-                    )}
-                  >
-                    <p className="truncate font-medium">{getSessionTitle(session)}</p>
-                    <p className="mt-0.5 text-[10px] text-white/30">
-                      {new Date(session.created_at).toLocaleDateString("pt-BR")} · {session.messages?.length || 0} msgs
-                    </p>
-                  </button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100 text-white/40 hover:text-white hover:bg-white/10 shrink-0 mr-1"
-                      >
-                        <MoreVertical className="h-3.5 w-3.5" />
+                  {editingId === session.id ? (
+                    <div className="flex-1 flex items-center gap-1 px-2 py-1.5">
+                      <Input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveTitle();
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                        className="h-7 text-xs border-white/20 bg-white/10 text-white"
+                        autoFocus
+                      />
+                      <Button variant="ghost" size="icon" onClick={saveTitle} className="h-6 w-6 text-green-400 hover:text-green-300 shrink-0">
+                        <Check className="h-3 w-3" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="border-white/10 bg-[hsl(220,25%,12%)] text-white min-w-[140px]">
-                      <DropdownMenuItem onClick={() => handleExport(session)} className="gap-2 text-xs cursor-pointer hover:bg-white/10">
-                        <FileDown className="h-3.5 w-3.5" />
-                        Exportar PDF
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setDeleteSessionId(session.id)} className="gap-2 text-xs cursor-pointer text-red-400 hover:bg-red-500/10 hover:text-red-300">
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                      <Button variant="ghost" size="icon" onClick={() => setEditingId(null)} className="h-6 w-6 text-white/40 hover:text-white shrink-0">
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => onSelectSession(session.id)}
+                        className={cn(
+                          "flex-1 text-left px-3 py-2.5 text-xs min-w-0",
+                          session.id === currentSessionId
+                            ? "text-white"
+                            : "text-white/50 hover:text-white/70"
+                        )}
+                      >
+                        <p className="truncate font-medium">{getSessionTitle(session)}</p>
+                        <p className="mt-0.5 text-[10px] text-white/30">
+                          {new Date(session.created_at).toLocaleDateString("pt-BR")} · {session.messages?.length || 0} msgs
+                        </p>
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 opacity-0 group-hover:opacity-100 text-white/40 hover:text-white hover:bg-white/10 shrink-0 mr-1"
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="border-white/10 bg-[hsl(220,25%,12%)] text-white min-w-[140px]">
+                          <DropdownMenuItem onClick={() => startEditing(session)} className="gap-2 text-xs cursor-pointer hover:bg-white/10">
+                            <Pencil className="h-3.5 w-3.5" />
+                            Renomear
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleExport(session)} className="gap-2 text-xs cursor-pointer hover:bg-white/10">
+                            <FileDown className="h-3.5 w-3.5" />
+                            Exportar PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setDeleteSessionId(session.id)} className="gap-2 text-xs cursor-pointer text-red-400 hover:bg-red-500/10 hover:text-red-300">
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </>
+                  )}
                 </div>
               ))
             )}
