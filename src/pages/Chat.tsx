@@ -454,6 +454,7 @@ export default function Chat() {
           input: fullInput, 
           conversationHistory,
           creditCost: hasFreeAccess ? 0 : cost,
+          ...(filesPayload.length > 0 ? { files: filesPayload } : {}),
         },
       });
 
