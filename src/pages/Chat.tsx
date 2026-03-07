@@ -566,6 +566,7 @@ export default function Chat() {
       {/* Sidebar */}
       <ChatSidebar
         agentId={actualAgentId!}
+        agentName={agent?.name || "Agente"}
         isCustom={!!isCustom}
         currentSessionId={sessionId}
         onSelectSession={handleSelectSession}
