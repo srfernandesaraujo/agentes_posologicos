@@ -18,6 +18,7 @@ import Admin from "./pages/Admin";
 import Settings from "./pages/Settings";
 import MyAgents from "./pages/MyAgents";
 import AgentEditor from "./pages/AgentEditor";
+import NativeAgentEditor from "./pages/NativeAgentEditor";
 import Conversations from "./pages/Conversations";
 import Knowledge from "./pages/Knowledge";
 import KnowledgeDetail from "./pages/KnowledgeDetail";
