@@ -1444,7 +1444,21 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId, creditCost, files } = body;
+    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId, creditCost, files, getDefaultPrompt } = body;
+
+    // Mode: return hardcoded default prompt for a native agent (admin only)
+    if (getDefaultPrompt && agentId) {
+      const { data: agentData } = await supabase
+        .from("agents")
+        .select("slug")
+        .eq("id", agentId)
+        .single();
+      const slug = agentData?.slug || "";
+      const defaultPrompt = AGENT_PROMPTS[slug] || DEFAULT_PROMPT;
+      return new Response(JSON.stringify({ prompt: defaultPrompt }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!agentId || !input) {
       return new Response(JSON.stringify({ error: "agentId and input are required" }), {
