@@ -1868,10 +1868,11 @@ Deno.serve(async (req) => {
         }
       }
 
+      const userContent = buildUserMessage(enrichedInput, files);
       const messages = [
         { role: "system", content: systemPrompt },
         ...(conversationHistory || []),
-        { role: "user", content: enrichedInput },
+        { role: "user", content: userContent },
       ];
 
       // Check if user has their own API key configured
