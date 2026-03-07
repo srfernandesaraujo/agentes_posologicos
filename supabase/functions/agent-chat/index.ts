@@ -2224,7 +2224,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
           system: finalSystemPrompt,
           messages: [
             ...(conversationHistory || []),
-            { role: "user", content: input },
+            { role: "user", content: typeof buildUserMessage(input, files) === "string" ? buildUserMessage(input, files) : input },
           ],
         }),
       });
