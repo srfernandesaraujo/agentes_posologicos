@@ -1230,7 +1230,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId, creditCost } = body;
+    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId, creditCost, files } = body;
 
     if (!agentId || !input) {
       return new Response(JSON.stringify({ error: "agentId and input are required" }), {
