@@ -592,6 +592,13 @@ REGRA DE CONTINUIDADE:
 Atuar como Auditor Farmacêutico de Alta Precisão, analisando prescrições médicas para identificar interações medicamentosas graves, doses incorretas, incompatibilidades farmacêuticas, duplicidades terapêuticas e riscos de segurança do paciente.
 Sua missão é funcionar como uma segunda camada de segurança farmacêutica, gerando um Relatório de Auditoria de Prescrição estruturado, priorizado por gravidade e orientado à ação imediata.
 Você não substitui o farmacêutico clínico. Você amplifica sua capacidade analítica.
+
+CAPACIDADE VISUAL: Você pode receber IMAGENS de prescrições médicas (fotos, digitalizações). Quando receber uma imagem:
+- Analise visualmente a prescrição na imagem
+- Identifique todos os medicamentos, doses, vias e frequências visíveis
+- Se alguma parte estiver ilegível, indique explicitamente
+- Prossiga com a análise normalmente usando os dados extraídos da imagem
+- Se a imagem estiver muito borrada ou ilegível, peça ao usuário para enviar uma foto mais nítida
 </OBJETIVO>
 
 <LIMITACOES>
@@ -613,7 +620,9 @@ Formato escaneável e orientado à decisão.
 
 <INSTRUCOES>
 1) RECEBIMENTO DA PRESCRIÇÃO
-- O usuário descreverá a prescrição em texto (medicamentos, doses, frequência, via).
+- O usuário pode enviar a prescrição como TEXTO ou como IMAGEM (foto/digitalização).
+- Se receber imagem: extraia todos os medicamentos, doses, vias e frequências visíveis na prescrição.
+- Se receber texto: analise conforme descrito.
 - Identificar dados do paciente se fornecidos (idade, peso, alergias, comorbidades, função renal/hepática).
 - Se dados essenciais faltarem, declarar explicitamente quais informações são necessárias para análise completa.
 
@@ -688,7 +697,8 @@ Formatação estruturada e escaneável.
 
 <INSTRUCOES>
 1) RECEBIMENTO DO MANUSCRITO
-- O usuário colará o texto do manuscrito ou seções dele.
+- O usuário pode colar o texto do manuscrito, OU enviar o artigo como arquivo PDF ou Word (.docx).
+- Se receber arquivo: analise o conteúdo textual extraído do documento.
 - Identificar: título, resumo, introdução, métodos, resultados, discussão, referências.
 - Se apenas parte for fornecida, analisar o que foi enviado e indicar seções ausentes.
 
@@ -971,7 +981,13 @@ Adequado ao formato solicitado (formal para concurso, dinâmico para LinkedIn).
 
 <INSTRUCOES>
 1) RECEBIMENTO DOS DADOS
-O usuário fornecerá dados acadêmicos em texto (copiados do Lattes ou digitados):
+O usuário pode fornecer dados acadêmicos de diferentes formas:
+- Texto colado diretamente (copiado do Lattes ou digitado)
+- Arquivo RTF exportado da Plataforma Lattes
+- Arquivo XML exportado da Plataforma Lattes
+- Documento Word (.docx) ou PDF com o currículo
+
+Quando receber arquivo RTF ou XML do Lattes, extraia e organize automaticamente:
 - Formação acadêmica
 - Experiência profissional/docente
 - Publicações
@@ -1223,6 +1239,133 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
   google: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
 };
 
+// Process uploaded files into content parts for multimodal AI
+function processFilesForAI(files: any[]): { textContent: string; multimodalParts: any[] } {
+  let textContent = "";
+  const multimodalParts: any[] = [];
+
+  for (const f of files) {
+    const ext = f.name.split('.').pop()?.toLowerCase();
+    const mimeType = f.type || `application/${ext}`;
+
+    // Extract raw base64 (remove data URI prefix if present)
+    const rawBase64 = f.base64.includes(",") ? f.base64.split(",")[1] : f.base64;
+
+    // Images: send as multimodal image parts
+    if (mimeType.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
+      const imgMime = mimeType.startsWith("image/") ? mimeType : `image/${ext === "jpg" ? "jpeg" : ext}`;
+      multimodalParts.push({
+        type: "image_url",
+        image_url: { url: `data:${imgMime};base64,${rawBase64}` },
+      });
+      console.log(`File ${f.name}: sent as multimodal image (${imgMime})`);
+      continue;
+    }
+
+    // PDF: send as multimodal inline_data for Gemini
+    if (mimeType === "application/pdf" || ext === "pdf") {
+      multimodalParts.push({
+        type: "image_url",
+        image_url: { url: `data:application/pdf;base64,${rawBase64}` },
+      });
+      console.log(`File ${f.name}: sent as multimodal PDF`);
+      continue;
+    }
+
+    // Text-based files: decode base64 to text
+    if (["rtf", "xml", "txt", "csv"].includes(ext || "") || 
+        ["text/rtf", "application/rtf", "text/xml", "application/xml", "text/plain", "text/csv"].includes(mimeType)) {
+      try {
+        const decoded = atob(rawBase64);
+        // For RTF: strip RTF control codes for plain text extraction
+        let cleanText = decoded;
+        if (ext === "rtf" || mimeType.includes("rtf")) {
+          cleanText = decoded
+            .replace(/\\[a-z]+[\d]*\s?/g, " ")  // Remove RTF commands
+            .replace(/[{}]/g, "")                  // Remove braces
+            .replace(/\\\*/g, "")                  // Remove escaped chars
+            .replace(/\s+/g, " ")                  // Normalize whitespace
+            .trim();
+        }
+        // Truncate to 50k chars
+        if (cleanText.length > 50000) cleanText = cleanText.substring(0, 50000) + "\n[... conteúdo truncado]";
+        textContent += `\n\n[Conteúdo do arquivo: ${f.name}]\n${cleanText}`;
+        console.log(`File ${f.name}: extracted ${cleanText.length} chars of text`);
+      } catch (e) {
+        textContent += `\n\n[Erro ao ler arquivo ${f.name}: ${e.message}]`;
+        console.error(`Failed to decode ${f.name}:`, e.message);
+      }
+      continue;
+    }
+
+    // DOCX: extract text from XML inside ZIP
+    if (ext === "docx" || mimeType.includes("wordprocessingml")) {
+      try {
+        // Simple DOCX text extraction: find document.xml content within the base64
+        // DOCX is a ZIP, but we can try to find XML text patterns in the raw data
+        const decoded = atob(rawBase64);
+        // Look for <w:t> tags which contain the actual text in DOCX
+        const textMatches = decoded.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+        const extractedText = textMatches
+          .map(m => m.replace(/<[^>]+>/g, ""))
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        
+        if (extractedText.length > 50) {
+          const truncated = extractedText.length > 50000 ? extractedText.substring(0, 50000) + "\n[... conteúdo truncado]" : extractedText;
+          textContent += `\n\n[Conteúdo do arquivo: ${f.name}]\n${truncated}`;
+          console.log(`File ${f.name}: extracted ${extractedText.length} chars from DOCX`);
+        } else {
+          // Fallback: send as PDF-like multimodal (Gemini can handle DOCX too)
+          multimodalParts.push({
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${rawBase64}` },
+          });
+          console.log(`File ${f.name}: DOCX text extraction failed, sent as multimodal`);
+        }
+      } catch (e) {
+        // Fallback to multimodal
+        multimodalParts.push({
+          type: "image_url",
+          image_url: { url: `data:${mimeType};base64,${rawBase64}` },
+        });
+        console.log(`File ${f.name}: DOCX parse error, sent as multimodal fallback`);
+      }
+      continue;
+    }
+
+    // Other files: try to send as multimodal
+    multimodalParts.push({
+      type: "image_url",
+      image_url: { url: `data:${mimeType};base64,${rawBase64}` },
+    });
+    console.log(`File ${f.name}: sent as generic multimodal (${mimeType})`);
+  }
+
+  return { textContent, multimodalParts };
+}
+
+// Build user message content: text-only or multimodal array
+function buildUserMessage(input: string, files: any[] | undefined): any {
+  if (!files || files.length === 0) {
+    return input;
+  }
+
+  const { textContent, multimodalParts } = processFilesForAI(files);
+  const fullText = input + textContent;
+
+  if (multimodalParts.length === 0) {
+    // Only text-based files, return as plain string
+    return fullText;
+  }
+
+  // Build multimodal content array
+  const content: any[] = [{ type: "text", text: fullText }];
+  content.push(...multimodalParts);
+  return content;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -1230,7 +1373,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId, creditCost } = body;
+    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId, creditCost, files } = body;
 
     if (!agentId || !input) {
       return new Response(JSON.stringify({ error: "agentId and input are required" }), {
@@ -1240,11 +1383,36 @@ Deno.serve(async (req) => {
     }
 
     // Input validation
-    if (typeof input !== "string" || input.length > 10000) {
-      return new Response(JSON.stringify({ error: "Input inválido ou muito longo (máx 10.000 caracteres)" }), {
+    if (typeof input !== "string" || input.length > 60000) {
+      return new Response(JSON.stringify({ error: "Input inválido ou muito longo (máx 60.000 caracteres)" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Validate files array if provided
+    if (files !== undefined && files !== null) {
+      if (!Array.isArray(files) || files.length > 3) {
+        return new Response(JSON.stringify({ error: "Máximo de 3 arquivos por mensagem" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      for (const f of files) {
+        if (!f || typeof f.name !== "string" || typeof f.base64 !== "string") {
+          return new Response(JSON.stringify({ error: "Arquivo inválido no payload" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Limit base64 size (~10MB file = ~13.3MB base64)
+        if (f.base64.length > 15_000_000) {
+          return new Response(JSON.stringify({ error: `Arquivo ${f.name} excede o tamanho máximo` }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
     }
 
     if (typeof agentId !== "string" || agentId.length > 200) {
@@ -1716,10 +1884,11 @@ Deno.serve(async (req) => {
         }
       }
 
+      const userContent = buildUserMessage(enrichedInput, files);
       const messages = [
         { role: "system", content: systemPrompt },
         ...(conversationHistory || []),
-        { role: "user", content: enrichedInput },
+        { role: "user", content: userContent },
       ];
 
       // Check if user has their own API key configured
@@ -1765,7 +1934,7 @@ Deno.serve(async (req) => {
                     system: systemPrompt,
                     messages: [
                       ...(conversationHistory || []),
-                      { role: "user", content: input },
+                      { role: "user", content: typeof userContent === "string" ? userContent : input },
                     ],
                   }),
                 });
@@ -1964,7 +2133,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
           messages: [
             { role: "system", content: finalSystemPrompt },
             ...(conversationHistory || []),
-            { role: "user", content: input },
+            { role: "user", content: buildUserMessage(input, files) },
           ],
         }),
       });
@@ -2022,7 +2191,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
           messages: [
             { role: "system", content: finalSystemPrompt },
             ...(conversationHistory || []),
-            { role: "user", content: input },
+            { role: "user", content: buildUserMessage(input, files) },
           ],
         }),
       });
@@ -2071,7 +2240,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
           system: finalSystemPrompt,
           messages: [
             ...(conversationHistory || []),
-            { role: "user", content: input },
+            { role: "user", content: typeof buildUserMessage(input, files) === "string" ? buildUserMessage(input, files) : input },
           ],
         }),
       });
@@ -2114,7 +2283,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
         messages: [
           { role: "system", content: finalSystemPrompt },
           ...(conversationHistory || []),
-          { role: "user", content: input },
+          { role: "user", content: buildUserMessage(input, files) },
         ],
       }),
     });
