@@ -1223,6 +1223,133 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
   google: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
 };
 
+// Process uploaded files into content parts for multimodal AI
+function processFilesForAI(files: any[]): { textContent: string; multimodalParts: any[] } {
+  let textContent = "";
+  const multimodalParts: any[] = [];
+
+  for (const f of files) {
+    const ext = f.name.split('.').pop()?.toLowerCase();
+    const mimeType = f.type || `application/${ext}`;
+
+    // Extract raw base64 (remove data URI prefix if present)
+    const rawBase64 = f.base64.includes(",") ? f.base64.split(",")[1] : f.base64;
+
+    // Images: send as multimodal image parts
+    if (mimeType.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
+      const imgMime = mimeType.startsWith("image/") ? mimeType : `image/${ext === "jpg" ? "jpeg" : ext}`;
+      multimodalParts.push({
+        type: "image_url",
+        image_url: { url: `data:${imgMime};base64,${rawBase64}` },
+      });
+      console.log(`File ${f.name}: sent as multimodal image (${imgMime})`);
+      continue;
+    }
+
+    // PDF: send as multimodal inline_data for Gemini
+    if (mimeType === "application/pdf" || ext === "pdf") {
+      multimodalParts.push({
+        type: "image_url",
+        image_url: { url: `data:application/pdf;base64,${rawBase64}` },
+      });
+      console.log(`File ${f.name}: sent as multimodal PDF`);
+      continue;
+    }
+
+    // Text-based files: decode base64 to text
+    if (["rtf", "xml", "txt", "csv"].includes(ext || "") || 
+        ["text/rtf", "application/rtf", "text/xml", "application/xml", "text/plain", "text/csv"].includes(mimeType)) {
+      try {
+        const decoded = atob(rawBase64);
+        // For RTF: strip RTF control codes for plain text extraction
+        let cleanText = decoded;
+        if (ext === "rtf" || mimeType.includes("rtf")) {
+          cleanText = decoded
+            .replace(/\\[a-z]+[\d]*\s?/g, " ")  // Remove RTF commands
+            .replace(/[{}]/g, "")                  // Remove braces
+            .replace(/\\\*/g, "")                  // Remove escaped chars
+            .replace(/\s+/g, " ")                  // Normalize whitespace
+            .trim();
+        }
+        // Truncate to 50k chars
+        if (cleanText.length > 50000) cleanText = cleanText.substring(0, 50000) + "\n[... conteúdo truncado]";
+        textContent += `\n\n[Conteúdo do arquivo: ${f.name}]\n${cleanText}`;
+        console.log(`File ${f.name}: extracted ${cleanText.length} chars of text`);
+      } catch (e) {
+        textContent += `\n\n[Erro ao ler arquivo ${f.name}: ${e.message}]`;
+        console.error(`Failed to decode ${f.name}:`, e.message);
+      }
+      continue;
+    }
+
+    // DOCX: extract text from XML inside ZIP
+    if (ext === "docx" || mimeType.includes("wordprocessingml")) {
+      try {
+        // Simple DOCX text extraction: find document.xml content within the base64
+        // DOCX is a ZIP, but we can try to find XML text patterns in the raw data
+        const decoded = atob(rawBase64);
+        // Look for <w:t> tags which contain the actual text in DOCX
+        const textMatches = decoded.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+        const extractedText = textMatches
+          .map(m => m.replace(/<[^>]+>/g, ""))
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        
+        if (extractedText.length > 50) {
+          const truncated = extractedText.length > 50000 ? extractedText.substring(0, 50000) + "\n[... conteúdo truncado]" : extractedText;
+          textContent += `\n\n[Conteúdo do arquivo: ${f.name}]\n${truncated}`;
+          console.log(`File ${f.name}: extracted ${extractedText.length} chars from DOCX`);
+        } else {
+          // Fallback: send as PDF-like multimodal (Gemini can handle DOCX too)
+          multimodalParts.push({
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${rawBase64}` },
+          });
+          console.log(`File ${f.name}: DOCX text extraction failed, sent as multimodal`);
+        }
+      } catch (e) {
+        // Fallback to multimodal
+        multimodalParts.push({
+          type: "image_url",
+          image_url: { url: `data:${mimeType};base64,${rawBase64}` },
+        });
+        console.log(`File ${f.name}: DOCX parse error, sent as multimodal fallback`);
+      }
+      continue;
+    }
+
+    // Other files: try to send as multimodal
+    multimodalParts.push({
+      type: "image_url",
+      image_url: { url: `data:${mimeType};base64,${rawBase64}` },
+    });
+    console.log(`File ${f.name}: sent as generic multimodal (${mimeType})`);
+  }
+
+  return { textContent, multimodalParts };
+}
+
+// Build user message content: text-only or multimodal array
+function buildUserMessage(input: string, files: any[] | undefined): any {
+  if (!files || files.length === 0) {
+    return input;
+  }
+
+  const { textContent, multimodalParts } = processFilesForAI(files);
+  const fullText = input + textContent;
+
+  if (multimodalParts.length === 0) {
+    // Only text-based files, return as plain string
+    return fullText;
+  }
+
+  // Build multimodal content array
+  const content: any[] = [{ type: "text", text: fullText }];
+  content.push(...multimodalParts);
+  return content;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
