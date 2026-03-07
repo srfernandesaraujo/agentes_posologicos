@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgents } from "@/hooks/useAgents";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
-import { MessageSquare, Search, Filter, Trash2, FileDown, MoreVertical } from "lucide-react";
+import { MessageSquare, Search, Filter, Trash2, FileDown, MoreVertical, Pencil, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -21,6 +21,8 @@ export default function Conversations() {
   const [search, setSearch] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
   const { data: nativeAgents = [] } = useAgents();
   const { data: customAgents = [] } = useCustomAgents();
 
@@ -34,6 +36,7 @@ export default function Conversations() {
           agent_id,
           created_at,
           status,
+          title,
           messages(content, role, created_at)
         `)
         .eq("user_id", user!.id)
@@ -56,6 +59,17 @@ export default function Conversations() {
 
   const getAgentName = (agentId: string) => agentNameMap.get(agentId) || "Agente";
 
+  const getSessionTitle = (session: any) => {
+    if (session.title) return session.title;
+    const firstUserMsg = session.messages?.find((m: any) => m.role === "user");
+    if (firstUserMsg) {
+      return firstUserMsg.content.length > 50
+        ? firstUserMsg.content.substring(0, 50) + "..."
+        : firstUserMsg.content;
+    }
+    return "Conversa sem título";
+  };
+
   const sessionsWithMessages = sessions.filter((s: any) => s.messages && s.messages.length > 0);
 
   const agents = Array.from(
@@ -67,10 +81,10 @@ export default function Conversations() {
   const filtered = sessionsWithMessages.filter((s: any) => {
     if (agentFilter !== "all" && s.agent_id !== agentFilter) return false;
     if (search) {
-      const lastMsg = s.messages?.[s.messages.length - 1]?.content || "";
+      const title = getSessionTitle(s);
       const agentName = getAgentName(s.agent_id);
       const q = search.toLowerCase();
-      return lastMsg.toLowerCase().includes(q) || agentName.toLowerCase().includes(q);
+      return title.toLowerCase().includes(q) || agentName.toLowerCase().includes(q);
     }
     return true;
   });
@@ -97,6 +111,31 @@ export default function Conversations() {
     );
     exportConversationPdf(getAgentName(session.agent_id), sorted);
     toast.success("PDF exportado com sucesso");
+  };
+
+  const startEditing = (session: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(session.id);
+    setEditTitle(getSessionTitle(session));
+  };
+
+  const saveTitle = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!editingId || !editTitle.trim()) {
+      setEditingId(null);
+      return;
+    }
+    try {
+      await supabase
+        .from("chat_sessions")
+        .update({ title: editTitle.trim() } as any)
+        .eq("id", editingId);
+      queryClient.invalidateQueries({ queryKey: ["all-conversations", user?.id] });
+      toast.success("Título atualizado");
+    } catch {
+      toast.error("Erro ao atualizar título");
+    }
+    setEditingId(null);
   };
 
   if (isLoading) {
@@ -145,58 +184,82 @@ export default function Conversations() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((session: any) => {
-            const lastMsg = session.messages?.[session.messages.length - 1];
-            return (
-              <div
-                key={session.id}
-                className="group flex items-center rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
-              >
-                <button
-                  onClick={() => navigate(`/chat/${session.agent_id}?session=${session.id}`)}
-                  className="flex-1 text-left p-4 min-w-0"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-primary">
-                      {getAgentName(session.agent_id)}
-                    </span>
-                    <span className="text-xs text-white/30">
-                      {new Date(session.created_at).toLocaleDateString("pt-BR")}
-                    </span>
-                  </div>
-                  <p className="text-sm text-white/60 truncate">
-                    {lastMsg?.content || "Conversa vazia"}
-                  </p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className="text-xs text-white/30">
-                      {session.messages?.length || 0} mensagens
-                    </span>
-                  </div>
-                </button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100 text-white/40 hover:text-white hover:bg-white/10 shrink-0 mr-3"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="border-white/10 bg-[hsl(220,25%,12%)] text-white min-w-[140px]">
-                    <DropdownMenuItem onClick={() => handleExport(session)} className="gap-2 text-xs cursor-pointer hover:bg-white/10">
-                      <FileDown className="h-3.5 w-3.5" />
-                      Exportar PDF
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setDeleteSessionId(session.id)} className="gap-2 text-xs cursor-pointer text-red-400 hover:bg-red-500/10 hover:text-red-300">
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            );
-          })}
+          {filtered.map((session: any) => (
+            <div
+              key={session.id}
+              className="group flex items-center rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+            >
+              {editingId === session.id ? (
+                <div className="flex-1 flex items-center gap-2 p-3" onClick={(e) => e.stopPropagation()}>
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveTitle();
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                    className="h-9 text-sm border-white/20 bg-white/10 text-white"
+                    autoFocus
+                  />
+                  <Button variant="ghost" size="icon" onClick={saveTitle} className="h-8 w-8 text-green-400 hover:text-green-300 shrink-0">
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setEditingId(null); }} className="h-8 w-8 text-white/40 hover:text-white shrink-0">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => navigate(`/chat/${session.agent_id}?session=${session.id}`)}
+                    className="flex-1 text-left p-4 min-w-0"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-primary">
+                        {getAgentName(session.agent_id)}
+                      </span>
+                      <span className="text-xs text-white/30">
+                        {new Date(session.created_at).toLocaleDateString("pt-BR")}
+                      </span>
+                    </div>
+                    <p className="text-sm text-white/60 truncate">
+                      {getSessionTitle(session)}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-xs text-white/30">
+                        {session.messages?.length || 0} mensagens
+                      </span>
+                    </div>
+                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 sm:opacity-0 sm:group-hover:opacity-100 text-white/40 hover:text-white hover:bg-white/10 shrink-0 mr-3"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="border-white/10 bg-[hsl(220,25%,12%)] text-white min-w-[140px]">
+                      <DropdownMenuItem onClick={(e) => startEditing(session, e)} className="gap-2 text-xs cursor-pointer hover:bg-white/10">
+                        <Pencil className="h-3.5 w-3.5" />
+                        Renomear
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport(session)} className="gap-2 text-xs cursor-pointer hover:bg-white/10">
+                        <FileDown className="h-3.5 w-3.5" />
+                        Exportar PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setDeleteSessionId(session.id)} className="gap-2 text-xs cursor-pointer text-red-400 hover:bg-red-500/10 hover:text-red-300">
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
