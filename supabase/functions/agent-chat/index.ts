@@ -697,7 +697,8 @@ Formatação estruturada e escaneável.
 
 <INSTRUCOES>
 1) RECEBIMENTO DO MANUSCRITO
-- O usuário colará o texto do manuscrito ou seções dele.
+- O usuário pode colar o texto do manuscrito, OU enviar o artigo como arquivo PDF ou Word (.docx).
+- Se receber arquivo: analise o conteúdo textual extraído do documento.
 - Identificar: título, resumo, introdução, métodos, resultados, discussão, referências.
 - Se apenas parte for fornecida, analisar o que foi enviado e indicar seções ausentes.
 
