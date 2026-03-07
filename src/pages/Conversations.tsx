@@ -1,19 +1,26 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgents } from "@/hooks/useAgents";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
-import { MessageSquare, Search, Filter } from "lucide-react";
+import { MessageSquare, Search, Filter, Trash2, FileDown, MoreVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { exportConversationPdf } from "@/lib/exportConversationPdf";
+import { toast } from "sonner";
 
 export default function Conversations() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
   const { data: nativeAgents = [] } = useAgents();
   const { data: customAgents = [] } = useCustomAgents();
 
@@ -37,7 +44,6 @@ export default function Conversations() {
     enabled: !!user,
   });
 
-  // Resolve agent names from native + custom agents
   const agentNameMap = useMemo(() => {
     const map = new Map<string, string>();
     nativeAgents.forEach((a) => {
@@ -50,7 +56,6 @@ export default function Conversations() {
 
   const getAgentName = (agentId: string) => agentNameMap.get(agentId) || "Agente";
 
-  // Only show sessions that have at least 1 message
   const sessionsWithMessages = sessions.filter((s: any) => s.messages && s.messages.length > 0);
 
   const agents = Array.from(
@@ -70,6 +75,30 @@ export default function Conversations() {
     return true;
   });
 
+  const handleDelete = async (sessionId: string) => {
+    try {
+      await supabase.from("messages").delete().eq("session_id", sessionId);
+      await supabase.from("chat_sessions").delete().eq("id", sessionId);
+      queryClient.invalidateQueries({ queryKey: ["all-conversations", user?.id] });
+      toast.success("Conversa excluída");
+    } catch {
+      toast.error("Erro ao excluir conversa");
+    }
+    setDeleteSessionId(null);
+  };
+
+  const handleExport = (session: any) => {
+    if (!session.messages || session.messages.length === 0) {
+      toast.error("Conversa sem mensagens");
+      return;
+    }
+    const sorted = [...session.messages].sort(
+      (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    exportConversationPdf(getAgentName(session.agent_id), sorted);
+    toast.success("PDF exportado com sucesso");
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -85,7 +114,6 @@ export default function Conversations() {
         <p className="text-white/50">Acompanhe todas as interações</p>
       </div>
 
-      {/* Filters */}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
@@ -110,7 +138,6 @@ export default function Conversations() {
         </Select>
       </div>
 
-      {/* Sessions list */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-white/40">
           <MessageSquare className="mb-4 h-12 w-12" />
@@ -121,32 +148,77 @@ export default function Conversations() {
           {filtered.map((session: any) => {
             const lastMsg = session.messages?.[session.messages.length - 1];
             return (
-              <button
+              <div
                 key={session.id}
-                onClick={() => navigate(`/chat/${session.agent_id}?session=${session.id}`)}
-                className="w-full text-left rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] transition-colors"
+                className="group flex items-center rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-primary">
-                    {getAgentName(session.agent_id)}
-                  </span>
-                  <span className="text-xs text-white/30">
-                    {new Date(session.created_at).toLocaleDateString("pt-BR")}
-                  </span>
-                </div>
-                <p className="text-sm text-white/60 truncate">
-                  {lastMsg?.content || "Conversa vazia"}
-                </p>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-xs text-white/30">
-                    {session.messages?.length || 0} mensagens
-                  </span>
-                </div>
-              </button>
+                <button
+                  onClick={() => navigate(`/chat/${session.agent_id}?session=${session.id}`)}
+                  className="flex-1 text-left p-4 min-w-0"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-primary">
+                      {getAgentName(session.agent_id)}
+                    </span>
+                    <span className="text-xs text-white/30">
+                      {new Date(session.created_at).toLocaleDateString("pt-BR")}
+                    </span>
+                  </div>
+                  <p className="text-sm text-white/60 truncate">
+                    {lastMsg?.content || "Conversa vazia"}
+                  </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-xs text-white/30">
+                      {session.messages?.length || 0} mensagens
+                    </span>
+                  </div>
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 text-white/40 hover:text-white hover:bg-white/10 shrink-0 mr-3"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="border-white/10 bg-[hsl(220,25%,12%)] text-white min-w-[140px]">
+                    <DropdownMenuItem onClick={() => handleExport(session)} className="gap-2 text-xs cursor-pointer hover:bg-white/10">
+                      <FileDown className="h-3.5 w-3.5" />
+                      Exportar PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setDeleteSessionId(session.id)} className="gap-2 text-xs cursor-pointer text-red-400 hover:bg-red-500/10 hover:text-red-300">
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Excluir
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             );
           })}
         </div>
       )}
+
+      <AlertDialog open={!!deleteSessionId} onOpenChange={() => setDeleteSessionId(null)}>
+        <AlertDialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir conversa?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/50">
+              Esta ação não pode ser desfeita. Todas as mensagens desta conversa serão apagadas permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/10 bg-white/5 text-white hover:bg-white/10">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteSessionId && handleDelete(deleteSessionId)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
