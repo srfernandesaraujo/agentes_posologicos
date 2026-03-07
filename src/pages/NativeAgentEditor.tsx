@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bot, Wand2, FileText, MessageSquare, Settings2 } from "lucide-react";
+import { ArrowLeft, Bot, Wand2, FileText, MessageSquare, Settings2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { DocumentManager } from "@/components/agents/DocumentManager";
 
