@@ -981,7 +981,13 @@ Adequado ao formato solicitado (formal para concurso, dinâmico para LinkedIn).
 
 <INSTRUCOES>
 1) RECEBIMENTO DOS DADOS
-O usuário fornecerá dados acadêmicos em texto (copiados do Lattes ou digitados):
+O usuário pode fornecer dados acadêmicos de diferentes formas:
+- Texto colado diretamente (copiado do Lattes ou digitado)
+- Arquivo RTF exportado da Plataforma Lattes
+- Arquivo XML exportado da Plataforma Lattes
+- Documento Word (.docx) ou PDF com o currículo
+
+Quando receber arquivo RTF ou XML do Lattes, extraia e organize automaticamente:
 - Formação acadêmica
 - Experiência profissional/docente
 - Publicações
