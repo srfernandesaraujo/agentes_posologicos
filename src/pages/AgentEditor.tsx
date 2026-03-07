@@ -409,7 +409,7 @@ export default function AgentEditor() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="mt-3 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+                            className="mt-3 border-white/10 bg-transparent text-white/60 hover:text-white hover:bg-white/10"
                             onClick={() => navigate("/conteudos")}
                           >
                             <Plus className="h-3 w-3 mr-1" />
