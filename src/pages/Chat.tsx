@@ -524,6 +524,33 @@ export default function Chat() {
     setSessionId(sid);
   };
 
+  const handleDeleteSession = async () => {
+    if (!sessionId) return;
+    await supabase.from("messages").delete().eq("session_id", sessionId);
+    await supabase.from("chat_sessions").delete().eq("id", sessionId);
+    setShowDeleteDialog(false);
+    handleNewConversation();
+    queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
+    toast.success("Conversa excluída com sucesso");
+  };
+
+  const handleExportPdf = () => {
+    if (!sessionId || displayMessages.length === 0) {
+      toast.error("Nenhuma mensagem para exportar");
+      return;
+    }
+    exportConversationPdf(agent?.name || "Agente", displayMessages);
+    toast.success("PDF exportado com sucesso");
+  };
+
+  const handleRenameSession = async () => {
+    if (!sessionId || !renameValue.trim()) return;
+    await supabase.from("chat_sessions").update({ title: renameValue.trim() }).eq("id", sessionId);
+    setShowRenameDialog(false);
+    queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
+    toast.success("Título atualizado");
+  };
+
   if (agentLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
