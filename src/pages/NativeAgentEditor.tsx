@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bot, Wand2, FileText, MessageSquare, Settings2 } from "lucide-react";
+import { ArrowLeft, Bot, Wand2, FileText, MessageSquare, Settings2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { DocumentManager } from "@/components/agents/DocumentManager";
 
@@ -34,6 +34,7 @@ export default function NativeAgentEditor() {
   const [temperature, setTemperature] = useState(0.5);
   const [simplePrompt, setSimplePrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [loadingDefault, setLoadingDefault] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Fetch the native agent
@@ -280,9 +281,37 @@ export default function NativeAgentEditor() {
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-white/70">System Prompt</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-sm font-medium text-white/70">System Prompt</label>
+                      {!systemPrompt.trim() && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            setLoadingDefault(true);
+                            try {
+                              const { data, error } = await supabase.functions.invoke("agent-chat", {
+                                body: { agentId, getDefaultPrompt: true },
+                              });
+                              if (error) throw error;
+                              setSystemPrompt(data.prompt || "");
+                              toast.success("Prompt padrão carregado. Edite e salve para sobrescrever.");
+                            } catch {
+                              toast.error("Erro ao carregar prompt padrão");
+                            } finally {
+                              setLoadingDefault(false);
+                            }
+                          }}
+                          disabled={loadingDefault}
+                          className="gap-1.5 border-white/20 bg-transparent text-[hsl(174,62%,47%)] hover:bg-white/10 text-xs"
+                        >
+                          {loadingDefault ? <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Eye className="h-3.5 w-3.5" />}
+                          Carregar prompt padrão
+                        </Button>
+                      )}
+                    </div>
                     <p className="mb-2 text-xs text-white/30">
-                      {systemPrompt ? "Prompt customizado ativo. Deixe vazio para usar o prompt padrão do sistema." : "Usando prompt padrão hardcoded. Edite aqui para sobrescrever."}
+                      {systemPrompt ? "Prompt customizado ativo. Deixe vazio para usar o prompt padrão do sistema." : "Usando prompt padrão hardcoded. Clique em 'Carregar prompt padrão' para visualizar e editar."}
                     </p>
                     <Textarea
                       value={systemPrompt}
