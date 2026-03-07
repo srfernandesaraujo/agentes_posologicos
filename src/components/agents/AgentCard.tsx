@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { Agent, CATEGORY_COLORS } from "@/hooks/useAgents";
 import { getIcon } from "@/lib/icons";
-import { Coins, ArrowRight } from "lucide-react";
+import { Coins, ArrowRight, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 interface AgentCardProps {
   agent: Agent;
@@ -14,6 +15,7 @@ export function AgentCard({ agent }: AgentCardProps) {
   const Icon = getIcon(agent.icon);
   const catColor = CATEGORY_COLORS[agent.category] || "bg-primary";
   const { t } = useLanguage();
+  const { isAdmin } = useIsAdmin();
 
   return (
     <div className="group rounded-xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:border-white/20 hover:-translate-y-1 animate-fade-in">
@@ -21,9 +23,25 @@ export function AgentCard({ agent }: AgentCardProps) {
         <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${catColor} text-white`}>
           <Icon className="h-6 w-6" />
         </div>
-        <div className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-xs font-medium text-white/50">
-          <Coins className="h-3 w-3" />
-          {agent.credit_cost}
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-white/30 hover:text-white hover:bg-white/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/admin/agente/${agent.id}`);
+              }}
+              title="Editar agente (Admin)"
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          )}
+          <div className="flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-xs font-medium text-white/50">
+            <Coins className="h-3 w-3" />
+            {agent.credit_cost}
+          </div>
         </div>
       </div>
 

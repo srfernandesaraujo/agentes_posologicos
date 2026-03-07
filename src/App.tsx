@@ -61,6 +61,7 @@ const App = () => (
               <Route path="/configuracoes" element={<Settings />} />
               <Route path="/meus-agentes" element={<MyAgents />} />
               <Route path="/meus-agentes/:agentId" element={<AgentEditor />} />
+              <Route path="/admin/agente/:agentId" element={<NativeAgentEditor />} />
               <Route path="/conversas" element={<Conversations />} />
               <Route path="/conteudos" element={<Knowledge />} />
               <Route path="/conteudos/:kbId" element={<KnowledgeDetail />} />
