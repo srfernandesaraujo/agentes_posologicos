@@ -34,6 +34,7 @@ export default function NativeAgentEditor() {
   const [temperature, setTemperature] = useState(0.5);
   const [simplePrompt, setSimplePrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [loadingDefault, setLoadingDefault] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Fetch the native agent
