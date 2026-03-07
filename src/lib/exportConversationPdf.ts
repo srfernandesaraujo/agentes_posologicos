@@ -100,7 +100,11 @@ export function exportConversationPdf(
     // Label & time
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(isUser ? 20, 184, 166 : 51, 65, 85); // teal-500 or slate-700
+    if (isUser) {
+      doc.setTextColor(20, 184, 166);
+    } else {
+      doc.setTextColor(51, 65, 85);
+    }
     doc.text(label, margin + 2, y + 4);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(160, 160, 160);
