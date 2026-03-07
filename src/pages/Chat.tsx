@@ -383,21 +383,32 @@ export default function Chat() {
     mutationFn: async (text: string) => {
       if (!user || !agent) throw new Error("Sessão não encontrada");
 
-      // Build file context - read text-based files content
-      let fileContext = "";
+      // Build files array as base64 for the edge function
+      const filesPayload: { name: string; type: string; base64: string }[] = [];
+      let textFileContext = "";
       if (attachedFiles.length > 0) {
-        const fileContents: string[] = [];
         for (const f of attachedFiles) {
-          if (f.type === "text/csv" || f.type === "text/plain" || f.name.endsWith(".csv") || f.name.endsWith(".txt")) {
+          const ext = f.name.split('.').pop()?.toLowerCase();
+          const isTextBased = f.type === "text/csv" || f.type === "text/plain" || ext === "csv" || ext === "txt";
+          const isSpreadsheet = f.type.includes("spreadsheet") || f.type.includes("excel") || ext === "xlsx" || ext === "xls";
+          
+          if (isTextBased) {
+            // Read text files directly as context
             const content = await f.text();
-            fileContents.push(`[Arquivo: ${f.name}]\n${content.substring(0, 15000)}`);
-          } else if (f.type.includes("spreadsheet") || f.type.includes("excel") || f.name.endsWith(".xlsx") || f.name.endsWith(".xls")) {
-            fileContents.push(`[Arquivo Excel anexado: ${f.name} (${(f.size / 1024).toFixed(1)}KB) - Converta para CSV para melhor processamento]`);
+            textFileContext += `\n\n[Arquivo: ${f.name}]\n${content.substring(0, 15000)}`;
+          } else if (isSpreadsheet) {
+            textFileContext += `\n\n[Arquivo Excel anexado: ${f.name} (${(f.size / 1024).toFixed(1)}KB) - Converta para CSV para melhor processamento]`;
           } else {
-            fileContents.push(`[Arquivo anexado: ${f.name} (${f.type})]`);
+            // Convert to base64 for multimodal processing (PDF, DOCX, images, RTF, XML)
+            try {
+              const base64 = await fileToBase64(f);
+              filesPayload.push({ name: f.name, type: f.type || `application/${ext}`, base64 });
+            } catch (err) {
+              console.error(`Failed to convert ${f.name} to base64:`, err);
+              textFileContext += `\n\n[Erro ao processar arquivo: ${f.name}]`;
+            }
           }
         }
-        fileContext = "\n\n" + fileContents.join("\n\n");
       }
 
       // Add attached conversations as context
@@ -406,7 +417,7 @@ export default function Chat() {
         conversationContext = "\n\n" + attachedConversations.map(c => c.content).join("\n\n");
       }
 
-      const fullInput = text + fileContext + conversationContext;
+      const fullInput = text + textFileContext + conversationContext;
 
       // Build conversation history from current displayed messages
       const conversationHistory = displayMessages.map((m) => ({
