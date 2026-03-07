@@ -1493,7 +1493,8 @@ Deno.serve(async (req) => {
 
     // Mode: return hardcoded default prompt for a native agent (admin only)
     if (getDefaultPrompt && agentId) {
-      const { data: agentData } = await supabase
+      const promptClient = createClient(supabaseUrl, serviceRoleKey);
+      const { data: agentData } = await promptClient
         .from("agents")
         .select("slug")
         .eq("id", agentId)
