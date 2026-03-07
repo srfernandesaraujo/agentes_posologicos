@@ -1753,12 +1753,16 @@ Deno.serve(async (req) => {
     // Check if it's a built-in agent
     const { data: builtInAgent } = await supabase
       .from("agents")
-      .select("slug")
+      .select("slug, system_prompt, temperature")
       .eq("id", agentId)
       .single();
 
     if (builtInAgent) {
-      let systemPrompt = (AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
+      // Use DB-stored prompt if available (admin override), otherwise use hardcoded
+      const basePrompt = (builtInAgent as any).system_prompt && (builtInAgent as any).system_prompt.trim().length > 0
+        ? (builtInAgent as any).system_prompt
+        : (AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT);
+      let systemPrompt = basePrompt + GLOBAL_TABLE_INSTRUCTION;
       let enrichedInput = input;
 
       // PubMed real-time search for especialista-pubmed

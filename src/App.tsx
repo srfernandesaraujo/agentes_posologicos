@@ -18,6 +18,7 @@ import Admin from "./pages/Admin";
 import Settings from "./pages/Settings";
 import MyAgents from "./pages/MyAgents";
 import AgentEditor from "./pages/AgentEditor";
+import NativeAgentEditor from "./pages/NativeAgentEditor";
 import Conversations from "./pages/Conversations";
 import Knowledge from "./pages/Knowledge";
 import KnowledgeDetail from "./pages/KnowledgeDetail";
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="/configuracoes" element={<Settings />} />
               <Route path="/meus-agentes" element={<MyAgents />} />
               <Route path="/meus-agentes/:agentId" element={<AgentEditor />} />
+              <Route path="/admin/agente/:agentId" element={<NativeAgentEditor />} />
               <Route path="/conversas" element={<Conversations />} />
               <Route path="/conteudos" element={<Knowledge />} />
               <Route path="/conteudos/:kbId" element={<KnowledgeDetail />} />
