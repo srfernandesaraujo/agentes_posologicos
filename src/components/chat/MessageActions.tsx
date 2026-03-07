@@ -52,7 +52,7 @@ export function MessageActions({ content, agentName, messageRef }: MessageAction
           <div style="font-family:Helvetica,Arial,sans-serif;color:#555;font-size:12px;">${agentName}</div>
           <div style="font-family:Helvetica,Arial,sans-serif;color:#555;font-size:12px;">${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
         </div>
-        <div style="font-family:Helvetica,Arial,sans-serif;color:#999;font-size:9px;margin-top:4px;">Gerado por FarmaChat AI</div>
+        <div style="font-family:Helvetica,Arial,sans-serif;color:#999;font-size:9px;margin-top:4px;">Gerado por Agentes Posológicos</div>
       `;
       wrapper.appendChild(header);
 
