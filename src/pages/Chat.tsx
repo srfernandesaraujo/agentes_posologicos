@@ -646,6 +646,29 @@ export default function Chat() {
                 <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
                 {isCustom ? `${CUSTOM_AGENT_INTERACTION_COST}` : agent.credit_cost} crédito/uso
               </div>
+              {sessionId && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-white/60 hover:bg-white/10 hover:text-white">
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+                    <DropdownMenuItem onClick={() => { setRenameValue(""); setShowRenameDialog(true); }} className="text-white/80 focus:bg-white/10 focus:text-white">
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Renomear
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPdf} className="text-white/80 focus:bg-white/10 focus:text-white">
+                      <Download className="mr-2 h-4 w-4" />
+                      Exportar PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-400 focus:bg-red-500/10 focus:text-red-400">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir conversa
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </div>
