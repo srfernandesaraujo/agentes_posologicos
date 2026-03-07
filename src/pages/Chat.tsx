@@ -13,8 +13,11 @@ import { useCustomAgent } from "@/hooks/useCustomAgents";
 import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File, Settings2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File, Settings2, MoreVertical, Trash2, Download, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { exportConversationPdf } from "@/lib/exportConversationPdf";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InputTemplates } from "@/components/chat/InputTemplates";
 import { ConversationPicker } from "@/components/chat/ConversationPicker";
@@ -236,6 +239,9 @@ export default function Chat() {
   const [showConversationPicker, setShowConversationPicker] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -518,6 +524,33 @@ export default function Chat() {
     setSessionId(sid);
   };
 
+  const handleDeleteSession = async () => {
+    if (!sessionId) return;
+    await supabase.from("messages").delete().eq("session_id", sessionId);
+    await supabase.from("chat_sessions").delete().eq("id", sessionId);
+    setShowDeleteDialog(false);
+    handleNewConversation();
+    queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
+    toast.success("Conversa excluída com sucesso");
+  };
+
+  const handleExportPdf = () => {
+    if (!sessionId || displayMessages.length === 0) {
+      toast.error("Nenhuma mensagem para exportar");
+      return;
+    }
+    exportConversationPdf(agent?.name || "Agente", displayMessages);
+    toast.success("PDF exportado com sucesso");
+  };
+
+  const handleRenameSession = async () => {
+    if (!sessionId || !renameValue.trim()) return;
+    await supabase.from("chat_sessions").update({ title: renameValue.trim() }).eq("id", sessionId);
+    setShowRenameDialog(false);
+    queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
+    toast.success("Título atualizado");
+  };
+
   if (agentLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -559,6 +592,54 @@ export default function Chat() {
             Comprar Créditos
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Delete confirmation dialog */}
+    <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-white">Excluir conversa</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setShowDeleteDialog(false)} className="border-white/20 bg-transparent text-white hover:bg-white/10">
+            Cancelar
+          </Button>
+          <Button onClick={handleDeleteSession} className="bg-red-600 hover:bg-red-700 text-white border-0">
+            <Trash2 className="h-4 w-4 mr-2" />
+            Excluir
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Rename dialog */}
+    <Dialog open={showRenameDialog} onOpenChange={setShowRenameDialog}>
+      <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-white">Renomear conversa</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Digite o novo título para esta conversa.
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          placeholder="Novo título..."
+          className="border-white/20 bg-white/5 text-white placeholder:text-white/30"
+          onKeyDown={(e) => e.key === "Enter" && handleRenameSession()}
+        />
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setShowRenameDialog(false)} className="border-white/20 bg-transparent text-white hover:bg-white/10">
+            Cancelar
+          </Button>
+          <Button onClick={handleRenameSession} disabled={!renameValue.trim()} className="bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,40%)] text-white border-0">
+            Salvar
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
 
@@ -613,6 +694,29 @@ export default function Chat() {
                 <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
                 {isCustom ? `${CUSTOM_AGENT_INTERACTION_COST}` : agent.credit_cost} crédito/uso
               </div>
+              {sessionId && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-white/60 hover:bg-white/10 hover:text-white">
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+                    <DropdownMenuItem onClick={() => { setRenameValue(""); setShowRenameDialog(true); }} className="text-white/80 focus:bg-white/10 focus:text-white">
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Renomear
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPdf} className="text-white/80 focus:bg-white/10 focus:text-white">
+                      <Download className="mr-2 h-4 w-4" />
+                      Exportar PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-400 focus:bg-red-500/10 focus:text-red-400">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir conversa
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </div>
