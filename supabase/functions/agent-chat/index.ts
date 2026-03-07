@@ -2117,7 +2117,7 @@ Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em 
           messages: [
             { role: "system", content: finalSystemPrompt },
             ...(conversationHistory || []),
-            { role: "user", content: input },
+            { role: "user", content: buildUserMessage(input, files) },
           ],
         }),
       });
