@@ -1317,39 +1317,87 @@ function processFilesForAI(files: any[]): { textContent: string; multimodalParts
       continue;
     }
 
-    // DOCX: extract text from XML inside ZIP
+    // DOCX: extract text from XML inside ZIP using DecompressionStream
     if (ext === "docx" || mimeType.includes("wordprocessingml")) {
       try {
-        // Simple DOCX text extraction: find document.xml content within the base64
-        // DOCX is a ZIP, but we can try to find XML text patterns in the raw data
-        const decoded = atob(rawBase64);
-        // Look for <w:t> tags which contain the actual text in DOCX
-        const textMatches = decoded.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
-        const extractedText = textMatches
-          .map(m => m.replace(/<[^>]+>/g, ""))
-          .join(" ")
-          .replace(/\s+/g, " ")
-          .trim();
-        
-        if (extractedText.length > 50) {
+        const binaryStr = atob(rawBase64);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+        let extractedText = "";
+
+        // Find local file header for word/document.xml in ZIP
+        const targetName = "word/document.xml";
+        for (let i = 0; i < bytes.length - 30; i++) {
+          if (bytes[i] === 0x50 && bytes[i+1] === 0x4B && bytes[i+2] === 0x03 && bytes[i+3] === 0x04) {
+            const compressionMethod = bytes[i + 8] | (bytes[i + 9] << 8);
+            const compressedSize = bytes[i + 18] | (bytes[i + 19] << 8) | (bytes[i + 20] << 16) | (bytes[i + 21] << 24);
+            const fnameLen = bytes[i + 26] | (bytes[i + 27] << 8);
+            const extraLen = bytes[i + 28] | (bytes[i + 29] << 8);
+            const fname = new TextDecoder().decode(bytes.slice(i + 30, i + 30 + fnameLen));
+
+            if (fname === targetName && compressedSize > 0) {
+              const dataStart = i + 30 + fnameLen + extraLen;
+              const compressedData = bytes.slice(dataStart, dataStart + compressedSize);
+              let xmlText = "";
+
+              if (compressionMethod === 0) {
+                xmlText = new TextDecoder("utf-8", { fatal: false }).decode(compressedData);
+              } else if (compressionMethod === 8) {
+                try {
+                  const ds = new DecompressionStream("raw");
+                  const writer = ds.writable.getWriter();
+                  const reader = ds.readable.getReader();
+                  writer.write(compressedData).then(() => writer.close());
+                  const chunks: Uint8Array[] = [];
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    if (value) chunks.push(value);
+                  }
+                  const totalLen = chunks.reduce((s, c) => s + c.length, 0);
+                  const merged = new Uint8Array(totalLen);
+                  let off = 0;
+                  for (const c of chunks) { merged.set(c, off); off += c.length; }
+                  xmlText = new TextDecoder("utf-8").decode(merged);
+                } catch (decompErr) {
+                  console.error(`DOCX decompression failed:`, decompErr.message);
+                  xmlText = new TextDecoder("utf-8", { fatal: false }).decode(compressedData);
+                }
+              }
+
+              if (xmlText.length > 0) {
+                const textMatches = xmlText.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+                extractedText = textMatches.map(m => m.replace(/<[^>]+>/g, "")).join("");
+                // Insert paragraph breaks
+                extractedText = xmlText.split(/<\/w:p>/).map(para => {
+                  const matches = para.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+                  return matches.map(m => m.replace(/<[^>]+>/g, "")).join("");
+                }).filter(p => p.trim()).join("\n");
+                extractedText = extractedText.replace(/\s+/g, " ").trim();
+              }
+              break;
+            }
+          }
+        }
+
+        // Fallback: regex on raw decoded string
+        if (extractedText.length < 50) {
+          const rawMatches = binaryStr.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+          extractedText = rawMatches.map(m => m.replace(/<[^>]+>/g, "")).join(" ").replace(/\s+/g, " ").trim();
+        }
+
+        if (extractedText.length > 20) {
           const truncated = extractedText.length > 50000 ? extractedText.substring(0, 50000) + "\n[... conteúdo truncado]" : extractedText;
           textContent += `\n\n[Conteúdo do arquivo: ${f.name}]\n${truncated}`;
           console.log(`File ${f.name}: extracted ${extractedText.length} chars from DOCX`);
         } else {
-          // Fallback: send as PDF-like multimodal (Gemini can handle DOCX too)
-          multimodalParts.push({
-            type: "image_url",
-            image_url: { url: `data:${mimeType};base64,${rawBase64}` },
-          });
-          console.log(`File ${f.name}: DOCX text extraction failed, sent as multimodal`);
+          textContent += `\n\n[Arquivo ${f.name}: Não foi possível extrair o texto do documento Word. Por favor, salve como PDF e envie novamente.]`;
+          console.log(`File ${f.name}: DOCX extraction yielded insufficient text`);
         }
       } catch (e) {
-        // Fallback to multimodal
-        multimodalParts.push({
-          type: "image_url",
-          image_url: { url: `data:${mimeType};base64,${rawBase64}` },
-        });
-        console.log(`File ${f.name}: DOCX parse error, sent as multimodal fallback`);
+        textContent += `\n\n[Arquivo ${f.name}: Erro ao processar documento Word. Por favor, salve como PDF e envie novamente.]`;
+        console.error(`File ${f.name}: DOCX parse error:`, e.message);
       }
       continue;
     }
