@@ -326,6 +326,10 @@ export default function Chat() {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "application/msword",
       "application/vnd.ms-excel",
+      "application/rtf",
+      "text/rtf",
+      "text/xml",
+      "application/xml",
       "image/png",
       "image/jpeg",
       "image/gif",
@@ -333,11 +337,32 @@ export default function Chat() {
       "text/plain",
       "text/csv",
     ];
-    const valid = files.filter((f) => allowed.includes(f.type) || f.type.startsWith("image/"));
+    const valid = files.filter((f) => {
+      if (allowed.includes(f.type) || f.type.startsWith("image/")) return true;
+      // Accept by extension for types browsers may not recognize
+      const ext = f.name.split('.').pop()?.toLowerCase();
+      if (ext && ["rtf", "xml"].includes(ext)) return true;
+      return false;
+    });
     if (valid.length < files.length) {
       toast.error("Alguns arquivos não são suportados e foram ignorados.");
     }
-    setAttachedFiles((prev) => [...prev, ...valid]);
+    // Limit: max 10MB per file, max 3 files
+    const sizeFiltered = valid.filter(f => {
+      if (f.size > 10 * 1024 * 1024) {
+        toast.error(`Arquivo ${f.name} excede 10MB e foi ignorado.`);
+        return false;
+      }
+      return true;
+    });
+    setAttachedFiles((prev) => {
+      const combined = [...prev, ...sizeFiltered];
+      if (combined.length > 3) {
+        toast.error("Máximo de 3 arquivos por mensagem.");
+        return combined.slice(0, 3);
+      }
+      return combined;
+    });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
