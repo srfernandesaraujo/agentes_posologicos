@@ -1918,7 +1918,7 @@ Deno.serve(async (req) => {
                     system: systemPrompt,
                     messages: [
                       ...(conversationHistory || []),
-                      { role: "user", content: input },
+                      { role: "user", content: typeof userContent === "string" ? userContent : input },
                     ],
                   }),
                 });
