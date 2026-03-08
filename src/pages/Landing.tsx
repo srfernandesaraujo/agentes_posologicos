@@ -110,7 +110,7 @@ export default function Landing() {
       </section>
 
       {/* PIN Access */}
-      <section className="border-b border-white/10 bg-white/[0.02]">
+      <section id="pin-section" className="border-b border-white/10 bg-white/[0.02]">
         <div className="container py-12">
           <div className="mx-auto max-w-md text-center">
             <div className="flex items-center justify-center gap-2 mb-4">
@@ -223,8 +223,8 @@ export default function Landing() {
               <div className="flex flex-col gap-2 text-sm text-white/40">
                 <Link to="/signup" className="hover:text-white/70 transition-colors">Criar Conta</Link>
                 <Link to="/login" className="hover:text-white/70 transition-colors">Entrar</Link>
-                <Link to="/creditos" className="hover:text-white/70 transition-colors">Créditos</Link>
-                <Link to="/marketplace" className="hover:text-white/70 transition-colors">Marketplace</Link>
+                <Link to="/precos" className="hover:text-white/70 transition-colors">Créditos</Link>
+                <Link to="/vitrine" className="hover:text-white/70 transition-colors">Marketplace</Link>
               </div>
             </div>
 
@@ -232,9 +232,9 @@ export default function Landing() {
             <div className="flex flex-col gap-3">
               <h4 className="font-semibold text-white/80 text-sm">Recursos</h4>
               <div className="flex flex-col gap-2 text-sm text-white/40">
-                <Link to="/documentacao" className="hover:text-white/70 transition-colors">Documentação</Link>
-                <Link to="/contato" className="hover:text-white/70 transition-colors">Contato</Link>
-                <Link to="/salas-virtuais" className="hover:text-white/70 transition-colors">Salas Virtuais</Link>
+                <Link to="/docs" className="hover:text-white/70 transition-colors">Documentação</Link>
+                <Link to="/fale-conosco" className="hover:text-white/70 transition-colors">Contato</Link>
+                <button onClick={() => document.getElementById('pin-section')?.scrollIntoView({ behavior: 'smooth' })} className="text-left hover:text-white/70 transition-colors">Salas Virtuais</button>
               </div>
             </div>
 
@@ -242,8 +242,8 @@ export default function Landing() {
             <div className="flex flex-col gap-3">
               <h4 className="font-semibold text-white/80 text-sm">Legal</h4>
               <div className="flex flex-col gap-2 text-sm text-white/40">
-                <span className="cursor-default">Termos de Serviço</span>
-                <span className="cursor-default">Política de Privacidade</span>
+                <Link to="/termos" className="hover:text-white/70 transition-colors">Termos de Serviço</Link>
+                <Link to="/privacidade" className="hover:text-white/70 transition-colors">Política de Privacidade</Link>
               </div>
             </div>
           </div>

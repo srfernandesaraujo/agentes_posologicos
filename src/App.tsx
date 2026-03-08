@@ -30,6 +30,12 @@ import UserDashboard from "./pages/UserDashboard";
 import Contact from "./pages/Contact";
 import ResetPassword from "./pages/ResetPassword";
 import Documentation from "./pages/Documentation";
+import PublicCredits from "./pages/PublicCredits";
+import PublicMarketplace from "./pages/PublicMarketplace";
+import PublicDocumentation from "./pages/PublicDocumentation";
+import PublicContact from "./pages/PublicContact";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +53,12 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/redefinir-senha" element={<ResetPassword />} />
             <Route path="/sala/:pin" element={<VirtualRoomChat />} />
+            <Route path="/precos" element={<PublicCredits />} />
+            <Route path="/vitrine" element={<PublicMarketplace />} />
+            <Route path="/docs" element={<PublicDocumentation />} />
+            <Route path="/fale-conosco" element={<PublicContact />} />
+            <Route path="/termos" element={<TermsOfService />} />
+            <Route path="/privacidade" element={<PrivacyPolicy />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
