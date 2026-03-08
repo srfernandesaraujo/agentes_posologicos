@@ -2974,7 +2974,7 @@ Ao final, ofereça:
 4. Adaptar para outra população especial
 5. Verificar interações com medicamentos concomitantes
 
-</INSTRUCOES>\`,
+</INSTRUCOES>`,
 };
 
 const DEFAULT_PROMPT = "Você é um assistente especializado. Responda de forma clara, estruturada e objetiva. Mantenha-se dentro do escopo do tema solicitado.";
