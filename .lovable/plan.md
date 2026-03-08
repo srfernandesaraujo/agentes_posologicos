@@ -1,68 +1,52 @@
 
 
-## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
+## Plano: Agente Especialista em Adaptação de Aulas para Inclusão
 
-### Problema
-Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
+### O que será construído
 
-### Solucao
-Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
+Um novo agente nativo na categoria "EdTech e Professores 4.0" que guia o professor por 3 fases: receber o material da aula, identificar o público-alvo (neurodivergentes ou com deficiência) e gerar um plano de aula completamente adaptado com estratégias, plataformas e mídias específicas.
 
-### Como vai funcionar (fluxo do usuario)
+---
 
-1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
-2. A fonte e criada com status "pending"
-3. O sistema chama automaticamente a Edge Function para extrair a transcricao
-4. A transcricao e salva no campo `content` e o status muda para "ready"
-5. O agente passa a usar o texto transcrito como contexto
+### Fluxo de interação (3 fases)
 
-### Etapas de implementacao
+1. **Fase 1 — Recebimento do Material**: O agente pede ao professor o conteúdo/plano de aula original (texto, arquivo ou descrição)
+2. **Fase 2 — Identificação do Público**: Oferece lista numerada de perfis de alunos para adaptação:
+   - TDAH
+   - TEA (Transtorno do Espectro Autista)
+   - Dislexia
+   - Deficiência Auditiva (surdez parcial/total)
+   - Deficiência Visual (baixa visão/cegueira)
+   - Mudez / Deficiência de Fala
+   - Altas Habilidades / Superdotação
+   - Deficiência Intelectual
+   - Múltiplas (combinação)
+3. **Fase 3 — Plano Adaptado**: Gera plano completo com seções para estratégias pedagógicas, tecnologias assistivas, plataformas recomendadas, tipos de mídia, cronograma adaptado e avaliação inclusiva
 
-**1. Criar Edge Function `youtube-transcript`**
+---
 
-Arquivo: `supabase/functions/youtube-transcript/index.ts`
+### Implementação técnica
 
-- Recebe `source_id` e `url` do YouTube
-- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
-- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
-- Extrai a transcrição em português (pt) ou inglês (en) como fallback
-- Limpa tags XML das legendas e formata como texto puro
-- Atualiza o `content` e `status` da fonte no banco usando service role
-- Trunca a 50.000 caracteres se necessário
-- Se nao houver legendas, salva mensagem informativa e marca status como "error"
+#### 1. Prompt na Edge Function (`supabase/functions/agent-chat/index.ts`)
+- Novo slug: `adaptacao-inclusiva`
+- Prompt estruturado seguindo o padrão existente (`<OBJETIVO>`, `<LIMITACOES>`, `<ESTILO>`, `<INSTRUCOES>`)
+- Fases sequenciais obrigatórias com formatação em tabelas Markdown
 
-**2. Registrar funcao no `supabase/config.toml`**
+#### 2. Migration para inserir o agente na tabela `agents`
+- Nome: "Especialista em Adaptação Inclusiva de Aulas"
+- Categoria: "EdTech e Professores 4.0"
+- Ícone: `UserRound` (já disponível no iconMap)
+- Custo: 1 crédito
 
-Adicionar:
-```text
-[functions.youtube-transcript]
-verify_jwt = false
-```
+#### 3. Ícone
+- `UserRound` já está registrado em `src/lib/icons.ts`, não precisa editar
 
-**3. Atualizar `KnowledgeDetail.tsx`**
+---
 
-Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
-```text
-await supabase.functions.invoke("youtube-transcript", {
-  body: { source_id: newSource.id, url: sourceUrl }
-});
-```
+### Arquivos a criar/editar
 
-Mostrar toast informando que a transcrição esta sendo extraída.
-
-**4. Atualizar `DocumentManager.tsx`**
-
-Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
-
-### Detalhes tecnicos da extracao
-
-A Edge Function vai:
-1. Fazer fetch da pagina do video YouTube
-2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
-3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
-4. Fazer fetch do XML de legendas
-5. Parsear as tags `<text>` removendo timestamps e tags HTML
-6. Concatenar todo o texto como conteudo limpo
-
-Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
+| Ação | Arquivo |
+|------|---------|
+| Editar | `supabase/functions/agent-chat/index.ts` — adicionar prompt do agente |
+| Criar | Migration SQL para inserir agente na tabela |
 
