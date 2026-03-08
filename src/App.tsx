@@ -36,6 +36,8 @@ import PublicDocumentation from "./pages/PublicDocumentation";
 import PublicContact from "./pages/PublicContact";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import CookiePolicy from "./pages/CookiePolicy";
+import { CookieConsent } from "./components/cookies/CookieConsent";
 
 const queryClient = new QueryClient();
 
