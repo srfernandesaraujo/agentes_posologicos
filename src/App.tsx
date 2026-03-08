@@ -61,6 +61,7 @@ const App = () => (
             <Route path="/fale-conosco" element={<PublicContact />} />
             <Route path="/termos" element={<TermsOfService />} />
             <Route path="/privacidade" element={<PrivacyPolicy />} />
+            <Route path="/cookies" element={<CookiePolicy />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
