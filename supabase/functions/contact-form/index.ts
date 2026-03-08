@@ -30,15 +30,20 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
+    const { subject, message, senderName, senderEmail } = await req.json();
+
+    // Try authenticated user first, fall back to public sender info
+    let userEmail = senderEmail || null;
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("Not authenticated");
+    if (authHeader) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: userData } = await supabaseClient.auth.getUser(token);
+      if (userData?.user?.email) {
+        userEmail = userData.user.email;
+      }
+    }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: authError } = await supabaseClient.auth.getUser(token);
-    if (authError || !userData.user) throw new Error("Not authenticated");
-
-    const userEmail = userData.user.email;
-    const { subject, message } = await req.json();
+    if (!userEmail) throw new Error("Email é obrigatório");
 
     if (!subject || typeof subject !== "string" || subject.trim().length === 0) {
       throw new Error("Assunto é obrigatório");
