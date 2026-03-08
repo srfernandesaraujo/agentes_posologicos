@@ -89,6 +89,7 @@ const App = () => (
           </Routes>
         </AuthProvider>
         </LanguageProvider>
+        <CookieConsent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

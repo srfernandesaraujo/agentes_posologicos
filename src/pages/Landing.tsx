@@ -244,6 +244,7 @@ export default function Landing() {
               <div className="flex flex-col gap-2 text-sm text-white/40">
                 <Link to="/termos" className="hover:text-white/70 transition-colors">Termos de Serviço</Link>
                 <Link to="/privacidade" className="hover:text-white/70 transition-colors">Política de Privacidade</Link>
+                <Link to="/cookies" className="hover:text-white/70 transition-colors">Política de Cookies</Link>
               </div>
             </div>
           </div>
