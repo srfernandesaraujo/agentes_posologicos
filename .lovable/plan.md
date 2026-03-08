@@ -1,77 +1,68 @@
 
 
-## Plano: Sistema de Consentimento e Coleta de Cookies
+## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
 
-### O que será construído
+### Problema
+Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
 
-Um sistema completo de consentimento de cookies (LGPD-compliant) com banner, gerenciamento de preferências e coleta de dados analíticos úteis para o negócio.
+### Solucao
+Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
 
----
+### Como vai funcionar (fluxo do usuario)
 
-### Cookies que serão coletados
+1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
+2. A fonte e criada com status "pending"
+3. O sistema chama automaticamente a Edge Function para extrair a transcricao
+4. A transcricao e salva no campo `content` e o status muda para "ready"
+5. O agente passa a usar o texto transcrito como contexto
 
-| Cookie | Categoria | Finalidade | Uso para o negócio |
-|--------|-----------|------------|---------------------|
-| `cookie_consent` | Necessário | Armazena a escolha do usuário sobre cookies | Compliance LGPD |
-| `sidebar:state` | Necessário | Já existe — estado da sidebar | UX |
-| `analytics_session` | Analítico | ID de sessão anônimo, páginas visitadas, tempo de permanência | Entender quais agentes atraem mais interesse, otimizar landing page |
-| `utm_source` / `utm_campaign` | Marketing | Rastrear origem do tráfego (links de redes sociais, anúncios) | Saber de onde vêm os usuários que convertem em assinantes |
-| `preferred_language` | Funcional | Idioma preferido do usuário | Personalização |
-| `last_agent_viewed` | Funcional | Último agente visualizado | Sugestões personalizadas e retargeting |
+### Etapas de implementacao
 
-### Como usar os dados a seu favor
+**1. Criar Edge Function `youtube-transcript`**
 
-1. **Analytics internos (painel Admin)**: Agentes mais visualizados antes do cadastro, taxa de conversão por fonte de tráfego, páginas com maior abandono
-2. **Personalização**: Mostrar agentes relevantes baseado no histórico de navegação
-3. **Marketing**: Identificar quais campanhas (UTM) geram mais assinantes pagos
-4. **Otimização de produto**: Saber quais categorias de agentes têm mais interesse antes mesmo do login
+Arquivo: `supabase/functions/youtube-transcript/index.ts`
 
----
+- Recebe `source_id` e `url` do YouTube
+- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
+- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
+- Extrai a transcrição em português (pt) ou inglês (en) como fallback
+- Limpa tags XML das legendas e formata como texto puro
+- Atualiza o `content` e `status` da fonte no banco usando service role
+- Trunca a 50.000 caracteres se necessário
+- Se nao houver legendas, salva mensagem informativa e marca status como "error"
 
-### Implementação técnica
+**2. Registrar funcao no `supabase/config.toml`**
 
-#### 1. Componente `CookieConsent` (novo)
-- Banner fixo no rodapé com texto explicativo
-- 3 botões: "Aceitar todos", "Apenas necessários", "Personalizar"
-- Modal de personalização com toggles por categoria (Necessários, Funcionais, Analíticos, Marketing)
-- Salva preferência no cookie `cookie_consent` (JSON com categorias aceitas)
-- Só aparece se `cookie_consent` não existir
+Adicionar:
+```text
+[functions.youtube-transcript]
+verify_jwt = false
+```
 
-#### 2. Hook `useCookieConsent` (novo)
-- Lê/escreve o cookie `cookie_consent`
-- Expõe funções: `hasConsent(category)`, `setConsent(preferences)`, `trackEvent(name, data)`
-- Só coleta cookies das categorias autorizadas
+**3. Atualizar `KnowledgeDetail.tsx`**
 
-#### 3. Hook `useAnalytics` (novo)
-- Rastreia pageviews, tempo na página, cliques em agentes
-- Salva dados no localStorage agrupados por sessão
-- Envia batch para o Supabase via tabela `analytics_events` quando o usuário tem conta, ou mantém local para visitantes anônimos
+Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
+```text
+await supabase.functions.invoke("youtube-transcript", {
+  body: { source_id: newSource.id, url: sourceUrl }
+});
+```
 
-#### 4. Tabela Supabase `analytics_events` (nova)
-- Colunas: `id`, `user_id` (nullable), `session_id`, `event_type`, `event_data` (jsonb), `page`, `utm_source`, `utm_campaign`, `created_at`
-- RLS: usuários só veem seus próprios eventos; admin vê todos
+Mostrar toast informando que a transcrição esta sendo extraída.
 
-#### 5. Integração
-- `CookieConsent` renderizado no `App.tsx` (fora das rotas, sempre visível)
-- `useAnalytics` integrado na Landing, páginas públicas e páginas de agentes
-- Painel Admin recebe nova aba "Analytics de Visitantes" com dados dos cookies
+**4. Atualizar `DocumentManager.tsx`**
 
-#### 6. Página de Política de Cookies
-- Nova rota `/cookies` com detalhamento de cada cookie, finalidade e duração
-- Link adicionado ao banner de consentimento e ao rodapé
+Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
 
----
+### Detalhes tecnicos da extracao
 
-### Arquivos a criar/editar
+A Edge Function vai:
+1. Fazer fetch da pagina do video YouTube
+2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
+3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
+4. Fazer fetch do XML de legendas
+5. Parsear as tags `<text>` removendo timestamps e tags HTML
+6. Concatenar todo o texto como conteudo limpo
 
-| Ação | Arquivo |
-|------|---------|
-| Criar | `src/components/cookies/CookieConsent.tsx` |
-| Criar | `src/components/cookies/CookiePreferencesModal.tsx` |
-| Criar | `src/hooks/useCookieConsent.ts` |
-| Criar | `src/hooks/useAnalytics.ts` |
-| Criar | `src/pages/CookiePolicy.tsx` |
-| Editar | `src/App.tsx` — adicionar CookieConsent e rota `/cookies` |
-| Editar | `src/pages/Landing.tsx` — adicionar link de cookies no rodapé |
-| Criar | Migration para tabela `analytics_events` |
+Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
 

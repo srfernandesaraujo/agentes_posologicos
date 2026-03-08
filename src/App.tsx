@@ -36,6 +36,8 @@ import PublicDocumentation from "./pages/PublicDocumentation";
 import PublicContact from "./pages/PublicContact";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import CookiePolicy from "./pages/CookiePolicy";
+import { CookieConsent } from "./components/cookies/CookieConsent";
 
 const queryClient = new QueryClient();
 
@@ -59,6 +61,7 @@ const App = () => (
             <Route path="/fale-conosco" element={<PublicContact />} />
             <Route path="/termos" element={<TermsOfService />} />
             <Route path="/privacidade" element={<PrivacyPolicy />} />
+            <Route path="/cookies" element={<CookiePolicy />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
@@ -86,6 +89,7 @@ const App = () => (
           </Routes>
         </AuthProvider>
         </LanguageProvider>
+        <CookieConsent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
