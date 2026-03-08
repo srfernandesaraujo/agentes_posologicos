@@ -16,6 +16,7 @@ import {
   ClipboardList,
   ShieldAlert,
   GitCompare,
+  MessageCircleHeart,
   LucideIcon,
 } from "lucide-react";
 
