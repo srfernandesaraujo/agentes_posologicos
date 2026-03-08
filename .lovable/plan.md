@@ -1,68 +1,46 @@
 
 
-## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
+## Plano: Implementar 6 Agentes de Pesquisa Acadêmica
 
-### Problema
-Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
+### Agentes a criar
 
-### Solucao
-Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
+| # | Slug | Nome | Categoria | Ícone | Custo |
+|---|------|------|-----------|-------|-------|
+| 1 | `revisor-sistematico` | Revisor Sistemático e Assistente de Metanálise | Pesquisa Acadêmica e Dados | `ClipboardList` | 1 |
+| 2 | `escrita-cientifica` | Assistente de Escrita Científica e Formatação | Pesquisa Acadêmica e Dados | `FileText` | 1 |
+| 3 | `referencial-teorico` | Gerador de Referencial Teórico e Revisão de Literatura | Pesquisa Acadêmica e Dados | `BookOpen` | 1 |
+| 4 | `propriedade-intelectual` | Consultor de Propriedade Intelectual e Patentes | Pesquisa Acadêmica e Dados | `ShieldCheck` | 1 |
+| 5 | `mentor-carreira` | Mentor de Carreira Acadêmica e Produtividade | Pesquisa Acadêmica e Dados | `UserRound` | 1 |
+| 6 | `analista-qualitativo` | Analista de Dados Qualitativos | Pesquisa Acadêmica e Dados | `MessageCircleHeart` | 1 |
 
-### Como vai funcionar (fluxo do usuario)
+Todos os ícones já existem no `iconMap`.
 
-1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
-2. A fonte e criada com status "pending"
-3. O sistema chama automaticamente a Edge Function para extrair a transcricao
-4. A transcricao e salva no campo `content` e o status muda para "ready"
-5. O agente passa a usar o texto transcrito como contexto
+---
 
-### Etapas de implementacao
+### Implementação técnica
 
-**1. Criar Edge Function `youtube-transcript`**
+#### 1. Edge Function (`supabase/functions/agent-chat/index.ts`)
+Adicionar 6 prompts ao `AGENT_PROMPTS` antes do `};` (linha 2978), com padrão `<OBJETIVO>`, `<LIMITACOES>`, `<ESTILO>`, `<INSTRUCOES>`:
 
-Arquivo: `supabase/functions/youtube-transcript/index.ts`
+- **revisor-sistematico**: 3 fases — estruturação do protocolo PRISMA (PICO, critérios, estratégia de busca, registro PROSPERO) → seleção e extração (fluxograma PRISMA, formulário de extração, avaliação RoB 2/Newcastle-Ottawa com semáforo) → síntese e metanálise (modelo de efeitos, heterogeneidade I²/Tau², GRADE, tabela SoF)
+- **escrita-cientifica**: 2 fases — diagnóstico do manuscrito (tabela com notas 1-10 por aspecto: IMRAD, coerência, voz, conectivos) → revisão detalhada com track-changes simulado ([ORIGINAL] → [SUGESTÃO] + justificativa + prioridade 🔴🟡🟢) e checklist por seção. Suporta Vancouver, APA e ABNT
+- **referencial-teorico**: 2 fases — mapeamento (mapa conceitual hierárquico, autores seminais sugeridos com aviso de verificação, estratégia de busca por subtema) → estruturação e redação (template por seção com parágrafos de contexto/definição/revisão/crítica/transição, framework conceitual, identificação de gaps)
+- **propriedade-intelectual**: 2 fases — avaliação de patenteabilidade (3 requisitos Lei 9.279/96 com semáforo, alerta de grace period BR/EUA/Europa) → estratégia de proteção (tipo de PI, busca de anterioridade INPI/Espacenet/USPTO, estrutura de reivindicações, cronograma depósito→PCT→fase nacional)
+- **mentor-carreira**: 2 fases — diagnóstico de carreira (tabela de indicadores vs. metas vs. gaps: publicações, Qualis, h-index, orientações, financiamento) → plano estratégico (seleção de journals, networking, editais CNPq/CAPES/FAPs, preparação para concursos com barema, cronograma 12 meses, gestão de tempo e prevenção de burnout)
+- **analista-qualitativo**: 2 fases — configuração (escolha do método: Bardin, Braun & Clarke, Grounded Theory, Análise de Discurso, IPA, Narrativa) → codificação e categorização (tabelas de códigos, agrupamento em categorias, mapa temático textual, matriz de análise cruzada, critérios de rigor: triangulação, member checking, saturação)
 
-- Recebe `source_id` e `url` do YouTube
-- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
-- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
-- Extrai a transcrição em português (pt) ou inglês (en) como fallback
-- Limpa tags XML das legendas e formata como texto puro
-- Atualiza o `content` e `status` da fonte no banco usando service role
-- Trunca a 50.000 caracteres se necessário
-- Se nao houver legendas, salva mensagem informativa e marca status como "error"
+#### 2. Database (INSERT via insert tool)
+Inserir 6 registros na tabela `public.agents`.
 
-**2. Registrar funcao no `supabase/config.toml`**
+#### 3. Deploy
+Redeploy automático da Edge Function `agent-chat`.
 
-Adicionar:
-```text
-[functions.youtube-transcript]
-verify_jwt = false
-```
+---
 
-**3. Atualizar `KnowledgeDetail.tsx`**
+### Arquivos a editar/criar
 
-Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
-```text
-await supabase.functions.invoke("youtube-transcript", {
-  body: { source_id: newSource.id, url: sourceUrl }
-});
-```
-
-Mostrar toast informando que a transcrição esta sendo extraída.
-
-**4. Atualizar `DocumentManager.tsx`**
-
-Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
-
-### Detalhes tecnicos da extracao
-
-A Edge Function vai:
-1. Fazer fetch da pagina do video YouTube
-2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
-3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
-4. Fazer fetch do XML de legendas
-5. Parsear as tags `<text>` removendo timestamps e tags HTML
-6. Concatenar todo o texto como conteudo limpo
-
-Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
+| Ação | Arquivo |
+|------|---------|
+| Editar | `supabase/functions/agent-chat/index.ts` — 6 novos prompts |
+| INSERT | `public.agents` — 6 registros via insert tool |
 
