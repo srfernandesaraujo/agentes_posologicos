@@ -1,68 +1,46 @@
 
 
-## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
+## Plano: Implementar 6 Agentes Clínicos
 
-### Problema
-Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
+### Agentes a criar
 
-### Solucao
-Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
+| # | Slug | Nome | Categoria | Ícone | Custo |
+|---|------|------|-----------|-------|-------|
+| 1 | `calculadora-clinica` | Calculadora Clínica Inteligente | Prática Clínica e Farmácia | `Calculator` | 1 |
+| 2 | `diluicao-iv` | Consultor de Diluição e Estabilidade IV | Prática Clínica e Farmácia | `Pill` | 1 |
+| 3 | `farmacovigilancia` | Assistente de Farmacovigilância e Notificação | Prática Clínica e Farmácia | `ShieldAlert` | 1 |
+| 4 | `ajuste-renal-hepatico` | Orientador de Ajuste Renal e Hepático | Prática Clínica e Farmácia | `HeartPulse` | 1 |
+| 5 | `conciliador-medicamentoso` | Conciliador Medicamentoso Inteligente | Prática Clínica e Farmácia | `GitCompare` | 1 |
+| 6 | `antimicrobianos-especiais` | Consultor de Antimicrobianos para Populações Especiais | Prática Clínica e Farmácia | `ShieldCheck` | 1 |
 
-### Como vai funcionar (fluxo do usuario)
+Todos os ícones já existem no `iconMap` de `src/lib/icons.ts`.
 
-1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
-2. A fonte e criada com status "pending"
-3. O sistema chama automaticamente a Edge Function para extrair a transcricao
-4. A transcricao e salva no campo `content` e o status muda para "ready"
-5. O agente passa a usar o texto transcrito como contexto
+---
 
-### Etapas de implementacao
+### Implementação técnica
 
-**1. Criar Edge Function `youtube-transcript`**
+#### 1. Edge Function (`supabase/functions/agent-chat/index.ts`)
+Adicionar 6 novos prompts ao `AGENT_PROMPTS` antes do `};` (linha 2257), cada um com o padrão `<OBJETIVO>`, `<LIMITACOES>`, `<ESTILO>`, `<INSTRUCOES>`:
 
-Arquivo: `supabase/functions/youtube-transcript/index.ts`
+- **calculadora-clinica**: 2 fases — oferece 15+ calculadoras (Cockroft-Gault, CKD-EPI, MELD, Child-Pugh, Wells, CHA₂DS₂-VASc, BSA, IMC, doses pediátricas, etc.) → calcula com fórmula explícita + interpretação clínica + implicações farmacológicas
+- **diluicao-iv**: 2 fases — identifica medicamento → gera ficha completa (reconstituição, diluição, administração, estabilidade, compatibilidade Y-site, alertas vesicante/irritante)
+- **farmacovigilancia**: 3 fases — coleta dados da suspeita de RAM → aplica algoritmo de Naranjo (10 perguntas) + classificação OMS + código MedDRA → gera rascunho de notificação padrão ANVISA/VigiMed
+- **ajuste-renal-hepatico**: 2 fases — coleta medicamento + função renal/hepática → tabelas de ajuste por faixa TFG e Child-Pugh, metabólitos ativos, alternativas, monitoramento
+- **conciliador-medicamentoso**: 3 fases — recebe lista domiciliar + prescrição hospitalar → quadro comparativo com semáforo de risco (🔴🟡🟢) → resumo com alertas de medicamentos de alta vigilância
+- **antimicrobianos-especiais**: 2 fases — identifica população (gestante/lactante/neonato/idoso/imunossuprimido) + infecção → recomendações com tabela de segurança, contraindicados, e considerações especiais por população (teratogenicidade, LactMed, kernicterus, C. difficile)
 
-- Recebe `source_id` e `url` do YouTube
-- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
-- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
-- Extrai a transcrição em português (pt) ou inglês (en) como fallback
-- Limpa tags XML das legendas e formata como texto puro
-- Atualiza o `content` e `status` da fonte no banco usando service role
-- Trunca a 50.000 caracteres se necessário
-- Se nao houver legendas, salva mensagem informativa e marca status como "error"
+#### 2. Migration SQL
+INSERT de 6 registros na tabela `agents`.
 
-**2. Registrar funcao no `supabase/config.toml`**
+#### 3. Deploy
+Redeploy da Edge Function `agent-chat`.
 
-Adicionar:
-```text
-[functions.youtube-transcript]
-verify_jwt = false
-```
+---
 
-**3. Atualizar `KnowledgeDetail.tsx`**
+### Arquivos a criar/editar
 
-Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
-```text
-await supabase.functions.invoke("youtube-transcript", {
-  body: { source_id: newSource.id, url: sourceUrl }
-});
-```
-
-Mostrar toast informando que a transcrição esta sendo extraída.
-
-**4. Atualizar `DocumentManager.tsx`**
-
-Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
-
-### Detalhes tecnicos da extracao
-
-A Edge Function vai:
-1. Fazer fetch da pagina do video YouTube
-2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
-3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
-4. Fazer fetch do XML de legendas
-5. Parsear as tags `<text>` removendo timestamps e tags HTML
-6. Concatenar todo o texto como conteudo limpo
-
-Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
+| Ação | Arquivo |
+|------|---------|
+| Editar | `supabase/functions/agent-chat/index.ts` — 6 novos prompts |
+| Criar | Migration SQL — INSERT de 6 agentes |
 
