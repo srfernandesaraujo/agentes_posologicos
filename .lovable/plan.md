@@ -1,50 +1,68 @@
 
 
-## Plano: Implementar 6 Agentes de Produção de Conteúdo
+## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
 
-### Agentes a criar
+### Problema
+Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
 
-| # | Slug | Nome | Ícone | Custo |
-|---|------|------|-------|-------|
-| 1 | `roteirista-reels` | Roteirista de Reels e Shorts Científicos | `Youtube` | 1 |
-| 2 | `carrosseis-instagram` | Gerador de Posts e Carrosséis para Instagram | `LayoutGrid`* | 1 |
-| 3 | `ebooks-lead-magnets` | Criador de E-books e Lead Magnets Educacionais | `FileText` | 1 |
-| 4 | `newsletter-email` | Redator de Newsletters e E-mail Marketing | `Mail`* | 1 |
-| 5 | `landing-page-copy` | Construtor de Landing Pages e Copy de Vendas | `Megaphone`* | 1 |
-| 6 | `assistente-podcast` | Assistente de Podcast e Multiplicação de Conteúdo | `Mic`* | 1 |
+### Solucao
+Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
 
-Todos na categoria **Produção de Conteúdo e Nicho Tech**. Ícones marcados com * precisam ser adicionados ao `iconMap`.
+### Como vai funcionar (fluxo do usuario)
 
----
+1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
+2. A fonte e criada com status "pending"
+3. O sistema chama automaticamente a Edge Function para extrair a transcricao
+4. A transcricao e salva no campo `content` e o status muda para "ready"
+5. O agente passa a usar o texto transcrito como contexto
 
-### Implementação técnica
+### Etapas de implementacao
 
-#### 1. Atualizar `src/lib/icons.ts`
-Adicionar imports e entradas no `iconMap` para: `LayoutGrid`, `Mail`, `Megaphone`, `Mic`.
+**1. Criar Edge Function `youtube-transcript`**
 
-#### 2. Edge Function (`supabase/functions/agent-chat/index.ts`)
-Adicionar 6 prompts ao `AGENT_PROMPTS` antes do `};` (linha 3759):
+Arquivo: `supabase/functions/youtube-transcript/index.ts`
 
-- **roteirista-reels**: 2 fases — briefing (tema, plataforma, duração, tom) → roteiro timestampado com gancho 3s, variações de gancho, hashtags, sugestão de thumbnail, referência científica, dicas de gravação
-- **carrosseis-instagram**: 2 fases — briefing (tema, formato, público) → carrossel slide a slide com texto, direção visual, paleta de cores, legenda completa, hashtags por alcance, variação para Stories
-- **ebooks-lead-magnets**: 2 fases — briefing (tema, formato, público, produto) → estrutura completa capítulo a capítulo com textos prontos, CTAs internos, infográficos sugeridos, página de captura e sequência de 3 e-mails pós-download
-- **newsletter-email**: 2 fases — briefing (tema, frequência, objetivo) → e-mail completo com 3 variações A/B de subject line, preview text, corpo com storytelling, segmentação, métricas-alvo e automação sugerida
-- **landing-page-copy**: 2 fases — briefing (produto, público, preço) → landing page completa com 14 seções (hero, PAS, benefícios, módulos, para quem é, prova social, bônus, oferta, garantia, FAQ, urgência, CTA final)
-- **assistente-podcast**: 2 fases — briefing (tema, formato, duração) → roteiro timestampado, perguntas para entrevista, show notes SEO, tabela de multiplicação (1 episódio → 10+ peças), 3 audiogramas sugeridos
+- Recebe `source_id` e `url` do YouTube
+- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
+- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
+- Extrai a transcrição em português (pt) ou inglês (en) como fallback
+- Limpa tags XML das legendas e formata como texto puro
+- Atualiza o `content` e `status` da fonte no banco usando service role
+- Trunca a 50.000 caracteres se necessário
+- Se nao houver legendas, salva mensagem informativa e marca status como "error"
 
-#### 3. Database
-INSERT de 6 registros na tabela `public.agents` via insert tool.
+**2. Registrar funcao no `supabase/config.toml`**
 
-#### 4. Deploy
-Redeploy automático da Edge Function `agent-chat`.
+Adicionar:
+```text
+[functions.youtube-transcript]
+verify_jwt = false
+```
 
----
+**3. Atualizar `KnowledgeDetail.tsx`**
 
-### Arquivos a editar/criar
+Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
+```text
+await supabase.functions.invoke("youtube-transcript", {
+  body: { source_id: newSource.id, url: sourceUrl }
+});
+```
 
-| Ação | Arquivo |
-|------|---------|
-| Editar | `src/lib/icons.ts` — 4 novos ícones |
-| Editar | `supabase/functions/agent-chat/index.ts` — 6 novos prompts |
-| INSERT | `public.agents` — 6 registros via insert tool |
+Mostrar toast informando que a transcrição esta sendo extraída.
+
+**4. Atualizar `DocumentManager.tsx`**
+
+Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
+
+### Detalhes tecnicos da extracao
+
+A Edge Function vai:
+1. Fazer fetch da pagina do video YouTube
+2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
+3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
+4. Fazer fetch do XML de legendas
+5. Parsear as tags `<text>` removendo timestamps e tags HTML
+6. Concatenar todo o texto como conteudo limpo
+
+Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
 
