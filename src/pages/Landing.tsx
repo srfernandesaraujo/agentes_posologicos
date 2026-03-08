@@ -110,7 +110,7 @@ export default function Landing() {
       </section>
 
       {/* PIN Access */}
-      <section className="border-b border-white/10 bg-white/[0.02]">
+      <section id="pin-section" className="border-b border-white/10 bg-white/[0.02]">
         <div className="container py-12">
           <div className="mx-auto max-w-md text-center">
             <div className="flex items-center justify-center gap-2 mb-4">
