@@ -16,6 +16,7 @@ import {
   ClipboardList,
   ShieldAlert,
   GitCompare,
+  MessageCircleHeart,
   LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ const iconMap: Record<string, LucideIcon> = {
   ClipboardList,
   ShieldAlert,
   GitCompare,
+  MessageCircleHeart,
 };
 
 export function getIcon(name: string): LucideIcon {
