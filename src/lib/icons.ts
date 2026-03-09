@@ -48,6 +48,7 @@ const iconMap: Record<string, LucideIcon> = {
   Mail,
   Megaphone,
   Mic,
+  Clapperboard,
 };
 
 export function getIcon(name: string): LucideIcon {
