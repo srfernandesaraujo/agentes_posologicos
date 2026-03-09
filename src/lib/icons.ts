@@ -21,6 +21,7 @@ import {
   Mail,
   Megaphone,
   Mic,
+  Clapperboard,
   LucideIcon,
 } from "lucide-react";
 
