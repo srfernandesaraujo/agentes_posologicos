@@ -161,10 +161,13 @@ const markdownComponents = {
     <p className="text-sm text-white/70 leading-relaxed mb-2" {...props}>{children}</p>
   ),
   ul: ({ children, ...props }: any) => (
-    <ul className="list-disc list-inside space-y-1 text-sm text-white/70 ml-2 mb-2" {...props}>{children}</ul>
+    <ul className="list-disc list-outside space-y-1 text-sm text-white/70 ml-5 mb-2" {...props}>{children}</ul>
   ),
   ol: ({ children, ...props }: any) => (
-    <ol className="list-decimal list-inside space-y-1 text-sm text-white/70 ml-2 mb-2" {...props}>{children}</ol>
+    <ol className="list-decimal list-outside space-y-1 text-sm text-white/70 ml-5 mb-2" {...props}>{children}</ol>
+  ),
+  li: ({ children, ...props }: any) => (
+    <li className="text-sm text-white/70 leading-relaxed [&>p]:inline [&>p]:mb-0" {...props}>{children}</li>
   ),
   strong: ({ children, ...props }: any) => (
     <strong className="font-semibold text-white/90" {...props}>{children}</strong>
