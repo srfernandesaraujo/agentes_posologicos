@@ -5533,6 +5533,104 @@ Deno.serve(async (req) => {
         }
       }
 
+      // TMDB real-time search for aula-cinema
+      if (builtInAgent.slug === "aula-cinema") {
+        try {
+          const TMDB_API_KEY = Deno.env.get("TMDB_API_KEY");
+          if (TMDB_API_KEY) {
+            // Extract key terms from user input for TMDB search
+            // Remove common PT stop words to get meaningful search terms
+            let searchTerms = input.toLowerCase()
+              .replace(/\b(da|do|de|das|dos|na|no|nas|nos|em|para|com|por|ao|à|um|uma|uns|umas|o|a|os|as|que|quais|são|é|qual|sobre|entre|como|uso|usar|utilização|aula|plano|aulas|quero|preciso|criar|gostaria|fazer|tema|disciplina|alunos|minutos|horas|hora|min)\b/gi, " ")
+              .replace(/\s+/g, " ")
+              .trim();
+
+            // Also try to extract film/series name if user mentioned one
+            const directTitle = input.match(/(?:filme|série|series|movie|show)\s*[:\-]?\s*["']?([^"'\n,]+)/i);
+            
+            let tmdbContext = "\n\n<TMDB_CONTEXT>\n";
+            
+            // Search movies
+            const movieQuery = encodeURIComponent(directTitle ? directTitle[1].trim() : searchTerms.substring(0, 100));
+            const movieUrl = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${movieQuery}&language=pt-BR&page=1&include_adult=false`;
+            console.log("TMDB Movie Search:", movieQuery);
+            const movieResp = await fetch(movieUrl);
+            const movieData = await movieResp.json();
+            const movies = (movieData.results || []).slice(0, 5);
+
+            // Search TV series
+            const tvUrl = `https://api.themoviedb.org/3/search/tv?api_key=${TMDB_API_KEY}&query=${movieQuery}&language=pt-BR&page=1&include_adult=false`;
+            const tvResp = await fetch(tvUrl);
+            const tvData = await tvResp.json();
+            const tvShows = (tvData.results || []).slice(0, 5);
+
+            // Also search with English terms for broader results
+            const enQuery = encodeURIComponent(searchTerms.substring(0, 100));
+            if (enQuery !== movieQuery) {
+              const movieUrlEn = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${enQuery}&language=pt-BR&page=1&include_adult=false`;
+              const movieRespEn = await fetch(movieUrlEn);
+              const movieDataEn = await movieRespEn.json();
+              const moviesEn = (movieDataEn.results || []).filter((m: any) => !movies.find((e: any) => e.id === m.id)).slice(0, 3);
+              movies.push(...moviesEn);
+
+              const tvUrlEn = `https://api.themoviedb.org/3/search/tv?api_key=${TMDB_API_KEY}&query=${enQuery}&language=pt-BR&page=1&include_adult=false`;
+              const tvRespEn = await fetch(tvUrlEn);
+              const tvDataEn = await tvRespEn.json();
+              const tvEn = (tvDataEn.results || []).filter((t: any) => !tvShows.find((e: any) => e.id === t.id)).slice(0, 3);
+              tvShows.push(...tvEn);
+            }
+
+            if (movies.length > 0) {
+              tmdbContext += "FILMES ENCONTRADOS:\n\n";
+              for (const m of movies) {
+                // Fetch movie details for runtime and genres
+                let runtime = "N/A";
+                let genres = "";
+                try {
+                  const detailResp = await fetch(`https://api.themoviedb.org/3/movie/${m.id}?api_key=${TMDB_API_KEY}&language=pt-BR`);
+                  const detail = await detailResp.json();
+                  runtime = detail.runtime ? `${detail.runtime} min` : "N/A";
+                  genres = (detail.genres || []).map((g: any) => g.name).join(", ");
+                } catch {}
+                tmdbContext += `---\nID TMDB: ${m.id}\nTítulo: ${m.title || "N/A"}\nTítulo Original: ${m.original_title || "N/A"}\nAno: ${(m.release_date || "").substring(0, 4)}\nGêneros: ${genres}\nDuração: ${runtime}\nNota TMDB: ${m.vote_average || "N/A"}/10 (${m.vote_count || 0} votos)\nSinopse: ${m.overview || "Sem sinopse"}\nPoster: https://image.tmdb.org/t/p/w500${m.poster_path}\n\n`;
+              }
+            }
+
+            if (tvShows.length > 0) {
+              tmdbContext += "\nSÉRIES DE TV ENCONTRADAS:\n\n";
+              for (const t of tvShows) {
+                let seasons = "N/A";
+                let genres = "";
+                let episodeRuntime = "N/A";
+                try {
+                  const detailResp = await fetch(`https://api.themoviedb.org/3/tv/${t.id}?api_key=${TMDB_API_KEY}&language=pt-BR`);
+                  const detail = await detailResp.json();
+                  seasons = detail.number_of_seasons ? `${detail.number_of_seasons} temporada(s), ${detail.number_of_episodes || "?"} episódios` : "N/A";
+                  genres = (detail.genres || []).map((g: any) => g.name).join(", ");
+                  episodeRuntime = detail.episode_run_time?.length > 0 ? `${detail.episode_run_time[0]} min/episódio` : "N/A";
+                } catch {}
+                tmdbContext += `---\nID TMDB: ${t.id}\nTítulo: ${t.name || "N/A"}\nTítulo Original: ${t.original_name || "N/A"}\nAno: ${(t.first_air_date || "").substring(0, 4)}\nGêneros: ${genres}\nTemporadas: ${seasons}\nDuração: ${episodeRuntime}\nNota TMDB: ${t.vote_average || "N/A"}/10 (${t.vote_count || 0} votos)\nSinopse: ${t.overview || "Sem sinopse"}\nPoster: https://image.tmdb.org/t/p/w500${t.poster_path}\n\n`;
+              }
+            }
+
+            if (movies.length === 0 && tvShows.length === 0) {
+              tmdbContext += "Nenhum filme ou série encontrado para os termos buscados. Use seu conhecimento cinematográfico para sugerir opções adequadas ao tema.\n";
+            }
+
+            tmdbContext += "\nINSTRUÇÃO: Use estes dados do TMDB para selecionar e recomendar o filme/série mais adequado ao tema da aula. Priorize filmes/séries com boa avaliação e sinopse relevante ao conteúdo pedagógico. Se nenhum resultado for adequado, use seu conhecimento para sugerir alternativas.\n</TMDB_CONTEXT>";
+            
+            systemPrompt += tmdbContext;
+            console.log(`TMDB: found ${movies.length} movies and ${tvShows.length} TV shows`);
+          } else {
+            systemPrompt += "\n\n<TMDB_CONTEXT>\nChave TMDB não configurada. Use seu conhecimento cinematográfico para sugerir filmes e séries adequados ao tema da aula.\n</TMDB_CONTEXT>";
+            console.warn("TMDB_API_KEY not configured");
+          }
+        } catch (tmdbError) {
+          console.error("TMDB API error:", tmdbError.message);
+          systemPrompt += "\n\n<TMDB_CONTEXT>\nErro ao consultar TMDB. Use seu conhecimento cinematográfico para sugerir filmes e séries adequados ao tema da aula.\n</TMDB_CONTEXT>";
+        }
+      }
+
       const userContent = buildUserMessage(enrichedInput, files);
       const messages = [
         { role: "system", content: systemPrompt },
