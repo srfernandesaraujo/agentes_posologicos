@@ -200,6 +200,10 @@ export default function VirtualRooms() {
       }
 
       const agentExpiresAt = hasAgent ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
+      // Default expiration: if no date set, expire in 7 days
+      const expiresAt = roomExpiresAt
+        ? new Date(roomExpiresAt).toISOString()
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       const { error } = await supabase
         .from("virtual_rooms" as any)
@@ -211,6 +215,7 @@ export default function VirtualRooms() {
           agent_id: hasAgent ? agentId : null,
           is_active: isActive,
           agent_expires_at: agentExpiresAt,
+          room_expires_at: expiresAt,
         } as any);
       if (error) throw error;
 
