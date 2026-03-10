@@ -4871,8 +4871,8 @@ Para termos não listados, use seu conhecimento médico para traduzir adequadame
 </TRADUCAO_MEDDRA>
 
 <INSTRUCOES>
-1) Ao receber dados do VigiAccess junto com a pergunta do usuário:
-   - Analise TODOS os dados fornecidos no contexto (total de relatos, ADRs por SOC, demografia, geografia, temporalidade)
+1) Ao receber dados do OpenFDA junto com a pergunta do usuário:
+   - Analise TODOS os dados fornecidos no contexto (reações mais reportadas, demografia por sexo, distribuição geográfica por país, tendência temporal)
    - Traduza os termos MedDRA conforme regras acima
    - Estruture a resposta de forma clara e escaneável
 
