@@ -109,7 +109,7 @@ function AgentPicker({ value, onChange }: { value: string; onChange: (v: string)
             />
           </div>
         </div>
-        <div className="max-h-60 overflow-y-auto p-1">
+        <div className="max-h-80 overflow-y-auto p-1">
           {/* None option */}
           <button
             onClick={() => { onChange("none"); setOpen(false); setSearch(""); }}
