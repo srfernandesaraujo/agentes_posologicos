@@ -384,15 +384,15 @@ export default function VirtualRooms() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-white truncate">{room.name}</h3>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${room.is_active ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/40"}`}>
-                      {room.is_active ? "Ativa" : "Inativa"}
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${room.is_active && !isRoomExpired(room) ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/40"}`}>
+                      {isRoomExpired(room) ? "Expirada" : room.is_active ? "Ativa" : "Inativa"}
                     </span>
                   </div>
                   {room.description && <p className="text-sm text-white/50 mb-2 truncate">{room.description}</p>}
                   <div className="flex items-center gap-4 text-xs text-white/40 flex-wrap">
                     <span className="flex items-center gap-1">
                       PIN: <span className="font-mono font-bold text-[hsl(14,90%,58%)]">{room.pin}</span>
-                      <button onClick={() => { navigator.clipboard.writeText(room.pin); toast.success("PIN copiado!"); }}>
+                      <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(room.pin); toast.success("PIN copiado!"); }}>
                         <Copy className="h-3 w-3" />
                       </button>
                     </span>
@@ -408,6 +408,16 @@ export default function VirtualRooms() {
                             <Clock className="h-3 w-3" /> até {new Date(room.agent_expires_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                           </span>
                         ) : null}
+                      </span>
+                    )}
+                    {room.room_expires_at && (
+                      <span className="flex items-center gap-1">
+                        <CalendarClock className="h-3 w-3" />
+                        {isRoomExpired(room) ? (
+                          <span className="text-red-400">Sala expirou em {new Date(room.room_expires_at).toLocaleDateString("pt-BR")}</span>
+                        ) : (
+                          <span>Expira em {new Date(room.room_expires_at).toLocaleDateString("pt-BR")}</span>
+                        )}
                       </span>
                     )}
                   </div>
