@@ -321,6 +321,7 @@ export default function VirtualRooms() {
     setDescription(room.description);
     setAgentId(room.agent_id || "none");
     setIsActive(room.is_active);
+    setRoomExpiresAt(room.room_expires_at ? new Date(room.room_expires_at).toISOString().slice(0, 16) : "");
     setDialogOpen(true);
   };
 
