@@ -56,7 +56,7 @@ function AgentPicker({ value, onChange }: { value: string; onChange: (v: string)
     const list: AgentOption[] = [];
 
     // Native agents
-    nativeAgents.forEach((a) => list.push({ id: a.slug, name: a.name, type: "native", label: "Nativo" }));
+    nativeAgents.forEach((a) => list.push({ id: a.id, name: a.name, type: "native", label: "Nativo" }));
 
     // User's custom agents (published)
     customAgents
