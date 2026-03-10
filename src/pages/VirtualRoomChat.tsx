@@ -131,6 +131,7 @@ export default function VirtualRoomChat() {
   }, [messages]);
 
   const handleSend = async () => {
+    console.log("[VirtualRoom] handleSend called", { input: input.trim(), agentId: room?.agent_id, loading, agentExpired });
     if (!input.trim() || !room?.agent_id || loading) return;
     if (agentExpired) return;
 
