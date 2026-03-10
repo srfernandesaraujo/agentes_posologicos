@@ -4956,7 +4956,7 @@ IMPORTANTE: Sempre incluir nota de que diferenças no número de relatos não si
 
 ⚠️ **AVISO IMPORTANTE**
 Os dados apresentados são de **relatos de suspeitas** de reações adversas. Isso significa que um efeito reportado após o uso de um medicamento **não prova** que o medicamento causou aquele efeito. Confirmar uma relação causal requer avaliação científica aprofundada. **Nunca interrompa ou altere a dose de um medicamento sem consultar seu médico ou farmacêutico.**
-Fonte: VigiAccess (vigiaccess.org) – OMS/UMC
+Fonte primária: OpenFDA FAERS (open.fda.gov) | Consulta complementar: VigiAccess (vigiaccess.org) – OMS/UMC
 
 5) REGRA DE CONTINUIDADE
 Agora posso te ajudar com:
