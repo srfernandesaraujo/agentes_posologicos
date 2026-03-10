@@ -312,6 +312,7 @@ export default function VirtualRooms() {
     setDescription("");
     setAgentId("none");
     setIsActive(true);
+    setRoomExpiresAt("");
   };
 
   const openEdit = (room: VirtualRoom) => {
