@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Trash2, Edit2, Copy, DoorOpen, Coins, Clock, Search, Bot, ChevronDown, Check, MessageSquare } from "lucide-react";
+import { Plus, Trash2, Edit2, Copy, DoorOpen, Coins, Clock, Search, Bot, ChevronDown, Check, MessageSquare, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { RoomConversations } from "@/components/rooms/RoomConversations";
@@ -109,7 +109,7 @@ function AgentPicker({ value, onChange }: { value: string; onChange: (v: string)
             />
           </div>
         </div>
-        <div className="max-h-60 overflow-y-auto p-1">
+        <div className="max-h-80 overflow-y-auto p-1">
           {/* None option */}
           <button
             onClick={() => { onChange("none"); setOpen(false); setSearch(""); }}
@@ -176,6 +176,7 @@ export default function VirtualRooms() {
   const [description, setDescription] = useState("");
   const [agentId, setAgentId] = useState<string>("none");
   const [isActive, setIsActive] = useState(true);
+  const [roomExpiresAt, setRoomExpiresAt] = useState<string>("");
 
   const { data: rooms = [], isLoading } = useQuery({
     queryKey: ["virtual-rooms", user?.id],
@@ -199,6 +200,10 @@ export default function VirtualRooms() {
       }
 
       const agentExpiresAt = hasAgent ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
+      // Default expiration: if no date set, expire in 7 days
+      const expiresAt = roomExpiresAt
+        ? new Date(roomExpiresAt).toISOString()
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       const { error } = await supabase
         .from("virtual_rooms" as any)
@@ -210,6 +215,7 @@ export default function VirtualRooms() {
           agent_id: hasAgent ? agentId : null,
           is_active: isActive,
           agent_expires_at: agentExpiresAt,
+          room_expires_at: expiresAt,
         } as any);
       if (error) throw error;
 
@@ -242,11 +248,16 @@ export default function VirtualRooms() {
         throw new Error("Créditos insuficientes para vincular um novo agente.");
       }
 
+      const expiresAt = roomExpiresAt
+        ? new Date(roomExpiresAt).toISOString()
+        : null;
+
       const updateData: any = {
         name,
         description,
         agent_id: hasNewAgent ? agentId : null,
         is_active: isActive,
+        ...(expiresAt !== null && { room_expires_at: expiresAt }),
       };
 
       if (agentChanged) {
@@ -301,6 +312,7 @@ export default function VirtualRooms() {
     setDescription("");
     setAgentId("none");
     setIsActive(true);
+    setRoomExpiresAt("");
   };
 
   const openEdit = (room: VirtualRoom) => {
@@ -309,6 +321,7 @@ export default function VirtualRooms() {
     setDescription(room.description);
     setAgentId(room.agent_id || "none");
     setIsActive(room.is_active);
+    setRoomExpiresAt(room.room_expires_at ? new Date(room.room_expires_at).toISOString().slice(0, 16) : "");
     setDialogOpen(true);
   };
 
@@ -333,6 +346,11 @@ export default function VirtualRooms() {
   const isAgentExpired = (room: VirtualRoom) => {
     if (!room.agent_expires_at) return false;
     return new Date(room.agent_expires_at) < new Date();
+  };
+
+  const isRoomExpired = (room: VirtualRoom) => {
+    if (!room.room_expires_at) return false;
+    return new Date(room.room_expires_at) < new Date();
   };
 
   return (
@@ -366,15 +384,15 @@ export default function VirtualRooms() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-white truncate">{room.name}</h3>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${room.is_active ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/40"}`}>
-                      {room.is_active ? "Ativa" : "Inativa"}
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${room.is_active && !isRoomExpired(room) ? "bg-green-500/20 text-green-400" : "bg-white/10 text-white/40"}`}>
+                      {isRoomExpired(room) ? "Expirada" : room.is_active ? "Ativa" : "Inativa"}
                     </span>
                   </div>
                   {room.description && <p className="text-sm text-white/50 mb-2 truncate">{room.description}</p>}
                   <div className="flex items-center gap-4 text-xs text-white/40 flex-wrap">
                     <span className="flex items-center gap-1">
                       PIN: <span className="font-mono font-bold text-[hsl(14,90%,58%)]">{room.pin}</span>
-                      <button onClick={() => { navigator.clipboard.writeText(room.pin); toast.success("PIN copiado!"); }}>
+                      <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(room.pin); toast.success("PIN copiado!"); }}>
                         <Copy className="h-3 w-3" />
                       </button>
                     </span>
@@ -390,6 +408,16 @@ export default function VirtualRooms() {
                             <Clock className="h-3 w-3" /> até {new Date(room.agent_expires_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                           </span>
                         ) : null}
+                      </span>
+                    )}
+                    {room.room_expires_at && (
+                      <span className="flex items-center gap-1">
+                        <CalendarClock className="h-3 w-3" />
+                        {isRoomExpired(room) ? (
+                          <span className="text-red-400">Sala expirou em {new Date(room.room_expires_at).toLocaleDateString("pt-BR")}</span>
+                        ) : (
+                          <span>Expira em {new Date(room.room_expires_at).toLocaleDateString("pt-BR")}</span>
+                        )}
                       </span>
                     )}
                   </div>
@@ -443,6 +471,24 @@ export default function VirtualRooms() {
                   </span>
                 </div>
               )}
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-white/70">
+                <CalendarClock className="inline h-3.5 w-3.5 mr-1" />
+                Data de Expiração da Sala
+              </label>
+              <Input
+                type="datetime-local"
+                value={roomExpiresAt}
+                onChange={(e) => setRoomExpiresAt(e.target.value)}
+                className="border-white/10 bg-white/[0.05] text-white"
+                min={new Date().toISOString().slice(0, 16)}
+              />
+              <p className="mt-1 text-[11px] text-white/30">
+                {roomExpiresAt
+                  ? `A sala expirará em ${new Date(roomExpiresAt).toLocaleDateString("pt-BR")}`
+                  : "Se não definida, a sala expira automaticamente em 7 dias ou após 1 semana sem atividade."}
+              </p>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/70">Sala ativa</span>
