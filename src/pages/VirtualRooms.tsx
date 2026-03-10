@@ -176,6 +176,7 @@ export default function VirtualRooms() {
   const [description, setDescription] = useState("");
   const [agentId, setAgentId] = useState<string>("none");
   const [isActive, setIsActive] = useState(true);
+  const [roomExpiresAt, setRoomExpiresAt] = useState<string>("");
 
   const { data: rooms = [], isLoading } = useQuery({
     queryKey: ["virtual-rooms", user?.id],
