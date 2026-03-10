@@ -348,6 +348,11 @@ export default function VirtualRooms() {
     return new Date(room.agent_expires_at) < new Date();
   };
 
+  const isRoomExpired = (room: VirtualRoom) => {
+    if (!room.room_expires_at) return false;
+    return new Date(room.room_expires_at) < new Date();
+  };
+
   return (
     <div className="container max-w-4xl py-8">
       <div className="flex items-center justify-between mb-8">
