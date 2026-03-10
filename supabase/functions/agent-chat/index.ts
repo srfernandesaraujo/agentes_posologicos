@@ -5862,28 +5862,80 @@ Deno.serve(async (req) => {
             "tramadol": "tramadol",
             "codeina": "codeine",
             "morfina": "morphine",
+            "semaglutida": "semaglutide",
+            "ozempic": "semaglutide",
+            "wegovy": "semaglutide",
+            "rybelsus": "semaglutide",
+            "liraglutida": "liraglutide",
+            "saxenda": "liraglutide",
+            "victoza": "liraglutide",
+            "tirzepatida": "tirzepatide",
+            "mounjaro": "tirzepatide",
+            "dulaglutida": "dulaglutide",
+            "trulicity": "dulaglutide",
+            "empagliflozina": "empagliflozin",
+            "jardiance": "empagliflozin",
+            "dapagliflozina": "dapagliflozin",
+            "forxiga": "dapagliflozin",
+            "canagliflozina": "canagliflozin",
+            "invokana": "canagliflozin",
+            "sitagliptina": "sitagliptin",
+            "januvia": "sitagliptin",
+            "vildagliptina": "vildagliptin",
+            "galvus": "vildagliptin",
+            "rivaroxabana": "rivaroxaban",
+            "xarelto": "rivaroxaban",
+            "apixabana": "apixaban",
+            "eliquis": "apixaban",
+            "escitalopram": "escitalopram",
+            "duloxetina": "duloxetine",
+            "cymbalta": "duloxetine",
+            "quetiapina": "quetiapine",
+            "seroquel": "quetiapine",
+            "risperidona": "risperidone",
+            "aripiprazol": "aripiprazole",
+            "rosuvastatina": "rosuvastatin",
+            "crestor": "rosuvastatin",
+            "lisinopril": "lisinopril",
+            "ramipril": "ramipril",
+            "valsartana": "valsartan",
+            "candesartana": "candesartan",
+            "espironolactona": "spironolactone",
+            "metoprolol": "metoprolol",
+            "atenolol": "atenolol",
+            "propranolol": "propranolol",
+            "amitriptilina": "amitriptyline",
+            "nortriptilina": "nortriptyline",
+            "ciprofloxacino": "ciprofloxacin",
+            "levofloxacino": "levofloxacin",
+            "cefalexina": "cefalexin",
+            "ceftriaxona": "ceftriaxone",
+            "ivermectina": "ivermectin",
+            "cloroquina": "chloroquine",
+            "hidroxicloroquina": "hydroxychloroquine",
+            "metotrexato": "methotrexate",
           };
 
+          // Comprehensive PT stop words for cleaning
+          const stopWordsRegex = /\b(quais|qual|são|os|as|do|da|de|dos|das|efeitos|colaterais|reações|reacoes|adversas|adversos|medicamento|medicamentos|remédio|remedio|remedios|busque|pesquise|analise|compare|comparar|comparação|comparacao|sobre|para|com|por|em|no|na|nos|nas|um|uma|uns|umas|entre|mais|menos|dados|informações|informacoes|relatório|relatorio|principais|principal|quero|saber|me|mim|fale|diga|conte|mostre|mostra|liste|listar|existe|existem|pode|podem|ter|tem|têm|foi|foram|ser|está|estão|isso|esse|essa|esses|essas|este|esta|estes|estas|qual|quanto|quantos|quantas|como|porque|porquê|quando|onde|todo|todos|toda|todas|muito|muitos|muita|muitas|outro|outros|outra|outras|mesmo|mesma|também|tambem|ainda|já|ja|mais|depois|antes|agora|aqui|ali|lá|la|só|apenas|tipo|tipos|causa|causam|causar|provocar|provocam|usar|usando|tomar|tomando|possíveis|possiveis|possível|possivel|comum|comuns|grave|graves|raro|raros|frequente|frequentes|efeito|colateral|reação|reacao|sintoma|sintomas|risco|riscos|segurança|seguranca|perfil)\b/gi;
+
           if (drugNames.length === 0) {
-            // Try to find drug names in the input text
             const inputLower = input.toLowerCase();
-            // Check commercial names first
+            // Check commercial/generic names first
             for (const [commercial, inn] of Object.entries(commercialToINN)) {
-              if (inputLower.includes(commercial)) {
+              if (inputLower.includes(commercial.toLowerCase())) {
                 drugNames.push(inn);
               }
             }
-            // If still empty, extract likely drug names (words that look like drug names)
+            // If still empty, clean and extract
             if (drugNames.length === 0) {
-              // Use the whole cleaned input as a single search term
               const cleaned = input
-                .replace(/\b(quais|são|os|as|do|da|de|dos|das|efeitos|colaterais|reações|adversas|medicamento|remédio|busque|pesquise|analise|compare|comparar|sobre|para|com|por|em|no|na|nos|nas|um|uma|entre|mais|menos|dados|informações|relatório)\b/gi, " ")
-                .replace(/[?!.,;:()]/g, " ")
+                .replace(stopWordsRegex, " ")
+                .replace(/[?!.,;:()""''«»\[\]{}]/g, " ")
                 .replace(/\s+/g, " ")
                 .trim();
               if (cleaned.length > 1) {
-                // Split by "e", "vs", "versus", "ou" for comparison queries
-                const parts = cleaned.split(/\b(?:e|vs\.?|versus|ou|and|x)\b/i).map(p => p.trim()).filter(p => p.length > 1);
+                const parts = cleaned.split(/\b(?:e|vs\.?|versus|ou|and|x)\b/i).map(p => p.trim()).filter(p => p.length > 2);
                 drugNames = parts.length > 0 ? parts : [cleaned];
               }
             }
