@@ -96,16 +96,21 @@ function AgentPicker({ value, onChange }: { value: string; onChange: (v: string)
           <ChevronDown className="h-4 w-4 text-white/40" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 border-white/10 bg-[hsl(220,25%,10%)]" align="start">
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] p-0 border-white/10 bg-[hsl(220,25%,10%)]"
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <div className="p-2 border-b border-white/10">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
-            <Input
+            <input
+              ref={(el) => { if (el) setTimeout(() => el.focus(), 0); }}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar agente..."
-              className="h-8 pl-8 text-sm border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
-              autoFocus
+              className="flex h-8 w-full rounded-md border border-white/10 bg-white/[0.05] pl-8 pr-3 text-sm text-white placeholder:text-white/30 outline-none focus:ring-1 focus:ring-primary"
+              onKeyDown={(e) => e.stopPropagation()}
             />
           </div>
         </div>
