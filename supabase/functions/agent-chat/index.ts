@@ -5791,6 +5791,231 @@ Deno.serve(async (req) => {
         }
       }
 
+      // VigiAccess real-time search for consultor-vigiaccess
+      if (builtInAgent.slug === "consultor-vigiaccess") {
+        try {
+          const VIGI_AUTH = "Basic VmlnaUJhc2VBY2Nlc3NDbGllbnQ6cHN3ZDRWaUE=";
+          const vigiHeaders = {
+            "Accept": "application/json, text/plain, */*",
+            "Authorization": VIGI_AUTH,
+            "Origin": "https://www.vigiaccess.org",
+            "Referer": "https://www.vigiaccess.org/",
+          };
+
+          // Extract drug names from user input (simple heuristic: look for capitalized words or quoted terms)
+          let drugNames: string[] = [];
+          
+          // Check for quoted terms first
+          const quotedTerms = input.match(/["'«»]([^"'«»]+)["'«»]/g);
+          if (quotedTerms) {
+            drugNames = quotedTerms.map(t => t.replace(/["'«»]/g, "").trim());
+          }
+          
+          // Common PT commercial name → INN mapping
+          const commercialToINN: Record<string, string> = {
+            "tylenol": "acetaminophen",
+            "advil": "ibuprofen",
+            "alivium": "ibuprofen",
+            "rivotril": "clonazepam",
+            "losartana": "losartan",
+            "puran": "levothyroxine",
+            "euthyrox": "levothyroxine",
+            "glifage": "metformin",
+            "amoxil": "amoxicillin",
+            "buscopan": "hyoscine butylbromide",
+            "novalgina": "metamizole",
+            "dipirona": "metamizole",
+            "dorflex": "metamizole",
+            "lexapro": "escitalopram",
+            "fluoxetina": "fluoxetine",
+            "omeprazol": "omeprazole",
+            "pantoprazol": "pantoprazole",
+            "sinvastatina": "simvastatin",
+            "atorvastatina": "atorvastatin",
+            "metformina": "metformin",
+            "levotiroxina": "levothyroxine",
+            "amoxicilina": "amoxicillin",
+            "azitromicina": "azithromycin",
+            "ibuprofeno": "ibuprofen",
+            "paracetamol": "acetaminophen",
+            "clonazepam": "clonazepam",
+            "diazepam": "diazepam",
+            "prednisona": "prednisone",
+            "prednisolona": "prednisolone",
+            "dexametasona": "dexamethasone",
+            "captopril": "captopril",
+            "enalapril": "enalapril",
+            "anlodipino": "amlodipine",
+            "hidroclorotiazida": "hydrochlorothiazide",
+            "furosemida": "furosemide",
+            "warfarina": "warfarin",
+            "clopidogrel": "clopidogrel",
+            "insulina": "insulin",
+            "sertralina": "sertraline",
+            "venlafaxina": "venlafaxine",
+            "carbamazepina": "carbamazepine",
+            "fenitoina": "phenytoin",
+            "valproato": "valproic acid",
+            "ácido valproico": "valproic acid",
+            "gabapentina": "gabapentin",
+            "pregabalina": "pregabalin",
+            "tramadol": "tramadol",
+            "codeina": "codeine",
+            "morfina": "morphine",
+          };
+
+          if (drugNames.length === 0) {
+            // Try to find drug names in the input text
+            const inputLower = input.toLowerCase();
+            // Check commercial names first
+            for (const [commercial, inn] of Object.entries(commercialToINN)) {
+              if (inputLower.includes(commercial)) {
+                drugNames.push(inn);
+              }
+            }
+            // If still empty, extract likely drug names (words that look like drug names)
+            if (drugNames.length === 0) {
+              // Use the whole cleaned input as a single search term
+              const cleaned = input
+                .replace(/\b(quais|são|os|as|do|da|de|dos|das|efeitos|colaterais|reações|adversas|medicamento|remédio|busque|pesquise|analise|compare|comparar|sobre|para|com|por|em|no|na|nos|nas|um|uma|entre|mais|menos|dados|informações|relatório)\b/gi, " ")
+                .replace(/[?!.,;:()]/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+              if (cleaned.length > 1) {
+                // Split by "e", "vs", "versus", "ou" for comparison queries
+                const parts = cleaned.split(/\b(?:e|vs\.?|versus|ou|and|x)\b/i).map(p => p.trim()).filter(p => p.length > 1);
+                drugNames = parts.length > 0 ? parts : [cleaned];
+              }
+            }
+          }
+
+          // Deduplicate
+          drugNames = [...new Set(drugNames)].slice(0, 3);
+
+          let vigiContext = "\n\n<VIGIACCESS_CONTEXT>\n";
+          vigiContext += `Busca VigiAccess em tempo real para: ${drugNames.join(", ")}\n`;
+          
+          for (const drugName of drugNames) {
+            try {
+              // Step 1: Search for drug to get substanceId
+              const searchUrl = `https://api.who-umc.org/vigibase/icsrstatistics/dimensions/drug?tradename=${encodeURIComponent(drugName)}`;
+              console.log(`VigiAccess: searching for "${drugName}"...`);
+              const searchResp = await fetch(searchUrl, { headers: vigiHeaders });
+              
+              if (!searchResp.ok) {
+                vigiContext += `\n--- MEDICAMENTO: ${drugName} ---\nErro ao buscar: HTTP ${searchResp.status}\n`;
+                continue;
+              }
+              
+              const searchData = await searchResp.json();
+              
+              if (!searchData || (Array.isArray(searchData) && searchData.length === 0)) {
+                vigiContext += `\n--- MEDICAMENTO: ${drugName} ---\nNenhum resultado encontrado no VigiAccess para "${drugName}". Verifique a ortografia ou tente o princípio ativo em inglês.\n`;
+                continue;
+              }
+              
+              // Get first matching substance
+              const substance = Array.isArray(searchData) ? searchData[0] : searchData;
+              const substanceId = substance.substanceId || substance.id || substance.substId;
+              const substanceName = substance.substanceName || substance.name || drugName;
+              
+              if (!substanceId) {
+                vigiContext += `\n--- MEDICAMENTO: ${drugName} ---\nSubstância encontrada mas sem ID válido. Dados brutos: ${JSON.stringify(substance).substring(0, 500)}\n`;
+                continue;
+              }
+
+              vigiContext += `\n--- MEDICAMENTO: ${substanceName} (buscado como "${drugName}", substanceId: ${substanceId}) ---\n`;
+
+              // Step 2: Get distributions (ADRs, demographics, geography)
+              const distUrl = `https://api.who-umc.org/vigibase/icsrstatistics/distributions?agegroupFilter=&continentFilter=&substanceId=${substanceId}`;
+              const distResp = await fetch(distUrl, { headers: vigiHeaders });
+              
+              if (distResp.ok) {
+                const distData = await distResp.json();
+                
+                // Parse total ICSRs
+                if (distData.totalCount !== undefined) {
+                  vigiContext += `Total de relatos (ICSRs): ${distData.totalCount}\n`;
+                }
+
+                // Parse ADRs by SOC (System Organ Class)
+                if (distData.reactionGroups && Array.isArray(distData.reactionGroups)) {
+                  vigiContext += `\nREAÇÕES POR CLASSE DE ÓRGÃO (SOC):\n`;
+                  const sortedSOCs = distData.reactionGroups.sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
+                  for (const soc of sortedSOCs.slice(0, 20)) {
+                    vigiContext += `- ${soc.name || soc.socName}: ${soc.count || 0} relatos\n`;
+                    // Include individual reactions within SOC if available
+                    if (soc.reactions && Array.isArray(soc.reactions)) {
+                      for (const rx of soc.reactions.slice(0, 10)) {
+                        vigiContext += `  • ${rx.name || rx.reactionName}: ${rx.count || 0}\n`;
+                      }
+                    }
+                  }
+                }
+
+                // Parse demographics - Age groups
+                if (distData.ageGroups && Array.isArray(distData.ageGroups)) {
+                  vigiContext += `\nDISTRIBUIÇÃO POR FAIXA ETÁRIA:\n`;
+                  for (const ag of distData.ageGroups) {
+                    vigiContext += `- ${ag.name || ag.ageGroup}: ${ag.count || 0} relatos\n`;
+                  }
+                }
+
+                // Parse demographics - Sex
+                if (distData.sexGroups && Array.isArray(distData.sexGroups)) {
+                  vigiContext += `\nDISTRIBUIÇÃO POR SEXO:\n`;
+                  for (const sg of distData.sexGroups) {
+                    vigiContext += `- ${sg.name || sg.sex}: ${sg.count || 0} relatos\n`;
+                  }
+                }
+
+                // Parse geography - Continents
+                if (distData.continentGroups && Array.isArray(distData.continentGroups)) {
+                  vigiContext += `\nDISTRIBUIÇÃO POR CONTINENTE:\n`;
+                  for (const cg of distData.continentGroups) {
+                    vigiContext += `- ${cg.name || cg.continent}: ${cg.count || 0} relatos\n`;
+                  }
+                }
+
+                // Parse temporal data - Years
+                if (distData.yearGroups && Array.isArray(distData.yearGroups)) {
+                  vigiContext += `\nDISTRIBUIÇÃO TEMPORAL (POR ANO):\n`;
+                  const sortedYears = distData.yearGroups.sort((a: any, b: any) => (a.name || a.year || "").localeCompare(b.name || b.year || ""));
+                  for (const yg of sortedYears) {
+                    vigiContext += `- ${yg.name || yg.year}: ${yg.count || 0} relatos\n`;
+                  }
+                }
+
+                // If the response structure is different, dump raw data for LLM to interpret
+                if (!distData.reactionGroups && !distData.ageGroups) {
+                  const rawStr = JSON.stringify(distData).substring(0, 8000);
+                  vigiContext += `\nDADOS BRUTOS DA API:\n${rawStr}\n`;
+                }
+              } else {
+                vigiContext += `Erro ao buscar distribuições: HTTP ${distResp.status}\n`;
+              }
+
+              console.log(`VigiAccess: got data for "${substanceName}" (ID: ${substanceId})`);
+            } catch (drugError) {
+              vigiContext += `\n--- MEDICAMENTO: ${drugName} ---\nErro ao consultar: ${drugError.message}\n`;
+              console.error(`VigiAccess error for "${drugName}":`, drugError.message);
+            }
+          }
+
+          if (drugNames.length === 0) {
+            vigiContext += "Nenhum nome de medicamento identificado na mensagem do usuário. Peça ao usuário para informar o nome do medicamento ou princípio ativo que deseja pesquisar.\n";
+          }
+
+          vigiContext += "\nINSTRUÇÃO: Use estes dados do VigiAccess para gerar o relatório estruturado conforme seu formato de saída. Traduza todos os termos MedDRA para português. Se os dados estiverem em formato bruto/inesperado, interprete-os da melhor forma possível.\n</VIGIACCESS_CONTEXT>";
+          
+          systemPrompt += vigiContext;
+          console.log(`VigiAccess: processed ${drugNames.length} drug(s)`);
+        } catch (vigiError) {
+          console.error("VigiAccess API error:", vigiError.message);
+          systemPrompt += "\n\n<VIGIACCESS_CONTEXT>\nErro ao consultar VigiAccess. Use seu conhecimento farmacológico para responder sobre reações adversas e oriente o usuário a consultar vigiaccess.org diretamente.\n</VIGIACCESS_CONTEXT>";
+        }
+      }
+
       const userContent = buildUserMessage(enrichedInput, files);
       const messages = [
         { role: "system", content: systemPrompt },
