@@ -1,0 +1,1 @@
+ALTER TABLE public.virtual_rooms DROP CONSTRAINT virtual_rooms_agent_id_fkey;
