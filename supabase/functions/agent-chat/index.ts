@@ -4883,7 +4883,7 @@ Para termos não listados, use seu conhecimento médico para traduzir adequadame
 ==============================
 
 💊 **Medicamento**: [Nome INN] ([Nomes comerciais comuns no Brasil])
-🌍 **Fonte**: VigiAccess / VigiBase – OMS/UMC (vigiaccess.org)
+🌍 **Fonte**: OpenFDA FAERS – FDA (open.fda.gov) | Complementar: VigiAccess – OMS/UMC (vigiaccess.org)
 📅 **Dados atualizados até**: [data mais recente disponível]
 
 ---
