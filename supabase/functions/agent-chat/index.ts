@@ -5791,18 +5791,10 @@ Deno.serve(async (req) => {
         }
       }
 
-      // VigiAccess real-time search for consultor-vigiaccess
+      // OpenFDA FAERS real-time search for consultor-vigiaccess
       if (builtInAgent.slug === "consultor-vigiaccess") {
         try {
-          const VIGI_AUTH = "Basic VmlnaUJhc2VBY2Nlc3NDbGllbnQ6cHN3ZDRWaUE=";
-          const vigiHeaders = {
-            "Accept": "application/json, text/plain, */*",
-            "Authorization": VIGI_AUTH,
-            "Origin": "https://www.vigiaccess.org",
-            "Referer": "https://www.vigiaccess.org/",
-          };
-
-          // Extract drug names from user input (simple heuristic: look for capitalized words or quoted terms)
+          // Extract drug names from user input
           let drugNames: string[] = [];
           
           // Check for quoted terms first
@@ -5921,13 +5913,11 @@ Deno.serve(async (req) => {
 
           if (drugNames.length === 0) {
             const inputLower = input.toLowerCase();
-            // Check commercial/generic names first
             for (const [commercial, inn] of Object.entries(commercialToINN)) {
               if (inputLower.includes(commercial.toLowerCase())) {
                 drugNames.push(inn);
               }
             }
-            // If still empty, clean and extract
             if (drugNames.length === 0) {
               const cleaned = input
                 .replace(stopWordsRegex, " ")
@@ -5944,127 +5934,122 @@ Deno.serve(async (req) => {
           // Deduplicate
           drugNames = [...new Set(drugNames)].slice(0, 3);
 
-          let vigiContext = "\n\n<VIGIACCESS_CONTEXT>\n";
-          vigiContext += `Busca VigiAccess em tempo real para: ${drugNames.join(", ")}\n`;
+          let fdaContext = "\n\n<OPENFDA_CONTEXT>\n";
+          fdaContext += `Busca OpenFDA FAERS em tempo real para: ${drugNames.join(", ")}\n`;
+          
+          const OPENFDA_BASE = "https://api.fda.gov/drug/event.json";
           
           for (const drugName of drugNames) {
             try {
-              // Step 1: Search for drug to get substanceId
-              const searchUrl = `https://api.who-umc.org/vigibase/icsrstatistics/dimensions/drug?tradename=${encodeURIComponent(drugName)}`;
-              console.log(`VigiAccess: searching for "${drugName}"...`);
-              const searchResp = await fetch(searchUrl, { headers: vigiHeaders });
+              console.log(`OpenFDA: searching for "${drugName}"...`);
+              const searchTerm = encodeURIComponent(`"${drugName}"`);
+              const searchParam = `patient.drug.openfda.generic_name:${searchTerm}`;
               
-              if (!searchResp.ok) {
-                vigiContext += `\n--- MEDICAMENTO: ${drugName} ---\nErro ao buscar: HTTP ${searchResp.status}\n`;
-                continue;
-              }
-              
-              const searchData = await searchResp.json();
-              
-              if (!searchData || (Array.isArray(searchData) && searchData.length === 0)) {
-                vigiContext += `\n--- MEDICAMENTO: ${drugName} ---\nNenhum resultado encontrado no VigiAccess para "${drugName}". Verifique a ortografia ou tente o princípio ativo em inglês.\n`;
-                continue;
-              }
-              
-              // Get first matching substance
-              const substance = Array.isArray(searchData) ? searchData[0] : searchData;
-              const substanceId = substance.substanceId || substance.id || substance.substId;
-              const substanceName = substance.substanceName || substance.name || drugName;
-              
-              if (!substanceId) {
-                vigiContext += `\n--- MEDICAMENTO: ${drugName} ---\nSubstância encontrada mas sem ID válido. Dados brutos: ${JSON.stringify(substance).substring(0, 500)}\n`;
-                continue;
-              }
+              // Fetch all data in parallel: reactions, sex, country, timeline
+              const [reactionsResp, sexResp, countryResp, timelineResp] = await Promise.all([
+                fetch(`${OPENFDA_BASE}?search=${searchParam}&count=patient.reaction.reactionmeddrapt.exact&limit=25`),
+                fetch(`${OPENFDA_BASE}?search=${searchParam}&count=patient.patientsex`),
+                fetch(`${OPENFDA_BASE}?search=${searchParam}&count=occurcountry.exact&limit=15`),
+                fetch(`${OPENFDA_BASE}?search=${searchParam}&count=receivedate`),
+              ]);
 
-              vigiContext += `\n--- MEDICAMENTO: ${substanceName} (buscado como "${drugName}", substanceId: ${substanceId}) ---\n`;
+              fdaContext += `\n--- MEDICAMENTO: ${drugName.toUpperCase()} ---\n`;
 
-              // Step 2: Get distributions (ADRs, demographics, geography)
-              const distUrl = `https://api.who-umc.org/vigibase/icsrstatistics/distributions?agegroupFilter=&continentFilter=&substanceId=${substanceId}`;
-              const distResp = await fetch(distUrl, { headers: vigiHeaders });
-              
-              if (distResp.ok) {
-                const distData = await distResp.json();
-                
-                // Parse total ICSRs
-                if (distData.totalCount !== undefined) {
-                  vigiContext += `Total de relatos (ICSRs): ${distData.totalCount}\n`;
-                }
-
-                // Parse ADRs by SOC (System Organ Class)
-                if (distData.reactionGroups && Array.isArray(distData.reactionGroups)) {
-                  vigiContext += `\nREAÇÕES POR CLASSE DE ÓRGÃO (SOC):\n`;
-                  const sortedSOCs = distData.reactionGroups.sort((a: any, b: any) => (b.count || 0) - (a.count || 0));
-                  for (const soc of sortedSOCs.slice(0, 20)) {
-                    vigiContext += `- ${soc.name || soc.socName}: ${soc.count || 0} relatos\n`;
-                    // Include individual reactions within SOC if available
-                    if (soc.reactions && Array.isArray(soc.reactions)) {
-                      for (const rx of soc.reactions.slice(0, 10)) {
-                        vigiContext += `  • ${rx.name || rx.reactionName}: ${rx.count || 0}\n`;
-                      }
-                    }
+              // Parse reactions (top ADRs)
+              if (reactionsResp.ok) {
+                const reactionsData = await reactionsResp.json();
+                if (reactionsData.results && reactionsData.results.length > 0) {
+                  const totalReactions = reactionsData.results.reduce((sum: number, r: any) => sum + r.count, 0);
+                  fdaContext += `\nTOP REAÇÕES ADVERSAS REPORTADAS (termos MedDRA):\n`;
+                  for (const r of reactionsData.results) {
+                    const pct = ((r.count / totalReactions) * 100).toFixed(1);
+                    fdaContext += `- ${r.term}: ${r.count} relatos (${pct}%)\n`;
                   }
-                }
-
-                // Parse demographics - Age groups
-                if (distData.ageGroups && Array.isArray(distData.ageGroups)) {
-                  vigiContext += `\nDISTRIBUIÇÃO POR FAIXA ETÁRIA:\n`;
-                  for (const ag of distData.ageGroups) {
-                    vigiContext += `- ${ag.name || ag.ageGroup}: ${ag.count || 0} relatos\n`;
-                  }
-                }
-
-                // Parse demographics - Sex
-                if (distData.sexGroups && Array.isArray(distData.sexGroups)) {
-                  vigiContext += `\nDISTRIBUIÇÃO POR SEXO:\n`;
-                  for (const sg of distData.sexGroups) {
-                    vigiContext += `- ${sg.name || sg.sex}: ${sg.count || 0} relatos\n`;
-                  }
-                }
-
-                // Parse geography - Continents
-                if (distData.continentGroups && Array.isArray(distData.continentGroups)) {
-                  vigiContext += `\nDISTRIBUIÇÃO POR CONTINENTE:\n`;
-                  for (const cg of distData.continentGroups) {
-                    vigiContext += `- ${cg.name || cg.continent}: ${cg.count || 0} relatos\n`;
-                  }
-                }
-
-                // Parse temporal data - Years
-                if (distData.yearGroups && Array.isArray(distData.yearGroups)) {
-                  vigiContext += `\nDISTRIBUIÇÃO TEMPORAL (POR ANO):\n`;
-                  const sortedYears = distData.yearGroups.sort((a: any, b: any) => (a.name || a.year || "").localeCompare(b.name || b.year || ""));
-                  for (const yg of sortedYears) {
-                    vigiContext += `- ${yg.name || yg.year}: ${yg.count || 0} relatos\n`;
-                  }
-                }
-
-                // If the response structure is different, dump raw data for LLM to interpret
-                if (!distData.reactionGroups && !distData.ageGroups) {
-                  const rawStr = JSON.stringify(distData).substring(0, 8000);
-                  vigiContext += `\nDADOS BRUTOS DA API:\n${rawStr}\n`;
+                } else {
+                  fdaContext += `Nenhuma reação adversa encontrada para "${drugName}" no OpenFDA.\n`;
                 }
               } else {
-                vigiContext += `Erro ao buscar distribuições: HTTP ${distResp.status}\n`;
+                // Try searching by brand_name as fallback
+                const brandParam = `patient.drug.openfda.brand_name:${searchTerm}`;
+                const brandResp = await fetch(`${OPENFDA_BASE}?search=${brandParam}&count=patient.reaction.reactionmeddrapt.exact&limit=25`);
+                if (brandResp.ok) {
+                  const brandData = await brandResp.json();
+                  if (brandData.results && brandData.results.length > 0) {
+                    const totalReactions = brandData.results.reduce((sum: number, r: any) => sum + r.count, 0);
+                    fdaContext += `\nTOP REAÇÕES ADVERSAS REPORTADAS (busca por nome comercial, termos MedDRA):\n`;
+                    for (const r of brandData.results) {
+                      const pct = ((r.count / totalReactions) * 100).toFixed(1);
+                      fdaContext += `- ${r.term}: ${r.count} relatos (${pct}%)\n`;
+                    }
+                  }
+                } else {
+                  fdaContext += `Nenhum resultado encontrado no OpenFDA para "${drugName}". Verifique a ortografia ou tente o princípio ativo em inglês.\n`;
+                }
               }
 
-              console.log(`VigiAccess: got data for "${substanceName}" (ID: ${substanceId})`);
+              // Parse sex distribution (1=Male, 2=Female, 0=Unknown)
+              if (sexResp.ok) {
+                const sexData = await sexResp.json();
+                if (sexData.results) {
+                  const sexMap: Record<number, string> = { 0: "Desconhecido", 1: "Masculino", 2: "Feminino" };
+                  const totalSex = sexData.results.reduce((sum: number, s: any) => sum + s.count, 0);
+                  fdaContext += `\nDISTRIBUIÇÃO POR SEXO:\n`;
+                  for (const s of sexData.results) {
+                    const pct = ((s.count / totalSex) * 100).toFixed(1);
+                    fdaContext += `- ${sexMap[s.term] || `Código ${s.term}`}: ${s.count} relatos (${pct}%)\n`;
+                  }
+                }
+              }
+
+              // Parse country distribution
+              if (countryResp.ok) {
+                const countryData = await countryResp.json();
+                if (countryData.results) {
+                  fdaContext += `\nDISTRIBUIÇÃO POR PAÍS (top 15):\n`;
+                  for (const c of countryData.results.slice(0, 15)) {
+                    fdaContext += `- ${c.term}: ${c.count} relatos\n`;
+                  }
+                }
+              }
+
+              // Parse timeline (aggregate by year from receivedate YYYYMMDD)
+              if (timelineResp.ok) {
+                const timeData = await timelineResp.json();
+                if (timeData.results) {
+                  // Aggregate by year
+                  const yearCounts: Record<string, number> = {};
+                  for (const t of timeData.results) {
+                    const year = String(t.time).substring(0, 4);
+                    yearCounts[year] = (yearCounts[year] || 0) + t.count;
+                  }
+                  const sortedYears = Object.entries(yearCounts).sort(([a], [b]) => a.localeCompare(b));
+                  // Show last 10 years
+                  const recentYears = sortedYears.slice(-10);
+                  fdaContext += `\nTENDÊNCIA TEMPORAL (relatos por ano):\n`;
+                  for (const [year, count] of recentYears) {
+                    fdaContext += `- ${year}: ${count} relatos\n`;
+                  }
+                }
+              }
+
+              console.log(`OpenFDA: got data for "${drugName}"`);
             } catch (drugError) {
-              vigiContext += `\n--- MEDICAMENTO: ${drugName} ---\nErro ao consultar: ${drugError.message}\n`;
-              console.error(`VigiAccess error for "${drugName}":`, drugError.message);
+              fdaContext += `\n--- MEDICAMENTO: ${drugName} ---\nErro ao consultar OpenFDA: ${drugError.message}\n`;
+              console.error(`OpenFDA error for "${drugName}":`, drugError.message);
             }
           }
 
           if (drugNames.length === 0) {
-            vigiContext += "Nenhum nome de medicamento identificado na mensagem do usuário. Peça ao usuário para informar o nome do medicamento ou princípio ativo que deseja pesquisar.\n";
+            fdaContext += "Nenhum nome de medicamento identificado na mensagem do usuário. Peça ao usuário para informar o nome do medicamento ou princípio ativo que deseja pesquisar.\n";
           }
 
-          vigiContext += "\nINSTRUÇÃO: Use estes dados do VigiAccess para gerar o relatório estruturado conforme seu formato de saída. Traduza todos os termos MedDRA para português. Se os dados estiverem em formato bruto/inesperado, interprete-os da melhor forma possível.\n</VIGIACCESS_CONTEXT>";
+          fdaContext += "\nINSTRUÇÃO: Use estes dados do OpenFDA FAERS para gerar o relatório estruturado conforme seu formato de saída. Traduza todos os termos MedDRA para português. O OpenFDA usa dados do FDA dos EUA — mencione isso e sugira ao usuário consultar também o VigiAccess (vigiaccess.org) da OMS para uma visão global.\n</OPENFDA_CONTEXT>";
           
-          systemPrompt += vigiContext;
-          console.log(`VigiAccess: processed ${drugNames.length} drug(s)`);
-        } catch (vigiError) {
-          console.error("VigiAccess API error:", vigiError.message);
-          systemPrompt += "\n\n<VIGIACCESS_CONTEXT>\nErro ao consultar VigiAccess. Use seu conhecimento farmacológico para responder sobre reações adversas e oriente o usuário a consultar vigiaccess.org diretamente.\n</VIGIACCESS_CONTEXT>";
+          systemPrompt += fdaContext;
+          console.log(`OpenFDA: processed ${drugNames.length} drug(s)`);
+        } catch (fdaError) {
+          console.error("OpenFDA API error:", fdaError.message);
+          systemPrompt += "\n\n<OPENFDA_CONTEXT>\nErro ao consultar OpenFDA. Use seu conhecimento farmacológico para responder sobre reações adversas e oriente o usuário a consultar open.fda.gov e vigiaccess.org diretamente.\n</OPENFDA_CONTEXT>";
         }
       }
 
