@@ -472,6 +472,24 @@ export default function VirtualRooms() {
                 </div>
               )}
             </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-white/70">
+                <CalendarClock className="inline h-3.5 w-3.5 mr-1" />
+                Data de Expiração da Sala
+              </label>
+              <Input
+                type="datetime-local"
+                value={roomExpiresAt}
+                onChange={(e) => setRoomExpiresAt(e.target.value)}
+                className="border-white/10 bg-white/[0.05] text-white"
+                min={new Date().toISOString().slice(0, 16)}
+              />
+              <p className="mt-1 text-[11px] text-white/30">
+                {roomExpiresAt
+                  ? `A sala expirará em ${new Date(roomExpiresAt).toLocaleDateString("pt-BR")}`
+                  : "Se não definida, a sala expira automaticamente em 7 dias ou após 1 semana sem atividade."}
+              </p>
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/70">Sala ativa</span>
               <Switch checked={isActive} onCheckedChange={setIsActive} />
