@@ -248,11 +248,16 @@ export default function VirtualRooms() {
         throw new Error("Créditos insuficientes para vincular um novo agente.");
       }
 
+      const expiresAt = roomExpiresAt
+        ? new Date(roomExpiresAt).toISOString()
+        : null;
+
       const updateData: any = {
         name,
         description,
         agent_id: hasNewAgent ? agentId : null,
         is_active: isActive,
+        ...(expiresAt !== null && { room_expires_at: expiresAt }),
       };
 
       if (agentChanged) {
