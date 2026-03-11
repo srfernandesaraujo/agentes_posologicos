@@ -145,13 +145,28 @@ export default function VirtualRoomChat() {
 
     try {
       // Insert user message to DB (will be broadcast via Realtime)
-      await (supabase as any).from("room_messages").insert({
+      const { error: insertError } = await (supabase as any).from("room_messages").insert({
         room_id: room.id,
         sender_name: participantName || "Anônimo",
         sender_email: participantEmail || "",
         role: "user",
         content: text,
       });
+      console.log("[VirtualRoom] User message insert result:", { insertError });
+
+      // Optimistically add user message to local state if insert succeeded
+      if (!insertError) {
+        const optimisticMsg: RoomMessage = {
+          id: crypto.randomUUID(),
+          room_id: room.id,
+          sender_name: participantName || "Anônimo",
+          sender_email: participantEmail || "",
+          role: "user",
+          content: text,
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, optimisticMsg]);
+      }
 
       // Build conversation history from last 20 messages
       const recentMessages = messages.slice(-20).map((m) => ({
@@ -159,29 +174,70 @@ export default function VirtualRoomChat() {
         content: m.role === "user" ? `[${m.sender_name}]: ${m.content}` : m.content,
       }));
 
-      // Call agent
-      const { data, error } = await supabase.functions.invoke("agent-chat", {
-        body: {
+      // Call agent via direct fetch (bypass SDK auth header for anonymous users)
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      console.log("[VirtualRoom] Calling agent-chat...", { agentId: room.agent_id, roomId: room.id });
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseAnonKey,
+          "Authorization": `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
           agentId: room.agent_id,
           input: `[${participantName}]: ${text}`,
           isCustomAgent: true,
           isVirtualRoom: true,
           roomId: room.id,
           conversationHistory: recentMessages,
-        },
+        }),
       });
 
-      if (error) throw error;
+      console.log("[VirtualRoom] agent-chat response status:", response.status);
+      const data = await response.json();
+      console.log("[VirtualRoom] agent-chat response data:", data);
+
+      if (!response.ok) throw new Error(data?.error || "Agent error");
 
       // Insert assistant response to DB (tagged with same email)
-      await (supabase as any).from("room_messages").insert({
+      const { error: assistantInsertError } = await (supabase as any).from("room_messages").insert({
         room_id: room.id,
         sender_name: "Assistente",
         sender_email: participantEmail,
         role: "assistant",
         content: data?.output || "Sem resposta.",
       });
-    } catch {
+      console.log("[VirtualRoom] Assistant message insert result:", { assistantInsertError });
+
+      // Optimistically add assistant message
+      if (!assistantInsertError) {
+        const assistantMsg: RoomMessage = {
+          id: crypto.randomUUID(),
+          room_id: room.id,
+          sender_name: "Assistente",
+          sender_email: participantEmail,
+          role: "assistant",
+          content: data?.output || "Sem resposta.",
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      }
+    } catch (err: any) {
+      console.error("[VirtualRoom] Error in handleSend:", err);
+      const errorMsg: RoomMessage = {
+        id: crypto.randomUUID(),
+        room_id: room.id,
+        sender_name: "Sistema",
+        sender_email: participantEmail,
+        role: "assistant",
+        content: "Erro ao processar a mensagem. Tente novamente.",
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      
       await (supabase as any).from("room_messages").insert({
         room_id: room.id,
         sender_name: "Sistema",
