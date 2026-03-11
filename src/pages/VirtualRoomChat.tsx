@@ -178,20 +178,6 @@ export default function VirtualRoomChat() {
       });
       console.log("[VirtualRoom] User message insert result:", { insertError });
 
-      // Optimistically add user message to local state if insert succeeded
-      if (!insertError) {
-        const optimisticMsg: RoomMessage = {
-          id: crypto.randomUUID(),
-          room_id: room.id,
-          sender_name: participantName || "Anônimo",
-          sender_email: participantEmail || "",
-          role: "user",
-          content: text,
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, optimisticMsg]);
-      }
-
       // Build conversation history from last 20 messages
       const recentMessages = messages.slice(-20).map((m) => ({
         role: m.role,
