@@ -227,7 +227,7 @@ export default function VirtualRoomChat() {
       if (!response.ok) throw new Error(data?.error || "Agent error");
 
       // Insert assistant response to DB (tagged with same email)
-      const { error: assistantInsertError } = await (supabase as any).from("room_messages").insert({
+      const { error: assistantInsertError } = await roomMessagesRest("POST", undefined, {
         room_id: room.id,
         sender_name: "Assistente",
         sender_email: participantEmail,
