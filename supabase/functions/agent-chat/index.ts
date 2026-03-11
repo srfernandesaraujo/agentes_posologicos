@@ -5269,7 +5269,7 @@ Deno.serve(async (req) => {
       const roomCheckClient = createClient(supabaseUrl, serviceRoleKey);
       const { data: roomData, error: roomErr } = await roomCheckClient
         .from("virtual_rooms")
-        .select("id, agent_id, is_active")
+        .select("id, agent_id, is_active, user_id")
         .eq("id", roomId)
         .eq("is_active", true)
         .single();
@@ -5280,6 +5280,9 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      // Store room owner's user_id as fallback for API key lookup
+      var roomOwnerId: string | null = roomData.user_id || null;
 
       // Optionally extract user identity if auth header present
       if (authHeader?.startsWith("Bearer ")) {
