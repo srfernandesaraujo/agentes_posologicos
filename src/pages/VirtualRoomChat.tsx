@@ -262,7 +262,7 @@ export default function VirtualRoomChat() {
       };
       setMessages((prev) => [...prev, errorMsg]);
       
-      await (supabase as any).from("room_messages").insert({
+      await roomMessagesRest("POST", undefined, {
         room_id: room.id,
         sender_name: "Sistema",
         sender_email: participantEmail,
