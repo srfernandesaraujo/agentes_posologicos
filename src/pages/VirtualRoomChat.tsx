@@ -9,6 +9,32 @@ import { ArrowLeft, Send, Bot, User, Loader2, Pill, Users, Radio } from "lucide-
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// Direct REST helper to bypass SDK auth issues for anonymous users
+async function roomMessagesRest(method: "GET" | "POST", params?: Record<string, string>, body?: any) {
+  const url = new URL(`${SUPABASE_URL}/rest/v1/room_messages`);
+  if (params) {
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  }
+  const headers: Record<string, string> = {
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+  if (method === "POST") headers["Prefer"] = "return=representation";
+  if (method === "GET") url.searchParams.set("order", "created_at.asc");
+
+  const resp = await fetch(url.toString(), { method, headers, body: body ? JSON.stringify(body) : undefined });
+  if (!resp.ok) {
+    console.error("[VirtualRoom] REST error:", resp.status, await resp.text());
+    return { data: null, error: { message: `REST ${resp.status}` } };
+  }
+  const data = await resp.json();
+  return { data, error: null };
+}
+
 interface RoomMessage {
   id: string;
   room_id: string;
@@ -56,12 +82,10 @@ export default function VirtualRoomChat() {
   useEffect(() => {
     if (!room?.id || !nameConfirmed || !participantEmail) return;
     const loadMessages = async () => {
-      const { data, error } = await (supabase as any)
-        .from("room_messages")
-        .select("*")
-        .eq("room_id", room.id)
-        .eq("sender_email", participantEmail)
-        .order("created_at", { ascending: true });
+      const { data, error } = await roomMessagesRest("GET", {
+        room_id: `eq.${room.id}`,
+        sender_email: `eq.${participantEmail}`,
+      });
       if (!error && data) {
         setMessages(data);
       }
@@ -145,7 +169,7 @@ export default function VirtualRoomChat() {
 
     try {
       // Insert user message to DB (will be broadcast via Realtime)
-      const { error: insertError } = await (supabase as any).from("room_messages").insert({
+      const { error: insertError } = await roomMessagesRest("POST", undefined, {
         room_id: room.id,
         sender_name: participantName || "Anônimo",
         sender_email: participantEmail || "",
@@ -203,7 +227,7 @@ export default function VirtualRoomChat() {
       if (!response.ok) throw new Error(data?.error || "Agent error");
 
       // Insert assistant response to DB (tagged with same email)
-      const { error: assistantInsertError } = await (supabase as any).from("room_messages").insert({
+      const { error: assistantInsertError } = await roomMessagesRest("POST", undefined, {
         room_id: room.id,
         sender_name: "Assistente",
         sender_email: participantEmail,
@@ -238,7 +262,7 @@ export default function VirtualRoomChat() {
       };
       setMessages((prev) => [...prev, errorMsg]);
       
-      await (supabase as any).from("room_messages").insert({
+      await roomMessagesRest("POST", undefined, {
         room_id: room.id,
         sender_name: "Sistema",
         sender_email: participantEmail,
