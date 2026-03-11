@@ -178,20 +178,6 @@ export default function VirtualRoomChat() {
       });
       console.log("[VirtualRoom] User message insert result:", { insertError });
 
-      // Optimistically add user message to local state if insert succeeded
-      if (!insertError) {
-        const optimisticMsg: RoomMessage = {
-          id: crypto.randomUUID(),
-          room_id: room.id,
-          sender_name: participantName || "Anônimo",
-          sender_email: participantEmail || "",
-          role: "user",
-          content: text,
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, optimisticMsg]);
-      }
-
       // Build conversation history from last 20 messages
       const recentMessages = messages.slice(-20).map((m) => ({
         role: m.role,
@@ -235,20 +221,6 @@ export default function VirtualRoomChat() {
         content: data?.output || "Sem resposta.",
       });
       console.log("[VirtualRoom] Assistant message insert result:", { assistantInsertError });
-
-      // Optimistically add assistant message
-      if (!assistantInsertError) {
-        const assistantMsg: RoomMessage = {
-          id: crypto.randomUUID(),
-          room_id: room.id,
-          sender_name: "Assistente",
-          sender_email: participantEmail,
-          role: "assistant",
-          content: data?.output || "Sem resposta.",
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
-      }
     } catch (err: any) {
       console.error("[VirtualRoom] Error in handleSend:", err);
       const errorMsg: RoomMessage = {
