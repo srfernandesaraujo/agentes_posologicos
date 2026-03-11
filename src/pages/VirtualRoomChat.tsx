@@ -82,12 +82,10 @@ export default function VirtualRoomChat() {
   useEffect(() => {
     if (!room?.id || !nameConfirmed || !participantEmail) return;
     const loadMessages = async () => {
-      const { data, error } = await (supabase as any)
-        .from("room_messages")
-        .select("*")
-        .eq("room_id", room.id)
-        .eq("sender_email", participantEmail)
-        .order("created_at", { ascending: true });
+      const { data, error } = await roomMessagesRest("GET", {
+        room_id: `eq.${room.id}`,
+        sender_email: `eq.${participantEmail}`,
+      });
       if (!error && data) {
         setMessages(data);
       }
