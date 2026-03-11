@@ -6068,12 +6068,14 @@ Deno.serve(async (req) => {
       ];
 
       // Check if user has their own API key configured
-      if (userId) {
+      // Use room owner's API keys as fallback for virtual rooms
+      const apiKeyLookupId = userId || (typeof roomOwnerId !== "undefined" ? roomOwnerId : null);
+      if (apiKeyLookupId) {
         const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         const { data: userKeys } = await serviceClient
           .from("user_api_keys")
           .select("provider, api_key_encrypted")
-          .eq("user_id", userId)
+          .eq("user_id", apiKeyLookupId)
           .order("updated_at", { ascending: false })
           .limit(1);
 
@@ -6094,7 +6096,7 @@ Deno.serve(async (req) => {
           const model = DEFAULT_MODELS[provider] || "gpt-4o";
 
           if (endpoint) {
-            console.log(`Native agent: using user's ${provider} key`);
+            console.log(`Native agent: using ${userId ? "user's" : "room owner's"} ${provider} key`);
             try {
               if (provider === "anthropic") {
                 const anthropicResponse = await fetch(endpoint, {
@@ -6147,6 +6149,7 @@ Deno.serve(async (req) => {
             }
           }
         }
+      }
       }
 
       // Fallback: use Lovable AI Gateway
