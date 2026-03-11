@@ -1,68 +1,48 @@
 
 
-## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
+## Diagnosis
 
-### Problema
-Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
+The agent works in the platform (logged-in user) but not in virtual rooms (anonymous participant). Here's why:
 
-### Solucao
-Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
+**Root Cause**: When an anonymous user sends a message in a virtual room, the Edge Function `agent-chat` cannot identify any `userId`. At line 6068, it checks `if (userId)` to look up the user's API keys -- this is `null` for anonymous participants, so it skips user API keys entirely. It then falls back to the Lovable AI Gateway, which appears to be failing silently (edge function logs show TMDB search completing but no AI response logged).
 
-### Como vai funcionar (fluxo do usuario)
+When you test from the platform (logged in), your `userId` is available, your Google API key is found, and the agent works perfectly.
 
-1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
-2. A fonte e criada com status "pending"
-3. O sistema chama automaticamente a Edge Function para extrair a transcricao
-4. A transcricao e salva no campo `content` e o status muda para "ready"
-5. O agente passa a usar o texto transcrito como contexto
+**Evidence**:
+- Edge function logs show your virtual room attempts at 07:43-07:47: TMDB searches succeed, but NO "AI usage logged" entries -- the AI call never completes
+- My curl test at 07:48 succeeded because the tool sends auth that resolves to a real userId, finding your Google API key
+- The log "Native agent: using user's google key" only appears for the curl test, never for virtual room attempts
 
-### Etapas de implementacao
+## Fix Plan
 
-**1. Criar Edge Function `youtube-transcript`**
+### 1. Edge Function: Use room owner's API keys for virtual rooms
 
-Arquivo: `supabase/functions/youtube-transcript/index.ts`
+In the `agent-chat` Edge Function, after validating the room (around line 5268-5282), extract the room owner's `user_id` from `roomData` and store it as a fallback for API key lookup:
 
-- Recebe `source_id` e `url` do YouTube
-- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
-- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
-- Extrai a transcrição em português (pt) ou inglês (en) como fallback
-- Limpa tags XML das legendas e formata como texto puro
-- Atualiza o `content` e `status` da fonte no banco usando service role
-- Trunca a 50.000 caracteres se necessário
-- Se nao houver legendas, salva mensagem informativa e marca status como "error"
+- The room validation query already fetches `roomData` including the room's `user_id` (the owner)
+- Store this as `roomOwnerId` 
+- When looking up API keys for native agents (line 6067-6146), if `userId` is null but `roomOwnerId` exists, use `roomOwnerId` to fetch the room owner's API keys
+- This way anonymous participants can use the room owner's configured API key
 
-**2. Registrar funcao no `supabase/config.toml`**
+### 2. Fallback chain
 
-Adicionar:
+The modified logic at the native agent API key lookup section:
+
 ```text
-[functions.youtube-transcript]
-verify_jwt = false
+1. If userId exists → use user's own API keys (current behavior)
+2. If userId is null AND roomOwnerId exists → use room owner's API keys  
+3. If neither has keys → fall back to Lovable AI Gateway
 ```
 
-**3. Atualizar `KnowledgeDetail.tsx`**
+This is consistent with the existing pattern documented in memory: "the Edge Function uses service_role_key to fetch configurations and API keys of the original agent creator."
 
-Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
-```text
-await supabase.functions.invoke("youtube-transcript", {
-  body: { source_id: newSource.id, url: sourceUrl }
-});
-```
+### Technical Details
 
-Mostrar toast informando que a transcrição esta sendo extraída.
+**File**: `supabase/functions/agent-chat/index.ts`
 
-**4. Atualizar `DocumentManager.tsx`**
-
-Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
-
-### Detalhes tecnicos da extracao
-
-A Edge Function vai:
-1. Fazer fetch da pagina do video YouTube
-2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
-3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
-4. Fazer fetch do XML de legendas
-5. Parsear as tags `<text>` removendo timestamps e tags HTML
-6. Concatenar todo o texto como conteudo limpo
-
-Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
+Changes:
+1. Around line 5270-5282: Save `roomData.user_id` as `roomOwnerId` (the room already returns this field, it's selected but not used)
+2. Need to add `user_id` to the select query: change `.select("id, agent_id, is_active")` to `.select("id, agent_id, is_active, user_id")`
+3. Around line 6067-6146: Modify the API key lookup to use `roomOwnerId` when `userId` is null
+4. Same pattern needed for the custom agent section (around line 6200+) where it looks up the agent creator's keys
 
