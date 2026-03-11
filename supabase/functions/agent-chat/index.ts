@@ -6150,7 +6150,6 @@ Deno.serve(async (req) => {
           }
         }
       }
-      }
 
       // Fallback: use Lovable AI Gateway
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
