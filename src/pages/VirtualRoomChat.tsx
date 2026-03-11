@@ -169,7 +169,7 @@ export default function VirtualRoomChat() {
 
     try {
       // Insert user message to DB (will be broadcast via Realtime)
-      const { error: insertError } = await (supabase as any).from("room_messages").insert({
+      const { error: insertError } = await roomMessagesRest("POST", undefined, {
         room_id: room.id,
         sender_name: participantName || "Anônimo",
         sender_email: participantEmail || "",
