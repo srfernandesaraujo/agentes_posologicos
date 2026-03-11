@@ -9,6 +9,32 @@ import { ArrowLeft, Send, Bot, User, Loader2, Pill, Users, Radio } from "lucide-
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// Direct REST helper to bypass SDK auth issues for anonymous users
+async function roomMessagesRest(method: "GET" | "POST", params?: Record<string, string>, body?: any) {
+  const url = new URL(`${SUPABASE_URL}/rest/v1/room_messages`);
+  if (params) {
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  }
+  const headers: Record<string, string> = {
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+  if (method === "POST") headers["Prefer"] = "return=representation";
+  if (method === "GET") url.searchParams.set("order", "created_at.asc");
+
+  const resp = await fetch(url.toString(), { method, headers, body: body ? JSON.stringify(body) : undefined });
+  if (!resp.ok) {
+    console.error("[VirtualRoom] REST error:", resp.status, await resp.text());
+    return { data: null, error: { message: `REST ${resp.status}` } };
+  }
+  const data = await resp.json();
+  return { data, error: null };
+}
+
 interface RoomMessage {
   id: string;
   room_id: string;
