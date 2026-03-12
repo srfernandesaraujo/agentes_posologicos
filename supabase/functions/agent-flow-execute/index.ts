@@ -186,10 +186,11 @@ Deno.serve(async (req) => {
         let flowInstruction = `\n\n<FLOW_MODE_INSTRUCTION>
 IMPORTANTE: Você está operando dentro de um FLUXO SEQUENCIAL DE AGENTES (Etapa ${stage_number || "?"} de ${total_stages || "?"}).
 REGRAS OBRIGATÓRIAS DO MODO FLUXO:
-1. NÃO faça perguntas ao final da sua resposta. NÃO peça confirmação, preferências ou feedback.
-2. Entregue sua resposta COMPLETA e DEFINITIVA de forma direta.
-3. Se esta não é a primeira etapa, sua entrega DEVE ser complementar e construída sobre o resultado da etapa anterior. Integre e referencie o conteúdo anterior.
-4. Use tabelas Markdown formatadas corretamente quando aplicável.
+1. Se você precisa de informações para realizar seu trabalho, faça suas perguntas de forma CLARA e OBJETIVA.
+2. Quando tiver todas as informações necessárias, entregue sua resposta COMPLETA e DEFINITIVA.
+3. NÃO inclua sugestões de interação ao final (como "Posso te ajudar com..." ou listas de ações seguintes). Apenas entregue o resultado.
+4. Se esta não é a primeira etapa, sua entrega DEVE ser complementar e construída sobre o resultado da etapa anterior. Integre e referencie o conteúdo anterior.
+5. Use tabelas Markdown formatadas corretamente quando aplicável.
 </FLOW_MODE_INSTRUCTION>`;
 
         if (previous_stage_output && (stage_number || 0) > 1) {
