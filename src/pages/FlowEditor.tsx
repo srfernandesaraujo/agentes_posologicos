@@ -224,6 +224,7 @@ export default function FlowEditor() {
   const [agentSearch, setAgentSearch] = useState("");
   const [configOpen, setConfigOpen] = useState(false);
   const [editPrompt, setEditPrompt] = useState("");
+  const [configMode, setConfigMode] = useState(false);
 
   // Execution
   const [execOpen, setExecOpen] = useState(false);
@@ -443,17 +444,21 @@ export default function FlowEditor() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-1 border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+              className={`gap-1 ${configMode ? "border-amber-400/50 bg-amber-400/20 text-amber-300 hover:bg-amber-400/30 hover:text-amber-200" : "border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"}`}
               onClick={() => {
                 if (selectedNodeId) {
                   openConfig();
                 } else {
-                  toast.info("Clique em um nó no canvas para selecioná-lo e configurar.");
+                  setConfigMode(!configMode);
+                  setConnectMode(false);
+                  if (!configMode) {
+                    toast.info("Agora clique em um nó no canvas para configurá-lo.");
+                  }
                 }
               }}
             >
               <Settings2 className="h-4 w-4" />
-              Configurar
+              {configMode ? "Cancelar Config" : "Configurar"}
             </Button>
           )}
           {selectedNodeId && (
@@ -534,7 +539,17 @@ export default function FlowEditor() {
                   agentName={info.name}
                   agentIcon={info.icon}
                   isSelected={selectedNodeId === node.id}
-                  onSelect={() => setSelectedNodeId(node.id)}
+                  onSelect={() => {
+                    setSelectedNodeId(node.id);
+                    if (configMode) {
+                      const n = nodes.find(nd => nd.id === node.id);
+                      if (n) {
+                        setEditPrompt(n.input_prompt || "");
+                        setConfigOpen(true);
+                        setConfigMode(false);
+                      }
+                    }
+                  }}
                   onDragStart={(e) => handleDragStart(node.id, e)}
                   onConnect={() => handleNodeConnect(node.id)}
                   connectMode={connectMode}
