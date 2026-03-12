@@ -50,21 +50,38 @@ function getIcon(iconName: string) {
   return Icon;
 }
 
-// Detect if agent output contains questions requiring user input
+// Detect if agent output contains questions DIRECTED AT THE USER (not pedagogical questions)
 function detectQuestions(output: string): boolean {
-  // Check last 30% of the output for questions (agents typically ask at the end)
+  // Check for the explicit marker first
+  if (/PERGUNTAS PARA O USUÁRIO:/i.test(output)) {
+    return true;
+  }
+  
+  // Check last 15% of the output for direct conversational questions
   const lines = output.split("\n").map(l => l.trim()).filter(Boolean);
-  const lastChunkStart = Math.max(0, Math.floor(lines.length * 0.7));
+  const lastChunkStart = Math.max(0, Math.floor(lines.length * 0.85));
   const tailLines = lines.slice(lastChunkStart);
   
-  // Count question marks in tail lines (handles multiple "?" on same line too)
-  const questionCount = tailLines.reduce((count, line) => {
-    const matches = line.match(/\?/g);
-    return count + (matches ? matches.length : 0);
-  }, 0);
+  // Patterns that indicate the agent is asking the USER something (not pedagogical)
+  const userQuestionPatterns = [
+    /^(qual|quais|que|como|onde|quando|por que|você|vocês|gostaria|prefere|deseja|quer)\b.*\?$/i,
+    /^(me (diga|informe|conte)|poderia (me |nos )?informar|poderia (me |nos )?dizer)/i,
+    /escolh(a|er|e)/i,
+    /^(opção|alternativa)\s*\d/i,
+  ];
   
-  // Even a single question near the end should pause the flow
-  return questionCount >= 1;
+  // Only count questions that match user-directed patterns
+  const userQuestions = tailLines.filter(line => {
+    if (!line.endsWith("?")) return false;
+    // Skip if it looks like a pedagogical/content question (numbered, in a section)
+    if (/^\d+[\.\)]/.test(line)) return false;
+    if (/^[a-z]\)/.test(line)) return false;
+    if (/^[-•▸►]/.test(line)) return false;
+    // Check if it matches user-directed patterns
+    return userQuestionPatterns.some(p => p.test(line));
+  });
+  
+  return userQuestions.length >= 1;
 }
 
 // Strip trailing interaction suggestions that agents add in flow mode
