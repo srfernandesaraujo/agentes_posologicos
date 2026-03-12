@@ -52,9 +52,19 @@ function getIcon(iconName: string) {
 
 // Detect if agent output contains questions requiring user input
 function detectQuestions(output: string): boolean {
+  // Check last 30% of the output for questions (agents typically ask at the end)
   const lines = output.split("\n").map(l => l.trim()).filter(Boolean);
-  const questionLines = lines.filter(l => l.endsWith("?") && l.length > 10);
-  return questionLines.length >= 2;
+  const lastChunkStart = Math.max(0, Math.floor(lines.length * 0.7));
+  const tailLines = lines.slice(lastChunkStart);
+  
+  // Count question marks in tail lines (handles multiple "?" on same line too)
+  const questionCount = tailLines.reduce((count, line) => {
+    const matches = line.match(/\?/g);
+    return count + (matches ? matches.length : 0);
+  }, 0);
+  
+  // Even a single question near the end should pause the flow
+  return questionCount >= 1;
 }
 
 // Strip trailing interaction suggestions that agents add in flow mode
