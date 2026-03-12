@@ -5331,8 +5331,9 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const maxContentLength = body.flowMode ? 50000 : 10000;
       for (const msg of conversationHistory) {
-        if (!msg || typeof msg.role !== "string" || typeof msg.content !== "string" || msg.content.length > 10000) {
+        if (!msg || typeof msg.role !== "string" || typeof msg.content !== "string" || msg.content.length > maxContentLength) {
           return new Response(JSON.stringify({ error: "Mensagem do histórico inválida" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
