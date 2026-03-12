@@ -5396,20 +5396,26 @@ Deno.serve(async (req) => {
         });
       }
 
-      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } },
-      });
-
       const token = authHeader.replace("Bearer ", "");
-      const { data: claimsData, error: claimsError } = await tempClient.auth.getClaims(token);
-      if (claimsError || !claimsData?.claims) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
 
-      userId = claimsData.claims.sub as string;
+      // Check if this is a server-to-server call (service role key) with userId in body
+      if (token === serviceRoleKey && bodyUserId) {
+        userId = bodyUserId;
+      } else {
+        const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+
+        const { data: claimsData, error: claimsError } = await tempClient.auth.getClaims(token);
+        if (claimsError || !claimsData?.claims) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        userId = claimsData.claims.sub as string;
+      }
     }
 
     // Create a supabase client (service role for virtual rooms, user-scoped otherwise)
