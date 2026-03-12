@@ -20,11 +20,38 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight } from "lucide-react";
+import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, SkipForward, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import ReactMarkdown from "react-markdown";
 import * as LucideIcons from "lucide-react";
+
+// Detects if agent response contains questions (heuristic)
+function responseHasQuestions(text: string): boolean {
+  if (!text) return false;
+  // Check last 40% of text for question marks
+  const lastPortion = text.slice(Math.floor(text.length * 0.6));
+  const questionMarks = (lastPortion.match(/\?/g) || []).length;
+  return questionMarks >= 1;
+}
+
+interface FlowStep {
+  index: number;
+  node_id: string;
+  agent_id: string;
+  agent_type: string;
+  agent_name: string;
+  input_prompt: string;
+}
+
+interface StepResult {
+  step_index: number;
+  agent_name: string;
+  output: string;
+  status: "completed" | "error" | "waiting_input" | "running";
+  chatHistory: Array<{ role: "user" | "assistant"; content: string }>;
+}
 
 function getIcon(iconName: string) {
   const Icon = (LucideIcons as any)[iconName] || LucideIcons.Bot;
@@ -226,11 +253,16 @@ export default function FlowEditor() {
   const [editPrompt, setEditPrompt] = useState("");
   const [configMode, setConfigMode] = useState(false);
 
-  // Execution
+  // Execution - phased mode
   const [execOpen, setExecOpen] = useState(false);
   const [execInput, setExecInput] = useState("");
   const [executing, setExecuting] = useState(false);
-  const [execResults, setExecResults] = useState<any[]>([]);
+  const [executionId, setExecutionId] = useState<string | null>(null);
+  const [flowSteps, setFlowSteps] = useState<FlowStep[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(-1);
+  const [stepResults, setStepResults] = useState<StepResult[]>([]);
+  const [stepChatInput, setStepChatInput] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
   const [execFinal, setExecFinal] = useState("");
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -379,30 +411,214 @@ export default function FlowEditor() {
     setConfigOpen(false);
   };
 
-  // Execute flow
+  // Phased execution: init → step-by-step with chat
   const handleExecute = async () => {
     if (!flowId || !execInput.trim()) return;
     setExecuting(true);
-    setExecResults([]);
+    setStepResults([]);
+    setFlowSteps([]);
+    setCurrentStepIndex(-1);
     setExecFinal("");
+    setExecutionId(null);
+
     try {
+      // Step 1: Init execution - get ordered steps
       const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
-        body: { flow_id: flowId, initial_input: execInput },
+        body: { mode: "init", flow_id: flowId, initial_input: execInput },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setExecResults(data?.node_results || []);
-      setExecFinal(data?.final_output || "");
-      if (data?.node_results?.some((r: any) => r.status === "error")) {
-        toast.error("Fluxo concluído com erros em algumas etapas");
-      } else {
-        toast.success("Fluxo executado com sucesso!");
-      }
+
+      setExecutionId(data.execution_id);
+      setFlowSteps(data.steps);
+
+      // Start executing first step
+      await executeStep(0, data.steps, data.execution_id, execInput);
     } catch (e: any) {
-      toast.error(e.message || "Erro na execução");
-    } finally {
+      toast.error(e.message || "Erro ao iniciar execução");
       setExecuting(false);
     }
+  };
+
+  const executeStep = async (
+    stepIndex: number,
+    steps: FlowStep[],
+    execId: string,
+    inputText: string,
+    history: Array<{ role: "user" | "assistant"; content: string }> = []
+  ) => {
+    if (stepIndex >= steps.length) {
+      // All steps done
+      const lastResult = stepResults[stepResults.length - 1] || null;
+      const finalOutput = lastResult?.output || inputText;
+      setExecFinal(finalOutput);
+      setExecuting(false);
+      setCurrentStepIndex(-1);
+
+      // Mark execution complete
+      await supabase.functions.invoke("agent-flow-execute", {
+        body: { mode: "complete", execution_id: execId, final_output: finalOutput, flow_id: flowId },
+      });
+      toast.success("Fluxo concluído com sucesso!");
+      return;
+    }
+
+    const step = steps[stepIndex];
+    setCurrentStepIndex(stepIndex);
+
+    // Build input with input_prompt if present
+    let contextMessage = inputText;
+    if (step.input_prompt) {
+      contextMessage = `${step.input_prompt}\n\n---\n\nConteúdo de entrada:\n${inputText}`;
+    }
+
+    // Add running placeholder
+    setStepResults((prev) => [
+      ...prev.filter((r) => r.step_index !== stepIndex),
+      {
+        step_index: stepIndex,
+        agent_name: step.agent_name,
+        output: "",
+        status: "running",
+        chatHistory: history,
+      },
+    ]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
+        body: {
+          mode: "step",
+          execution_id: execId,
+          node_id: step.node_id,
+          agent_id: step.agent_id,
+          input_text: contextMessage,
+          conversation_history: history,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.status === "error") throw new Error(data.error || data.output);
+
+      const output = data.output;
+      const hasQuestions = responseHasQuestions(output);
+
+      const newChatHistory = [...history, { role: "assistant" as const, content: output }];
+
+      setStepResults((prev) =>
+        prev.map((r) =>
+          r.step_index === stepIndex
+            ? {
+                ...r,
+                output,
+                status: hasQuestions ? "waiting_input" : "completed",
+                chatHistory: newChatHistory,
+              }
+            : r
+        )
+      );
+
+      if (hasQuestions) {
+        // Pause - wait for user input or skip
+        setExecuting(false);
+      } else {
+        // Auto-continue to next step
+        await executeStep(stepIndex + 1, steps, execId, output, []);
+      }
+    } catch (e: any) {
+      setStepResults((prev) =>
+        prev.map((r) =>
+          r.step_index === stepIndex
+            ? { ...r, output: e.message, status: "error", chatHistory: history }
+            : r
+        )
+      );
+      setExecuting(false);
+      toast.error(`Erro na etapa ${stepIndex + 1}: ${e.message}`);
+    }
+  };
+
+  // Handle user reply within a step
+  const handleStepChatReply = async (stepIndex: number) => {
+    if (!stepChatInput.trim() || !executionId || !flowSteps[stepIndex]) return;
+    const step = flowSteps[stepIndex];
+    const currentResult = stepResults.find((r) => r.step_index === stepIndex);
+    if (!currentResult) return;
+
+    setSendingChat(true);
+    const userMessage = stepChatInput.trim();
+    setStepChatInput("");
+
+    // Add user message to chat history
+    const updatedHistory = [
+      ...currentResult.chatHistory,
+      { role: "user" as const, content: userMessage },
+    ];
+
+    setStepResults((prev) =>
+      prev.map((r) =>
+        r.step_index === stepIndex
+          ? { ...r, chatHistory: updatedHistory, status: "running" }
+          : r
+      )
+    );
+
+    try {
+      const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
+        body: {
+          mode: "step",
+          execution_id: executionId,
+          node_id: step.node_id,
+          agent_id: step.agent_id,
+          input_text: userMessage,
+          conversation_history: updatedHistory,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.status === "error") throw new Error(data.error || data.output);
+
+      const output = data.output;
+      const hasQuestions = responseHasQuestions(output);
+      const newHistory = [...updatedHistory, { role: "assistant" as const, content: output }];
+
+      setStepResults((prev) =>
+        prev.map((r) =>
+          r.step_index === stepIndex
+            ? { ...r, output, status: hasQuestions ? "waiting_input" : "completed", chatHistory: newHistory }
+            : r
+        )
+      );
+
+      // If no more questions, don't auto-advance - let user click "Continue"
+    } catch (e: any) {
+      setStepResults((prev) =>
+        prev.map((r) =>
+          r.step_index === stepIndex
+            ? { ...r, status: "waiting_input" }
+            : r
+        )
+      );
+      toast.error(e.message || "Erro ao enviar resposta");
+    } finally {
+      setSendingChat(false);
+    }
+  };
+
+  // Continue to next step after chat
+  const handleContinueToNextStep = async (stepIndex: number) => {
+    const currentResult = stepResults.find((r) => r.step_index === stepIndex);
+    if (!currentResult || !executionId) return;
+
+    // Mark current step as completed
+    setStepResults((prev) =>
+      prev.map((r) =>
+        r.step_index === stepIndex ? { ...r, status: "completed" } : r
+      )
+    );
+
+    setExecuting(true);
+    // Use last assistant output as input for next step
+    await executeStep(stepIndex + 1, flowSteps, executionId, currentResult.output, []);
   };
 
   if (!flow) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-white/40" /></div>;
@@ -595,81 +811,212 @@ export default function FlowEditor() {
       </Dialog>
 
       {/* Execution Dialog */}
-      <Dialog open={execOpen} onOpenChange={setExecOpen}>
-        <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-2xl max-h-[80vh] overflow-auto">
+      <Dialog open={execOpen} onOpenChange={(open) => {
+        if (!open && !executing) {
+          setExecOpen(false);
+        }
+      }}>
+        <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Executar Fluxo</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              Executar Fluxo
+              {currentStepIndex >= 0 && flowSteps.length > 0 && (
+                <Badge variant="outline" className="text-xs border-[hsl(var(--accent))]/30 text-[hsl(var(--accent))]">
+                  Etapa {currentStepIndex + 1}/{flowSteps.length}
+                </Badge>
+              )}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <ScrollArea className="flex-1 overflow-auto">
+          <div className="space-y-4 pr-2">
             {/* Flow summary */}
             <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <p className="text-xs text-white/40 mb-2">Pipeline de execução:</p>
+              <p className="text-xs text-white/40 mb-2">Pipeline de execução (faseado):</p>
               <div className="flex flex-wrap items-center gap-1">
-                {nodes
-                  .sort((a, b) => a.sort_order - b.sort_order)
-                  .map((node, i) => {
-                    const info = getAgentInfo(node);
-                    const NodeIcon = getIcon(info.icon);
-                    return (
-                      <div key={node.id} className="flex items-center gap-1">
-                        <div className="flex items-center gap-1 rounded-md bg-white/10 px-2 py-1">
-                          <NodeIcon className="h-3 w-3 text-[hsl(var(--accent))]" />
-                          <span className="text-xs text-white/70">{info.name}</span>
-                        </div>
-                        {i < nodes.length - 1 && <ChevronRight className="h-3 w-3 text-white/20" />}
+                {(flowSteps.length > 0 ? flowSteps : nodes.sort((a, b) => a.sort_order - b.sort_order).map((n, i) => ({
+                  index: i,
+                  node_id: n.id,
+                  agent_id: n.agent_id,
+                  agent_type: n.agent_type,
+                  agent_name: getAgentInfo(n).name,
+                  input_prompt: n.input_prompt || "",
+                }))).map((step, i) => {
+                  const stepResult = stepResults.find(r => r.step_index === i);
+                  const isActive = currentStepIndex === i;
+                  const isDone = stepResult?.status === "completed";
+                  const isWaiting = stepResult?.status === "waiting_input";
+                  return (
+                    <div key={step.node_id} className="flex items-center gap-1">
+                      <div className={`flex items-center gap-1 rounded-md px-2 py-1 transition-all ${
+                        isActive ? "bg-[hsl(var(--accent))]/20 ring-1 ring-[hsl(var(--accent))]/40" :
+                        isDone ? "bg-green-500/10" :
+                        isWaiting ? "bg-amber-500/10 ring-1 ring-amber-400/30" :
+                        "bg-white/10"
+                      }`}>
+                        {stepResult?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
+                        {isWaiting && <MessageCircle className="h-3 w-3 text-amber-400" />}
+                        <span className={`text-xs ${isDone ? "text-green-400" : isWaiting ? "text-amber-300" : "text-white/70"}`}>
+                          {step.agent_name}
+                        </span>
                       </div>
-                    );
-                  })}
+                      {i < (flowSteps.length || nodes.length) - 1 && <ChevronRight className="h-3 w-3 text-white/20" />}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div>
-              <label className="text-sm text-white/60 mb-1 block">Entrada inicial</label>
-              <Textarea
-                placeholder="Digite o texto inicial que será processado pelo primeiro agente..."
-                value={execInput}
-                onChange={(e) => setExecInput(e.target.value)}
-                className="min-h-[80px] bg-white/5 border-white/10"
-              />
-            </div>
-            <Button onClick={handleExecute} disabled={executing || !execInput.trim()} className="gap-2 gradient-primary w-full">
-              {executing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {executing ? "Executando..." : "Iniciar Execução"}
-            </Button>
+            {/* Initial input */}
+            {stepResults.length === 0 && (
+              <>
+                <div>
+                  <label className="text-sm text-white/60 mb-1 block">Entrada inicial</label>
+                  <Textarea
+                    placeholder="Digite o texto inicial que será processado pelo primeiro agente..."
+                    value={execInput}
+                    onChange={(e) => setExecInput(e.target.value)}
+                    className="min-h-[80px] bg-white/5 border-white/10"
+                    disabled={executing}
+                  />
+                </div>
+                <Button onClick={handleExecute} disabled={executing || !execInput.trim()} className="gap-2 gradient-primary w-full">
+                  {executing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  {executing ? "Iniciando..." : "Iniciar Execução Faseada"}
+                </Button>
+              </>
+            )}
 
-            {execResults.length > 0 && (
-              <div className="space-y-3 mt-4">
+            {/* Step results with inline chat */}
+            {stepResults.length > 0 && (
+              <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-white/80">Resultados por Etapa</h3>
-                {execResults.map((r: any, i: number) => (
-                  <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                {stepResults.map((result) => (
+                  <div key={result.step_index} className={`rounded-lg border p-3 ${
+                    result.status === "waiting_input" ? "border-amber-400/30 bg-amber-500/5" :
+                    result.status === "error" ? "border-red-500/30 bg-red-500/5" :
+                    result.status === "running" ? "border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5" :
+                    "border-white/10 bg-white/5"
+                  }`}>
                     <div className="flex items-center gap-2 mb-2">
-                      <Badge variant={r.status === "completed" ? "default" : "destructive"} className="text-xs">
-                        Etapa {i + 1}
+                      <Badge variant={
+                        result.status === "completed" ? "default" :
+                        result.status === "waiting_input" ? "outline" :
+                        result.status === "running" ? "secondary" :
+                        "destructive"
+                      } className={`text-xs ${result.status === "waiting_input" ? "border-amber-400/50 text-amber-300" : ""}`}>
+                        {result.status === "running" && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                        {result.status === "waiting_input" && <MessageCircle className="h-3 w-3 mr-1" />}
+                        Etapa {result.step_index + 1}
                       </Badge>
-                      <span className="text-xs text-white/40">{r.agent_name || "Agente"}</span>
+                      <span className="text-xs text-white/40">{result.agent_name}</span>
+                      {result.status === "waiting_input" && (
+                        <span className="text-xs text-amber-300/70 ml-auto">Aguardando resposta</span>
+                      )}
                     </div>
-                    {r.output_text && (
-                      <pre className="text-xs text-white/70 whitespace-pre-wrap max-h-40 overflow-auto">{r.output_text}</pre>
+
+                    {/* Chat history for this step */}
+                    {result.chatHistory.length > 0 && (
+                      <div className="space-y-2 mb-3">
+                        {result.chatHistory.map((msg, msgIdx) => (
+                          <div key={msgIdx} className={`rounded-lg p-2 text-sm ${
+                            msg.role === "assistant"
+                              ? "bg-white/5 border border-white/5"
+                              : "bg-[hsl(var(--accent))]/10 border border-[hsl(var(--accent))]/10 ml-8"
+                          }`}>
+                            <span className="text-[10px] font-medium mb-1 block text-white/30">
+                              {msg.role === "assistant" ? result.agent_name : "Você"}
+                            </span>
+                            <div className="text-xs text-white/70 prose prose-invert prose-xs max-w-none">
+                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
-                    {r.status === "error" && (
-                      <div className="mt-1 rounded bg-red-500/10 border border-red-500/20 p-2">
+
+                    {/* Show last output if no chat history */}
+                    {result.chatHistory.length === 0 && result.output && (
+                      <div className="text-xs text-white/70 prose prose-invert prose-xs max-w-none max-h-60 overflow-auto">
+                        <ReactMarkdown>{result.output}</ReactMarkdown>
+                      </div>
+                    )}
+
+                    {/* Error display */}
+                    {result.status === "error" && (
+                      <div className="mt-2 rounded bg-red-500/10 border border-red-500/20 p-2">
                         <p className="text-xs text-red-400 font-medium">❌ Erro nesta etapa</p>
-                        {r.output_text && (
-                          <p className="text-xs text-red-300/70 mt-1">{r.output_text.slice(0, 300)}</p>
-                        )}
+                        <p className="text-xs text-red-300/70 mt-1">{result.output?.slice(0, 300)}</p>
+                      </div>
+                    )}
+
+                    {/* Inline chat input for waiting steps */}
+                    {result.status === "waiting_input" && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Responda às perguntas do agente..."
+                            value={stepChatInput}
+                            onChange={(e) => setStepChatInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleStepChatReply(result.step_index);
+                              }
+                            }}
+                            className="bg-white/5 border-white/10 text-sm"
+                            disabled={sendingChat}
+                          />
+                          <Button
+                            size="icon"
+                            onClick={() => handleStepChatReply(result.step_index)}
+                            disabled={sendingChat || !stepChatInput.trim()}
+                            className="shrink-0 gradient-primary"
+                          >
+                            {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full gap-1 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+                          onClick={() => handleContinueToNextStep(result.step_index)}
+                        >
+                          <SkipForward className="h-3 w-3" />
+                          Pular para próxima etapa
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Continue button for completed steps that were chatted */}
+                    {result.status === "completed" && result.chatHistory.length > 1 &&
+                      result.step_index === Math.max(...stepResults.map(r => r.step_index)) &&
+                      !execFinal && !executing && result.step_index < flowSteps.length - 1 && (
+                      <div className="mt-3">
+                        <Button
+                          className="w-full gap-2 gradient-primary"
+                          onClick={() => handleContinueToNextStep(result.step_index)}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                          Continuar para Etapa {result.step_index + 2}
+                        </Button>
                       </div>
                     )}
                   </div>
                 ))}
+
+                {/* Final result */}
                 {execFinal && (
                   <div className="rounded-lg border border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/10 p-4">
-                    <h4 className="text-sm font-semibold text-[hsl(var(--accent))] mb-2">Resultado Final</h4>
-                    <pre className="text-sm text-white/80 whitespace-pre-wrap">{execFinal}</pre>
+                    <h4 className="text-sm font-semibold text-[hsl(var(--accent))] mb-2">✅ Resultado Final</h4>
+                    <div className="text-sm text-white/80 prose prose-invert prose-sm max-w-none">
+                      <ReactMarkdown>{execFinal}</ReactMarkdown>
+                    </div>
                   </div>
                 )}
               </div>
             )}
           </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
