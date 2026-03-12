@@ -961,9 +961,6 @@ export default function FlowEditor() {
                         </Button>
                       </div>
                     )}
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 ))}
 
@@ -971,8 +968,8 @@ export default function FlowEditor() {
                 {execFinal && (
                   <div className="rounded-lg border border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/10 p-4">
                     <h4 className="text-sm font-semibold text-[hsl(var(--accent))] mb-2">✅ Resultado Final</h4>
-                    <div className="text-sm text-white/80 prose prose-invert prose-sm max-w-none">
-                      <ReactMarkdown>{execFinal}</ReactMarkdown>
+                    <div className="text-sm text-white/80 prose prose-invert prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{execFinal}</ReactMarkdown>
                     </div>
                   </div>
                 )}
