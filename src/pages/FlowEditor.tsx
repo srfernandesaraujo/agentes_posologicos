@@ -548,16 +548,16 @@ export default function FlowEditor() {
     const userMessage = stepChatInput.trim();
     setStepChatInput("");
 
-    // Add user message to chat history
-    const updatedHistory = [
-      ...currentResult.chatHistory,
+    const priorHistory = currentResult.chatHistory;
+    const optimisticHistory = [
+      ...priorHistory,
       { role: "user" as const, content: userMessage },
     ];
 
     setStepResults((prev) =>
       prev.map((r) =>
         r.step_index === stepIndex
-          ? { ...r, chatHistory: updatedHistory, status: "running" }
+          ? { ...r, chatHistory: optimisticHistory, status: "running" }
           : r
       )
     );
@@ -570,7 +570,7 @@ export default function FlowEditor() {
           node_id: step.node_id,
           agent_id: step.agent_id,
           input_text: userMessage,
-          conversation_history: updatedHistory,
+          conversation_history: priorHistory,
         },
       });
 
@@ -579,7 +579,7 @@ export default function FlowEditor() {
 
       const output = data.output;
       const hasQuestions = responseHasQuestions(output);
-      const newHistory = [...updatedHistory, { role: "assistant" as const, content: output }];
+      const newHistory = [...optimisticHistory, { role: "assistant" as const, content: output }];
 
       setStepResults((prev) =>
         prev.map((r) =>
@@ -589,7 +589,10 @@ export default function FlowEditor() {
         )
       );
 
-      // If no more questions, don't auto-advance - let user click "Continue"
+      if (!hasQuestions) {
+        setExecuting(true);
+        await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
+      }
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>
@@ -952,8 +955,8 @@ export default function FlowEditor() {
                     {/* Inline chat input for waiting steps */}
                     {result.status === "waiting_input" && (
                       <div className="mt-3 space-y-2">
-                        <div className="flex gap-2">
-                          <Input
+                        <div className="space-y-2">
+                          <Textarea
                             placeholder="Responda às perguntas do agente..."
                             value={stepChatInput}
                             onChange={(e) => setStepChatInput(e.target.value)}
@@ -963,27 +966,29 @@ export default function FlowEditor() {
                                 handleStepChatReply(result.step_index);
                               }
                             }}
-                            className="bg-white/5 border-white/10 text-sm"
+                            className="min-h-[88px] bg-white/5 border-white/10 text-sm"
                             disabled={sendingChat}
                           />
-                          <Button
-                            size="icon"
-                            onClick={() => handleStepChatReply(result.step_index)}
-                            disabled={sendingChat || !stepChatInput.trim()}
-                            className="shrink-0 gradient-primary"
-                          >
-                            {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              size="icon"
+                              onClick={() => handleStepChatReply(result.step_index)}
+                              disabled={sendingChat || !stepChatInput.trim()}
+                              className="shrink-0 gradient-primary"
+                            >
+                              {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="flex-1 gap-1 border border-white/20 bg-white/5 text-white/80 hover:text-white hover:bg-white/15"
+                              onClick={() => handleContinueToNextStep(result.step_index)}
+                            >
+                              <SkipForward className="h-3 w-3" />
+                              Pular para próxima etapa
+                            </Button>
+                          </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full gap-1 border border-white/20 bg-white/5 text-white/80 hover:text-white hover:bg-white/15"
-                          onClick={() => handleContinueToNextStep(result.step_index)}
-                        >
-                          <SkipForward className="h-3 w-3" />
-                          Pular para próxima etapa
-                        </Button>
                       </div>
                     )}
 
