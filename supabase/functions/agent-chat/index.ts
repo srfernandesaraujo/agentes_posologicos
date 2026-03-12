@@ -5665,9 +5665,55 @@ Deno.serve(async (req) => {
       // Use DB-stored prompt if available (admin override), otherwise use hardcoded
       const basePrompt = (builtInAgent as any).system_prompt && (builtInAgent as any).system_prompt.trim().length > 0
         ? (builtInAgent as any).system_prompt
-        : (AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT);
+        : (builtInAgent.slug === "super-agente" ? SUPER_AGENT_BASE_PROMPT : (AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT));
       let systemPrompt = basePrompt + GLOBAL_TABLE_INSTRUCTION;
       let enrichedInput = input;
+
+      // Super Agente: inject dynamic agent catalog + marketplace
+      if (builtInAgent.slug === "super-agente") {
+        try {
+          // Fetch all native agents
+          const { data: nativeAgents } = await supabase
+            .from("agents")
+            .select("name, slug, description, category, credit_cost")
+            .eq("active", true)
+            .neq("slug", "super-agente")
+            .order("category");
+          
+          // Fetch marketplace agents
+          const { data: marketplaceAgents } = await supabase
+            .from("custom_agents")
+            .select("name, description, published_to_marketplace")
+            .eq("published_to_marketplace", true)
+            .eq("status", "published");
+
+          let catalog = "\n\n<CATALOGO_AGENTES_NATIVOS>\n";
+          if (nativeAgents && nativeAgents.length > 0) {
+            let currentCat = "";
+            for (const a of nativeAgents) {
+              if (a.category !== currentCat) {
+                currentCat = a.category;
+                catalog += `\n## ${currentCat}\n`;
+              }
+              catalog += `- **${a.name}** (${a.credit_cost} crédito${a.credit_cost !== 1 ? 's' : ''}): ${a.description}\n`;
+            }
+          }
+          catalog += "</CATALOGO_AGENTES_NATIVOS>\n";
+
+          if (marketplaceAgents && marketplaceAgents.length > 0) {
+            catalog += "\n<CATALOGO_MARKETPLACE>\nAgentes criados pela comunidade e disponíveis no Marketplace:\n";
+            for (const a of marketplaceAgents) {
+              catalog += `- **${a.name}**: ${a.description || 'Sem descrição'}\n`;
+            }
+            catalog += "</CATALOGO_MARKETPLACE>\n";
+          }
+
+          systemPrompt += catalog;
+          console.log(`Super Agente: injected ${nativeAgents?.length || 0} native + ${marketplaceAgents?.length || 0} marketplace agents`);
+        } catch (e) {
+          console.warn("Super Agente catalog fetch error:", e.message);
+        }
+      }
 
       // PubMed real-time search for especialista-pubmed
       if (builtInAgent.slug === "especialista-pubmed") {
