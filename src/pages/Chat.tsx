@@ -13,7 +13,7 @@ import { useCustomAgent } from "@/hooks/useCustomAgents";
 import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File, Settings2, MoreVertical, Trash2, Download, Pencil } from "lucide-react";
+import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File, Settings2, MoreVertical, Trash2, Download, Pencil, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { exportConversationPdf } from "@/lib/exportConversationPdf";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InputTemplates } from "@/components/chat/InputTemplates";
 import { ConversationPicker } from "@/components/chat/ConversationPicker";
+import { AgentConversationsPicker } from "@/components/chat/AgentConversationsPicker";
 import { MessageActions } from "@/components/chat/MessageActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
 import { toast } from "sonner";
@@ -240,6 +241,7 @@ export default function Chat() {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [attachedConversations, setAttachedConversations] = useState<{ title: string; content: string }[]>([]);
   const [showConversationPicker, setShowConversationPicker] = useState(false);
+  const [showAgentPicker, setShowAgentPicker] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -863,6 +865,13 @@ export default function Chat() {
                   <MessageSquare className="h-4 w-4" />
                   Conversas
                 </button>
+                <button
+                  onClick={() => { setShowAgentPicker(true); setAttachMenuOpen(false); }}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <Users className="h-4 w-4" />
+                  Agente completo
+                </button>
               </PopoverContent>
             </Popover>
             <InputTemplates
@@ -904,6 +913,14 @@ export default function Chat() {
       open={showConversationPicker}
       onClose={() => setShowConversationPicker(false)}
       onSelect={(conv) => setAttachedConversations(prev => [...prev, conv])}
+      excludeAgentId={actualAgentId}
+    />
+
+    {/* Agent Conversations Picker */}
+    <AgentConversationsPicker
+      open={showAgentPicker}
+      onClose={() => setShowAgentPicker(false)}
+      onSelect={(agents) => setAttachedConversations(prev => [...prev, ...agents])}
       excludeAgentId={actualAgentId}
     />
     </>
