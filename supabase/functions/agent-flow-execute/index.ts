@@ -10,17 +10,56 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { flow_id, initial_input, user_id } = await req.json();
-    if (!flow_id || !initial_input || !user_id) {
-      return new Response(JSON.stringify({ error: "flow_id, initial_input e user_id são obrigatórios" }), {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Authenticate user
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.replace("Bearer ", "");
+      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: claimsData, error: claimsError } = await tempClient.auth.getClaims(token);
+      if (!claimsError && claimsData?.claims) {
+        userId = claimsData.claims.sub as string;
+      }
+    }
+
+    const { flow_id, initial_input } = await req.json();
+
+    if (!flow_id || !initial_input) {
+      return new Response(JSON.stringify({ error: "flow_id e initial_input são obrigatórios" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Autenticação necessária" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, serviceKey);
+
+    // Verify flow ownership
+    const { data: flowData, error: flowError } = await supabase
+      .from("agent_flows")
+      .select("id, user_id")
+      .eq("id", flow_id)
+      .single();
+
+    if (flowError || !flowData || flowData.user_id !== userId) {
+      return new Response(JSON.stringify({ error: "Fluxo não encontrado ou sem permissão" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Load flow nodes ordered by sort_order
     const { data: nodes, error: nodesErr } = await supabase
@@ -75,13 +114,13 @@ Deno.serve(async (req) => {
     // Create execution record
     const { data: execution, error: execErr } = await supabase
       .from("agent_flow_executions")
-      .insert({ flow_id, user_id, status: "running", initial_input })
+      .insert({ flow_id, user_id: userId, status: "running", initial_input })
       .select()
       .single();
 
     if (execErr) throw execErr;
 
-    // Load agent details
+    // Load agent details and validate all exist
     const nativeIds = executionOrder.filter((n: any) => n.agent_type === "native").map((n: any) => n.agent_id);
     const customIds = executionOrder.filter((n: any) => n.agent_type === "custom").map((n: any) => n.agent_id);
 
@@ -93,6 +132,20 @@ Deno.serve(async (req) => {
     const agentMap = new Map<string, any>();
     (nativeRes.data || []).forEach((a: any) => agentMap.set(a.id, { ...a, type: "native" }));
     (customRes.data || []).forEach((a: any) => agentMap.set(a.id, { ...a, type: "custom" }));
+
+    // Validate all nodes have valid agents
+    for (const node of executionOrder) {
+      if (!agentMap.has(node.agent_id)) {
+        const errMsg = `Agente não encontrado para o nó (agent_id: ${node.agent_id}, tipo: ${node.agent_type}). Verifique se o agente ainda existe.`;
+        await supabase
+          .from("agent_flow_executions")
+          .update({ status: "error", final_output: errMsg, completed_at: new Date().toISOString() })
+          .eq("id", execution.id);
+        return new Response(JSON.stringify({ execution_id: execution.id, error: errMsg, node_results: [], final_output: "" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     // Execute sequentially
     let currentInput = initial_input;
@@ -122,8 +175,7 @@ Deno.serve(async (req) => {
           contextMessage = `${node.input_prompt}\n\n---\n\nConteúdo de entrada:\n${currentInput}`;
         }
 
-        // Call agent-chat function
-        const agentId = node.agent_id;
+        // Call agent-chat function with service role key for server-to-server auth
         const chatResponse = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
           method: "POST",
           headers: {
@@ -131,55 +183,31 @@ Deno.serve(async (req) => {
             Authorization: `Bearer ${serviceKey}`,
           },
           body: JSON.stringify({
-            agentId: agentId,
+            agentId: node.agent_id,
             input: contextMessage,
-            userId: user_id,
+            userId: userId,
             history: [],
             skipCredits: true,
           }),
         });
 
+        const responseText = await chatResponse.text();
+
         if (!chatResponse.ok) {
-          const errText = await chatResponse.text();
-          throw new Error(`Agent error: ${errText}`);
+          throw new Error(`Erro do agente "${agentName}": ${responseText}`);
         }
 
-        // Read streamed response
-        const reader = chatResponse.body?.getReader();
-        const decoder = new TextDecoder();
+        // Parse JSON response from agent-chat (returns { output: "..." })
         let fullOutput = "";
-
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            // Parse SSE
-            for (const line of chunk.split("\n")) {
-              if (!line.startsWith("data: ")) continue;
-              const jsonStr = line.slice(6).trim();
-              if (jsonStr === "[DONE]") continue;
-              try {
-                const parsed = JSON.parse(jsonStr);
-                const content = parsed.choices?.[0]?.delta?.content;
-                if (content) fullOutput += content;
-              } catch {
-                // Non-JSON response, treat as plain text
-                if (jsonStr && jsonStr !== "[DONE]") fullOutput += jsonStr;
-              }
-            }
-          }
+        try {
+          const json = JSON.parse(responseText);
+          fullOutput = json.output || json.response || responseText;
+        } catch {
+          fullOutput = responseText;
         }
 
-        // If no streamed content, try reading as plain text/json
-        if (!fullOutput) {
-          try {
-            const text = await chatResponse.text();
-            const json = JSON.parse(text);
-            fullOutput = json.response || json.output || text;
-          } catch {
-            // already consumed
-          }
+        if (!fullOutput || fullOutput.trim().length === 0) {
+          throw new Error(`Agente "${agentName}" retornou resposta vazia`);
         }
 
         // Update node result
@@ -195,6 +223,8 @@ Deno.serve(async (req) => {
         nodeResults.push({
           node_id: node.id,
           agent_name: agentName,
+          agent_id: node.agent_id,
+          agent_type: node.agent_type,
           input_text: currentInput,
           output_text: fullOutput,
           status: "completed",
@@ -210,6 +240,8 @@ Deno.serve(async (req) => {
         nodeResults.push({
           node_id: node.id,
           agent_name: agentName,
+          agent_id: node.agent_id,
+          agent_type: node.agent_type,
           input_text: currentInput,
           output_text: e.message,
           status: "error",
@@ -218,7 +250,7 @@ Deno.serve(async (req) => {
         // Stop execution on error
         await supabase
           .from("agent_flow_executions")
-          .update({ status: "error", final_output: `Erro no nó ${agentName}: ${e.message}`, completed_at: new Date().toISOString() })
+          .update({ status: "error", final_output: `Erro no nó "${agentName}": ${e.message}`, completed_at: new Date().toISOString() })
           .eq("id", execution.id);
 
         return new Response(
