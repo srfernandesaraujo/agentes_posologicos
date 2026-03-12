@@ -3,7 +3,7 @@ import { useAgents, CATEGORIES, CATEGORY_COLORS } from "@/hooks/useAgents";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { usePurchasedAgents, useMarketplaceAgents } from "@/hooks/useMarketplace";
 import { AgentCard } from "@/components/agents/AgentCard";
-import { Bot, Search, ArrowRight, ShoppingBag, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
+import { Bot, Search, ArrowRight, ShoppingBag, ChevronDown, ChevronRight, Sparkles, Compass } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
