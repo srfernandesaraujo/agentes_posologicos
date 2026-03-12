@@ -387,12 +387,17 @@ export default function FlowEditor() {
     setExecFinal("");
     try {
       const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
-        body: { flow_id: flowId, initial_input: execInput, user_id: user?.id },
+        body: { flow_id: flowId, initial_input: execInput },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       setExecResults(data?.node_results || []);
       setExecFinal(data?.final_output || "");
-      toast.success("Fluxo executado com sucesso!");
+      if (data?.node_results?.some((r: any) => r.status === "error")) {
+        toast.error("Fluxo concluído com erros em algumas etapas");
+      } else {
+        toast.success("Fluxo executado com sucesso!");
+      }
     } catch (e: any) {
       toast.error(e.message || "Erro na execução");
     } finally {
