@@ -50,21 +50,38 @@ function getIcon(iconName: string) {
   return Icon;
 }
 
-// Detect if agent output contains questions requiring user input
+// Detect if agent output contains questions DIRECTED AT THE USER (not pedagogical questions)
 function detectQuestions(output: string): boolean {
-  // Check last 30% of the output for questions (agents typically ask at the end)
+  // Check for the explicit marker first
+  if (/PERGUNTAS PARA O USUÁRIO:/i.test(output)) {
+    return true;
+  }
+  
+  // Check last 15% of the output for direct conversational questions
   const lines = output.split("\n").map(l => l.trim()).filter(Boolean);
-  const lastChunkStart = Math.max(0, Math.floor(lines.length * 0.7));
+  const lastChunkStart = Math.max(0, Math.floor(lines.length * 0.85));
   const tailLines = lines.slice(lastChunkStart);
   
-  // Count question marks in tail lines (handles multiple "?" on same line too)
-  const questionCount = tailLines.reduce((count, line) => {
-    const matches = line.match(/\?/g);
-    return count + (matches ? matches.length : 0);
-  }, 0);
+  // Patterns that indicate the agent is asking the USER something (not pedagogical)
+  const userQuestionPatterns = [
+    /^(qual|quais|que|como|onde|quando|por que|você|vocês|gostaria|prefere|deseja|quer)\b.*\?$/i,
+    /^(me (diga|informe|conte)|poderia (me |nos )?informar|poderia (me |nos )?dizer)/i,
+    /escolh(a|er|e)/i,
+    /^(opção|alternativa)\s*\d/i,
+  ];
   
-  // Even a single question near the end should pause the flow
-  return questionCount >= 1;
+  // Only count questions that match user-directed patterns
+  const userQuestions = tailLines.filter(line => {
+    if (!line.endsWith("?")) return false;
+    // Skip if it looks like a pedagogical/content question (numbered, in a section)
+    if (/^\d+[\.\)]/.test(line)) return false;
+    if (/^[a-z]\)/.test(line)) return false;
+    if (/^[-•▸►]/.test(line)) return false;
+    // Check if it matches user-directed patterns
+    return userQuestionPatterns.some(p => p.test(line));
+  });
+  
+  return userQuestions.length >= 1;
 }
 
 // Strip trailing interaction suggestions that agents add in flow mode
@@ -72,15 +89,27 @@ function stripFlowSuggestions(output: string): string {
   const lines = output.split("\n");
   let cutIndex = lines.length;
   
+  // Suggestion header patterns
+  const suggestionHeaders = [
+    /^(agora posso te ajudar com|posso te ajudar com|quer que eu|deseja que eu|gostaria que eu)/i,
+    /^(posso também|também posso|se precisar|caso precise|precisa de algo mais)/i,
+    /^(outras opções|próximos passos sugeridos|sugestões|o que mais posso fazer)/i,
+    /^(estou à disposição|fico à disposição|conte comigo)/i,
+    /^(escolha uma das opções|selecione uma opção)/i,
+  ];
+  
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
     if (!line) { cutIndex = i; continue; }
-    if (/^(Agora posso te ajudar com|Posso te ajudar com|Quer que eu|Deseja que eu|Gostaria que eu)/i.test(line)) {
+    
+    // Check if line matches a suggestion header
+    if (suggestionHeaders.some(p => p.test(line))) {
       cutIndex = i;
       continue;
     }
-    // Short action-like suggestion lines near the end
-    if (line.length < 60 && !line.endsWith(".") && !line.endsWith("?") && !line.startsWith("|") && !line.startsWith("#") && i > lines.length - 10 && cutIndex < lines.length) {
+    
+    // Short action-like suggestion lines near the end (e.g., "Gerar outro caso mais complexo")
+    if (line.length < 80 && !line.endsWith(".") && !line.endsWith("?") && !line.endsWith(":") && !line.startsWith("|") && !line.startsWith("#") && !line.startsWith("*") && !line.startsWith("-") && i > lines.length - 12 && cutIndex < lines.length) {
       cutIndex = i;
       continue;
     }
@@ -535,6 +564,7 @@ export default function FlowEditor() {
           previous_stage_output: previousStageOutput,
           stage_number: stepIndex + 1,
           total_stages: steps.length,
+          pipeline_context: steps.map(s => ({ agent_name: s.agent_name })),
         },
       });
 
@@ -625,6 +655,7 @@ export default function FlowEditor() {
           previous_stage_output: previousStageOutput,
           stage_number: stepIndex + 1,
           total_stages: flowSteps.length,
+          pipeline_context: flowSteps.map(s => ({ agent_name: s.agent_name })),
         },
       });
 
