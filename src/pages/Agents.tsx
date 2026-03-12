@@ -43,10 +43,13 @@ export default function Agents() {
       (!search || a.name.toLowerCase().includes(lowerSearch) || a.description.toLowerCase().includes(lowerSearch))
   );
 
+  const superAgent = useMemo(() => agents.find((a) => a.slug === "super-agente"), [agents]);
+
   const agentsByCategory = useMemo(() => {
     const map: Record<string, typeof agents> = {};
     for (const cat of CATEGORIES) {
       const catAgents = agents.filter((a) => {
+        if (a.slug === "super-agente") return false;
         const matchesSearch =
           !search || a.name.toLowerCase().includes(lowerSearch) || a.description.toLowerCase().includes(lowerSearch);
         return a.category === cat && matchesSearch;
