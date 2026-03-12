@@ -20,21 +20,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, SkipForward, MessageCircle } from "lucide-react";
+import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import * as LucideIcons from "lucide-react";
-
-// Detects if agent response contains questions (heuristic)
-function responseHasQuestions(text: string): boolean {
-  if (!text) return false;
-  // Check last 40% of text for question marks
-  const lastPortion = text.slice(Math.floor(text.length * 0.6));
-  const questionMarks = (lastPortion.match(/\?/g) || []).length;
-  return questionMarks >= 1;
-}
 
 interface FlowStep {
   index: number;
@@ -472,6 +464,10 @@ export default function FlowEditor() {
       contextMessage = `${step.input_prompt}\n\n---\n\nConteúdo de entrada:\n${inputText}`;
     }
 
+    // Get previous stage output for context chaining
+    const prevResult = stepIndex > 0 ? stepResults.find(r => r.step_index === stepIndex - 1) : null;
+    const previousStageOutput = prevResult?.output || "";
+
     // Add running placeholder
     setStepResults((prev) => [
       ...prev.filter((r) => r.step_index !== stepIndex),
@@ -493,6 +489,9 @@ export default function FlowEditor() {
           agent_id: step.agent_id,
           input_text: contextMessage,
           conversation_history: history,
+          previous_stage_output: previousStageOutput,
+          stage_number: stepIndex + 1,
+          total_stages: steps.length,
         },
       });
 
@@ -500,9 +499,6 @@ export default function FlowEditor() {
       if (data?.status === "error") throw new Error(data.error || data.output);
 
       const output = data.output;
-      const hasQuestions = responseHasQuestions(output);
-
-      const newChatHistory = [...history, { role: "assistant" as const, content: output }];
 
       setStepResults((prev) =>
         prev.map((r) =>
@@ -510,20 +506,15 @@ export default function FlowEditor() {
             ? {
                 ...r,
                 output,
-                status: hasQuestions ? "waiting_input" : "completed",
-                chatHistory: newChatHistory,
+                status: "completed",
+                chatHistory: [...history, { role: "assistant" as const, content: output }],
               }
             : r
         )
       );
 
-      if (hasQuestions) {
-        // Pause - wait for user input or skip
-        setExecuting(false);
-      } else {
-        // Auto-continue to next step
-        await executeStep(stepIndex + 1, steps, execId, output, []);
-      }
+      // Always auto-continue to next step (no question detection in flow mode)
+      await executeStep(stepIndex + 1, steps, execId, output, []);
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>
@@ -563,6 +554,9 @@ export default function FlowEditor() {
     );
 
     try {
+      const currentResult = stepResults.find((r) => r.step_index === stepIndex);
+      const previousStageOutput = stepIndex > 0 ? stepResults.find(r => r.step_index === stepIndex - 1)?.output || "" : "";
+
       const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
         body: {
           mode: "step",
@@ -571,6 +565,9 @@ export default function FlowEditor() {
           agent_id: step.agent_id,
           input_text: userMessage,
           conversation_history: priorHistory,
+          previous_stage_output: previousStageOutput,
+          stage_number: stepIndex + 1,
+          total_stages: flowSteps.length,
         },
       });
 
@@ -578,21 +575,19 @@ export default function FlowEditor() {
       if (data?.status === "error") throw new Error(data.error || data.output);
 
       const output = data.output;
-      const hasQuestions = responseHasQuestions(output);
       const newHistory = [...optimisticHistory, { role: "assistant" as const, content: output }];
 
       setStepResults((prev) =>
         prev.map((r) =>
           r.step_index === stepIndex
-            ? { ...r, output, status: hasQuestions ? "waiting_input" : "completed", chatHistory: newHistory }
+            ? { ...r, output, status: "completed", chatHistory: newHistory }
             : r
         )
       );
 
-      if (!hasQuestions) {
-        setExecuting(true);
-        await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
-      }
+      // Auto-advance to next step
+      setExecuting(true);
+      await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>
@@ -847,18 +842,15 @@ export default function FlowEditor() {
                   const stepResult = stepResults.find(r => r.step_index === i);
                   const isActive = currentStepIndex === i;
                   const isDone = stepResult?.status === "completed";
-                  const isWaiting = stepResult?.status === "waiting_input";
                   return (
                     <div key={step.node_id} className="flex items-center gap-1">
                       <div className={`flex items-center gap-1 rounded-md px-2 py-1 transition-all ${
                         isActive ? "bg-[hsl(var(--accent))]/20 ring-1 ring-[hsl(var(--accent))]/40" :
                         isDone ? "bg-green-500/10" :
-                        isWaiting ? "bg-amber-500/10 ring-1 ring-amber-400/30" :
                         "bg-white/10"
                       }`}>
                         {stepResult?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
-                        {isWaiting && <MessageCircle className="h-3 w-3 text-amber-400" />}
-                        <span className={`text-xs ${isDone ? "text-green-400" : isWaiting ? "text-amber-300" : "text-white/70"}`}>
+                        <span className={`text-xs ${isDone ? "text-green-400" : "text-white/70"}`}>
                           {step.agent_name}
                         </span>
                       </div>
@@ -884,18 +876,17 @@ export default function FlowEditor() {
                 </div>
                 <Button onClick={handleExecute} disabled={executing || !execInput.trim()} className="gap-2 gradient-primary w-full">
                   {executing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                  {executing ? "Iniciando..." : "Iniciar Execução Faseada"}
+                  {executing ? "Iniciando..." : "Iniciar Execução"}
                 </Button>
               </>
             )}
 
-            {/* Step results with inline chat */}
+            {/* Step results */}
             {stepResults.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-white/80">Resultados por Etapa</h3>
                 {stepResults.map((result) => (
                   <div key={result.step_index} className={`rounded-lg border p-3 ${
-                    result.status === "waiting_input" ? "border-amber-400/30 bg-amber-500/5" :
                     result.status === "error" ? "border-red-500/30 bg-red-500/5" :
                     result.status === "running" ? "border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5" :
                     "border-white/10 bg-white/5"
@@ -903,18 +894,13 @@ export default function FlowEditor() {
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant={
                         result.status === "completed" ? "default" :
-                        result.status === "waiting_input" ? "outline" :
                         result.status === "running" ? "secondary" :
                         "destructive"
-                      } className={`text-xs ${result.status === "waiting_input" ? "border-amber-400/50 text-amber-300" : ""}`}>
+                      } className="text-xs">
                         {result.status === "running" && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                        {result.status === "waiting_input" && <MessageCircle className="h-3 w-3 mr-1" />}
                         Etapa {result.step_index + 1}
                       </Badge>
                       <span className="text-xs text-white/40">{result.agent_name}</span>
-                      {result.status === "waiting_input" && (
-                        <span className="text-xs text-amber-300/70 ml-auto">Aguardando resposta</span>
-                      )}
                     </div>
 
                     {/* Chat history for this step */}
@@ -929,8 +915,8 @@ export default function FlowEditor() {
                             <span className="text-[10px] font-medium mb-1 block text-white/30">
                               {msg.role === "assistant" ? result.agent_name : "Você"}
                             </span>
-                            <div className="text-xs text-white/70 prose prose-invert prose-xs max-w-none">
-                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            <div className="text-sm text-white/70 prose prose-invert prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                             </div>
                           </div>
                         ))}
@@ -939,8 +925,8 @@ export default function FlowEditor() {
 
                     {/* Show last output if no chat history */}
                     {result.chatHistory.length === 0 && result.output && (
-                      <div className="text-xs text-white/70 prose prose-invert prose-xs max-w-none max-h-60 overflow-auto">
-                        <ReactMarkdown>{result.output}</ReactMarkdown>
+                      <div className="text-sm text-white/70 prose prose-invert prose-sm max-w-none max-h-60 overflow-auto [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.output}</ReactMarkdown>
                       </div>
                     )}
 
@@ -949,46 +935,6 @@ export default function FlowEditor() {
                       <div className="mt-2 rounded bg-red-500/10 border border-red-500/20 p-2">
                         <p className="text-xs text-red-400 font-medium">❌ Erro nesta etapa</p>
                         <p className="text-xs text-red-300/70 mt-1">{result.output?.slice(0, 300)}</p>
-                      </div>
-                    )}
-
-                    {/* Inline chat input for waiting steps */}
-                    {result.status === "waiting_input" && (
-                      <div className="mt-3 space-y-2">
-                        <div className="space-y-2">
-                          <Textarea
-                            placeholder="Responda às perguntas do agente..."
-                            value={stepChatInput}
-                            onChange={(e) => setStepChatInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                handleStepChatReply(result.step_index);
-                              }
-                            }}
-                            className="min-h-[88px] bg-white/5 border-white/10 text-sm"
-                            disabled={sendingChat}
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              size="icon"
-                              onClick={() => handleStepChatReply(result.step_index)}
-                              disabled={sendingChat || !stepChatInput.trim()}
-                              className="shrink-0 gradient-primary"
-                            >
-                              {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="flex-1 gap-1 border border-white/20 bg-white/5 text-white/80 hover:text-white hover:bg-white/15"
-                              onClick={() => handleContinueToNextStep(result.step_index)}
-                            >
-                              <SkipForward className="h-3 w-3" />
-                              Pular para próxima etapa
-                            </Button>
-                          </div>
-                        </div>
                       </div>
                     )}
 
@@ -1013,8 +959,8 @@ export default function FlowEditor() {
                 {execFinal && (
                   <div className="rounded-lg border border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/10 p-4">
                     <h4 className="text-sm font-semibold text-[hsl(var(--accent))] mb-2">✅ Resultado Final</h4>
-                    <div className="text-sm text-white/80 prose prose-invert prose-sm max-w-none">
-                      <ReactMarkdown>{execFinal}</ReactMarkdown>
+                    <div className="text-sm text-white/80 prose prose-invert prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{execFinal}</ReactMarkdown>
                     </div>
                   </div>
                 )}

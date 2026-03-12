@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
     // ========== MODE: STEP ==========
     // Executes a single step
     if (mode === "step") {
-      const { execution_id, node_id, agent_id, input_text, conversation_history } = body;
+      const { execution_id, node_id, agent_id, input_text, conversation_history, previous_stage_output, stage_number, total_stages } = body;
 
       if (!execution_id || !node_id || !agent_id || !input_text) {
         return new Response(JSON.stringify({ error: "execution_id, node_id, agent_id e input_text são obrigatórios" }), {
@@ -182,6 +182,26 @@ Deno.serve(async (req) => {
         // Build history for agent-chat (supports follow-up within same step)
         const history = conversation_history || [];
 
+        // Build flow-mode context instruction
+        let flowInstruction = `\n\n<FLOW_MODE_INSTRUCTION>
+IMPORTANTE: Você está operando dentro de um FLUXO SEQUENCIAL DE AGENTES (Etapa ${stage_number || "?"} de ${total_stages || "?"}).
+REGRAS OBRIGATÓRIAS DO MODO FLUXO:
+1. NÃO faça perguntas ao final da sua resposta. NÃO peça confirmação, preferências ou feedback.
+2. Entregue sua resposta COMPLETA e DEFINITIVA de forma direta.
+3. Se esta não é a primeira etapa, sua entrega DEVE ser complementar e construída sobre o resultado da etapa anterior. Integre e referencie o conteúdo anterior.
+4. Use tabelas Markdown formatadas corretamente quando aplicável.
+</FLOW_MODE_INSTRUCTION>`;
+
+        if (previous_stage_output && (stage_number || 0) > 1) {
+          flowInstruction += `\n\n<RESULTADO_ETAPA_ANTERIOR>
+O resultado da etapa anterior do fluxo é apresentado abaixo. Sua resposta DEVE ser complementar a este conteúdo, integrando-o e construindo sobre ele. NÃO repita o conteúdo anterior, mas referencie-o e expanda com sua especialidade.
+---
+${previous_stage_output}
+</RESULTADO_ETAPA_ANTERIOR>`;
+        }
+
+        const enrichedInput = input_text + flowInstruction;
+
         const chatResponse = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
           method: "POST",
           headers: {
@@ -190,10 +210,11 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             agentId: agent_id,
-            input: input_text,
+            input: enrichedInput,
             userId,
             conversationHistory: history,
             skipCredits: true,
+            flowMode: true,
           }),
         });
 
