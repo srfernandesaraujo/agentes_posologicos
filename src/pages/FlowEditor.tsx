@@ -253,11 +253,16 @@ export default function FlowEditor() {
   const [editPrompt, setEditPrompt] = useState("");
   const [configMode, setConfigMode] = useState(false);
 
-  // Execution
+  // Execution - phased mode
   const [execOpen, setExecOpen] = useState(false);
   const [execInput, setExecInput] = useState("");
   const [executing, setExecuting] = useState(false);
-  const [execResults, setExecResults] = useState<any[]>([]);
+  const [executionId, setExecutionId] = useState<string | null>(null);
+  const [flowSteps, setFlowSteps] = useState<FlowStep[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(-1);
+  const [stepResults, setStepResults] = useState<StepResult[]>([]);
+  const [stepChatInput, setStepChatInput] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
   const [execFinal, setExecFinal] = useState("");
 
   const canvasRef = useRef<HTMLDivElement>(null);
