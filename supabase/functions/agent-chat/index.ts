@@ -5270,7 +5270,7 @@ Deno.serve(async (req) => {
         .eq("id", agentId)
         .single();
       const slug = agentData?.slug || "";
-      const defaultPrompt = AGENT_PROMPTS[slug] || DEFAULT_PROMPT;
+      const defaultPrompt = slug === "super-agente" ? SUPER_AGENT_BASE_PROMPT : (AGENT_PROMPTS[slug] || DEFAULT_PROMPT);
       return new Response(JSON.stringify({ prompt: defaultPrompt }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
