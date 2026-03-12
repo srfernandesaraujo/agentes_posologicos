@@ -18,10 +18,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Play, Trash2, X, Loader2, GripVertical, Settings2, Search } from "lucide-react";
+import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,6 +30,45 @@ function getIcon(iconName: string) {
   const Icon = (LucideIcons as any)[iconName] || LucideIcons.Bot;
   return Icon;
 }
+
+// Guided steps configuration
+const GUIDE_STEPS = [
+  {
+    step: 1,
+    title: "Adicione agentes",
+    description: "Clique nos agentes na barra lateral esquerda para adicioná-los ao canvas.",
+    icon: Plus,
+    condition: (nodes: AgentFlowNode[]) => nodes.length === 0,
+  },
+  {
+    step: 2,
+    title: "Adicione mais agentes",
+    description: "Adicione pelo menos 2 agentes para criar um fluxo sequencial.",
+    icon: Plus,
+    condition: (nodes: AgentFlowNode[], edges: AgentFlowEdge[]) => nodes.length === 1,
+  },
+  {
+    step: 3,
+    title: "Conecte os agentes",
+    description: "Clique em \"Conectar Nós\" no topo, depois clique no agente de origem e no de destino.",
+    icon: Link2,
+    condition: (nodes: AgentFlowNode[], edges: AgentFlowEdge[]) => nodes.length >= 2 && edges.length === 0,
+  },
+  {
+    step: 4,
+    title: "Configure instruções (opcional)",
+    description: "Selecione um nó e clique \"Configurar\" para adicionar instruções extras de processamento.",
+    icon: Settings2,
+    condition: (nodes: AgentFlowNode[], edges: AgentFlowEdge[]) => nodes.length >= 2 && edges.length > 0 && nodes.every(n => !n.input_prompt),
+  },
+  {
+    step: 5,
+    title: "Execute o fluxo!",
+    description: "Tudo pronto! Clique em \"Executar\" para rodar o fluxo com sua entrada inicial.",
+    icon: Zap,
+    condition: (nodes: AgentFlowNode[], edges: AgentFlowEdge[]) => nodes.length >= 2 && edges.length > 0,
+  },
+];
 
 // Flow Canvas Node Component
 function FlowNode({
@@ -42,6 +80,7 @@ function FlowNode({
   onDragStart,
   onConnect,
   connectMode,
+  isConnectSource,
 }: {
   node: AgentFlowNode;
   agentName: string;
@@ -51,12 +90,12 @@ function FlowNode({
   onDragStart: (e: React.MouseEvent) => void;
   onConnect: () => void;
   connectMode: boolean;
+  isConnectSource: boolean;
 }) {
   const Icon = getIcon(agentIcon);
   return (
     <div
-      className={`absolute flex flex-col items-center gap-1 cursor-grab select-none group ${connectMode ? "cursor-crosshair" : ""}`}
-      style={{ left: node.position_x, top: node.position_y }}
+      className={`flex flex-col items-center gap-1 select-none group ${connectMode ? "cursor-crosshair" : "cursor-grab"}`}
       onMouseDown={(e) => {
         if (connectMode) {
           onConnect();
@@ -71,7 +110,9 @@ function FlowNode({
     >
       <div
         className={`flex items-center gap-2 rounded-xl border px-4 py-3 shadow-lg transition-all ${
-          isSelected
+          isConnectSource
+            ? "border-amber-400 bg-amber-400/20 shadow-amber-400/20 ring-2 ring-amber-400/40"
+            : isSelected
             ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent))]/20 shadow-[hsl(var(--accent))]/20"
             : "border-white/20 bg-[hsl(220,25%,12%)] hover:border-white/40"
         }`}
@@ -82,7 +123,12 @@ function FlowNode({
           {node.sort_order + 1}
         </Badge>
       </div>
-      {node.input_prompt && (
+      {connectMode && (
+        <span className="text-[10px] text-amber-300/80 font-medium">
+          {isConnectSource ? "Origem selecionada" : "Clique para conectar"}
+        </span>
+      )}
+      {node.input_prompt && !connectMode && (
         <span className="text-[10px] text-white/30 max-w-[180px] truncate">{node.input_prompt}</span>
       )}
     </div>
@@ -121,6 +167,37 @@ function EdgeLines({ nodes, edges }: { nodes: AgentFlowNode[]; edges: AgentFlowE
         );
       })}
     </svg>
+  );
+}
+
+// Guide Banner Component
+function GuideBanner({ nodes, edges }: { nodes: AgentFlowNode[]; edges: AgentFlowEdge[] }) {
+  const currentStep = GUIDE_STEPS.find((s) => s.condition(nodes, edges));
+  if (!currentStep) return null;
+
+  const StepIcon = currentStep.icon;
+  const progress = Math.min(((currentStep.step - 1) / (GUIDE_STEPS.length - 1)) * 100, 100);
+
+  return (
+    <div className="mx-4 mt-3 mb-1">
+      <div className="flex items-center gap-3 rounded-xl border border-[hsl(var(--accent))]/20 bg-[hsl(var(--accent))]/5 px-4 py-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent))]/20">
+          <StepIcon className="h-4 w-4 text-[hsl(var(--accent))]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-[hsl(var(--accent))]">Passo {currentStep.step}/{GUIDE_STEPS.length}</span>
+            <div className="flex-1 h-1 rounded-full bg-white/10 max-w-[120px]">
+              <div className="h-1 rounded-full bg-[hsl(var(--accent))] transition-all" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+          <p className="text-sm text-white/80 mt-0.5">
+            <span className="font-medium text-white">{currentStep.title}:</span> {currentStep.description}
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 text-white/20 shrink-0" />
+      </div>
+    </div>
   );
 }
 
@@ -184,12 +261,13 @@ export default function FlowEditor() {
   // Drag handling
   const handleDragStart = (nodeId: string, e: React.MouseEvent) => {
     if (connectMode) return;
-    const node = nodes.find((n) => n.id === nodeId);
-    if (!node) return;
+    const el = canvasRef.current?.querySelector(`[data-node-id="${nodeId}"]`) as HTMLElement | null;
+    if (!el || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
     dragRef.current = {
       nodeId,
-      offsetX: e.clientX - node.position_x,
-      offsetY: e.clientY - node.position_y,
+      offsetX: e.clientX - el.offsetLeft + canvasRef.current.scrollLeft,
+      offsetY: e.clientY - el.offsetTop + canvasRef.current.scrollTop,
     };
   };
 
@@ -197,24 +275,27 @@ export default function FlowEditor() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragRef.current || !canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
-      const x = Math.max(0, e.clientX - rect.left - dragRef.current.offsetX + canvasRef.current.scrollLeft);
-      const y = Math.max(0, e.clientY - rect.top - dragRef.current.offsetY + canvasRef.current.scrollTop);
-      // Update visually via DOM for performance
-      const el = canvasRef.current.querySelector(`[data-node-id="${dragRef.current.nodeId}"]`);
+      const x = Math.max(0, e.clientX - rect.left + canvasRef.current.scrollLeft - (dragRef.current.offsetX - (canvasRef.current.querySelector(`[data-node-id="${dragRef.current.nodeId}"]`) as HTMLElement)?.offsetLeft || 0));
+      const y = Math.max(0, e.clientY - rect.top + canvasRef.current.scrollTop - (dragRef.current.offsetY - (canvasRef.current.querySelector(`[data-node-id="${dragRef.current.nodeId}"]`) as HTMLElement)?.offsetTop || 0));
+      
+      const el = canvasRef.current.querySelector(`[data-node-id="${dragRef.current.nodeId}"]`) as HTMLElement | null;
       if (el) {
-        (el as HTMLElement).style.left = `${x}px`;
-        (el as HTMLElement).style.top = `${y}px`;
+        const newX = Math.max(0, e.clientX - rect.left + canvasRef.current.scrollLeft - (dragRef.current.offsetX - el.offsetLeft));
+        const newY = Math.max(0, e.clientY - rect.top + canvasRef.current.scrollTop - (dragRef.current.offsetY - el.offsetTop));
+        el.style.left = `${newX}px`;
+        el.style.top = `${newY}px`;
+        dragRef.current.offsetX = e.clientX - newX + canvasRef.current.scrollLeft;
+        dragRef.current.offsetY = e.clientY - newY + canvasRef.current.scrollTop;
       }
-      dragRef.current = { ...dragRef.current, offsetX: e.clientX - x, offsetY: e.clientY - y };
     };
 
     const handleMouseUp = async () => {
       if (!dragRef.current || !canvasRef.current) return;
       const nodeId = dragRef.current.nodeId;
-      const el = canvasRef.current.querySelector(`[data-node-id="${nodeId}"]`);
+      const el = canvasRef.current.querySelector(`[data-node-id="${nodeId}"]`) as HTMLElement | null;
       if (el) {
-        const x = parseFloat((el as HTMLElement).style.left);
-        const y = parseFloat((el as HTMLElement).style.top);
+        const x = parseFloat(el.style.left);
+        const y = parseFloat(el.style.top);
         await updateNode.mutateAsync({ id: nodeId, flow_id: flowId!, position_x: x, position_y: y });
       }
       dragRef.current = null;
@@ -232,7 +313,7 @@ export default function FlowEditor() {
   const handleAddAgent = async (agentId: string, agentType: string) => {
     if (!flowId) return;
     const nextOrder = nodes.length;
-    const x = 100 + (nextOrder % 3) * 250;
+    const x = 100 + (nextOrder % 3) * 280;
     const y = 80 + Math.floor(nextOrder / 3) * 140;
     try {
       await addNode.mutateAsync({
@@ -243,6 +324,11 @@ export default function FlowEditor() {
         position_y: y,
         sort_order: nextOrder,
       });
+      if (nextOrder === 0) {
+        toast.success("Agente adicionado! Adicione mais para criar o fluxo.");
+      } else if (nextOrder === 1 && edges.length === 0) {
+        toast.success("Ótimo! Agora conecte os agentes clicando em \"Conectar Nós\".");
+      }
     } catch {
       toast.error("Erro ao adicionar agente");
     }
@@ -252,16 +338,25 @@ export default function FlowEditor() {
   const handleNodeConnect = (nodeId: string) => {
     if (!connectSource) {
       setConnectSource(nodeId);
-      toast.info("Agora clique no nó de destino");
+      toast.info("Agora clique no nó de destino para criar a conexão");
     } else {
       if (connectSource === nodeId) {
+        setConnectSource(null);
+        toast.info("Seleção cancelada. Clique em outro nó.");
+        return;
+      }
+      // Check for existing edge
+      const exists = edges.some(e => e.source_node_id === connectSource && e.target_node_id === nodeId);
+      if (exists) {
+        toast.warning("Esses nós já estão conectados!");
         setConnectSource(null);
         setConnectMode(false);
         return;
       }
       addEdge.mutateAsync({ flow_id: flowId!, source_node_id: connectSource, target_node_id: nodeId });
+      toast.success("Conexão criada! Você pode adicionar mais conexões ou clicar \"Cancelar Conexão\".");
       setConnectSource(null);
-      setConnectMode(false);
+      // Stay in connect mode for easy chaining
     }
   };
 
@@ -328,31 +423,52 @@ export default function FlowEditor() {
           <Button
             variant="outline"
             size="sm"
-            className={`gap-1 ${connectMode ? "border-[hsl(var(--accent))] text-[hsl(var(--accent))]" : "border-white/20 text-white bg-white/10 hover:bg-white/20"}`}
+            className={`gap-1 ${
+              connectMode
+                ? "border-amber-400 bg-amber-400/20 text-amber-300 hover:bg-amber-400/30 hover:text-amber-200"
+                : "border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+            }`}
             onClick={() => {
               setConnectMode(!connectMode);
               setConnectSource(null);
+              if (!connectMode) {
+                toast.info("Modo conexão ativado! Clique no nó de origem primeiro.");
+              }
             }}
           >
+            <Link2 className="h-4 w-4" />
             {connectMode ? "Cancelar Conexão" : "Conectar Nós"}
           </Button>
           {selectedNodeId && (
             <>
-              <Button variant="outline" size="sm" className="gap-1 border-white/20 text-white/60" onClick={openConfig}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                onClick={openConfig}
+              >
                 <Settings2 className="h-4 w-4" />
                 Configurar
               </Button>
-              <Button variant="outline" size="sm" className="gap-1 border-red-500/40 text-red-400" onClick={handleDeleteNode}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                onClick={handleDeleteNode}
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </>
           )}
-          <Button className="gap-2 gradient-primary" onClick={() => setExecOpen(true)}>
+          <Button className="gap-2 gradient-primary" onClick={() => setExecOpen(true)} disabled={nodes.length < 2 || edges.length === 0}>
             <Play className="h-4 w-4" />
             Executar
           </Button>
         </div>
       </div>
+
+      {/* Guide Banner */}
+      <GuideBanner nodes={nodes} edges={edges} />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Agent Sidebar */}
@@ -372,14 +488,20 @@ export default function FlowEditor() {
             <div className="space-y-1">
               {filteredAgents.map((agent) => {
                 const Icon = getIcon(agent.icon || "Bot");
+                const alreadyAdded = nodes.some(n => n.agent_id === agent.id);
                 return (
                   <button
                     key={agent.id}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/70 hover:bg-white/10 transition-colors"
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                      alreadyAdded
+                        ? "text-white/40 bg-white/5"
+                        : "text-white/70 hover:bg-white/10"
+                    }`}
                     onClick={() => handleAddAgent(agent.id, agent.agent_type)}
                   >
                     <Icon className="h-4 w-4 shrink-0 text-[hsl(var(--accent))]" />
-                    <span className="truncate">{agent.name}</span>
+                    <span className="truncate flex-1">{agent.name}</span>
+                    {alreadyAdded && <span className="text-[10px] text-white/30">✓</span>}
                   </button>
                 );
               })}
@@ -402,7 +524,7 @@ export default function FlowEditor() {
             return (
               <div key={node.id} data-node-id={node.id} className="absolute" style={{ left: node.position_x, top: node.position_y, zIndex: 1 }}>
                 <FlowNode
-                  node={node}
+                  node={{ ...node, position_x: 0, position_y: 0 }}
                   agentName={info.name}
                   agentIcon={info.icon}
                   isSelected={selectedNodeId === node.id}
@@ -410,15 +532,19 @@ export default function FlowEditor() {
                   onDragStart={(e) => handleDragStart(node.id, e)}
                   onConnect={() => handleNodeConnect(node.id)}
                   connectMode={connectMode}
+                  isConnectSource={connectSource === node.id}
                 />
               </div>
             );
           })}
           {nodes.length === 0 && !nodesLoading && (
-            <div className="absolute inset-0 flex items-center justify-center text-white/20">
-              <div className="text-center">
-                <Plus className="h-12 w-12 mx-auto mb-2" />
-                <p>Adicione agentes da barra lateral</p>
+            <div className="absolute inset-0 flex items-center justify-center text-white/30">
+              <div className="text-center space-y-3">
+                <MousePointerClick className="h-16 w-16 mx-auto text-[hsl(var(--accent))]/30" />
+                <p className="text-lg font-medium">Comece adicionando agentes</p>
+                <p className="text-sm text-white/20 max-w-xs">
+                  Clique nos agentes na barra lateral esquerda para adicioná-los ao canvas e montar seu fluxo
+                </p>
               </div>
             </div>
           )}
@@ -454,6 +580,28 @@ export default function FlowEditor() {
             <DialogTitle>Executar Fluxo</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Flow summary */}
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <p className="text-xs text-white/40 mb-2">Pipeline de execução:</p>
+              <div className="flex flex-wrap items-center gap-1">
+                {nodes
+                  .sort((a, b) => a.sort_order - b.sort_order)
+                  .map((node, i) => {
+                    const info = getAgentInfo(node);
+                    const NodeIcon = getIcon(info.icon);
+                    return (
+                      <div key={node.id} className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 rounded-md bg-white/10 px-2 py-1">
+                          <NodeIcon className="h-3 w-3 text-[hsl(var(--accent))]" />
+                          <span className="text-xs text-white/70">{info.name}</span>
+                        </div>
+                        {i < nodes.length - 1 && <ChevronRight className="h-3 w-3 text-white/20" />}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
             <div>
               <label className="text-sm text-white/60 mb-1 block">Entrada inicial</label>
               <Textarea
