@@ -25,16 +25,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import * as LucideIcons from "lucide-react";
-
-// Detects if agent response contains questions (heuristic)
-function responseHasQuestions(text: string): boolean {
-  if (!text) return false;
-  // Check last 40% of text for question marks
-  const lastPortion = text.slice(Math.floor(text.length * 0.6));
-  const questionMarks = (lastPortion.match(/\?/g) || []).length;
-  return questionMarks >= 1;
-}
 
 interface FlowStep {
   index: number;
