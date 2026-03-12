@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
     // ========== MODE: STEP ==========
     // Executes a single step
     if (mode === "step") {
-      const { execution_id, node_id, agent_id, input_text, conversation_history, previous_stage_output, stage_number, total_stages } = body;
+      const { execution_id, node_id, agent_id, input_text, conversation_history, previous_stage_output, stage_number, total_stages, pipeline_context } = body;
 
       if (!execution_id || !node_id || !agent_id || !input_text) {
         return new Response(JSON.stringify({ error: "execution_id, node_id, agent_id e input_text são obrigatórios" }), {
@@ -182,15 +182,31 @@ Deno.serve(async (req) => {
         // Build history for agent-chat (supports follow-up within same step)
         const history = conversation_history || [];
 
+        // Build pipeline description so the agent knows its role
+        let pipelineDesc = "";
+        if (pipeline_context && Array.isArray(pipeline_context)) {
+          pipelineDesc = pipeline_context.map((s: any, i: number) => {
+            const marker = i + 1 === (stage_number || 0) ? " ← VOCÊ ESTÁ AQUI" : "";
+            return `  Etapa ${i + 1}: ${s.agent_name}${marker}`;
+          }).join("\n");
+        }
+
         // Build flow-mode context instruction
         let flowInstruction = `\n\n<FLOW_MODE_INSTRUCTION>
 IMPORTANTE: Você está operando dentro de um FLUXO SEQUENCIAL DE AGENTES (Etapa ${stage_number || "?"} de ${total_stages || "?"}).
+
+PIPELINE COMPLETO:
+${pipelineDesc || "(não disponível)"}
+
 REGRAS OBRIGATÓRIAS DO MODO FLUXO:
-1. Se você precisa de informações para realizar seu trabalho, faça suas perguntas de forma CLARA e OBJETIVA.
-2. Quando tiver todas as informações necessárias, entregue sua resposta COMPLETA e DEFINITIVA.
-3. NÃO inclua sugestões de interação ao final (como "Posso te ajudar com..." ou listas de ações seguintes). Apenas entregue o resultado.
-4. Se esta não é a primeira etapa, sua entrega DEVE ser complementar e construída sobre o resultado da etapa anterior. Integre e referencie o conteúdo anterior.
-5. Use tabelas Markdown formatadas corretamente quando aplicável.
+1. Se você precisa de informações do usuário para realizar seu trabalho, faça suas perguntas de forma CLARA e OBJETIVA. Coloque as perguntas DIRECIONADAS AO USUÁRIO no final da sua mensagem, claramente separadas do conteúdo produzido. Comece a seção de perguntas com a frase exata "PERGUNTAS PARA O USUÁRIO:" em uma linha separada.
+2. NÃO confunda perguntas pedagógicas/didáticas (perguntas socráticas, perguntas de estudo de caso, questões para discussão em sala) com perguntas ao usuário. Perguntas pedagógicas fazem parte do CONTEÚDO e devem ser incluídas normalmente.
+3. Quando tiver todas as informações necessárias, entregue sua resposta COMPLETA e DEFINITIVA.
+4. NUNCA inclua sugestões de interação, listas de próximos passos ou ofertas como "Posso te ajudar com...", "Deseja que eu...", "Agora posso...", "Quer que eu...", etc. PROIBIDO.
+5. Se esta não é a primeira etapa, sua entrega DEVE ser complementar e construída sobre o resultado da etapa anterior. Integre e referencie o conteúdo anterior.
+6. Ao finalizar sua entrega, inclua um parágrafo de TRANSIÇÃO explicando como seu resultado será utilizado na próxima etapa do fluxo (se houver próxima etapa). Exemplo: "Este plano de aula servirá como base para a Etapa 2 (Simulador de Casos Clínicos), onde serão criados casos clínicos alinhados à metodologia ativa escolhida."
+7. Use tabelas Markdown formatadas corretamente quando aplicável.
+8. Você é o agente da Etapa ${stage_number}. Produza APENAS o que sua especialidade pede. Não produza conteúdo que pertence a outras etapas.
 </FLOW_MODE_INSTRUCTION>`;
 
         if (previous_stage_output && (stage_number || 0) > 1) {

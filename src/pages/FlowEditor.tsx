@@ -89,15 +89,27 @@ function stripFlowSuggestions(output: string): string {
   const lines = output.split("\n");
   let cutIndex = lines.length;
   
+  // Suggestion header patterns
+  const suggestionHeaders = [
+    /^(agora posso te ajudar com|posso te ajudar com|quer que eu|deseja que eu|gostaria que eu)/i,
+    /^(posso também|também posso|se precisar|caso precise|precisa de algo mais)/i,
+    /^(outras opções|próximos passos sugeridos|sugestões|o que mais posso fazer)/i,
+    /^(estou à disposição|fico à disposição|conte comigo)/i,
+    /^(escolha uma das opções|selecione uma opção)/i,
+  ];
+  
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim();
     if (!line) { cutIndex = i; continue; }
-    if (/^(Agora posso te ajudar com|Posso te ajudar com|Quer que eu|Deseja que eu|Gostaria que eu)/i.test(line)) {
+    
+    // Check if line matches a suggestion header
+    if (suggestionHeaders.some(p => p.test(line))) {
       cutIndex = i;
       continue;
     }
-    // Short action-like suggestion lines near the end
-    if (line.length < 60 && !line.endsWith(".") && !line.endsWith("?") && !line.startsWith("|") && !line.startsWith("#") && i > lines.length - 10 && cutIndex < lines.length) {
+    
+    // Short action-like suggestion lines near the end (e.g., "Gerar outro caso mais complexo")
+    if (line.length < 80 && !line.endsWith(".") && !line.endsWith("?") && !line.endsWith(":") && !line.startsWith("|") && !line.startsWith("#") && !line.startsWith("*") && !line.startsWith("-") && i > lines.length - 12 && cutIndex < lines.length) {
       cutIndex = i;
       continue;
     }
