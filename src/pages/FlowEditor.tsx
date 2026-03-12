@@ -439,26 +439,32 @@ export default function FlowEditor() {
             <Link2 className="h-4 w-4" />
             {connectMode ? "Cancelar Conexão" : "Conectar Nós"}
           </Button>
+          {nodes.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1 border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+              onClick={() => {
+                if (selectedNodeId) {
+                  openConfig();
+                } else {
+                  toast.info("Clique em um nó no canvas para selecioná-lo e configurar.");
+                }
+              }}
+            >
+              <Settings2 className="h-4 w-4" />
+              Configurar
+            </Button>
+          )}
           {selectedNodeId && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-                onClick={openConfig}
-              >
-                <Settings2 className="h-4 w-4" />
-                Configurar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
-                onClick={handleDeleteNode}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1 border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+              onClick={handleDeleteNode}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           )}
           <Button className="gap-2 gradient-primary" onClick={() => setExecOpen(true)} disabled={nodes.length < 2 || edges.length === 0}>
             <Play className="h-4 w-4" />
