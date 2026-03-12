@@ -20,13 +20,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send } from "lucide-react";
+import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import * as LucideIcons from "lucide-react";
+import MindMapRenderer, { detectMindMap } from "@/components/chat/MindMapRenderer";
+import { exportFlowPdf } from "@/lib/exportFlowPdf";
 
 interface FlowStep {
   index: number;
@@ -73,11 +75,9 @@ function detectQuestions(output: string): boolean {
   // Only count questions that match user-directed patterns
   const userQuestions = tailLines.filter(line => {
     if (!line.endsWith("?")) return false;
-    // Skip if it looks like a pedagogical/content question (numbered, in a section)
     if (/^\d+[\.\)]/.test(line)) return false;
     if (/^[a-z]\)/.test(line)) return false;
     if (/^[-•▸►]/.test(line)) return false;
-    // Check if it matches user-directed patterns
     return userQuestionPatterns.some(p => p.test(line));
   });
   
@@ -89,7 +89,6 @@ function stripFlowSuggestions(output: string): string {
   const lines = output.split("\n");
   let cutIndex = lines.length;
   
-  // Suggestion header patterns
   const suggestionHeaders = [
     /^(agora posso te ajudar com|posso te ajudar com|quer que eu|deseja que eu|gostaria que eu)/i,
     /^(posso também|também posso|se precisar|caso precise|precisa de algo mais)/i,
@@ -102,13 +101,11 @@ function stripFlowSuggestions(output: string): string {
     const line = lines[i].trim();
     if (!line) { cutIndex = i; continue; }
     
-    // Check if line matches a suggestion header
     if (suggestionHeaders.some(p => p.test(line))) {
       cutIndex = i;
       continue;
     }
     
-    // Short action-like suggestion lines near the end (e.g., "Gerar outro caso mais complexo")
     if (line.length < 80 && !line.endsWith(".") && !line.endsWith("?") && !line.endsWith(":") && !line.startsWith("|") && !line.startsWith("#") && !line.startsWith("*") && !line.startsWith("-") && i > lines.length - 12 && cutIndex < lines.length) {
       cutIndex = i;
       continue;
@@ -120,6 +117,68 @@ function stripFlowSuggestions(output: string): string {
     return lines.slice(0, cutIndex).join("\n").trimEnd();
   }
   return output;
+}
+
+// Strip agent intro/greeting text that repeats the agent's self-description
+function stripAgentIntro(output: string): string {
+  const lines = output.split("\n");
+  let startIndex = 0;
+  
+  const introPatterns = [
+    /^(olá|oi|hello|bem-vindo|boas-vindas)[\s!,.]*/i,
+    /^sou o\s/i,
+    /^eu sou o\s/i,
+    /^(transformo|envie|cole)\s/i,
+    /^o (tema|que foi perguntado|resultado)/i,
+    /já foi (fornecido|respondido|entregue)/i,
+    /^(ou descreva|nível:|foco:)/i,
+    /PERGUNTAS PARA O USUÁRIO.*"/i,
+  ];
+
+  // Check first 10 lines for intro patterns
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    if (introPatterns.some(p => p.test(line))) {
+      startIndex = i + 1;
+    } else if (startIndex > 0 && line.length < 60 && !line.startsWith("#") && !line.startsWith("|") && !line.startsWith("-") && !line.startsWith("*")) {
+      // Continue skipping short non-content lines after intro
+      startIndex = i + 1;
+    } else {
+      break;
+    }
+  }
+
+  if (startIndex > 0) {
+    const result = lines.slice(startIndex).join("\n").trim();
+    return result || output; // fallback to original if stripping removes everything
+  }
+  return output;
+}
+
+// Markdown prose classes reusable
+const PROSE_CLASSES = "text-sm text-white/70 prose prose-invert prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60";
+
+// Render content with mind map detection
+function RenderContent({ content }: { content: string }) {
+  if (detectMindMap(content)) {
+    // Split: render text parts as markdown, mind map sections as visual
+    return (
+      <div>
+        <MindMapRenderer content={content} />
+        <div className={PROSE_CLASSES}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {content.split("\n").filter(l => !/[├└│]──|[├└│]—/.test(l) && !/^🧠/.test(l.trim())).join("\n")}
+          </ReactMarkdown>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={PROSE_CLASSES}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
+  );
 }
 
 // Guided steps configuration
@@ -328,9 +387,18 @@ export default function FlowEditor() {
   const [stepChatInput, setStepChatInput] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
   const [execFinal, setExecFinal] = useState("");
+  const [flowCompleted, setFlowCompleted] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ nodeId: string; offsetX: number; offsetY: number } | null>(null);
+  const scrollEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new content appears
+  useEffect(() => {
+    if (scrollEndRef.current) {
+      scrollEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [stepResults, currentStepIndex, flowCompleted]);
 
   const allAgents = [
     ...nativeAgents.map((a) => ({ ...a, agent_type: "native" as const })),
@@ -437,7 +505,6 @@ export default function FlowEditor() {
         toast.info("Seleção cancelada. Clique em outro nó.");
         return;
       }
-      // Check for existing edge
       const exists = edges.some(e => e.source_node_id === connectSource && e.target_node_id === nodeId);
       if (exists) {
         toast.warning("Esses nós já estão conectados!");
@@ -446,9 +513,8 @@ export default function FlowEditor() {
         return;
       }
       addEdge.mutateAsync({ flow_id: flowId!, source_node_id: connectSource, target_node_id: nodeId });
-      toast.success("Conexão criada! Você pode adicionar mais conexões ou clicar \"Cancelar Conexão\".");
+      toast.success("Conexão criada!");
       setConnectSource(null);
-      // Stay in connect mode for easy chaining
     }
   };
 
@@ -475,7 +541,7 @@ export default function FlowEditor() {
     setConfigOpen(false);
   };
 
-  // Phased execution: init → step-by-step with chat
+  // Phased execution
   const handleExecute = async () => {
     if (!flowId || !execInput.trim()) return;
     setExecuting(true);
@@ -484,9 +550,9 @@ export default function FlowEditor() {
     setCurrentStepIndex(-1);
     setExecFinal("");
     setExecutionId(null);
+    setFlowCompleted(false);
 
     try {
-      // Step 1: Init execution - get ordered steps
       const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
         body: { mode: "init", flow_id: flowId, initial_input: execInput },
       });
@@ -496,7 +562,6 @@ export default function FlowEditor() {
       setExecutionId(data.execution_id);
       setFlowSteps(data.steps);
 
-      // Start executing first step
       await executeStep(0, data.steps, data.execution_id, execInput);
     } catch (e: any) {
       toast.error(e.message || "Erro ao iniciar execução");
@@ -518,8 +583,8 @@ export default function FlowEditor() {
       setExecFinal(finalOutput);
       setExecuting(false);
       setCurrentStepIndex(-1);
+      setFlowCompleted(true);
 
-      // Mark execution complete
       await supabase.functions.invoke("agent-flow-execute", {
         body: { mode: "complete", execution_id: execId, final_output: finalOutput, flow_id: flowId },
       });
@@ -530,13 +595,11 @@ export default function FlowEditor() {
     const step = steps[stepIndex];
     setCurrentStepIndex(stepIndex);
 
-    // Build input with input_prompt if present
     let contextMessage = inputText;
     if (step.input_prompt) {
       contextMessage = `${step.input_prompt}\n\n---\n\nConteúdo de entrada:\n${inputText}`;
     }
 
-    // Get previous stage output for context chaining
     const prevResult = stepIndex > 0 ? stepResults.find(r => r.step_index === stepIndex - 1) : null;
     const previousStageOutput = prevResult?.output || "";
 
@@ -572,17 +635,16 @@ export default function FlowEditor() {
       if (data?.status === "error") throw new Error(data.error || data.output);
 
       const rawOutput = data.output;
-      
-      // Strip trailing interaction suggestions from agent output in flow mode
-      const output = stripFlowSuggestions(rawOutput);
+      let output = stripFlowSuggestions(rawOutput);
+      // For stages > 1, also strip redundant agent intro
+      if (stepIndex > 0) {
+        output = stripAgentIntro(output);
+      }
 
       const newChatHistory = [...history, { role: "assistant" as const, content: output }];
-
-      // Detect if agent is asking questions (lines ending with ?)
       const hasQuestions = detectQuestions(output);
 
       if (hasQuestions) {
-        // Pause for user input
         setStepResults((prev) =>
           prev.map((r) =>
             r.step_index === stepIndex
@@ -592,7 +654,6 @@ export default function FlowEditor() {
         );
         setExecuting(false);
       } else {
-        // Auto-advance to next step
         setStepResults((prev) =>
           prev.map((r) =>
             r.step_index === stepIndex
@@ -641,7 +702,6 @@ export default function FlowEditor() {
     );
 
     try {
-      const currentResult = stepResults.find((r) => r.step_index === stepIndex);
       const previousStageOutput = stepIndex > 0 ? stepResults.find(r => r.step_index === stepIndex - 1)?.output || "" : "";
 
       const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
@@ -665,11 +725,9 @@ export default function FlowEditor() {
       const rawOutput = data.output;
       const output = stripFlowSuggestions(rawOutput);
       const newHistory = [...optimisticHistory, { role: "assistant" as const, content: output }];
-
       const hasQuestions = detectQuestions(output);
 
       if (hasQuestions) {
-        // Agent still has questions - stay in this step
         setStepResults((prev) =>
           prev.map((r) =>
             r.step_index === stepIndex
@@ -678,7 +736,6 @@ export default function FlowEditor() {
           )
         );
       } else {
-        // No more questions - advance to next step
         setStepResults((prev) =>
           prev.map((r) =>
             r.step_index === stepIndex
@@ -708,7 +765,6 @@ export default function FlowEditor() {
     const currentResult = stepResults.find((r) => r.step_index === stepIndex);
     if (!currentResult || !executionId) return;
 
-    // Mark current step as completed
     setStepResults((prev) =>
       prev.map((r) =>
         r.step_index === stepIndex ? { ...r, status: "completed" } : r
@@ -716,8 +772,22 @@ export default function FlowEditor() {
     );
 
     setExecuting(true);
-    // Use last assistant output as input for next step
     await executeStep(stepIndex + 1, flowSteps, executionId, currentResult.output, []);
+  };
+
+  // PDF export
+  const handleExportPdf = () => {
+    if (!flow || stepResults.length === 0) return;
+    exportFlowPdf(
+      flow.name,
+      stepResults.map(r => ({
+        step_index: r.step_index,
+        agent_name: r.agent_name,
+        chatHistory: r.chatHistory.map(m => ({ role: m.role, content: m.content })),
+        output: r.output,
+      }))
+    );
+    toast.success("PDF gerado com sucesso!");
   };
 
   if (!flow) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-white/40" /></div>;
@@ -915,8 +985,8 @@ export default function FlowEditor() {
           setExecOpen(false);
         }
       }}>
-        <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-3xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-3">
             <DialogTitle className="flex items-center gap-2">
               Executar Fluxo
               {currentStepIndex >= 0 && flowSteps.length > 0 && (
@@ -924,11 +994,16 @@ export default function FlowEditor() {
                   Etapa {currentStepIndex + 1}/{flowSteps.length}
                 </Badge>
               )}
+              {flowCompleted && (
+                <Badge className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                  ✅ Concluído
+                </Badge>
+              )}
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="flex-1 overflow-auto">
-          <div className="space-y-4 pr-2">
-            {/* Flow summary */}
+
+          {/* Sticky Pipeline Indicator */}
+          <div className="sticky top-0 z-10 px-6 pb-3 bg-[hsl(220,25%,10%)] border-b border-white/10">
             <div className="rounded-lg border border-white/10 bg-white/5 p-3">
               <p className="text-xs text-white/40 mb-2">Pipeline de execução (faseado):</p>
               <div className="flex flex-wrap items-center gap-1">
@@ -951,7 +1026,8 @@ export default function FlowEditor() {
                         "bg-white/10"
                       }`}>
                         {stepResult?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
-                        <span className={`text-xs ${isDone ? "text-green-400" : "text-white/70"}`}>
+                        {isDone && <span className="text-green-400 text-xs">✓</span>}
+                        <span className={`text-xs ${isDone ? "text-green-400" : isActive ? "text-[hsl(var(--accent))]" : "text-white/70"}`}>
                           {step.agent_name}
                         </span>
                       </div>
@@ -961,144 +1037,161 @@ export default function FlowEditor() {
                 })}
               </div>
             </div>
+          </div>
 
-            {/* Initial input */}
-            {stepResults.length === 0 && (
-              <>
-                <div>
-                  <label className="text-sm text-white/60 mb-1 block">Entrada inicial</label>
-                  <Textarea
-                    placeholder="Digite o texto inicial que será processado pelo primeiro agente..."
-                    value={execInput}
-                    onChange={(e) => setExecInput(e.target.value)}
-                    className="min-h-[80px] bg-white/5 border-white/10"
-                    disabled={executing}
-                  />
-                </div>
-                <Button onClick={handleExecute} disabled={executing || !execInput.trim()} className="gap-2 gradient-primary w-full">
-                  {executing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                  {executing ? "Iniciando..." : "Iniciar Execução"}
-                </Button>
-              </>
-            )}
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-4">
+              {/* Initial input */}
+              {stepResults.length === 0 && (
+                <>
+                  <div>
+                    <label className="text-sm text-white/60 mb-1 block">Entrada inicial</label>
+                    <Textarea
+                      placeholder="Digite o texto inicial que será processado pelo primeiro agente..."
+                      value={execInput}
+                      onChange={(e) => setExecInput(e.target.value)}
+                      className="min-h-[80px] bg-white/5 border-white/10"
+                      disabled={executing}
+                    />
+                  </div>
+                  <Button onClick={handleExecute} disabled={executing || !execInput.trim()} className="gap-2 gradient-primary w-full">
+                    {executing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                    {executing ? "Iniciando..." : "Iniciar Execução"}
+                  </Button>
+                </>
+              )}
 
-            {/* Step results */}
-            {stepResults.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-white/80">Resultados por Etapa</h3>
-                {stepResults.map((result) => (
-                  <div key={result.step_index} className={`rounded-lg border p-3 ${
-                    result.status === "error" ? "border-red-500/30 bg-red-500/5" :
-                    result.status === "running" ? "border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5" :
-                    "border-white/10 bg-white/5"
-                  }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant={
-                        result.status === "completed" ? "default" :
-                        result.status === "running" ? "secondary" :
-                        "destructive"
-                      } className="text-xs">
-                        {result.status === "running" && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                        Etapa {result.step_index + 1}
-                      </Badge>
-                      <span className="text-xs text-white/40">{result.agent_name}</span>
-                    </div>
+              {/* Step results */}
+              {stepResults.length > 0 && (
+                <div className="space-y-4">
+                  {stepResults.map((result) => (
+                    <div key={result.step_index} className={`rounded-lg border p-4 ${
+                      result.status === "error" ? "border-red-500/30 bg-red-500/5" :
+                      result.status === "running" ? "border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5" :
+                      result.status === "waiting_input" ? "border-amber-400/30 bg-amber-400/5" :
+                      "border-white/10 bg-white/5"
+                    }`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge variant={
+                          result.status === "completed" ? "default" :
+                          result.status === "running" ? "secondary" :
+                          result.status === "waiting_input" ? "secondary" :
+                          "destructive"
+                        } className="text-xs">
+                          {result.status === "running" && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                          Etapa {result.step_index + 1}
+                        </Badge>
+                        <span className="text-xs text-white/40">{result.agent_name}</span>
+                      </div>
 
-                    {/* Chat history for this step */}
-                    {result.chatHistory.length > 0 && (
-                      <div className="space-y-2 mb-3">
-                        {result.chatHistory.map((msg, msgIdx) => (
-                          <div key={msgIdx} className={`rounded-lg p-2 text-sm ${
-                            msg.role === "assistant"
-                              ? "bg-white/5 border border-white/5"
-                              : "bg-[hsl(var(--accent))]/10 border border-[hsl(var(--accent))]/10 ml-8"
-                          }`}>
-                            <span className="text-[10px] font-medium mb-1 block text-white/30">
-                              {msg.role === "assistant" ? result.agent_name : "Você"}
-                            </span>
-                            <div className="text-sm text-white/70 prose prose-invert prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                      {/* Chat history for this step */}
+                      {result.chatHistory.length > 0 && (
+                        <div className="space-y-3 mb-3">
+                          {result.chatHistory.map((msg, msgIdx) => (
+                            <div key={msgIdx} className={`rounded-lg p-3 ${
+                              msg.role === "assistant"
+                                ? "bg-white/5 border border-white/5"
+                                : "bg-[hsl(var(--accent))]/10 border border-[hsl(var(--accent))]/10 ml-8"
+                            }`}>
+                              <span className="text-[10px] font-medium mb-1 block text-white/30">
+                                {msg.role === "assistant" ? result.agent_name : "Você"}
+                              </span>
+                              {msg.role === "assistant" ? (
+                                <RenderContent content={msg.content} />
+                              ) : (
+                                <div className={PROSE_CLASSES}>
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                                </div>
+                              )}
                             </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Show last output if no chat history */}
+                      {result.chatHistory.length === 0 && result.output && (
+                        <RenderContent content={result.output} />
+                      )}
+
+                      {/* Error display */}
+                      {result.status === "error" && (
+                        <div className="mt-2 rounded bg-red-500/10 border border-red-500/20 p-2">
+                          <p className="text-xs text-red-400 font-medium">❌ Erro nesta etapa</p>
+                          <p className="text-xs text-red-300/70 mt-1">{result.output?.slice(0, 300)}</p>
+                        </div>
+                      )}
+
+                      {/* Chat input for waiting_input steps */}
+                      {result.status === "waiting_input" && (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex gap-2">
+                            <Textarea
+                              placeholder="Responda as perguntas do agente... (Shift+Enter para nova linha)"
+                              value={stepChatInput}
+                              onChange={(e) => setStepChatInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleStepChatReply(result.step_index);
+                                }
+                              }}
+                              className="min-h-[60px] max-h-[120px] bg-white/5 border-white/10 text-sm flex-1 resize-none"
+                              disabled={sendingChat}
+                            />
+                            <Button
+                              size="icon"
+                              className="gradient-primary shrink-0 self-end"
+                              onClick={() => handleStepChatReply(result.step_index)}
+                              disabled={sendingChat || !stepChatInput.trim()}
+                            >
+                              {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            </Button>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          <p className="text-[10px] text-white/30">Enter para enviar · Shift+Enter para nova linha</p>
+                        </div>
+                      )}
 
-                    {/* Show last output if no chat history */}
-                    {result.chatHistory.length === 0 && result.output && (
-                      <div className="text-sm text-white/70 prose prose-invert prose-sm max-w-none max-h-60 overflow-auto [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.output}</ReactMarkdown>
-                      </div>
-                    )}
-
-                    {/* Error display */}
-                    {result.status === "error" && (
-                      <div className="mt-2 rounded bg-red-500/10 border border-red-500/20 p-2">
-                        <p className="text-xs text-red-400 font-medium">❌ Erro nesta etapa</p>
-                        <p className="text-xs text-red-300/70 mt-1">{result.output?.slice(0, 300)}</p>
-                      </div>
-                    )}
-
-                    {/* Chat input for waiting_input steps */}
-                    {result.status === "waiting_input" && (
-                      <div className="mt-3 space-y-2">
-                        <div className="flex gap-2">
-                          <Textarea
-                            placeholder="Responda as perguntas do agente... (Shift+Enter para nova linha)"
-                            value={stepChatInput}
-                            onChange={(e) => setStepChatInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                handleStepChatReply(result.step_index);
-                              }
-                            }}
-                            className="min-h-[60px] max-h-[120px] bg-white/5 border-white/10 text-sm flex-1 resize-none"
-                            disabled={sendingChat}
-                          />
+                      {/* Continue button for completed steps that were chatted */}
+                      {result.status === "completed" && result.chatHistory.length > 1 &&
+                        result.step_index === Math.max(...stepResults.map(r => r.step_index)) &&
+                        !flowCompleted && !executing && result.step_index < flowSteps.length - 1 && (
+                        <div className="mt-3">
                           <Button
-                            size="icon"
-                            className="gradient-primary shrink-0 self-end"
-                            onClick={() => handleStepChatReply(result.step_index)}
-                            disabled={sendingChat || !stepChatInput.trim()}
+                            className="w-full gap-2 gradient-primary"
+                            onClick={() => handleContinueToNextStep(result.step_index)}
                           >
-                            {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                            <ChevronRight className="h-4 w-4" />
+                            Continuar para Etapa {result.step_index + 2}
                           </Button>
                         </div>
-                        <p className="text-[10px] text-white/30">Enter para enviar · Shift+Enter para nova linha</p>
-                      </div>
-                    )}
-
-                    {/* Continue button for completed steps that were chatted */}
-                    {result.status === "completed" && result.chatHistory.length > 1 &&
-                      result.step_index === Math.max(...stepResults.map(r => r.step_index)) &&
-                      !execFinal && !executing && result.step_index < flowSteps.length - 1 && (
-                      <div className="mt-3">
-                        <Button
-                          className="w-full gap-2 gradient-primary"
-                          onClick={() => handleContinueToNextStep(result.step_index)}
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                          Continuar para Etapa {result.step_index + 2}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Final result */}
-                {execFinal && (
-                  <div className="rounded-lg border border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/10 p-4">
-                    <h4 className="text-sm font-semibold text-[hsl(var(--accent))] mb-2">✅ Resultado Final</h4>
-                    <div className="text-sm text-white/80 prose prose-invert prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{execFinal}</ReactMarkdown>
+                      )}
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  ))}
+
+                  {/* Flow completed banner + PDF export */}
+                  {flowCompleted && (
+                    <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-5 text-center space-y-4">
+                      <div>
+                        <h4 className="text-base font-semibold text-green-400 mb-1">✅ Fluxo concluído com sucesso!</h4>
+                        <p className="text-sm text-white/50">
+                          Todas as {flowSteps.length} etapas foram executadas. Você pode exportar o resultado completo em PDF.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleExportPdf}
+                        className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Download className="h-4 w-4" />
+                        Gerar PDF do Fluxo
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div ref={scrollEndRef} />
+            </div>
           </div>
-          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>
