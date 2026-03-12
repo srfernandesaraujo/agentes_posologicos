@@ -224,6 +224,7 @@ export default function FlowEditor() {
   const [agentSearch, setAgentSearch] = useState("");
   const [configOpen, setConfigOpen] = useState(false);
   const [editPrompt, setEditPrompt] = useState("");
+  const [configMode, setConfigMode] = useState(false);
 
   // Execution
   const [execOpen, setExecOpen] = useState(false);
