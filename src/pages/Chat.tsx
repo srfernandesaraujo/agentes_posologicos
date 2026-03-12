@@ -865,6 +865,13 @@ export default function Chat() {
                   <MessageSquare className="h-4 w-4" />
                   Conversas
                 </button>
+                <button
+                  onClick={() => { setShowAgentPicker(true); setAttachMenuOpen(false); }}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <Users className="h-4 w-4" />
+                  Agente completo
+                </button>
               </PopoverContent>
             </Popover>
             <InputTemplates
