@@ -267,8 +267,8 @@ export default function FlowEditor() {
     const rect = canvasRef.current.getBoundingClientRect();
     dragRef.current = {
       nodeId,
-      offsetX: e.clientX - el.offsetLeft + canvasRef.current.scrollLeft,
-      offsetY: e.clientY - el.offsetTop + canvasRef.current.scrollTop,
+      offsetX: e.clientX - rect.left - el.offsetLeft + canvasRef.current.scrollLeft,
+      offsetY: e.clientY - rect.top - el.offsetTop + canvasRef.current.scrollTop,
     };
   };
 
@@ -276,17 +276,12 @@ export default function FlowEditor() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragRef.current || !canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
-      const x = Math.max(0, e.clientX - rect.left + canvasRef.current.scrollLeft - (dragRef.current.offsetX - (canvasRef.current.querySelector(`[data-node-id="${dragRef.current.nodeId}"]`) as HTMLElement)?.offsetLeft || 0));
-      const y = Math.max(0, e.clientY - rect.top + canvasRef.current.scrollTop - (dragRef.current.offsetY - (canvasRef.current.querySelector(`[data-node-id="${dragRef.current.nodeId}"]`) as HTMLElement)?.offsetTop || 0));
-      
+      const newX = Math.max(0, e.clientX - rect.left - dragRef.current.offsetX + canvasRef.current.scrollLeft);
+      const newY = Math.max(0, e.clientY - rect.top - dragRef.current.offsetY + canvasRef.current.scrollTop);
       const el = canvasRef.current.querySelector(`[data-node-id="${dragRef.current.nodeId}"]`) as HTMLElement | null;
       if (el) {
-        const newX = Math.max(0, e.clientX - rect.left + canvasRef.current.scrollLeft - (dragRef.current.offsetX - el.offsetLeft));
-        const newY = Math.max(0, e.clientY - rect.top + canvasRef.current.scrollTop - (dragRef.current.offsetY - el.offsetTop));
         el.style.left = `${newX}px`;
         el.style.top = `${newY}px`;
-        dragRef.current.offsetX = e.clientX - newX + canvasRef.current.scrollLeft;
-        dragRef.current.offsetY = e.clientY - newY + canvasRef.current.scrollTop;
       }
     };
 
