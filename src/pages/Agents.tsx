@@ -298,7 +298,7 @@ export default function Agents() {
                       <div
                         key={agent.id}
                         onClick={() => navigate(`/chat/${agent.id}`)}
-                        className="group flex items-start gap-3 rounded-lg border border-border bg-secondary/50 p-3.5 cursor-pointer transition-all hover:border-primary/30 hover:bg-secondary"
+                        className="group flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5 cursor-pointer transition-all hover:border-white/20 hover:-translate-y-0.5"
                       >
                         <div
                           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
