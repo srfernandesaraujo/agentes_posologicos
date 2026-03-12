@@ -242,14 +242,14 @@ export default function Agents() {
                   <div
                     key={agent.id}
                     onClick={() => navigate(`/chat/custom-${agent.id}`)}
-                    className="group flex items-center gap-3 rounded-lg border border-border bg-secondary/50 p-3 cursor-pointer transition-all hover:border-primary/30 hover:bg-secondary"
+                    className="group flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 cursor-pointer transition-all hover:border-white/20 hover:-translate-y-0.5"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--cat-clinica))]/15 text-[hsl(var(--cat-clinica))]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary">
                       <Bot className="h-5 w-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-foreground truncate">{agent.name}</h3>
-                      <p className="text-xs text-muted-foreground line-clamp-1">{agent.description || t("agents.noDesc")}</p>
+                      <h3 className="text-sm font-semibold text-white truncate">{agent.name}</h3>
+                      <p className="text-xs text-white/40 line-clamp-1">{agent.description || t("agents.noDesc")}</p>
                     </div>
                     <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                   </div>
@@ -258,14 +258,14 @@ export default function Agents() {
                   <div
                     key={agent.id}
                     onClick={() => navigate(`/chat/custom-${agent.id}`)}
-                    className="group flex items-center gap-3 rounded-lg border border-border bg-secondary/50 p-3 cursor-pointer transition-all hover:border-primary/30 hover:bg-secondary"
+                    className="group flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 cursor-pointer transition-all hover:border-white/20 hover:-translate-y-0.5"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]">
                       <ShoppingBag className="h-5 w-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-foreground truncate">{agent.name}</h3>
-                      <p className="text-xs text-muted-foreground line-clamp-1">{agent.description || "Sem descrição"}</p>
+                      <h3 className="text-sm font-semibold text-white truncate">{agent.name}</h3>
+                      <p className="text-xs text-white/40 line-clamp-1">{agent.description || "Sem descrição"}</p>
                     </div>
                     <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                   </div>
@@ -298,7 +298,7 @@ export default function Agents() {
                       <div
                         key={agent.id}
                         onClick={() => navigate(`/chat/${agent.id}`)}
-                        className="group flex items-start gap-3 rounded-lg border border-border bg-secondary/50 p-3.5 cursor-pointer transition-all hover:border-primary/30 hover:bg-secondary"
+                        className="group flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5 cursor-pointer transition-all hover:border-white/20 hover:-translate-y-0.5"
                       >
                         <div
                           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
@@ -311,7 +311,7 @@ export default function Agents() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-semibold text-foreground truncate">{agent.name}</h3>
+                            <h3 className="text-sm font-semibold text-white truncate">{agent.name}</h3>
                             {isAdmin && (
                               <button
                                 onClick={(e) => {
@@ -325,14 +325,14 @@ export default function Agents() {
                               </button>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{agent.description}</p>
+                          <p className="text-xs text-white/50 line-clamp-2 mt-0.5">{agent.description}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2 shrink-0">
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <div className="flex items-center gap-1 text-[10px] text-white/30">
                             <Coins className="h-3 w-3" />
                             {agent.credit_cost}
                           </div>
-                          <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                          <ArrowRight className="h-4 w-4 text-white/30 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                         </div>
                       </div>
                     );
