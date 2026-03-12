@@ -38,3 +38,9 @@ verify_jwt = false
 
 [functions.pubmed-monitor]
 verify_jwt = false
+
+[functions.agent-flow-execute]
+verify_jwt = false
+
+[functions.agent-flow-plan]
+verify_jwt = false

@@ -14,6 +14,212 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_flow_edges: {
+        Row: {
+          flow_id: string
+          id: string
+          source_node_id: string
+          target_node_id: string
+        }
+        Insert: {
+          flow_id: string
+          id?: string
+          source_node_id: string
+          target_node_id: string
+        }
+        Update: {
+          flow_id?: string
+          id?: string
+          source_node_id?: string
+          target_node_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_flow_edges_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_flow_edges_source_node_id_fkey"
+            columns: ["source_node_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_flow_edges_target_node_id_fkey"
+            columns: ["target_node_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flow_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_flow_executions: {
+        Row: {
+          completed_at: string | null
+          final_output: string | null
+          flow_id: string
+          id: string
+          initial_input: string
+          started_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          final_output?: string | null
+          flow_id: string
+          id?: string
+          initial_input?: string
+          started_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          final_output?: string | null
+          flow_id?: string
+          id?: string
+          initial_input?: string
+          started_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_flow_executions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_flow_node_results: {
+        Row: {
+          completed_at: string | null
+          execution_id: string
+          id: string
+          input_text: string
+          node_id: string
+          output_text: string | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          execution_id: string
+          id?: string
+          input_text?: string
+          node_id: string
+          output_text?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          execution_id?: string
+          id?: string
+          input_text?: string
+          node_id?: string
+          output_text?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_flow_node_results_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flow_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_flow_node_results_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flow_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_flow_nodes: {
+        Row: {
+          agent_id: string
+          agent_type: string
+          created_at: string
+          flow_id: string
+          id: string
+          input_prompt: string
+          position_x: number
+          position_y: number
+          sort_order: number
+        }
+        Insert: {
+          agent_id: string
+          agent_type?: string
+          created_at?: string
+          flow_id: string
+          id?: string
+          input_prompt?: string
+          position_x?: number
+          position_y?: number
+          sort_order?: number
+        }
+        Update: {
+          agent_id?: string
+          agent_type?: string
+          created_at?: string
+          flow_id?: string
+          id?: string
+          input_prompt?: string
+          position_x?: number
+          position_y?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_flow_nodes_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_flows: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       agent_knowledge_bases: {
         Row: {
           agent_id: string
