@@ -548,16 +548,16 @@ export default function FlowEditor() {
     const userMessage = stepChatInput.trim();
     setStepChatInput("");
 
-    // Add user message to chat history
-    const updatedHistory = [
-      ...currentResult.chatHistory,
+    const priorHistory = currentResult.chatHistory;
+    const optimisticHistory = [
+      ...priorHistory,
       { role: "user" as const, content: userMessage },
     ];
 
     setStepResults((prev) =>
       prev.map((r) =>
         r.step_index === stepIndex
-          ? { ...r, chatHistory: updatedHistory, status: "running" }
+          ? { ...r, chatHistory: optimisticHistory, status: "running" }
           : r
       )
     );
@@ -570,7 +570,7 @@ export default function FlowEditor() {
           node_id: step.node_id,
           agent_id: step.agent_id,
           input_text: userMessage,
-          conversation_history: updatedHistory,
+          conversation_history: priorHistory,
         },
       });
 
@@ -579,7 +579,7 @@ export default function FlowEditor() {
 
       const output = data.output;
       const hasQuestions = responseHasQuestions(output);
-      const newHistory = [...updatedHistory, { role: "assistant" as const, content: output }];
+      const newHistory = [...optimisticHistory, { role: "assistant" as const, content: output }];
 
       setStepResults((prev) =>
         prev.map((r) =>
@@ -589,7 +589,10 @@ export default function FlowEditor() {
         )
       );
 
-      // If no more questions, don't auto-advance - let user click "Continue"
+      if (!hasQuestions) {
+        setExecuting(true);
+        await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
+      }
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>

@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
             agentId: agent_id,
             input: input_text,
             userId,
-            history,
+            conversationHistory: history,
             skipCredits: true,
           }),
         });
