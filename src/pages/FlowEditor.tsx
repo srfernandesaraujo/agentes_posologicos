@@ -652,13 +652,13 @@ export default function FlowEditor() {
                       <pre className="text-xs text-white/70 whitespace-pre-wrap max-h-40 overflow-auto">{r.output_text}</pre>
                     )}
                     {r.status === "error" && (
-                      <p className="text-xs text-red-400 mt-1">Erro na execução deste nó</p>
+                      <div className="mt-1 rounded bg-red-500/10 border border-red-500/20 p-2">
+                        <p className="text-xs text-red-400 font-medium">❌ Erro nesta etapa</p>
+                        {r.output_text && (
+                          <p className="text-xs text-red-300/70 mt-1">{r.output_text.slice(0, 300)}</p>
+                        )}
+                      </div>
                     )}
-                  </div>
-                ))}
-                {execFinal && (
-                  <div className="rounded-lg border border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/10 p-4">
-                    <h4 className="text-sm font-semibold text-[hsl(var(--accent))] mb-2">Resultado Final</h4>
                     <pre className="text-sm text-white/80 whitespace-pre-wrap">{execFinal}</pre>
                   </div>
                 )}
