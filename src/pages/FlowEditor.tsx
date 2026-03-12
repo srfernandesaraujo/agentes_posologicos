@@ -133,6 +133,10 @@ function stripAgentIntro(output: string): string {
     /já foi (fornecido|respondido|entregue)/i,
     /^(ou descreva|nível:|foco:)/i,
     /PERGUNTAS PARA O USUÁRIO.*"/i,
+    /^perfeito[!.]?\s*(entendido)?/i,
+    /^(vou gerar|vou preparar|vou criar|vou produzir)/i,
+    /^(por favor,?\s*)?(me )?aguarde/i,
+    /enquanto (processo|preparo|gero|crio)/i,
   ];
 
   // Check first 10 lines for intro patterns
