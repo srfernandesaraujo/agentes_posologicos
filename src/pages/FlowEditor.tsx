@@ -976,9 +976,9 @@ export default function FlowEditor() {
                           </Button>
                         </div>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className="w-full gap-1 border-white/10 text-white/60 hover:text-white hover:bg-white/10"
+                          className="w-full gap-1 border border-white/20 bg-white/5 text-white/80 hover:text-white hover:bg-white/15"
                           onClick={() => handleContinueToNextStep(result.step_index)}
                         >
                           <SkipForward className="h-3 w-3" />
