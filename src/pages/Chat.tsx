@@ -915,6 +915,14 @@ export default function Chat() {
       onSelect={(conv) => setAttachedConversations(prev => [...prev, conv])}
       excludeAgentId={actualAgentId}
     />
+
+    {/* Agent Conversations Picker */}
+    <AgentConversationsPicker
+      open={showAgentPicker}
+      onClose={() => setShowAgentPicker(false)}
+      onSelect={(agents) => setAttachedConversations(prev => [...prev, ...agents])}
+      excludeAgentId={actualAgentId}
+    />
     </>
   );
 }
