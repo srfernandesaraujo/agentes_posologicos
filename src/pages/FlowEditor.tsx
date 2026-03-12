@@ -564,6 +564,7 @@ export default function FlowEditor() {
           previous_stage_output: previousStageOutput,
           stage_number: stepIndex + 1,
           total_stages: steps.length,
+          pipeline_context: steps.map(s => ({ agent_name: s.agent_name })),
         },
       });
 
