@@ -50,6 +50,39 @@ function getIcon(iconName: string) {
   return Icon;
 }
 
+// Detect if agent output contains questions requiring user input
+function detectQuestions(output: string): boolean {
+  const lines = output.split("\n").map(l => l.trim()).filter(Boolean);
+  const questionLines = lines.filter(l => l.endsWith("?") && l.length > 10);
+  return questionLines.length >= 2;
+}
+
+// Strip trailing interaction suggestions that agents add in flow mode
+function stripFlowSuggestions(output: string): string {
+  const lines = output.split("\n");
+  let cutIndex = lines.length;
+  
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line) { cutIndex = i; continue; }
+    if (/^(Agora posso te ajudar com|Posso te ajudar com|Quer que eu|Deseja que eu|Gostaria que eu)/i.test(line)) {
+      cutIndex = i;
+      continue;
+    }
+    // Short action-like suggestion lines near the end
+    if (line.length < 60 && !line.endsWith(".") && !line.endsWith("?") && !line.startsWith("|") && !line.startsWith("#") && i > lines.length - 10 && cutIndex < lines.length) {
+      cutIndex = i;
+      continue;
+    }
+    break;
+  }
+  
+  if (cutIndex < lines.length) {
+    return lines.slice(0, cutIndex).join("\n").trimEnd();
+  }
+  return output;
+}
+
 // Guided steps configuration
 const GUIDE_STEPS = [
   {
