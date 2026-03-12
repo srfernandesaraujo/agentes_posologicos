@@ -3,7 +3,7 @@ import { useAgents, CATEGORIES, CATEGORY_COLORS } from "@/hooks/useAgents";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { usePurchasedAgents, useMarketplaceAgents } from "@/hooks/useMarketplace";
 import { AgentCard } from "@/components/agents/AgentCard";
-import { Bot, Search, ArrowRight, ShoppingBag, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
+import { Bot, Search, ArrowRight, ShoppingBag, ChevronDown, ChevronRight, Sparkles, Compass } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -43,10 +43,13 @@ export default function Agents() {
       (!search || a.name.toLowerCase().includes(lowerSearch) || a.description.toLowerCase().includes(lowerSearch))
   );
 
+  const superAgent = useMemo(() => agents.find((a) => a.slug === "super-agente"), [agents]);
+
   const agentsByCategory = useMemo(() => {
     const map: Record<string, typeof agents> = {};
     for (const cat of CATEGORIES) {
       const catAgents = agents.filter((a) => {
+        if (a.slug === "super-agente") return false;
         const matchesSearch =
           !search || a.name.toLowerCase().includes(lowerSearch) || a.description.toLowerCase().includes(lowerSearch);
         return a.category === cat && matchesSearch;
@@ -98,6 +101,28 @@ export default function Agents() {
           </p>
         )}
       </div>
+
+      {/* Super Agent Featured Card */}
+      {superAgent && !search && (
+        <div
+          className="mb-8 group cursor-pointer rounded-2xl border-2 border-primary/40 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 transition-all hover:border-primary/60 hover:shadow-lg hover:shadow-primary/10"
+          onClick={() => navigate(`/chat/${superAgent.id}`)}
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/20 text-primary">
+              <Compass className="h-7 w-7" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="font-display text-xl font-bold text-card-foreground">{superAgent.name}</h2>
+                <span className="rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">GRÁTIS</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{superAgent.description}</p>
+            </div>
+            <ArrowRight className="h-5 w-5 shrink-0 text-primary transition-transform group-hover:translate-x-1" />
+          </div>
+        </div>
+      )}
 
       {/* Quick category jump */}
       <div className="mb-8 flex flex-wrap gap-2">

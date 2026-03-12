@@ -22,6 +22,7 @@ import {
   Megaphone,
   Mic,
   Clapperboard,
+  Compass,
   LucideIcon,
 } from "lucide-react";
 
@@ -49,6 +50,7 @@ const iconMap: Record<string, LucideIcon> = {
   Megaphone,
   Mic,
   Clapperboard,
+  Compass,
 };
 
 export function getIcon(name: string): LucideIcon {
