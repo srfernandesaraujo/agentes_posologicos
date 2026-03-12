@@ -554,6 +554,9 @@ export default function FlowEditor() {
     );
 
     try {
+      const currentResult = stepResults.find((r) => r.step_index === stepIndex);
+      const previousStageOutput = stepIndex > 0 ? stepResults.find(r => r.step_index === stepIndex - 1)?.output || "" : "";
+
       const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
         body: {
           mode: "step",
@@ -562,6 +565,9 @@ export default function FlowEditor() {
           agent_id: step.agent_id,
           input_text: userMessage,
           conversation_history: priorHistory,
+          previous_stage_output: previousStageOutput,
+          stage_number: stepIndex + 1,
+          total_stages: flowSteps.length,
         },
       });
 
@@ -569,21 +575,19 @@ export default function FlowEditor() {
       if (data?.status === "error") throw new Error(data.error || data.output);
 
       const output = data.output;
-      const hasQuestions = responseHasQuestions(output);
       const newHistory = [...optimisticHistory, { role: "assistant" as const, content: output }];
 
       setStepResults((prev) =>
         prev.map((r) =>
           r.step_index === stepIndex
-            ? { ...r, output, status: hasQuestions ? "waiting_input" : "completed", chatHistory: newHistory }
+            ? { ...r, output, status: "completed", chatHistory: newHistory }
             : r
         )
       );
 
-      if (!hasQuestions) {
-        setExecuting(true);
-        await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
-      }
+      // Auto-advance to next step
+      setExecuting(true);
+      await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>
