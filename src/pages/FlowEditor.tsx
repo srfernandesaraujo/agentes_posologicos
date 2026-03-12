@@ -621,20 +621,33 @@ export default function FlowEditor() {
       if (error) throw error;
       if (data?.status === "error") throw new Error(data.error || data.output);
 
-      const output = data.output;
+      const rawOutput = data.output;
+      const output = stripFlowSuggestions(rawOutput);
       const newHistory = [...optimisticHistory, { role: "assistant" as const, content: output }];
 
-      setStepResults((prev) =>
-        prev.map((r) =>
-          r.step_index === stepIndex
-            ? { ...r, output, status: "completed", chatHistory: newHistory }
-            : r
-        )
-      );
+      const hasQuestions = detectQuestions(output);
 
-      // Auto-advance to next step
-      setExecuting(true);
-      await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
+      if (hasQuestions) {
+        // Agent still has questions - stay in this step
+        setStepResults((prev) =>
+          prev.map((r) =>
+            r.step_index === stepIndex
+              ? { ...r, output, status: "waiting_input", chatHistory: newHistory }
+              : r
+          )
+        );
+      } else {
+        // No more questions - advance to next step
+        setStepResults((prev) =>
+          prev.map((r) =>
+            r.step_index === stepIndex
+              ? { ...r, output, status: "completed", chatHistory: newHistory }
+              : r
+          )
+        );
+        setExecuting(true);
+        await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
+      }
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>
