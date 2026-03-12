@@ -50,6 +50,39 @@ function getIcon(iconName: string) {
   return Icon;
 }
 
+// Detect if agent output contains questions requiring user input
+function detectQuestions(output: string): boolean {
+  const lines = output.split("\n").map(l => l.trim()).filter(Boolean);
+  const questionLines = lines.filter(l => l.endsWith("?") && l.length > 10);
+  return questionLines.length >= 2;
+}
+
+// Strip trailing interaction suggestions that agents add in flow mode
+function stripFlowSuggestions(output: string): string {
+  const lines = output.split("\n");
+  let cutIndex = lines.length;
+  
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line) { cutIndex = i; continue; }
+    if (/^(Agora posso te ajudar com|Posso te ajudar com|Quer que eu|Deseja que eu|Gostaria que eu)/i.test(line)) {
+      cutIndex = i;
+      continue;
+    }
+    // Short action-like suggestion lines near the end
+    if (line.length < 60 && !line.endsWith(".") && !line.endsWith("?") && !line.startsWith("|") && !line.startsWith("#") && i > lines.length - 10 && cutIndex < lines.length) {
+      cutIndex = i;
+      continue;
+    }
+    break;
+  }
+  
+  if (cutIndex < lines.length) {
+    return lines.slice(0, cutIndex).join("\n").trimEnd();
+  }
+  return output;
+}
+
 // Guided steps configuration
 const GUIDE_STEPS = [
   {
@@ -498,23 +531,37 @@ export default function FlowEditor() {
       if (error) throw error;
       if (data?.status === "error") throw new Error(data.error || data.output);
 
-      const output = data.output;
+      const rawOutput = data.output;
+      
+      // Strip trailing interaction suggestions from agent output in flow mode
+      const output = stripFlowSuggestions(rawOutput);
 
-      setStepResults((prev) =>
-        prev.map((r) =>
-          r.step_index === stepIndex
-            ? {
-                ...r,
-                output,
-                status: "completed",
-                chatHistory: [...history, { role: "assistant" as const, content: output }],
-              }
-            : r
-        )
-      );
+      const newChatHistory = [...history, { role: "assistant" as const, content: output }];
 
-      // Always auto-continue to next step (no question detection in flow mode)
-      await executeStep(stepIndex + 1, steps, execId, output, []);
+      // Detect if agent is asking questions (lines ending with ?)
+      const hasQuestions = detectQuestions(output);
+
+      if (hasQuestions) {
+        // Pause for user input
+        setStepResults((prev) =>
+          prev.map((r) =>
+            r.step_index === stepIndex
+              ? { ...r, output, status: "waiting_input", chatHistory: newChatHistory }
+              : r
+          )
+        );
+        setExecuting(false);
+      } else {
+        // Auto-advance to next step
+        setStepResults((prev) =>
+          prev.map((r) =>
+            r.step_index === stepIndex
+              ? { ...r, output, status: "completed", chatHistory: newChatHistory }
+              : r
+          )
+        );
+        await executeStep(stepIndex + 1, steps, execId, output, []);
+      }
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>
@@ -574,20 +621,33 @@ export default function FlowEditor() {
       if (error) throw error;
       if (data?.status === "error") throw new Error(data.error || data.output);
 
-      const output = data.output;
+      const rawOutput = data.output;
+      const output = stripFlowSuggestions(rawOutput);
       const newHistory = [...optimisticHistory, { role: "assistant" as const, content: output }];
 
-      setStepResults((prev) =>
-        prev.map((r) =>
-          r.step_index === stepIndex
-            ? { ...r, output, status: "completed", chatHistory: newHistory }
-            : r
-        )
-      );
+      const hasQuestions = detectQuestions(output);
 
-      // Auto-advance to next step
-      setExecuting(true);
-      await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
+      if (hasQuestions) {
+        // Agent still has questions - stay in this step
+        setStepResults((prev) =>
+          prev.map((r) =>
+            r.step_index === stepIndex
+              ? { ...r, output, status: "waiting_input", chatHistory: newHistory }
+              : r
+          )
+        );
+      } else {
+        // No more questions - advance to next step
+        setStepResults((prev) =>
+          prev.map((r) =>
+            r.step_index === stepIndex
+              ? { ...r, output, status: "completed", chatHistory: newHistory }
+              : r
+          )
+        );
+        setExecuting(true);
+        await executeStep(stepIndex + 1, flowSteps, executionId, output, []);
+      }
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>
@@ -935,6 +995,36 @@ export default function FlowEditor() {
                       <div className="mt-2 rounded bg-red-500/10 border border-red-500/20 p-2">
                         <p className="text-xs text-red-400 font-medium">❌ Erro nesta etapa</p>
                         <p className="text-xs text-red-300/70 mt-1">{result.output?.slice(0, 300)}</p>
+                      </div>
+                    )}
+
+                    {/* Chat input for waiting_input steps */}
+                    {result.status === "waiting_input" && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex gap-2">
+                          <Textarea
+                            placeholder="Responda as perguntas do agente... (Shift+Enter para nova linha)"
+                            value={stepChatInput}
+                            onChange={(e) => setStepChatInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleStepChatReply(result.step_index);
+                              }
+                            }}
+                            className="min-h-[60px] max-h-[120px] bg-white/5 border-white/10 text-sm flex-1 resize-none"
+                            disabled={sendingChat}
+                          />
+                          <Button
+                            size="icon"
+                            className="gradient-primary shrink-0 self-end"
+                            onClick={() => handleStepChatReply(result.step_index)}
+                            disabled={sendingChat || !stepChatInput.trim()}
+                          >
+                            {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-white/30">Enter para enviar · Shift+Enter para nova linha</p>
                       </div>
                     )}
 
