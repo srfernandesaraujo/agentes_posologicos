@@ -947,46 +947,6 @@ export default function FlowEditor() {
                       </div>
                     )}
 
-                    {/* Inline chat input for waiting steps */}
-                    {result.status === "waiting_input" && (
-                      <div className="mt-3 space-y-2">
-                        <div className="space-y-2">
-                          <Textarea
-                            placeholder="Responda às perguntas do agente..."
-                            value={stepChatInput}
-                            onChange={(e) => setStepChatInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                handleStepChatReply(result.step_index);
-                              }
-                            }}
-                            className="min-h-[88px] bg-white/5 border-white/10 text-sm"
-                            disabled={sendingChat}
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              size="icon"
-                              onClick={() => handleStepChatReply(result.step_index)}
-                              disabled={sendingChat || !stepChatInput.trim()}
-                              className="shrink-0 gradient-primary"
-                            >
-                              {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="flex-1 gap-1 border border-white/20 bg-white/5 text-white/80 hover:text-white hover:bg-white/15"
-                              onClick={() => handleContinueToNextStep(result.step_index)}
-                            >
-                              <SkipForward className="h-3 w-3" />
-                              Pular para próxima etapa
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Continue button for completed steps that were chatted */}
                     {result.status === "completed" && result.chatHistory.length > 1 &&
                       result.step_index === Math.max(...stepResults.map(r => r.step_index)) &&
@@ -998,6 +958,9 @@ export default function FlowEditor() {
                         >
                           <ChevronRight className="h-4 w-4" />
                           Continuar para Etapa {result.step_index + 2}
+                        </Button>
+                      </div>
+                    )}
                         </Button>
                       </div>
                     )}
