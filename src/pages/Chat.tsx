@@ -241,6 +241,7 @@ export default function Chat() {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [attachedConversations, setAttachedConversations] = useState<{ title: string; content: string }[]>([]);
   const [showConversationPicker, setShowConversationPicker] = useState(false);
+  const [showAgentPicker, setShowAgentPicker] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
