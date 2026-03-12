@@ -231,7 +231,7 @@ export default function Agents() {
             <section className="mb-8">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-5 rounded-full bg-primary" />
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-white">
                   Meus Agentes
                 </h2>
                 <span className="text-xs text-muted-foreground">({publishedCustom.length + purchasedAgents.length})</span>
