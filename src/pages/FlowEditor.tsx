@@ -464,6 +464,10 @@ export default function FlowEditor() {
       contextMessage = `${step.input_prompt}\n\n---\n\nConteúdo de entrada:\n${inputText}`;
     }
 
+    // Get previous stage output for context chaining
+    const prevResult = stepIndex > 0 ? stepResults.find(r => r.step_index === stepIndex - 1) : null;
+    const previousStageOutput = prevResult?.output || "";
+
     // Add running placeholder
     setStepResults((prev) => [
       ...prev.filter((r) => r.step_index !== stepIndex),
@@ -485,6 +489,9 @@ export default function FlowEditor() {
           agent_id: step.agent_id,
           input_text: contextMessage,
           conversation_history: history,
+          previous_stage_output: previousStageOutput,
+          stage_number: stepIndex + 1,
+          total_stages: steps.length,
         },
       });
 
@@ -492,9 +499,6 @@ export default function FlowEditor() {
       if (data?.status === "error") throw new Error(data.error || data.output);
 
       const output = data.output;
-      const hasQuestions = responseHasQuestions(output);
-
-      const newChatHistory = [...history, { role: "assistant" as const, content: output }];
 
       setStepResults((prev) =>
         prev.map((r) =>
@@ -502,20 +506,15 @@ export default function FlowEditor() {
             ? {
                 ...r,
                 output,
-                status: hasQuestions ? "waiting_input" : "completed",
-                chatHistory: newChatHistory,
+                status: "completed",
+                chatHistory: [...history, { role: "assistant" as const, content: output }],
               }
             : r
         )
       );
 
-      if (hasQuestions) {
-        // Pause - wait for user input or skip
-        setExecuting(false);
-      } else {
-        // Auto-continue to next step
-        await executeStep(stepIndex + 1, steps, execId, output, []);
-      }
+      // Always auto-continue to next step (no question detection in flow mode)
+      await executeStep(stepIndex + 1, steps, execId, output, []);
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>
