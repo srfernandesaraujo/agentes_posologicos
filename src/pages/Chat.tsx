@@ -21,6 +21,7 @@ import { exportConversationPdf } from "@/lib/exportConversationPdf";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InputTemplates } from "@/components/chat/InputTemplates";
 import { ConversationPicker } from "@/components/chat/ConversationPicker";
+import { AgentConversationsPicker } from "@/components/chat/AgentConversationsPicker";
 import { MessageActions } from "@/components/chat/MessageActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
 import { toast } from "sonner";
