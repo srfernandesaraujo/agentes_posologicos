@@ -192,7 +192,7 @@ const markdownComponents = {
 };
 
 function ChatMessageContent({ content }: { content: string }) {
-  const parts: Array<{ type: "text" | "chart"; content: string }> = [];
+  const parts: Array<{ type: "text" | "chart" | "mindmap"; content: string }> = [];
   const regex = /```chart\s*\n([\s\S]*?)```/g;
   let lastIndex = 0;
   let match;
@@ -207,11 +207,29 @@ function ChatMessageContent({ content }: { content: string }) {
     parts.push({ type: "text", content: content.slice(lastIndex) });
   }
 
+  // Check text parts for mind maps
+  const finalParts: typeof parts = [];
+  for (const part of parts) {
+    if (part.type === "text" && detectMindMap(part.content)) {
+      finalParts.push({ type: "mindmap", content: part.content });
+      // Also render remaining non-tree text as markdown
+      const nonTreeLines = part.content.split("\n").filter(l => !/[├└│┣┗┃][━─—]+/.test(l) && !/^🎯/.test(l.trim()));
+      const remaining = nonTreeLines.join("\n").trim();
+      if (remaining) {
+        finalParts.push({ type: "text", content: remaining });
+      }
+    } else {
+      finalParts.push(part);
+    }
+  }
+
   return (
     <>
-      {parts.map((part, i) =>
+      {finalParts.map((part, i) =>
         part.type === "chart" ? (
           <ChartBlock key={i} jsonString={part.content} />
+        ) : part.type === "mindmap" ? (
+          <MindMapRenderer key={i} content={part.content} />
         ) : (
           <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={markdownComponents}>{sanitizeMarkdownTables(part.content)}</ReactMarkdown>
         )
