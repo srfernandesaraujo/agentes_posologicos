@@ -842,18 +842,15 @@ export default function FlowEditor() {
                   const stepResult = stepResults.find(r => r.step_index === i);
                   const isActive = currentStepIndex === i;
                   const isDone = stepResult?.status === "completed";
-                  const isWaiting = stepResult?.status === "waiting_input";
                   return (
                     <div key={step.node_id} className="flex items-center gap-1">
                       <div className={`flex items-center gap-1 rounded-md px-2 py-1 transition-all ${
                         isActive ? "bg-[hsl(var(--accent))]/20 ring-1 ring-[hsl(var(--accent))]/40" :
                         isDone ? "bg-green-500/10" :
-                        isWaiting ? "bg-amber-500/10 ring-1 ring-amber-400/30" :
                         "bg-white/10"
                       }`}>
                         {stepResult?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
-                        {isWaiting && <MessageCircle className="h-3 w-3 text-amber-400" />}
-                        <span className={`text-xs ${isDone ? "text-green-400" : isWaiting ? "text-amber-300" : "text-white/70"}`}>
+                        <span className={`text-xs ${isDone ? "text-green-400" : "text-white/70"}`}>
                           {step.agent_name}
                         </span>
                       </div>
@@ -879,18 +876,17 @@ export default function FlowEditor() {
                 </div>
                 <Button onClick={handleExecute} disabled={executing || !execInput.trim()} className="gap-2 gradient-primary w-full">
                   {executing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                  {executing ? "Iniciando..." : "Iniciar Execução Faseada"}
+                  {executing ? "Iniciando..." : "Iniciar Execução"}
                 </Button>
               </>
             )}
 
-            {/* Step results with inline chat */}
+            {/* Step results */}
             {stepResults.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-white/80">Resultados por Etapa</h3>
                 {stepResults.map((result) => (
                   <div key={result.step_index} className={`rounded-lg border p-3 ${
-                    result.status === "waiting_input" ? "border-amber-400/30 bg-amber-500/5" :
                     result.status === "error" ? "border-red-500/30 bg-red-500/5" :
                     result.status === "running" ? "border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5" :
                     "border-white/10 bg-white/5"
@@ -898,18 +894,13 @@ export default function FlowEditor() {
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant={
                         result.status === "completed" ? "default" :
-                        result.status === "waiting_input" ? "outline" :
                         result.status === "running" ? "secondary" :
                         "destructive"
-                      } className={`text-xs ${result.status === "waiting_input" ? "border-amber-400/50 text-amber-300" : ""}`}>
+                      } className="text-xs">
                         {result.status === "running" && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                        {result.status === "waiting_input" && <MessageCircle className="h-3 w-3 mr-1" />}
                         Etapa {result.step_index + 1}
                       </Badge>
                       <span className="text-xs text-white/40">{result.agent_name}</span>
-                      {result.status === "waiting_input" && (
-                        <span className="text-xs text-amber-300/70 ml-auto">Aguardando resposta</span>
-                      )}
                     </div>
 
                     {/* Chat history for this step */}
