@@ -5399,8 +5399,10 @@ Deno.serve(async (req) => {
       const token = authHeader.replace("Bearer ", "");
 
       // Check if this is a server-to-server call (service role key) with userId in body
+      var isServerCall = false;
       if (token === serviceRoleKey && bodyUserId) {
         userId = bodyUserId;
+        isServerCall = true;
       } else {
         const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
           global: { headers: { Authorization: authHeader } },
@@ -5418,8 +5420,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Create a supabase client (service role for virtual rooms, user-scoped otherwise)
-    const supabase = isVirtualRoom
+    // Create a supabase client (service role for virtual rooms and server-to-server calls, user-scoped otherwise)
+    const supabase = (isVirtualRoom || isServerCall)
       ? createClient(supabaseUrl, serviceRoleKey)
       : createClient(supabaseUrl, supabaseAnonKey, {
           global: { headers: { Authorization: authHeader! } },
