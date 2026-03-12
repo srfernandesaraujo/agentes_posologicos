@@ -311,7 +311,7 @@ export default function Agents() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-semibold text-foreground truncate">{agent.name}</h3>
+                            <h3 className="text-sm font-semibold text-white truncate">{agent.name}</h3>
                             {isAdmin && (
                               <button
                                 onClick={(e) => {
