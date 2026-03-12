@@ -85,7 +85,7 @@ export default function Agents() {
     <div className="container max-w-7xl py-6">
       {/* Header */}
       <div className="mb-6 animate-slide-up">
-        <h1 className="mb-1 font-display text-3xl font-bold text-foreground">
+        <h1 className="mb-1 font-display text-3xl font-bold text-white">
           {t("agents.title")}
         </h1>
         <p className="text-sm text-muted-foreground">
