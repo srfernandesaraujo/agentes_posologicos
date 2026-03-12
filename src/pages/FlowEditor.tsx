@@ -328,7 +328,7 @@ export default function FlowEditor() {
           <Button
             variant="outline"
             size="sm"
-            className={`gap-1 ${connectMode ? "border-[hsl(var(--accent))] text-[hsl(var(--accent))]" : "border-white/20 text-white/60"}`}
+            className={`gap-1 ${connectMode ? "border-[hsl(var(--accent))] text-[hsl(var(--accent))]" : "border-white/20 text-white bg-white/10 hover:bg-white/20"}`}
             onClick={() => {
               setConnectMode(!connectMode);
               setConnectSource(null);
