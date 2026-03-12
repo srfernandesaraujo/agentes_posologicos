@@ -411,30 +411,214 @@ export default function FlowEditor() {
     setConfigOpen(false);
   };
 
-  // Execute flow
+  // Phased execution: init → step-by-step with chat
   const handleExecute = async () => {
     if (!flowId || !execInput.trim()) return;
     setExecuting(true);
-    setExecResults([]);
+    setStepResults([]);
+    setFlowSteps([]);
+    setCurrentStepIndex(-1);
     setExecFinal("");
+    setExecutionId(null);
+
     try {
+      // Step 1: Init execution - get ordered steps
       const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
-        body: { flow_id: flowId, initial_input: execInput },
+        body: { mode: "init", flow_id: flowId, initial_input: execInput },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setExecResults(data?.node_results || []);
-      setExecFinal(data?.final_output || "");
-      if (data?.node_results?.some((r: any) => r.status === "error")) {
-        toast.error("Fluxo concluído com erros em algumas etapas");
-      } else {
-        toast.success("Fluxo executado com sucesso!");
-      }
+
+      setExecutionId(data.execution_id);
+      setFlowSteps(data.steps);
+
+      // Start executing first step
+      await executeStep(0, data.steps, data.execution_id, execInput);
     } catch (e: any) {
-      toast.error(e.message || "Erro na execução");
-    } finally {
+      toast.error(e.message || "Erro ao iniciar execução");
       setExecuting(false);
     }
+  };
+
+  const executeStep = async (
+    stepIndex: number,
+    steps: FlowStep[],
+    execId: string,
+    inputText: string,
+    history: Array<{ role: "user" | "assistant"; content: string }> = []
+  ) => {
+    if (stepIndex >= steps.length) {
+      // All steps done
+      const lastResult = stepResults[stepResults.length - 1] || null;
+      const finalOutput = lastResult?.output || inputText;
+      setExecFinal(finalOutput);
+      setExecuting(false);
+      setCurrentStepIndex(-1);
+
+      // Mark execution complete
+      await supabase.functions.invoke("agent-flow-execute", {
+        body: { mode: "complete", execution_id: execId, final_output: finalOutput, flow_id: flowId },
+      });
+      toast.success("Fluxo concluído com sucesso!");
+      return;
+    }
+
+    const step = steps[stepIndex];
+    setCurrentStepIndex(stepIndex);
+
+    // Build input with input_prompt if present
+    let contextMessage = inputText;
+    if (step.input_prompt) {
+      contextMessage = `${step.input_prompt}\n\n---\n\nConteúdo de entrada:\n${inputText}`;
+    }
+
+    // Add running placeholder
+    setStepResults((prev) => [
+      ...prev.filter((r) => r.step_index !== stepIndex),
+      {
+        step_index: stepIndex,
+        agent_name: step.agent_name,
+        output: "",
+        status: "running",
+        chatHistory: history,
+      },
+    ]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
+        body: {
+          mode: "step",
+          execution_id: execId,
+          node_id: step.node_id,
+          agent_id: step.agent_id,
+          input_text: contextMessage,
+          conversation_history: history,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.status === "error") throw new Error(data.error || data.output);
+
+      const output = data.output;
+      const hasQuestions = responseHasQuestions(output);
+
+      const newChatHistory = [...history, { role: "assistant" as const, content: output }];
+
+      setStepResults((prev) =>
+        prev.map((r) =>
+          r.step_index === stepIndex
+            ? {
+                ...r,
+                output,
+                status: hasQuestions ? "waiting_input" : "completed",
+                chatHistory: newChatHistory,
+              }
+            : r
+        )
+      );
+
+      if (hasQuestions) {
+        // Pause - wait for user input or skip
+        setExecuting(false);
+      } else {
+        // Auto-continue to next step
+        await executeStep(stepIndex + 1, steps, execId, output, []);
+      }
+    } catch (e: any) {
+      setStepResults((prev) =>
+        prev.map((r) =>
+          r.step_index === stepIndex
+            ? { ...r, output: e.message, status: "error", chatHistory: history }
+            : r
+        )
+      );
+      setExecuting(false);
+      toast.error(`Erro na etapa ${stepIndex + 1}: ${e.message}`);
+    }
+  };
+
+  // Handle user reply within a step
+  const handleStepChatReply = async (stepIndex: number) => {
+    if (!stepChatInput.trim() || !executionId || !flowSteps[stepIndex]) return;
+    const step = flowSteps[stepIndex];
+    const currentResult = stepResults.find((r) => r.step_index === stepIndex);
+    if (!currentResult) return;
+
+    setSendingChat(true);
+    const userMessage = stepChatInput.trim();
+    setStepChatInput("");
+
+    // Add user message to chat history
+    const updatedHistory = [
+      ...currentResult.chatHistory,
+      { role: "user" as const, content: userMessage },
+    ];
+
+    setStepResults((prev) =>
+      prev.map((r) =>
+        r.step_index === stepIndex
+          ? { ...r, chatHistory: updatedHistory, status: "running" }
+          : r
+      )
+    );
+
+    try {
+      const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
+        body: {
+          mode: "step",
+          execution_id: executionId,
+          node_id: step.node_id,
+          agent_id: step.agent_id,
+          input_text: userMessage,
+          conversation_history: updatedHistory,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.status === "error") throw new Error(data.error || data.output);
+
+      const output = data.output;
+      const hasQuestions = responseHasQuestions(output);
+      const newHistory = [...updatedHistory, { role: "assistant" as const, content: output }];
+
+      setStepResults((prev) =>
+        prev.map((r) =>
+          r.step_index === stepIndex
+            ? { ...r, output, status: hasQuestions ? "waiting_input" : "completed", chatHistory: newHistory }
+            : r
+        )
+      );
+
+      // If no more questions, don't auto-advance - let user click "Continue"
+    } catch (e: any) {
+      setStepResults((prev) =>
+        prev.map((r) =>
+          r.step_index === stepIndex
+            ? { ...r, status: "waiting_input" }
+            : r
+        )
+      );
+      toast.error(e.message || "Erro ao enviar resposta");
+    } finally {
+      setSendingChat(false);
+    }
+  };
+
+  // Continue to next step after chat
+  const handleContinueToNextStep = async (stepIndex: number) => {
+    const currentResult = stepResults.find((r) => r.step_index === stepIndex);
+    if (!currentResult || !executionId) return;
+
+    // Mark current step as completed
+    setStepResults((prev) =>
+      prev.map((r) =>
+        r.step_index === stepIndex ? { ...r, status: "completed" } : r
+      )
+    );
+
+    setExecuting(true);
+    // Use last assistant output as input for next step
+    await executeStep(stepIndex + 1, flowSteps, executionId, currentResult.output, []);
   };
 
   if (!flow) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-white/40" /></div>;
