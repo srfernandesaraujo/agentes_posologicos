@@ -498,23 +498,37 @@ export default function FlowEditor() {
       if (error) throw error;
       if (data?.status === "error") throw new Error(data.error || data.output);
 
-      const output = data.output;
+      const rawOutput = data.output;
+      
+      // Strip trailing interaction suggestions from agent output in flow mode
+      const output = stripFlowSuggestions(rawOutput);
 
-      setStepResults((prev) =>
-        prev.map((r) =>
-          r.step_index === stepIndex
-            ? {
-                ...r,
-                output,
-                status: "completed",
-                chatHistory: [...history, { role: "assistant" as const, content: output }],
-              }
-            : r
-        )
-      );
+      const newChatHistory = [...history, { role: "assistant" as const, content: output }];
 
-      // Always auto-continue to next step (no question detection in flow mode)
-      await executeStep(stepIndex + 1, steps, execId, output, []);
+      // Detect if agent is asking questions (lines ending with ?)
+      const hasQuestions = detectQuestions(output);
+
+      if (hasQuestions) {
+        // Pause for user input
+        setStepResults((prev) =>
+          prev.map((r) =>
+            r.step_index === stepIndex
+              ? { ...r, output, status: "waiting_input", chatHistory: newChatHistory }
+              : r
+          )
+        );
+        setExecuting(false);
+      } else {
+        // Auto-advance to next step
+        setStepResults((prev) =>
+          prev.map((r) =>
+            r.step_index === stepIndex
+              ? { ...r, output, status: "completed", chatHistory: newChatHistory }
+              : r
+          )
+        );
+        await executeStep(stepIndex + 1, steps, execId, output, []);
+      }
     } catch (e: any) {
       setStepResults((prev) =>
         prev.map((r) =>
