@@ -924,8 +924,8 @@ export default function FlowEditor() {
                             <span className="text-[10px] font-medium mb-1 block text-white/30">
                               {msg.role === "assistant" ? result.agent_name : "Você"}
                             </span>
-                            <div className="text-xs text-white/70 prose prose-invert prose-xs max-w-none">
-                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            <div className="text-sm text-white/70 prose prose-invert prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                             </div>
                           </div>
                         ))}
@@ -934,8 +934,8 @@ export default function FlowEditor() {
 
                     {/* Show last output if no chat history */}
                     {result.chatHistory.length === 0 && result.output && (
-                      <div className="text-xs text-white/70 prose prose-invert prose-xs max-w-none max-h-60 overflow-auto">
-                        <ReactMarkdown>{result.output}</ReactMarkdown>
+                      <div className="text-sm text-white/70 prose prose-invert prose-sm max-w-none max-h-60 overflow-auto [&_table]:w-full [&_table]:border-collapse [&_table]:text-xs [&_th]:border [&_th]:border-white/20 [&_th]:bg-white/10 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white/80 [&_td]:border [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-1.5 [&_td]:text-white/60">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.output}</ReactMarkdown>
                       </div>
                     )}
 
