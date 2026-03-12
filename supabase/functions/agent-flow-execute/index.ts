@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
         const chatResponse = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-          body: JSON.stringify({ agentId: node.agent_id, input: contextMessage, userId, history: [], skipCredits: true }),
+          body: JSON.stringify({ agentId: node.agent_id, input: contextMessage, userId, conversationHistory: [], skipCredits: true }),
         });
 
         const responseText = await chatResponse.text();
