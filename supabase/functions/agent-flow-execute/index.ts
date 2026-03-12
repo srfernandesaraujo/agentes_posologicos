@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
         }
 
         // Call agent-chat function
-        const agentId = agent?.slug || node.agent_id;
+        const agentId = node.agent_id;
         const chatResponse = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
           method: "POST",
           headers: {
