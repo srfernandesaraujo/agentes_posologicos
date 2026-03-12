@@ -325,7 +325,7 @@ export default function Agents() {
                               </button>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{agent.description}</p>
+                          <p className="text-xs text-white/50 line-clamp-2 mt-0.5">{agent.description}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2 shrink-0">
                           <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
