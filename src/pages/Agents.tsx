@@ -328,11 +328,11 @@ export default function Agents() {
                           <p className="text-xs text-white/50 line-clamp-2 mt-0.5">{agent.description}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2 shrink-0">
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <div className="flex items-center gap-1 text-[10px] text-white/30">
                             <Coins className="h-3 w-3" />
                             {agent.credit_cost}
                           </div>
-                          <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                          <ArrowRight className="h-4 w-4 text-white/30 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                         </div>
                       </div>
                     );
