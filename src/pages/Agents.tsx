@@ -283,7 +283,7 @@ export default function Agents() {
               <section key={cat} id={`cat-${cat}`} className="mb-8 scroll-mt-4">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-1 h-5 rounded-full" style={{ background: `hsl(var(--cat-${cat === CATEGORIES[0] ? "clinica" : cat === CATEGORIES[1] ? "edtech" : cat === CATEGORIES[2] ? "pesquisa" : "conteudo"}))` }} />
-                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-white">
                     {cat}
                   </h2>
                   <span className="text-xs text-muted-foreground">({catAgents.length})</span>
