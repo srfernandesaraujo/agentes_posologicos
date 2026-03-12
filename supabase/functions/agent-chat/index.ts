@@ -5257,7 +5257,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId, creditCost, files, getDefaultPrompt } = body;
+    const { agentId, input, isVirtualRoom, isCustomAgent, conversationHistory, roomId, creditCost, files, getDefaultPrompt, userId: bodyUserId, skipCredits } = body;
 
     // Mode: return hardcoded default prompt for a native agent (admin only)
     if (getDefaultPrompt && agentId) {
