@@ -83,49 +83,60 @@ export default function KnowledgeDetail() {
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user || !kbId) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0 || !user || !kbId) return;
 
     setUploading(true);
-    try {
-      const filePath = `${user.id}/${kbId}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("knowledge-files")
-        .upload(filePath, file);
+    let successCount = 0;
+    let errorCount = 0;
 
-      if (uploadError) throw uploadError;
+    for (const file of files) {
+      try {
+        const filePath = `${user.id}/${kbId}/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("knowledge-files")
+          .upload(filePath, file);
 
-      // Read file content for text-based files
-      let content = "";
-      const lowerName = file.name.toLowerCase();
-      if (file.type.startsWith("text/") || lowerName.endsWith(".csv") || lowerName.endsWith(".json") || lowerName.endsWith(".txt")) {
-        content = await file.text();
-      } else if (lowerName.endsWith(".pdf")) {
-        // For PDF, we store a reference - content will be the file metadata
-        content = `[PDF: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Arquivo armazenado para processamento]`;
-      } else if (lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) {
-        content = `[Word: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Arquivo armazenado para processamento]`;
-      } else if (lowerName.endsWith(".xls") || lowerName.endsWith(".xlsx")) {
-        content = `[Excel: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Converta para CSV para melhor processamento]`;
-      } else {
-        content = `[Arquivo: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`;
+        if (uploadError) throw uploadError;
+
+        let content = "";
+        const lowerName = file.name.toLowerCase();
+        if (file.type.startsWith("text/") || lowerName.endsWith(".csv") || lowerName.endsWith(".json") || lowerName.endsWith(".txt")) {
+          content = await file.text();
+        } else if (lowerName.endsWith(".pdf")) {
+          content = `[PDF: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Arquivo armazenado para processamento]`;
+        } else if (lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) {
+          content = `[Word: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Arquivo armazenado para processamento]`;
+        } else if (lowerName.endsWith(".xls") || lowerName.endsWith(".xlsx")) {
+          content = `[Excel: ${file.name} (${(file.size / 1024).toFixed(1)}KB) - Converta para CSV para melhor processamento]`;
+        } else {
+          content = `[Arquivo: ${file.name} (${(file.size / 1024).toFixed(1)}KB)]`;
+        }
+
+        await createSource.mutateAsync({
+          knowledge_base_id: kbId,
+          name: file.name,
+          type: "file",
+          content,
+          file_path: filePath,
+        });
+
+        successCount++;
+      } catch (err: any) {
+        console.error(`Erro ao enviar ${file.name}:`, err);
+        errorCount++;
       }
-
-      await createSource.mutateAsync({
-        knowledge_base_id: kbId,
-        name: sourceName || file.name,
-        type: "file",
-        content,
-        file_path: filePath,
-      });
-
-      toast.success("Arquivo enviado!");
-      resetForm();
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao enviar arquivo");
-    } finally {
-      setUploading(false);
     }
+
+    if (successCount > 0) {
+      toast.success(`${successCount} arquivo(s) enviado(s) com sucesso!`);
+      resetForm();
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} arquivo(s) falharam no envio.`);
+    }
+    setUploading(false);
+    if (e.target) e.target.value = "";
   };
 
   const resetForm = () => {
