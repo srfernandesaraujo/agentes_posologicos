@@ -267,8 +267,8 @@ export default function FlowEditor() {
     const rect = canvasRef.current.getBoundingClientRect();
     dragRef.current = {
       nodeId,
-      offsetX: e.clientX - el.offsetLeft + canvasRef.current.scrollLeft,
-      offsetY: e.clientY - el.offsetTop + canvasRef.current.scrollTop,
+      offsetX: e.clientX - rect.left - el.offsetLeft + canvasRef.current.scrollLeft,
+      offsetY: e.clientY - rect.top - el.offsetTop + canvasRef.current.scrollTop,
     };
   };
 
