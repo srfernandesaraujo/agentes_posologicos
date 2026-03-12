@@ -998,6 +998,36 @@ export default function FlowEditor() {
                       </div>
                     )}
 
+                    {/* Chat input for waiting_input steps */}
+                    {result.status === "waiting_input" && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex gap-2">
+                          <Textarea
+                            placeholder="Responda as perguntas do agente... (Shift+Enter para nova linha)"
+                            value={stepChatInput}
+                            onChange={(e) => setStepChatInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleStepChatReply(result.step_index);
+                              }
+                            }}
+                            className="min-h-[60px] max-h-[120px] bg-white/5 border-white/10 text-sm flex-1 resize-none"
+                            disabled={sendingChat}
+                          />
+                          <Button
+                            size="icon"
+                            className="gradient-primary shrink-0 self-end"
+                            onClick={() => handleStepChatReply(result.step_index)}
+                            disabled={sendingChat || !stepChatInput.trim()}
+                          >
+                            {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-white/30">Enter para enviar · Shift+Enter para nova linha</p>
+                      </div>
+                    )}
+
                     {/* Continue button for completed steps that were chatted */}
                     {result.status === "completed" && result.chatHistory.length > 1 &&
                       result.step_index === Math.max(...stepResults.map(r => r.step_index)) &&
