@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
             input: contextMessage,
             userId: user_id,
             history: [],
-            skipCredits: false,
+            skipCredits: true,
           }),
         });
 
