@@ -226,15 +226,17 @@ export default function KnowledgeDetail() {
 
           {sourceType === "file" && (
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-white/70">Arquivo</label>
+              <label className="mb-1.5 block text-sm font-medium text-white/70">Arquivos</label>
+              <p className="mb-2 text-xs text-white/40">Selecione um ou vários arquivos de uma vez</p>
               <input
                 type="file"
+                multiple
                 accept=".pdf,.csv,.json,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
                 onChange={handleFileUpload}
                 className="block w-full text-sm text-white/60 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[hsl(14,90%,58%)] file:text-white hover:file:bg-[hsl(14,90%,52%)]"
                 disabled={uploading}
               />
-              {uploading && <p className="mt-2 text-xs text-white/40">Enviando...</p>}
+              {uploading && <p className="mt-2 text-xs text-white/40">Enviando arquivos...</p>}
             </div>
           )}
 
