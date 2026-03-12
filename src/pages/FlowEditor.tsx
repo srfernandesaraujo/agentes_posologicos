@@ -535,7 +535,17 @@ export default function FlowEditor() {
                   agentName={info.name}
                   agentIcon={info.icon}
                   isSelected={selectedNodeId === node.id}
-                  onSelect={() => setSelectedNodeId(node.id)}
+                  onSelect={() => {
+                    setSelectedNodeId(node.id);
+                    if (configMode) {
+                      const n = nodes.find(nd => nd.id === node.id);
+                      if (n) {
+                        setEditPrompt(n.input_prompt || "");
+                        setConfigOpen(true);
+                        setConfigMode(false);
+                      }
+                    }
+                  }}
                   onDragStart={(e) => handleDragStart(node.id, e)}
                   onConnect={() => handleNodeConnect(node.id)}
                   connectMode={connectMode}
