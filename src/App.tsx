@@ -26,6 +26,8 @@ import VirtualRooms from "./pages/VirtualRooms";
 import VirtualRoomChat from "./pages/VirtualRoomChat";
 import Marketplace from "./pages/Marketplace";
 import NotFound from "./pages/NotFound";
+import Flows from "./pages/Flows";
+import FlowEditor from "./pages/FlowEditor";
 import UserDashboard from "./pages/UserDashboard";
 import Contact from "./pages/Contact";
 import ResetPassword from "./pages/ResetPassword";
