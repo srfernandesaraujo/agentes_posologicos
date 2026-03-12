@@ -20,11 +20,38 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight } from "lucide-react";
+import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, SkipForward, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import ReactMarkdown from "react-markdown";
 import * as LucideIcons from "lucide-react";
+
+// Detects if agent response contains questions (heuristic)
+function responseHasQuestions(text: string): boolean {
+  if (!text) return false;
+  // Check last 40% of text for question marks
+  const lastPortion = text.slice(Math.floor(text.length * 0.6));
+  const questionMarks = (lastPortion.match(/\?/g) || []).length;
+  return questionMarks >= 1;
+}
+
+interface FlowStep {
+  index: number;
+  node_id: string;
+  agent_id: string;
+  agent_type: string;
+  agent_name: string;
+  input_prompt: string;
+}
+
+interface StepResult {
+  step_index: number;
+  agent_name: string;
+  output: string;
+  status: "completed" | "error" | "waiting_input" | "running";
+  chatHistory: Array<{ role: "user" | "assistant"; content: string }>;
+}
 
 function getIcon(iconName: string) {
   const Icon = (LucideIcons as any)[iconName] || LucideIcons.Bot;
