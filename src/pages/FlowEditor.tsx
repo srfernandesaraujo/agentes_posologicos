@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, SkipForward, MessageCircle } from "lucide-react";
+import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
