@@ -1,68 +1,99 @@
 
 
-## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
+## Rede de Agentes (Agent Flow / Pipeline)
 
-### Problema
-Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
+### Visão Geral
 
-### Solucao
-Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
+Criar uma funcionalidade estilo n8n onde o usuário pode montar fluxos visuais conectando agentes em sequência. A saída de um agente alimenta a entrada do próximo. O sistema também aceita uma descrição em linguagem natural e gera automaticamente o fluxo com os agentes adequados, criando agentes personalizados quando necessário.
 
-### Como vai funcionar (fluxo do usuario)
+### Banco de Dados — Novas Tabelas
 
-1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
-2. A fonte e criada com status "pending"
-3. O sistema chama automaticamente a Edge Function para extrair a transcricao
-4. A transcricao e salva no campo `content` e o status muda para "ready"
-5. O agente passa a usar o texto transcrito como contexto
+**`agent_flows`** — armazena cada fluxo criado pelo usuário:
+- `id` (uuid, PK)
+- `user_id` (uuid, NOT NULL)
+- `name` (text, NOT NULL)
+- `description` (text, default '')
+- `status` (text, default 'draft') — draft, ready, running, completed, error
+- `created_at`, `updated_at` (timestamptz)
 
-### Etapas de implementacao
+**`agent_flow_nodes`** — cada nó (agente) dentro de um fluxo:
+- `id` (uuid, PK)
+- `flow_id` (uuid, FK → agent_flows)
+- `agent_id` (uuid) — referencia agents OU custom_agents (sem FK rígida, mesmo padrão de chat_sessions)
+- `agent_type` (text) — 'native' ou 'custom'
+- `position_x`, `position_y` (numeric) — posição no canvas
+- `sort_order` (integer) — ordem de execução
+- `input_prompt` (text, default '') — instrução extra para este nó sobre como processar a entrada
+- `created_at` (timestamptz)
 
-**1. Criar Edge Function `youtube-transcript`**
+**`agent_flow_edges`** — conexões entre nós:
+- `id` (uuid, PK)
+- `flow_id` (uuid, FK → agent_flows)
+- `source_node_id` (uuid, FK → agent_flow_nodes)
+- `target_node_id` (uuid, FK → agent_flow_nodes)
 
-Arquivo: `supabase/functions/youtube-transcript/index.ts`
+**`agent_flow_executions`** — registro de cada execução de fluxo:
+- `id` (uuid, PK)
+- `flow_id` (uuid, FK → agent_flows)
+- `user_id` (uuid)
+- `status` (text) — running, completed, error
+- `initial_input` (text)
+- `final_output` (text)
+- `started_at`, `completed_at` (timestamptz)
 
-- Recebe `source_id` e `url` do YouTube
-- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
-- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
-- Extrai a transcrição em português (pt) ou inglês (en) como fallback
-- Limpa tags XML das legendas e formata como texto puro
-- Atualiza o `content` e `status` da fonte no banco usando service role
-- Trunca a 50.000 caracteres se necessário
-- Se nao houver legendas, salva mensagem informativa e marca status como "error"
+**`agent_flow_node_results`** — resultado de cada nó em uma execução:
+- `id` (uuid, PK)
+- `execution_id` (uuid, FK → agent_flow_executions)
+- `node_id` (uuid, FK → agent_flow_nodes)
+- `input_text` (text)
+- `output_text` (text)
+- `status` (text) — pending, running, completed, error
+- `started_at`, `completed_at` (timestamptz)
 
-**2. Registrar funcao no `supabase/config.toml`**
+RLS: todas as tabelas filtradas por `auth.uid() = user_id` (ou via join com agent_flows).
 
-Adicionar:
-```text
-[functions.youtube-transcript]
-verify_jwt = false
-```
+### Frontend — Novas Páginas e Componentes
 
-**3. Atualizar `KnowledgeDetail.tsx`**
+1. **Página `/fluxos`** — lista de fluxos do usuário com botão "Novo Fluxo" e "Criar com IA"
+2. **Página `/fluxos/:flowId`** — editor visual do fluxo:
+   - Canvas com nós arrastáveis representando agentes (usando posição x/y simples, sem lib pesada)
+   - Sidebar para buscar e adicionar agentes (nativos + custom)
+   - Conexões visuais entre nós (linhas SVG)
+   - Painel de configuração do nó selecionado (instrução extra, ordem)
+   - Botão "Play" para executar o fluxo
+3. **Modal "Criar com IA"** — campo de texto onde o usuário descreve o que quer. O sistema chama a edge function que analisa os agentes disponíveis, monta o plano, e se necessário cria custom agents automaticamente
+4. **Painel de Execução** — mostra progresso em tempo real: cada nó com status (pendente, rodando, concluído), input/output de cada etapa, e resultado final
 
-Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
-```text
-await supabase.functions.invoke("youtube-transcript", {
-  body: { source_id: newSource.id, url: sourceUrl }
-});
-```
+### Backend — Edge Functions
 
-Mostrar toast informando que a transcrição esta sendo extraída.
+**`agent-flow-execute`** — nova edge function:
+- Recebe `flow_id` e `initial_input`
+- Carrega nós e edges, calcula ordem topológica
+- Executa sequencialmente: para cada nó, chama a lógica existente do `agent-chat` (reutilizando roteamento de provedores, débito de créditos, etc.)
+- A saída de cada nó é passada como entrada do próximo
+- Salva resultados intermediários em `agent_flow_node_results`
+- Retorna resultado final
 
-**4. Atualizar `DocumentManager.tsx`**
+**`agent-flow-plan`** — nova edge function para "Criar com IA":
+- Recebe a descrição do usuário em linguagem natural
+- Consulta catálogo completo de agentes (nativos + custom do usuário)
+- Usa IA para gerar um plano JSON: quais agentes usar, em que ordem, com que instruções
+- Se um agente necessário não existe, inclui no plano a criação de um custom agent com nome, descrição e prompt sugerido
+- Retorna o plano para aprovação do usuário antes de executar
 
-Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
+### Navegação
 
-### Detalhes tecnicos da extracao
+- Adicionar link "Fluxos" no menu lateral/bottom nav com ícone `Workflow` do lucide
+- Rota protegida `/fluxos` e `/fluxos/:flowId`
 
-A Edge Function vai:
-1. Fazer fetch da pagina do video YouTube
-2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
-3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
-4. Fazer fetch do XML de legendas
-5. Parsear as tags `<text>` removendo timestamps e tags HTML
-6. Concatenar todo o texto como conteudo limpo
+### Etapas de Implementação
 
-Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
+1. Criar migração com as 5 tabelas + RLS policies
+2. Criar página de listagem de fluxos (`/fluxos`)
+3. Criar editor visual de fluxo (`/fluxos/:flowId`) com canvas de nós e conexões
+4. Criar edge function `agent-flow-execute` para execução sequencial
+5. Criar edge function `agent-flow-plan` para geração de fluxo via IA
+6. Integrar modal "Criar com IA" na página de fluxos
+7. Adicionar painel de execução com progresso em tempo real
+8. Adicionar rotas e navegação
 
