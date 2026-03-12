@@ -659,6 +659,11 @@ export default function FlowEditor() {
                         )}
                       </div>
                     )}
+                  </div>
+                ))}
+                {execFinal && (
+                  <div className="rounded-lg border border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/10 p-4">
+                    <h4 className="text-sm font-semibold text-[hsl(var(--accent))] mb-2">Resultado Final</h4>
                     <pre className="text-sm text-white/80 whitespace-pre-wrap">{execFinal}</pre>
                   </div>
                 )}
