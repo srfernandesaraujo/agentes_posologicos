@@ -19,6 +19,8 @@ export default function Landing() {
     { icon: Smartphone, title: t("feature.whatsapp"), description: t("feature.whatsapp.desc") },
     { icon: Shield, title: t("feature.rag"), description: t("feature.rag.desc") },
     { icon: Zap, title: t("feature.structured"), description: t("feature.structured.desc") },
+    { icon: Workflow, title: "Rede de Agentes (Fluxos)", description: "Encadeie múltiplos agentes em pipelines interativos. Cada etapa alimenta a próxima, com pausas inteligentes para perguntas e exportação em PDF ao final." },
+    { icon: BarChart3, title: "Dashboard Analítico", description: "Painel completo com saldo de créditos, conversas recentes, agentes criados e bases de conhecimento — tudo em uma visão rápida." },
   ];
 
   const CATEGORIES = [
