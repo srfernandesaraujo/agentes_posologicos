@@ -35,6 +35,7 @@ export default function Landing() {
     { value: "5", label: t("landing.stats.providers") },
     { value: "∞", label: t("landing.stats.custom") },
     { value: "RAG", label: t("landing.stats.rag") },
+    { value: "Fluxos", label: "Pipelines de agentes encadeados" },
   ];
 
   const handlePinAccess = () => {
