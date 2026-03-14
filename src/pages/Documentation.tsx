@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, Bot, Brain, Wrench, MessageSquare, CreditCard, DoorOpen, Database, Store, Zap, Shield, ChevronRight, Search, Pill, Stethoscope, Video, FileText, Users, BarChart3, Smartphone, Key, ArrowUp } from "lucide-react";
+import { BookOpen, Bot, Brain, Wrench, MessageSquare, CreditCard, DoorOpen, Database, Store, Zap, Shield, ChevronRight, Search, Pill, Stethoscope, Video, FileText, Users, BarChart3, Smartphone, Key, ArrowUp, Workflow, GitBranch, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
