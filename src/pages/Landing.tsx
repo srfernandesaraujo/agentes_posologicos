@@ -101,7 +101,7 @@ export default function Landing() {
       {/* Stats */}
       <section className="border-y border-white/10 bg-white/[0.02]">
         <div className="container py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
             {STATS.map((s) => (
               <div key={s.label} className="text-center">
                 <p className="font-display text-3xl font-bold gradient-text">{s.value}</p>
