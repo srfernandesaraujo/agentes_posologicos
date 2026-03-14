@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Bot, Brain, Wrench, MessageSquare, CreditCard, DoorOpen, Database, Store, Zap, Shield, Search, Pill, Stethoscope, FileText, Smartphone, Key, ArrowUp, ArrowLeft } from "lucide-react";
+import { BookOpen, Bot, Brain, Wrench, MessageSquare, CreditCard, DoorOpen, Database, Store, Zap, Shield, Search, Pill, Stethoscope, FileText, Smartphone, Key, ArrowUp, ArrowLeft, Workflow, BarChart3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
