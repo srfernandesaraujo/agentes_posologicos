@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bot, ArrowRight, Pill, BookOpen, FlaskConical, Video, MessageSquare, Settings, Sparkles, Shield, Zap, Users, Brain, BarChart3, FileText, CheckCircle2, DoorOpen, Wrench, Stethoscope, Smartphone } from "lucide-react";
+import { Bot, ArrowRight, Pill, BookOpen, FlaskConical, Video, MessageSquare, Settings, Sparkles, Shield, Zap, Users, Brain, BarChart3, FileText, CheckCircle2, DoorOpen, Wrench, Stethoscope, Smartphone, Workflow } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
@@ -19,6 +19,8 @@ export default function Landing() {
     { icon: Smartphone, title: t("feature.whatsapp"), description: t("feature.whatsapp.desc") },
     { icon: Shield, title: t("feature.rag"), description: t("feature.rag.desc") },
     { icon: Zap, title: t("feature.structured"), description: t("feature.structured.desc") },
+    { icon: Workflow, title: "Rede de Agentes (Fluxos)", description: "Encadeie múltiplos agentes em pipelines interativos. Cada etapa alimenta a próxima, com pausas inteligentes para perguntas e exportação em PDF ao final." },
+    { icon: BarChart3, title: "Dashboard Analítico", description: "Painel completo com saldo de créditos, conversas recentes, agentes criados e bases de conhecimento — tudo em uma visão rápida." },
   ];
 
   const CATEGORIES = [
@@ -33,6 +35,7 @@ export default function Landing() {
     { value: "5", label: t("landing.stats.providers") },
     { value: "∞", label: t("landing.stats.custom") },
     { value: "RAG", label: t("landing.stats.rag") },
+    { value: "Fluxos", label: "Pipelines de agentes encadeados" },
   ];
 
   const handlePinAccess = () => {
@@ -98,7 +101,7 @@ export default function Landing() {
       {/* Stats */}
       <section className="border-y border-white/10 bg-white/[0.02]">
         <div className="container py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
             {STATS.map((s) => (
               <div key={s.label} className="text-center">
                 <p className="font-display text-3xl font-bold gradient-text">{s.value}</p>

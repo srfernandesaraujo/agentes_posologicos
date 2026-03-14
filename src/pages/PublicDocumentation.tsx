@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Bot, Brain, Wrench, MessageSquare, CreditCard, DoorOpen, Database, Store, Zap, Shield, Search, Pill, Stethoscope, FileText, Smartphone, Key, ArrowUp, ArrowLeft } from "lucide-react";
+import { BookOpen, Bot, Brain, Wrench, MessageSquare, CreditCard, DoorOpen, Database, Store, Zap, Shield, Search, Pill, Stethoscope, FileText, Smartphone, Key, ArrowUp, ArrowLeft, Workflow, BarChart3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
@@ -281,6 +281,73 @@ export default function PublicDocumentation() {
             <ul className="space-y-2 text-sm text-white/60">
               <li><strong className="text-white/80">Chat Interativo</strong> — Faça perguntas e receba sínteses com citações e links diretos.</li>
               <li><strong className="text-white/80">Monitor Semanal</strong> — Cadastre interesses e receba notificações de novos artigos toda segunda-feira.</li>
+            </ul>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "flows",
+      title: "Rede de Agentes (Fluxos)",
+      icon: Workflow,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            A <strong className="text-white">Rede de Agentes</strong> permite encadear múltiplos agentes em um pipeline sequencial, onde cada etapa alimenta a próxima automaticamente.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Recursos</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">Pipeline visual</strong> — Indicador fixo mostra a etapa atual e status de cada nó.</li>
+              <li><strong className="text-white/80">Modo interativo</strong> — Pausa automática quando o agente precisa de mais informações.</li>
+              <li><strong className="text-white/80">Transição inteligente</strong> — Contexto completo das etapas anteriores é passado ao próximo agente.</li>
+              <li><strong className="text-white/80">Exportação em PDF</strong> — Gere um PDF com o resultado completo ao final do fluxo.</li>
+              <li><strong className="text-white/80">Mapas mentais SVG</strong> — Visualização interativa com zoom e pan para agentes de mapas mentais.</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-[hsl(174,62%,47%)]/20 bg-[hsl(174,62%,47%)]/5 p-4">
+            <p className="text-sm text-[hsl(174,62%,47%)]">
+              <strong>Exemplo:</strong> Arquiteto de Metodologias → Simulador de Casos → Gerador de Mapas Mentais — tudo encadeado automaticamente.
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "dashboard",
+      title: "Dashboard",
+      icon: BarChart3,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            O Dashboard oferece uma visão geral da sua atividade na plataforma com estatísticas e atalhos rápidos.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Informações disponíveis</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">Saldo de créditos</strong> — Visualize rapidamente quantos créditos você possui.</li>
+              <li><strong className="text-white/80">Conversas recentes</strong> — Acesse suas últimas interações com agentes.</li>
+              <li><strong className="text-white/80">Agentes e bases</strong> — Veja quantos agentes e bases de conhecimento você criou.</li>
+            </ul>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "conversations",
+      title: "Histórico de Conversas",
+      icon: MessageSquare,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            Todas as conversas são salvas automaticamente. Revise, continue ou exporte qualquer conversa anterior.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Funcionalidades</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">Filtrar por agente</strong> — Encontre conversas específicas rapidamente.</li>
+              <li><strong className="text-white/80">Continuar conversa</strong> — Retome de onde parou.</li>
+              <li><strong className="text-white/80">Exportar em PDF</strong> — Gere um PDF da conversa completa.</li>
             </ul>
           </div>
         </div>

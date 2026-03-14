@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, Bot, Brain, Wrench, MessageSquare, CreditCard, DoorOpen, Database, Store, Zap, Shield, ChevronRight, Search, Pill, Stethoscope, Video, FileText, Users, BarChart3, Smartphone, Key, ArrowUp } from "lucide-react";
+import { BookOpen, Bot, Brain, Wrench, MessageSquare, CreditCard, DoorOpen, Database, Store, Zap, Shield, ChevronRight, Search, Pill, Stethoscope, Video, FileText, Users, BarChart3, Smartphone, Key, ArrowUp, Workflow, GitBranch, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -279,6 +279,46 @@ export default function Documentation() {
             <h4 className="text-sm font-semibold text-white mb-3">Comprar um agente</h4>
             <p className="text-sm text-white/60 leading-relaxed">
               Ao adquirir um agente no Marketplace, você recebe uma cópia funcional que pode usar imediatamente. O custo é deduzido dos seus créditos. Você pode ver avaliações e reviews de outros usuários antes de comprar.
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "flows",
+      title: "Rede de Agentes (Fluxos)",
+      icon: Workflow,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            A <strong className="text-white">Rede de Agentes</strong> permite encadear múltiplos agentes em um pipeline sequencial. Cada agente recebe a saída do anterior como contexto, criando fluxos de trabalho complexos e automatizados.
+          </p>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Como funciona</h4>
+            <ol className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">1. Crie um fluxo</strong> — Acesse <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/fluxos</code> e defina nome e descrição.</li>
+              <li><strong className="text-white/80">2. Monte o pipeline</strong> — Adicione agentes como nós no editor visual e conecte-os na ordem desejada.</li>
+              <li><strong className="text-white/80">3. Execute</strong> — Forneça o input inicial e o sistema processará cada etapa automaticamente.</li>
+              <li><strong className="text-white/80">4. Interaja</strong> — Se um agente precisar de informações adicionais, o fluxo pausa e exibe um chat inline para você responder.</li>
+              <li><strong className="text-white/80">5. Exporte</strong> — Ao final, gere um PDF com o resultado completo de todas as etapas.</li>
+            </ol>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Recursos do pipeline</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">Pipeline visual</strong> — Indicador fixo no topo mostra a etapa atual e o status (processando/concluído) de cada nó.</li>
+              <li><strong className="text-white/80">Modo interativo</strong> — Detecção automática de perguntas do agente com pausa para resposta do usuário.</li>
+              <li><strong className="text-white/80">Transição inteligente</strong> — Cada agente recebe o contexto completo das etapas anteriores para respostas complementares.</li>
+              <li><strong className="text-white/80">Exportação em PDF</strong> — Botão "Gerar PDF" disponível ao final do fluxo para download do resultado completo.</li>
+              <li><strong className="text-white/80">Mapas mentais</strong> — Agentes que geram mapas mentais renderizam automaticamente uma visualização SVG interativa com zoom e pan.</li>
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-[hsl(174,62%,47%)]/20 bg-[hsl(174,62%,47%)]/5 p-4">
+            <p className="text-sm text-[hsl(174,62%,47%)]">
+              <strong>Exemplo de fluxo:</strong> Arquiteto de Metodologias → Simulador de Casos Clínicos → Gerador de Mapas Mentais. O professor insere um tema e recebe um plano de aula completo, casos clínicos para discussão e um mapa mental visual — tudo encadeado automaticamente.
             </p>
           </div>
         </div>
