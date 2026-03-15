@@ -445,6 +445,382 @@ export default function Documentation() {
         </div>
       ),
     },
+    // ──────────────── DOCUMENTAÇÃO TÉCNICA ────────────────
+    {
+      id: "tech-overview",
+      title: "Visão Geral Técnica",
+      icon: Server,
+      content: (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-[hsl(38,92%,50%)]/20 bg-[hsl(38,92%,50%)]/5 p-4 mb-4">
+            <p className="text-sm text-[hsl(38,92%,50%)]">
+              <strong>Seção Técnica:</strong> As seções a seguir descrevem a arquitetura interna, banco de dados, APIs e tecnologias utilizadas na construção da plataforma.
+            </p>
+          </div>
+          <p className="text-white/70 leading-relaxed">
+            O <strong className="text-white">Agentes Posológicos</strong> é uma aplicação web SPA (Single Page Application) construída com arquitetura serverless. O frontend é uma aplicação React hospedada estaticamente, enquanto toda a lógica de backend roda em <strong className="text-white">Supabase Edge Functions</strong> (Deno runtime).
+          </p>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Stack principal</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-white/60">
+              <div><strong className="text-white/80">Frontend:</strong> React 18 + TypeScript + Vite</div>
+              <div><strong className="text-white/80">Estilização:</strong> Tailwind CSS + shadcn/ui</div>
+              <div><strong className="text-white/80">State Management:</strong> TanStack React Query</div>
+              <div><strong className="text-white/80">Roteamento:</strong> React Router v6</div>
+              <div><strong className="text-white/80">Backend:</strong> Supabase (PostgreSQL + Auth + Storage + Edge Functions)</div>
+              <div><strong className="text-white/80">Runtime Backend:</strong> Deno (Edge Functions)</div>
+              <div><strong className="text-white/80">Pagamentos:</strong> Stripe (Checkout + Webhooks)</div>
+              <div><strong className="text-white/80">IA Gateway:</strong> Lovable AI (Gemini / GPT-5)</div>
+              <div><strong className="text-white/80">Reuniões:</strong> Recall.ai (transcrição Meet)</div>
+              <div><strong className="text-white/80">Exportação:</strong> jsPDF + html2canvas</div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Fluxo de uma requisição típica</h4>
+            <ol className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">1.</strong> Usuário envia mensagem no chat (React frontend)</li>
+              <li><strong className="text-white/80">2.</strong> Frontend chama <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">supabase.functions.invoke("agent-chat")</code></li>
+              <li><strong className="text-white/80">3.</strong> Edge Function valida JWT via <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">getClaims()</code>, verifica créditos e carrega contexto RAG</li>
+              <li><strong className="text-white/80">4.</strong> Edge Function chama o Lovable AI Gateway (ou provedor configurado) com streaming SSE</li>
+              <li><strong className="text-white/80">5.</strong> Resposta é transmitida token-por-token ao frontend via Server-Sent Events</li>
+              <li><strong className="text-white/80">6.</strong> Edge Function debita créditos e salva mensagens no banco</li>
+            </ol>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "tech-database",
+      title: "Estrutura do Banco de Dados",
+      icon: HardDrive,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            O banco de dados é <strong className="text-white">PostgreSQL</strong> gerenciado pelo Supabase. Todas as tabelas utilizam <strong className="text-white">Row-Level Security (RLS)</strong> para isolamento de dados por usuário.
+          </p>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Tabelas principais</h4>
+            <div className="space-y-3 text-sm">
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agents</code>
+                <p className="text-white/50 text-xs mt-1">Agentes nativos do sistema. Campos: name, slug, category, system_prompt, model, provider, temperature, credit_cost. Leitura pública, edição apenas por admins.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">custom_agents</code>
+                <p className="text-white/50 text-xs mt-1">Agentes personalizados dos usuários. Inclui system_prompt, model, provider, temperature, flags de publicação (marketplace, WhatsApp, sala virtual), restrict_content e markdown_response.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">chat_sessions</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">messages</code>
+                <p className="text-white/50 text-xs mt-1">Sessões de chat e mensagens. Cada sessão vincula user_id + agent_id (sem FK para suportar nativos e custom). Messages armazena role, content e tokens_used.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">knowledge_bases</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">knowledge_sources</code>
+                <p className="text-white/50 text-xs mt-1">Bases de conhecimento RAG. Sources armazena content (texto extraído), type (text/file/url/youtube), file_path, url e metadata JSON.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agent_knowledge_bases</code>
+                <p className="text-white/50 text-xs mt-1">Tabela de junção N:N entre custom_agents e knowledge_bases. Permite vincular múltiplas bases a um agente.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">credits_ledger</code>
+                <p className="text-white/50 text-xs mt-1">Ledger financeiro append-only. Registra type (bonus, purchase, usage, refund), amount e description. Saldo = SUM(amount).</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agent_flows</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agent_flow_nodes</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agent_flow_edges</code>
+                <p className="text-white/50 text-xs mt-1">Rede de Agentes. Flows contém metadata, nodes representam agentes no pipeline (com position e sort_order), edges conectam nós.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agent_flow_executions</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agent_flow_node_results</code>
+                <p className="text-white/50 text-xs mt-1">Execuções de fluxos. Armazena input/output de cada etapa, status e timestamps.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">virtual_rooms</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">room_messages</code>
+                <p className="text-white/50 text-xs mt-1">Salas virtuais com PIN de acesso. room_messages permite inserção sem autenticação (anon) para salas ativas.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meetings</code>
+                <p className="text-white/50 text-xs mt-1">Reuniões do Google Meet. Armazena meet_link, bot_id (Recall.ai), transcript, summary e status (pending→recording→transcribing→summarizing→done).</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">profiles</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">user_roles</code>
+                <p className="text-white/50 text-xs mt-1">Perfis de usuário e sistema de roles (admin/user). Roles em tabela separada com função security definer has_role() para evitar recursão de RLS.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">user_api_keys</code>
+                <p className="text-white/50 text-xs mt-1">Chaves de API dos provedores de IA. Criptografadas em repouso com pgcrypto (AES) via funções encrypt_api_key/decrypt_api_key.</p>
+              </div>
+              <div>
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">analytics_events</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">ai_usage_log</code>
+                <p className="text-white/50 text-xs mt-1">Eventos de analytics (page views, cliques, UTMs) e log de uso de IA (provider, model, tokens, custo estimado).</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Storage Buckets</h4>
+            <ul className="space-y-1 text-sm text-white/60">
+              <li><code className="text-[hsl(174,62%,47%)] font-mono text-xs">knowledge-files</code> — Arquivos de fontes de conhecimento (privado)</li>
+              <li><code className="text-[hsl(174,62%,47%)] font-mono text-xs">avatars</code> — Fotos de perfil dos usuários (público)</li>
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Funções de banco de dados</h4>
+            <ul className="space-y-1 text-sm text-white/60">
+              <li><code className="text-[hsl(174,62%,47%)] font-mono text-xs">has_role(user_id, role)</code> — Verifica role do usuário (security definer, evita recursão RLS)</li>
+              <li><code className="text-[hsl(174,62%,47%)] font-mono text-xs">encrypt_api_key(key)</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">decrypt_api_key(encrypted)</code> — Criptografia AES via pgcrypto</li>
+              <li><code className="text-[hsl(174,62%,47%)] font-mono text-xs">get_room_by_pin(pin)</code> — Busca sala virtual por PIN (security definer)</li>
+              <li><code className="text-[hsl(174,62%,47%)] font-mono text-xs">get_current_user_email()</code> — Retorna email do usuário autenticado</li>
+              <li><code className="text-[hsl(174,62%,47%)] font-mono text-xs">handle_new_user()</code> — Trigger: cria perfil automaticamente no cadastro</li>
+              <li><code className="text-[hsl(174,62%,47%)] font-mono text-xs">grant_signup_bonus()</code> — Trigger: concede 15 créditos no cadastro</li>
+              <li><code className="text-[hsl(174,62%,47%)] font-mono text-xs">update_updated_at_column()</code> — Trigger genérico para atualizar updated_at</li>
+            </ul>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "tech-edge-functions",
+      title: "Edge Functions (Backend)",
+      icon: Cpu,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            Toda a lógica de backend roda em <strong className="text-white">Supabase Edge Functions</strong> — funções serverless escritas em TypeScript executadas no runtime Deno. Cada função é deployada automaticamente.
+          </p>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Funções disponíveis</h4>
+            <div className="space-y-3 text-sm">
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agent-chat</code>
+                <p className="text-white/50 text-xs mt-1">Core do sistema. Recebe mensagem, valida auth, verifica créditos, carrega contexto RAG (knowledge bases), chama o provedor de IA com streaming SSE, debita créditos e salva mensagens. Suporta chamadas server-to-server (isServerCall) para fluxos automatizados.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agent-flow-execute</code>
+                <p className="text-white/50 text-xs mt-1">Executa uma etapa do pipeline de fluxos. Chama agent-chat internamente usando SUPABASE_SERVICE_ROLE_KEY para autenticação server-to-server.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">agent-flow-plan</code>
+                <p className="text-white/50 text-xs mt-1">Gera fluxos automaticamente via IA a partir de descrição em linguagem natural. Usa tool calling para retornar estrutura JSON de nós e conexões.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-bot</code>
+                <p className="text-white/50 text-xs mt-1">Envia bot do Recall.ai para uma reunião do Google Meet. Valida formato do link, cria bot via API REST e salva na tabela meetings.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-webhook</code>
+                <p className="text-white/50 text-xs mt-1">Recebe callbacks do Recall.ai (status changes, transcrição pronta). Busca transcrição completa, gera ata com IA e atualiza o banco.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-summary</code>
+                <p className="text-white/50 text-xs mt-1">Regenera ata de reunião a partir da transcrição existente. Permite prompt customizado.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">create-checkout</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">stripe-webhook</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">customer-portal</code>
+                <p className="text-white/50 text-xs mt-1">Integração Stripe. Cria sessões de checkout, processa webhooks (pagamento confirmado → credita créditos) e gerencia portal do cliente.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">check-subscription</code>
+                <p className="text-white/50 text-xs mt-1">Verifica status de assinatura do usuário via Stripe API. Retorna status padrão (200) em vez de erros para estabilidade do frontend.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">youtube-transcript</code>
+                <p className="text-white/50 text-xs mt-1">Extrai transcrição automática de vídeos do YouTube para uso como fonte de conhecimento RAG.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">pubmed-monitor</code>
+                <p className="text-white/50 text-xs mt-1">Busca artigos recentes no PubMed baseado nos interesses de pesquisa do usuário. Executado semanalmente via cron.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">manage-api-keys</code>
+                <p className="text-white/50 text-xs mt-1">CRUD de chaves de API dos provedores. Usa pgcrypto para criptografia/descriptografia em repouso.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">admin-analytics</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">hub-metrics</code>
+                <p className="text-white/50 text-xs mt-1">Endpoints de analytics e métricas. admin-analytics agrega dados para o painel admin. hub-metrics expõe métricas para monitoramento externo.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">invite-user</code>
+                <p className="text-white/50 text-xs mt-1">Convida usuários para acesso ilimitado. Restrito a admins via validação de role.</p>
+              </div>
+              <div className="border-b border-white/5 pb-2">
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">purchase-agent</code>
+                <p className="text-white/50 text-xs mt-1">Processa compra de agentes no Marketplace. Debita créditos do comprador e registra a aquisição.</p>
+              </div>
+              <div>
+                <code className="text-[hsl(174,62%,47%)] font-mono text-xs">contact-form</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">expire-rooms</code>
+                <p className="text-white/50 text-xs mt-1">Envia emails de contato (Resend) e expira salas virtuais com prazo vencido.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "tech-apis",
+      title: "APIs e Serviços Externos",
+      icon: Globe,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            O sistema integra com diversas APIs externas. Todas as chamadas são feitas server-side (Edge Functions) para proteger chaves de API.
+          </p>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Serviços integrados</h4>
+            <div className="space-y-4 text-sm">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-2 w-2 rounded-full bg-[hsl(174,62%,47%)]" />
+                  <strong className="text-white">Lovable AI Gateway</strong>
+                </div>
+                <p className="text-white/50 text-xs ml-4">Endpoint: <code className="bg-white/10 px-1 py-0.5 rounded">https://ai.gateway.lovable.dev/v1/chat/completions</code><br/>Modelos: Google Gemini (2.5 Pro, 2.5 Flash, 3 Flash Preview), OpenAI GPT-5. Usado para agentes nativos, geração de atas e planejamento de fluxos. Autenticação via LOVABLE_API_KEY (auto-provisionada).</p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-2 w-2 rounded-full bg-[hsl(199,89%,48%)]" />
+                  <strong className="text-white">Provedores de IA (via chave do usuário)</strong>
+                </div>
+                <p className="text-white/50 text-xs ml-4">OpenAI, Google AI, Anthropic, Groq, DeepSeek. Chaves armazenadas criptografadas no banco. O agent-chat seleciona o endpoint correto baseado no provider do agente.</p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-2 w-2 rounded-full bg-[hsl(262,52%,56%)]" />
+                  <strong className="text-white">Stripe</strong>
+                </div>
+                <p className="text-white/50 text-xs ml-4">Checkout Sessions para compra de créditos, Webhooks para confirmação de pagamento, Customer Portal para gestão de assinaturas. Chaves: STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET.</p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-2 w-2 rounded-full bg-red-400" />
+                  <strong className="text-white">Recall.ai</strong>
+                </div>
+                <p className="text-white/50 text-xs ml-4">API: <code className="bg-white/10 px-1 py-0.5 rounded">https://us-west-2.recall.ai/api/v1/bot</code><br/>Cria bots que entram em reuniões do Google Meet, gravam áudio, transcrevem e enviam webhooks. Autenticação: Token header.</p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-2 w-2 rounded-full bg-green-400" />
+                  <strong className="text-white">PubMed (NCBI E-utilities)</strong>
+                </div>
+                <p className="text-white/50 text-xs ml-4">API pública do NCBI para busca de artigos científicos. Endpoints esearch e efetch. Usado pelo agente PubMed e pelo monitor semanal.</p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-2 w-2 rounded-full bg-blue-400" />
+                  <strong className="text-white">Resend</strong>
+                </div>
+                <p className="text-white/50 text-xs ml-4">Serviço de envio de emails transacionais. Usado pelo formulário de contato. Chave: RESEND_API_KEY.</p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="h-2 w-2 rounded-full bg-emerald-400" />
+                  <strong className="text-white">WhatsApp (Evolution API / Z-API)</strong>
+                </div>
+                <p className="text-white/50 text-xs ml-4">Integração opcional para conectar agentes ao WhatsApp. Configuração por agente com webhook URL, token e phone number ID.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "tech-security",
+      title: "Segurança e Autenticação",
+      icon: Lock,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            A segurança é implementada em múltiplas camadas: autenticação via Supabase Auth, autorização via RLS e roles, criptografia de dados sensíveis e validação server-side.
+          </p>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Camadas de segurança</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">Autenticação</strong> — Supabase Auth com email/senha. JWT validado via <code className="bg-white/10 px-1 py-0.5 rounded text-xs">getClaims()</code> em todas as Edge Functions.</li>
+              <li><strong className="text-white/80">Row-Level Security (RLS)</strong> — Todas as tabelas têm RLS ativado. Cada usuário acessa apenas seus próprios dados. Função <code className="bg-white/10 px-1 py-0.5 rounded text-xs">has_role()</code> com security definer para verificar roles sem recursão.</li>
+              <li><strong className="text-white/80">Roles em tabela separada</strong> — Roles (admin/user) armazenados na tabela <code className="bg-white/10 px-1 py-0.5 rounded text-xs">user_roles</code>, nunca no perfil — prevenindo escalação de privilégio.</li>
+              <li><strong className="text-white/80">Criptografia de API Keys</strong> — Chaves de provedores de IA criptografadas com AES via extensão pgcrypto. Chave mestra: API_ENCRYPTION_KEY (secret do Supabase).</li>
+              <li><strong className="text-white/80">Server-to-server auth</strong> — Comunicação interna entre Edge Functions usa SUPABASE_SERVICE_ROLE_KEY com padrão isServerCall para processos automatizados.</li>
+              <li><strong className="text-white/80">Validação de input</strong> — Limite de 60.000 caracteres por mensagem, histórico máximo de 50 mensagens, sanitização de HTML.</li>
+              <li><strong className="text-white/80">Débito server-side</strong> — Créditos são debitados na Edge Function após geração da resposta, nunca no frontend.</li>
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Secrets configurados</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-white/50 font-mono">
+              <span>SUPABASE_SERVICE_ROLE_KEY</span>
+              <span>SUPABASE_ANON_KEY</span>
+              <span>LOVABLE_API_KEY</span>
+              <span>STRIPE_SECRET_KEY</span>
+              <span>STRIPE_WEBHOOK_SECRET</span>
+              <span>API_ENCRYPTION_KEY</span>
+              <span>RECALL_API_KEY</span>
+              <span>RESEND_API_KEY</span>
+              <span>HUB_SERVICE_KEY / HUB_METRICS_KEY</span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "tech-architecture",
+      title: "Padrões de Arquitetura",
+      icon: Layers,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            O projeto segue padrões arquiteturais consistentes para manter a qualidade e facilitar a manutenção.
+          </p>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Padrões do Frontend</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">Design System</strong> — Tokens semânticos em CSS (--primary, --background, etc.) com tema dark-first. Componentes shadcn/ui customizados.</li>
+              <li><strong className="text-white/80">Data Fetching</strong> — TanStack React Query para cache, refetch e invalidação. Queries com keys compostas (ex: ["meetings", userId]).</li>
+              <li><strong className="text-white/80">Hooks personalizados</strong> — useCredits, useAgents, useCustomAgents, useSubscription, useIsAdmin, etc. Encapsulam lógica de dados.</li>
+              <li><strong className="text-white/80">Streaming SSE</strong> — Parsing line-by-line de Server-Sent Events para renderização token-por-token das respostas de IA.</li>
+              <li><strong className="text-white/80">Exportação PDF</strong> — Motor dedicado via jsPDF com branding "Agentes Posológicos" (cabeçalhos Slate-900, acentos Teal-500).</li>
+              <li><strong className="text-white/80">i18n</strong> — Sistema de traduções com LanguageContext suportando PT-BR e EN.</li>
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Padrões do Backend</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">CORS headers padrão</strong> — Todas as Edge Functions incluem headers CORS para compatibilidade com web apps.</li>
+              <li><strong className="text-white/80">verify_jwt = false</strong> — JWT validado em código (não no gateway) usando getClaims() para compatibilidade com signing-keys.</li>
+              <li><strong className="text-white/80">Graceful error handling</strong> — Retorna status 200 com dados padrão em vez de 500 para manter estabilidade do frontend.</li>
+              <li><strong className="text-white/80">Service role para webhooks</strong> — Webhooks externos (Stripe, Recall.ai) usam SUPABASE_SERVICE_ROLE_KEY para acessar dados sem JWT de usuário.</li>
+              <li><strong className="text-white/80">Append-only ledger</strong> — Credits nunca são editados/deletados — apenas novas entradas são inseridas.</li>
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Estrutura de diretórios</h4>
+            <pre className="text-xs text-white/50 font-mono leading-relaxed overflow-x-auto">{`src/
+├── components/     # Componentes React (ui/, layout/, chat/, agents/, etc.)
+├── contexts/       # AuthContext, LanguageContext
+├── hooks/          # Custom hooks (useCredits, useAgents, etc.)
+├── integrations/   # Cliente Supabase + tipos auto-gerados
+├── lib/            # Utilitários (exportPdf, icons, utils)
+├── pages/          # Páginas/rotas da aplicação
+└── i18n/           # Traduções PT-BR / EN
+
+supabase/
+└── functions/      # Edge Functions (Deno runtime)
+    ├── agent-chat/
+    ├── meeting-bot/
+    ├── meeting-webhook/
+    └── ...16 funções ao total`}</pre>
+          </div>
+        </div>
+      ),
+    },
   ];
 
   const filteredSections = search.trim()
