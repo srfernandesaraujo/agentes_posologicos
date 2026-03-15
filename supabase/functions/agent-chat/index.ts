@@ -6410,6 +6410,32 @@ Deno.serve(async (req) => {
 
     // Build system prompt with extras
     let finalSystemPrompt = (customAgent.system_prompt || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
+
+    // Inject active skills into system prompt
+    try {
+      const { data: activeSkills } = await serviceClient
+        .from("agent_active_skills")
+        .select("skill_id")
+        .eq("agent_id", customAgent.id);
+
+      if (activeSkills && activeSkills.length > 0) {
+        const skillIds = activeSkills.map((s: any) => s.skill_id);
+        const { data: skills } = await serviceClient
+          .from("agent_skills")
+          .select("name, prompt_snippet")
+          .in("id", skillIds);
+
+        if (skills && skills.length > 0) {
+          const skillsContent = skills.map((s: any) =>
+            `<SKILL name="${s.name}">\n${s.prompt_snippet}\n</SKILL>`
+          ).join("\n");
+          finalSystemPrompt += `\n\n<SKILLS_ATIVAS>\n${skillsContent}\n</SKILLS_ATIVAS>`;
+        }
+      }
+    } catch (skillErr) {
+      console.error("Error loading skills:", skillErr);
+    }
+
     if (ragContext) {
       finalSystemPrompt += ragContext;
     }
