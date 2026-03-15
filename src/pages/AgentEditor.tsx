@@ -31,6 +31,8 @@ export default function AgentEditor() {
   const { data: apiKeys = [] } = useApiKeys();
   const { data: knowledgeBases = [] } = useKnowledgeBases();
   const { data: agentKBs = [], linkKB, unlinkKB } = useAgentKnowledgeBases(agentId);
+  const { data: allSkills = [] } = useAgentSkills();
+  const { data: activeSkills = [], toggleSkill } = useAgentActiveSkills(agentId);
 
   // Local state for editing
   const [tab, setTab] = useState("config");
