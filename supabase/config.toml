@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.meeting-summary]
 verify_jwt = false
+
+[functions.meeting-sync]
+verify_jwt = false

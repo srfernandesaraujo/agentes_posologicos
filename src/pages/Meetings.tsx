@@ -42,6 +42,8 @@ export default function Meetings() {
   const { data: meetings = [], isLoading } = useQuery({
     queryKey: ["meetings", user?.id],
     queryFn: async () => {
+      await supabase.functions.invoke("meeting-sync", { body: {} });
+
       const { data, error } = await supabase
         .from("meetings" as any)
         .select("*")
