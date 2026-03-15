@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_active_skills: {
+        Row: {
+          agent_id: string
+          created_at: string
+          id: string
+          skill_id: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          id?: string
+          skill_id: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          id?: string
+          skill_id?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_active_skills_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "custom_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_active_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "agent_skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_flow_edges: {
         Row: {
           flow_id: string
@@ -296,6 +338,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      agent_skills: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          is_global: boolean
+          name: string
+          prompt_snippet: string
+          user_id: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          is_global?: boolean
+          name: string
+          prompt_snippet?: string
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          is_global?: boolean
+          name?: string
+          prompt_snippet?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       agents: {
         Row: {

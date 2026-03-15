@@ -14,7 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2, DoorOpen, ExternalLink, Store, Plus, X, Database, FileText } from "lucide-react";
+import { ArrowLeft, Bot, Trash2, MessageSquare, Wand2, DoorOpen, ExternalLink, Store, Plus, X, Database, FileText, Zap } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import { useAgentSkills, useAgentActiveSkills } from "@/hooks/useAgentSkills";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { WhatsAppConnect } from "@/components/agents/WhatsAppConnect";
@@ -29,6 +31,8 @@ export default function AgentEditor() {
   const { data: apiKeys = [] } = useApiKeys();
   const { data: knowledgeBases = [] } = useKnowledgeBases();
   const { data: agentKBs = [], linkKB, unlinkKB } = useAgentKnowledgeBases(agentId);
+  const { data: allSkills = [] } = useAgentSkills();
+  const { data: activeSkills = [], toggleSkill } = useAgentActiveSkills(agentId);
 
   // Local state for editing
   const [tab, setTab] = useState("config");
@@ -291,6 +295,7 @@ export default function AgentEditor() {
               {[
                 { id: "geral", label: "Visão Geral", icon: Bot },
                 { id: "documentos", label: "Documentos", icon: FileText },
+                { id: "skills", label: "Skills", icon: Zap },
                 { id: "modelo", label: "Modelo", icon: Bot },
                 { id: "prompt", label: "Prompt", icon: Bot },
               ].map((item) => (
@@ -440,6 +445,75 @@ export default function AgentEditor() {
               {configTab === "documentos" && (
                 <DocumentManager agentId={agentId!} />
               )}
+
+              {configTab === "skills" && (() => {
+                const activeSkillIds = new Set(activeSkills.map((s) => s.skill_id));
+                const categories = [...new Set(allSkills.map((s) => s.category))].sort();
+
+                const getIcon = (iconName: string) => {
+                  const Icon = (LucideIcons as any)[iconName];
+                  return Icon ? <Icon className="h-4 w-4" /> : <Zap className="h-4 w-4" />;
+                };
+
+                return (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Skills Modulares</h3>
+                      <p className="text-sm text-white/50 mt-1">
+                        Ative ou desative habilidades para personalizar o comportamento do seu agente.
+                        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-xs text-accent">
+                          {activeSkills.length} ativas
+                        </span>
+                      </p>
+                    </div>
+
+                    {categories.map((cat) => {
+                      const catSkills = allSkills.filter((s) => s.category === cat);
+                      return (
+                        <div key={cat} className="space-y-2">
+                          <h4 className="text-sm font-semibold text-white/70 border-b border-white/10 pb-1">{cat}</h4>
+                          <div className="grid gap-2">
+                            {catSkills.map((skill) => {
+                              const isActive = activeSkillIds.has(skill.id);
+                              return (
+                                <button
+                                  key={skill.id}
+                                  onClick={() => toggleSkill.mutate({ skillId: skill.id, active: !isActive })}
+                                  disabled={toggleSkill.isPending}
+                                  className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all ${
+                                    isActive
+                                      ? "border-accent/50 bg-accent/10"
+                                      : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05]"
+                                  }`}
+                                >
+                                  <div className={`mt-0.5 shrink-0 rounded-md p-1.5 ${
+                                    isActive ? "bg-accent/20 text-accent" : "bg-white/10 text-white/40"
+                                  }`}>
+                                    {getIcon(skill.icon)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-sm font-medium ${isActive ? "text-white" : "text-white/70"}`}>
+                                      {skill.name}
+                                    </p>
+                                    <p className="text-xs text-white/40 mt-0.5 line-clamp-2">{skill.description}</p>
+                                  </div>
+                                  <div className={`mt-1 shrink-0 h-5 w-9 rounded-full transition-colors ${
+                                    isActive ? "bg-accent" : "bg-white/20"
+                                  }`}>
+                                    <div className={`h-4 w-4 rounded-full bg-white shadow transition-transform mt-0.5 ${
+                                      isActive ? "translate-x-4 ml-0.5" : "translate-x-0.5"
+                                    }`} />
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               {configTab === "modelo" && (
                 <>
