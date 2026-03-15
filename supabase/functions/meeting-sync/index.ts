@@ -7,6 +7,98 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const DONE_STATUSES = new Set([
+  "done",
+  "call_ended",
+  "recording_done",
+  "completed",
+  "analysis_done",
+]);
+
+const ERROR_STATUSES = new Set([
+  "fatal",
+  "error",
+  "failed",
+  "analysis_failed",
+]);
+
+const normalizeRecallStatus = (value: unknown): string => {
+  if (!value) return "";
+  return String(value).toLowerCase().trim().replace(/^bot\./, "");
+};
+
+const isDoneStatus = (status: string): boolean => {
+  if (!status) return false;
+  return (
+    DONE_STATUSES.has(status) ||
+    status.includes("call_ended") ||
+    status.endsWith("_done") ||
+    status === "left_call" ||
+    status.includes("completed")
+  );
+};
+
+const isErrorStatus = (status: string): boolean => {
+  if (!status) return false;
+  return (
+    ERROR_STATUSES.has(status) ||
+    status.includes("fatal") ||
+    status.includes("error") ||
+    status.includes("failed")
+  );
+};
+
+const extractBotStatus = (botData: any): { status: string; history: string[] } => {
+  const history = Array.isArray(botData?.status_changes)
+    ? botData.status_changes
+        .map((change: any) => normalizeRecallStatus(change?.code || change?.event || change?.status?.code))
+        .filter(Boolean)
+    : [];
+
+  const latestHistoryStatus = history.length > 0 ? history[history.length - 1] : "";
+
+  const candidates = [
+    botData?.status?.code,
+    botData?.status?.event,
+    botData?.status,
+    botData?.state,
+    botData?.event,
+    botData?.latest_status?.code,
+    latestHistoryStatus,
+  ]
+    .map(normalizeRecallStatus)
+    .filter(Boolean);
+
+  return {
+    status: candidates[0] || "",
+    history,
+  };
+};
+
+const fetchBotData = async (botId: string, recallApiKey: string): Promise<any | null> => {
+  const urls = [
+    `https://us-west-2.recall.ai/api/v1/bot/${botId}/`,
+    `https://us-west-2.recall.ai/api/v1/bot/${botId}`,
+  ];
+
+  for (const url of urls) {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Token ${recallApiKey}`,
+      },
+    });
+
+    if (response.ok) {
+      return await response.json();
+    }
+
+    const detail = await response.text();
+    console.error(`[meeting-sync] Failed to fetch bot status [${response.status}] for ${botId} (${url}):`, detail);
+  }
+
+  return null;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -56,7 +148,7 @@ serve(async (req) => {
 
     let meetingsQuery = supabaseAdmin
       .from("meetings")
-      .select("id, bot_id, status")
+      .select("id, bot_id, status, created_at")
       .eq("user_id", userId)
       .in("status", ["pending", "recording"])
       .not("bot_id", "is", null);
@@ -77,40 +169,37 @@ serve(async (req) => {
       if (!meeting.bot_id) continue;
       inspected += 1;
 
-      const botResponse = await fetch(`https://us-west-2.recall.ai/api/v1/bot/${meeting.bot_id}`, {
-        headers: {
-          Authorization: `Token ${RECALL_API_KEY}`,
-        },
-      });
-
-      if (!botResponse.ok) {
-        const detail = await botResponse.text();
-        console.error(`Failed to fetch bot status [${botResponse.status}] for ${meeting.bot_id}:`, detail);
+      const botData = await fetchBotData(meeting.bot_id, RECALL_API_KEY);
+      if (!botData) {
         continue;
       }
 
-      const botData = await botResponse.json();
-      const rawStatus = botData?.status?.code || botData?.status || botData?.state || "";
-      const normalizedStatus = String(rawStatus).toLowerCase();
+      const { status: normalizedStatus, history } = extractBotStatus(botData);
+      const finalStatus = normalizedStatus || (history.length > 0 ? history[history.length - 1] : "");
 
-      const isDone = ["done", "call_ended", "recording_done", "completed"].includes(normalizedStatus);
-      const isError = ["fatal", "error", "failed"].includes(normalizedStatus);
+      const endedAt = botData?.ended_at || botData?.left_at || botData?.completed_at;
+      const done = isDoneStatus(finalStatus) || (!isErrorStatus(finalStatus) && Boolean(endedAt));
+      const error = isErrorStatus(finalStatus);
 
-      if (!isDone && !isError) {
+      if (!done && !error) {
         continue;
       }
 
       const webhookPayload = {
         bot_id: meeting.bot_id,
         status: {
-          code: isDone ? "done" : "error",
-          message: isError ? botData?.status?.message || "Bot finalizado com erro" : undefined,
+          code: done ? "done" : "error",
+          message: error
+            ? botData?.status?.message || botData?.error || "Bot finalizado com erro"
+            : undefined,
         },
         data: {
           bot_id: meeting.bot_id,
           status: {
-            code: isDone ? "done" : "error",
-            message: isError ? botData?.status?.message || "Bot finalizado com erro" : undefined,
+            code: done ? "done" : "error",
+            message: error
+              ? botData?.status?.message || botData?.error || "Bot finalizado com erro"
+              : undefined,
           },
         },
       };

@@ -7,6 +7,48 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const DONE_STATUSES = new Set([
+  "done",
+  "call_ended",
+  "recording_done",
+  "completed",
+  "analysis_done",
+]);
+
+const ERROR_STATUSES = new Set([
+  "fatal",
+  "error",
+  "failed",
+  "analysis_failed",
+  "recording_permission_denied",
+]);
+
+const normalizeStatus = (value: unknown): string => {
+  if (!value) return "";
+  return String(value).toLowerCase().trim().replace(/^bot\./, "");
+};
+
+const isDoneStatus = (status: string): boolean => {
+  if (!status) return false;
+  return (
+    DONE_STATUSES.has(status) ||
+    status.includes("call_ended") ||
+    status.endsWith("_done") ||
+    status === "left_call" ||
+    status.includes("completed")
+  );
+};
+
+const isErrorStatus = (status: string): boolean => {
+  if (!status) return false;
+  return (
+    ERROR_STATUSES.has(status) ||
+    status.includes("fatal") ||
+    status.includes("error") ||
+    status.includes("failed")
+  );
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -26,7 +68,8 @@ serve(async (req) => {
 
     // Handle status change webhook from Recall.ai
     const botId = payload.data?.bot_id || payload.bot_id || payload.id;
-    const status = payload.data?.status?.code || payload.status?.code || payload.event;
+    const rawStatus = payload.data?.status?.code || payload.status?.code || payload.event || payload.type;
+    const status = normalizeStatus(rawStatus);
 
     if (!botId) {
       console.log("No bot_id found in payload, ignoring");
@@ -46,21 +89,31 @@ serve(async (req) => {
     }
 
     // If bot is done / call ended, fetch transcript
-    if (status === "done" || status === "call_ended" || status === "recording_done") {
+    if (isDoneStatus(status)) {
       // Update status to transcribing
       await supabase.from("meetings").update({ status: "transcribing" }).eq("id", meeting.id);
 
       // Fetch transcript from Recall.ai
-      const transcriptRes = await fetch(`https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript`, {
-        headers: { Authorization: `Token ${RECALL_API_KEY}` },
-      });
+      const transcriptUrls = [
+        `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript/`,
+        `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript`,
+      ];
 
-      if (!transcriptRes.ok) {
-        const errText = await transcriptRes.text();
-        console.error("Failed to fetch transcript:", transcriptRes.status, errText);
+      let transcriptRes: Response | null = null;
+      for (const url of transcriptUrls) {
+        const candidate = await fetch(url, {
+          headers: { Authorization: `Token ${RECALL_API_KEY}` },
+        });
+        if (candidate.ok) {
+          transcriptRes = candidate;
+          break;
+        }
+      }
+
+      if (!transcriptRes) {
         await supabase.from("meetings").update({
           status: "error",
-          error_message: `Failed to fetch transcript: ${transcriptRes.status}`,
+          error_message: "Failed to fetch transcript from Recall.ai",
         }).eq("id", meeting.id);
         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
       }
@@ -174,11 +227,13 @@ Use formatação Markdown. Seja conciso mas completo.`,
         summary,
       }).eq("id", meeting.id);
 
-    } else if (status === "fatal" || status === "error") {
+    } else if (isErrorStatus(status)) {
       await supabase.from("meetings").update({
         status: "error",
         error_message: payload.data?.status?.message || "Erro no bot da reunião",
       }).eq("id", meeting.id);
+    } else {
+      console.log("Ignoring non-terminal status:", status || "unknown");
     }
 
     return new Response(JSON.stringify({ ok: true }), {
