@@ -62,43 +62,148 @@ const hasTranscriptNotReadyMessage = (message: string): boolean => {
   );
 };
 
-const fetchTranscript = async (botId: string, recallApiKey: string) => {
-  const transcriptUrls = [
-    `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript/`,
-    `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript`,
-  ];
-
+const fetchRecallJson = async (urls: string[], recallApiKey: string) => {
   let lastStatus = 0;
   let lastMessage = "";
-  let retryable = false;
 
-  for (const url of transcriptUrls) {
+  for (const url of urls) {
     const response = await fetch(url, {
-      headers: { Authorization: `Token ${recallApiKey}` },
+      headers: {
+        Authorization: `Token ${recallApiKey}`,
+        Accept: "application/json",
+      },
     });
 
     if (response.ok) {
       return { ok: true as const, data: await response.json() };
     }
 
-    const errorBody = await response.text();
-    const currentRetryable = RETRYABLE_TRANSCRIPT_STATUS.has(response.status) || hasTranscriptNotReadyMessage(errorBody);
-
     lastStatus = response.status;
-    lastMessage = errorBody;
-    retryable = retryable || currentRetryable;
-
-    if (!currentRetryable) {
-      break;
-    }
+    lastMessage = await response.text();
   }
+
+  return { ok: false as const, status: lastStatus, message: lastMessage };
+};
+
+const extractTranscriptShortcut = (botData: any): any | null => {
+  const recordings = Array.isArray(botData?.recordings) ? botData.recordings : [];
+
+  for (let i = recordings.length - 1; i >= 0; i -= 1) {
+    const shortcut = recordings[i]?.media_shortcuts?.transcript;
+    if (shortcut) return shortcut;
+  }
+
+  if (botData?.media_shortcuts?.transcript) {
+    return botData.media_shortcuts.transcript;
+  }
+
+  return null;
+};
+
+const fetchTranscriptPayload = async (downloadUrl: string, recallApiKey: string) => {
+  const directResponse = await fetch(downloadUrl, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (directResponse.ok) {
+    return { ok: true as const, data: await directResponse.json() };
+  }
+
+  const authenticatedResponse = await fetch(downloadUrl, {
+    headers: {
+      Authorization: `Token ${recallApiKey}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (authenticatedResponse.ok) {
+    return { ok: true as const, data: await authenticatedResponse.json() };
+  }
+
+  const detail = await authenticatedResponse.text();
+  const retryable = RETRYABLE_TRANSCRIPT_STATUS.has(authenticatedResponse.status) || hasTranscriptNotReadyMessage(detail);
 
   return {
     ok: false as const,
-    status: lastStatus,
-    message: lastMessage,
+    status: authenticatedResponse.status,
+    message: detail,
     retryable,
   };
+};
+
+const fetchTranscript = async (botId: string, recallApiKey: string) => {
+  const botResult = await fetchRecallJson(
+    [
+      `https://us-west-2.recall.ai/api/v1/bot/${botId}/`,
+      `https://us-west-2.recall.ai/api/v1/bot/${botId}`,
+    ],
+    recallApiKey
+  );
+
+  if (!botResult.ok) {
+    return {
+      ok: false as const,
+      status: botResult.status,
+      message: botResult.message,
+      retryable: RETRYABLE_TRANSCRIPT_STATUS.has(botResult.status),
+    };
+  }
+
+  const transcriptShortcut = extractTranscriptShortcut(botResult.data);
+  if (!transcriptShortcut) {
+    return {
+      ok: false as const,
+      status: 404,
+      message: "Transcript shortcut not available in bot recordings yet",
+      retryable: true,
+    };
+  }
+
+  let transcriptStatus = normalizeStatus(transcriptShortcut?.status?.code);
+  let downloadUrl = transcriptShortcut?.data?.download_url as string | undefined;
+
+  if (!downloadUrl && transcriptShortcut?.id) {
+    const transcriptResult = await fetchRecallJson(
+      [
+        `https://us-west-2.recall.ai/api/v1/transcript/${transcriptShortcut.id}/`,
+        `https://us-west-2.recall.ai/api/v1/transcript/${transcriptShortcut.id}`,
+      ],
+      recallApiKey
+    );
+
+    if (transcriptResult.ok) {
+      downloadUrl = transcriptResult.data?.data?.download_url;
+      transcriptStatus = normalizeStatus(transcriptResult.data?.status?.code || transcriptStatus);
+    } else {
+      const retryable = RETRYABLE_TRANSCRIPT_STATUS.has(transcriptResult.status) || hasTranscriptNotReadyMessage(transcriptResult.message);
+      return {
+        ok: false as const,
+        status: transcriptResult.status,
+        message: transcriptResult.message,
+        retryable,
+      };
+    }
+  }
+
+  if (transcriptStatus && transcriptStatus !== "done") {
+    return {
+      ok: false as const,
+      status: transcriptStatus === "failed" ? 422 : 409,
+      message: `Transcript status is ${transcriptStatus}`,
+      retryable: transcriptStatus !== "failed",
+    };
+  }
+
+  if (!downloadUrl) {
+    return {
+      ok: false as const,
+      status: 404,
+      message: "Transcript download URL not available yet",
+      retryable: true,
+    };
+  }
+
+  return await fetchTranscriptPayload(downloadUrl, recallApiKey);
 };
 
 serve(async (req) => {
@@ -147,7 +252,7 @@ serve(async (req) => {
         if (transcriptResult.retryable) {
           await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
           return new Response(
-            JSON.stringify({ ok: true, pending_transcript: true, detail: "Transcript not ready yet" }),
+            JSON.stringify({ ok: true, pending_transcript: true, detail: transcriptResult.message }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -169,8 +274,11 @@ serve(async (req) => {
       if (Array.isArray(transcriptData)) {
         transcript = transcriptData
           .map((segment: any) => {
-            const speaker = segment.speaker || "Speaker";
-            const words = segment.words?.map((w: any) => w.text).join(" ") || segment.text || "";
+            const participantName = segment?.participant?.name;
+            const speaker = participantName || segment?.speaker || "Speaker";
+            const words = Array.isArray(segment?.words)
+              ? segment.words.map((w: any) => w?.text).filter(Boolean).join(" ")
+              : segment?.text || "";
             return `${speaker}: ${words}`;
           })
           .join("\n\n");
