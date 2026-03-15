@@ -44,3 +44,12 @@ verify_jwt = false
 
 [functions.agent-flow-plan]
 verify_jwt = false
+
+[functions.meeting-bot]
+verify_jwt = false
+
+[functions.meeting-webhook]
+verify_jwt = false
+
+[functions.meeting-summary]
+verify_jwt = false
