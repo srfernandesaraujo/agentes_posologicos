@@ -60,9 +60,6 @@ serve(async (req) => {
       body: JSON.stringify({
         meeting_url: meet_link.trim(),
         bot_name: "Agentes Posológicos - Ata",
-        real_time_transcription: {
-          destination_url: webhookUrl,
-        },
         status_changes_webhook_url: webhookUrl,
       }),
     });
