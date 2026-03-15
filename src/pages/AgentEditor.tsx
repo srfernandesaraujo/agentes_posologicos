@@ -295,6 +295,7 @@ export default function AgentEditor() {
               {[
                 { id: "geral", label: "Visão Geral", icon: Bot },
                 { id: "documentos", label: "Documentos", icon: FileText },
+                { id: "skills", label: "Skills", icon: Zap },
                 { id: "modelo", label: "Modelo", icon: Bot },
                 { id: "prompt", label: "Prompt", icon: Bot },
               ].map((item) => (
