@@ -99,9 +99,16 @@ const fetchBotData = async (botId: string, recallApiKey: string): Promise<any | 
   return null;
 };
 
+const MAX_TRANSCRIBING_WAIT_MS = 15 * 60 * 1000;
+
 const shouldRetryTranscribingNow = (updatedAt: string | null | undefined): boolean => {
   if (!updatedAt) return true;
   return Date.now() - new Date(updatedAt).getTime() > 20000;
+};
+
+const hasExceededTranscribingWait = (updatedAt: string | null | undefined): boolean => {
+  if (!updatedAt) return false;
+  return Date.now() - new Date(updatedAt).getTime() > MAX_TRANSCRIBING_WAIT_MS;
 };
 
 serve(async (req) => {

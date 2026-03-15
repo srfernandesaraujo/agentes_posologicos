@@ -24,6 +24,7 @@ const ERROR_STATUSES = new Set([
 ]);
 
 const RETRYABLE_TRANSCRIPT_STATUS = new Set([404, 408, 409, 423, 425, 429, 500, 502, 503, 504]);
+const MAX_TRANSCRIBING_WAIT_MS = 15 * 60 * 1000;
 
 const normalizeStatus = (value: unknown): string => {
   if (!value) return "";
@@ -60,6 +61,11 @@ const hasTranscriptNotReadyMessage = (message: string): boolean => {
     text.includes("processing") ||
     text.includes("pending")
   );
+};
+
+const hasExceededTranscribingWait = (updatedAt: string | null | undefined): boolean => {
+  if (!updatedAt) return false;
+  return Date.now() - new Date(updatedAt).getTime() > MAX_TRANSCRIBING_WAIT_MS;
 };
 
 const fetchRecallJson = async (urls: string[], recallApiKey: string) => {
