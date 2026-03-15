@@ -141,13 +141,13 @@ export default function Meetings() {
               placeholder="https://meet.google.com/abc-defg-hij"
               value={meetLink}
               onChange={(e) => setMeetLink(e.target.value)}
-              className="flex-1 bg-white/5 border-white/10"
+              className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
             />
             <Input
               placeholder="Título da reunião (opcional)"
               value={meetTitle}
               onChange={(e) => setMeetTitle(e.target.value)}
-              className="sm:w-64 bg-white/5 border-white/10"
+              className="sm:w-64 bg-white/10 border-white/20 text-white placeholder:text-white/40"
             />
             <Button
               onClick={() => sendBotMutation.mutate()}
