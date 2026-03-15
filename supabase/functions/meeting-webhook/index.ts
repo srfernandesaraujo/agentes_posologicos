@@ -24,6 +24,7 @@ const ERROR_STATUSES = new Set([
 ]);
 
 const RETRYABLE_TRANSCRIPT_STATUS = new Set([404, 408, 409, 423, 425, 429, 500, 502, 503, 504]);
+const MAX_TRANSCRIBING_WAIT_MS = 15 * 60 * 1000;
 
 const normalizeStatus = (value: unknown): string => {
   if (!value) return "";
@@ -60,6 +61,11 @@ const hasTranscriptNotReadyMessage = (message: string): boolean => {
     text.includes("processing") ||
     text.includes("pending")
   );
+};
+
+const hasExceededTranscribingWait = (updatedAt: string | null | undefined): boolean => {
+  if (!updatedAt) return false;
+  return Date.now() - new Date(updatedAt).getTime() > MAX_TRANSCRIBING_WAIT_MS;
 };
 
 const fetchRecallJson = async (urls: string[], recallApiKey: string) => {
@@ -244,13 +250,30 @@ serve(async (req) => {
     }
 
     if (isDoneStatus(status)) {
-      await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
+      const alreadyTranscribing = meeting.status === "transcribing";
+      const transcribingSince = alreadyTranscribing ? meeting.updated_at : new Date().toISOString();
+
+      if (!alreadyTranscribing || meeting.error_message) {
+        await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
+      }
 
       const transcriptResult = await fetchTranscript(botId, RECALL_API_KEY);
 
       if (!transcriptResult.ok) {
         if (transcriptResult.retryable) {
-          await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
+          if (hasExceededTranscribingWait(transcribingSince)) {
+            const timeoutMinutes = Math.round(MAX_TRANSCRIBING_WAIT_MS / 60000);
+            await supabase.from("meetings").update({
+              status: "error",
+              error_message: `Transcrição indisponível no Recall.ai após ${timeoutMinutes} minutos. Tente novamente mais tarde.`,
+            }).eq("id", meeting.id);
+
+            return new Response(
+              JSON.stringify({ ok: true, transcript_timeout: true, detail: transcriptResult.message }),
+              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
           return new Response(
             JSON.stringify({ ok: true, pending_transcript: true, detail: transcriptResult.message }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

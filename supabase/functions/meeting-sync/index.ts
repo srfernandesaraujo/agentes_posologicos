@@ -99,9 +99,16 @@ const fetchBotData = async (botId: string, recallApiKey: string): Promise<any | 
   return null;
 };
 
+const MAX_TRANSCRIBING_WAIT_MS = 15 * 60 * 1000;
+
 const shouldRetryTranscribingNow = (updatedAt: string | null | undefined): boolean => {
   if (!updatedAt) return true;
   return Date.now() - new Date(updatedAt).getTime() > 20000;
+};
+
+const hasExceededTranscribingWait = (updatedAt: string | null | undefined): boolean => {
+  if (!updatedAt) return false;
+  return Date.now() - new Date(updatedAt).getTime() > MAX_TRANSCRIBING_WAIT_MS;
 };
 
 serve(async (req) => {
@@ -172,6 +179,26 @@ serve(async (req) => {
 
     for (const meeting of meetings || []) {
       if (!meeting.bot_id) continue;
+
+      if (meeting.status === "transcribing" && hasExceededTranscribingWait(meeting.updated_at)) {
+        const timeoutMinutes = Math.round(MAX_TRANSCRIBING_WAIT_MS / 60000);
+        const { error: timeoutError } = await supabaseAdmin
+          .from("meetings")
+          .update({
+            status: "error",
+            error_message: `Transcrição indisponível no Recall.ai após ${timeoutMinutes} minutos. Tente novamente mais tarde.`,
+          })
+          .eq("id", meeting.id)
+          .eq("status", "transcribing");
+
+        if (timeoutError) {
+          console.error(`[meeting-sync] Failed to mark timeout for meeting ${meeting.id}:`, timeoutError);
+        } else {
+          synced += 1;
+        }
+
+        continue;
+      }
 
       if (meeting.status === "transcribing" && !shouldRetryTranscribingNow(meeting.updated_at)) {
         continue;
