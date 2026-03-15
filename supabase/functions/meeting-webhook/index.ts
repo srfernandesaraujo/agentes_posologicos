@@ -23,6 +23,8 @@ const ERROR_STATUSES = new Set([
   "recording_permission_denied",
 ]);
 
+const RETRYABLE_TRANSCRIPT_STATUS = new Set([404, 408, 409, 423, 425, 429, 500, 502, 503, 504]);
+
 const normalizeStatus = (value: unknown): string => {
   if (!value) return "";
   return String(value).toLowerCase().trim().replace(/^bot\./, "");
@@ -49,6 +51,161 @@ const isErrorStatus = (status: string): boolean => {
   );
 };
 
+const hasTranscriptNotReadyMessage = (message: string): boolean => {
+  const text = message.toLowerCase();
+  return (
+    text.includes("not ready") ||
+    text.includes("not available") ||
+    text.includes("analysis") ||
+    text.includes("processing") ||
+    text.includes("pending")
+  );
+};
+
+const fetchRecallJson = async (urls: string[], recallApiKey: string) => {
+  let lastStatus = 0;
+  let lastMessage = "";
+
+  for (const url of urls) {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Token ${recallApiKey}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (response.ok) {
+      return { ok: true as const, data: await response.json() };
+    }
+
+    lastStatus = response.status;
+    lastMessage = await response.text();
+  }
+
+  return { ok: false as const, status: lastStatus, message: lastMessage };
+};
+
+const extractTranscriptShortcut = (botData: any): any | null => {
+  const recordings = Array.isArray(botData?.recordings) ? botData.recordings : [];
+
+  for (let i = recordings.length - 1; i >= 0; i -= 1) {
+    const shortcut = recordings[i]?.media_shortcuts?.transcript;
+    if (shortcut) return shortcut;
+  }
+
+  if (botData?.media_shortcuts?.transcript) {
+    return botData.media_shortcuts.transcript;
+  }
+
+  return null;
+};
+
+const fetchTranscriptPayload = async (downloadUrl: string, recallApiKey: string) => {
+  const directResponse = await fetch(downloadUrl, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (directResponse.ok) {
+    return { ok: true as const, data: await directResponse.json() };
+  }
+
+  const authenticatedResponse = await fetch(downloadUrl, {
+    headers: {
+      Authorization: `Token ${recallApiKey}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (authenticatedResponse.ok) {
+    return { ok: true as const, data: await authenticatedResponse.json() };
+  }
+
+  const detail = await authenticatedResponse.text();
+  const retryable = RETRYABLE_TRANSCRIPT_STATUS.has(authenticatedResponse.status) || hasTranscriptNotReadyMessage(detail);
+
+  return {
+    ok: false as const,
+    status: authenticatedResponse.status,
+    message: detail,
+    retryable,
+  };
+};
+
+const fetchTranscript = async (botId: string, recallApiKey: string) => {
+  const botResult = await fetchRecallJson(
+    [
+      `https://us-west-2.recall.ai/api/v1/bot/${botId}/`,
+      `https://us-west-2.recall.ai/api/v1/bot/${botId}`,
+    ],
+    recallApiKey
+  );
+
+  if (!botResult.ok) {
+    return {
+      ok: false as const,
+      status: botResult.status,
+      message: botResult.message,
+      retryable: RETRYABLE_TRANSCRIPT_STATUS.has(botResult.status),
+    };
+  }
+
+  const transcriptShortcut = extractTranscriptShortcut(botResult.data);
+  if (!transcriptShortcut) {
+    return {
+      ok: false as const,
+      status: 404,
+      message: "Transcript shortcut not available in bot recordings yet",
+      retryable: true,
+    };
+  }
+
+  let transcriptStatus = normalizeStatus(transcriptShortcut?.status?.code);
+  let downloadUrl = transcriptShortcut?.data?.download_url as string | undefined;
+
+  if (!downloadUrl && transcriptShortcut?.id) {
+    const transcriptResult = await fetchRecallJson(
+      [
+        `https://us-west-2.recall.ai/api/v1/transcript/${transcriptShortcut.id}/`,
+        `https://us-west-2.recall.ai/api/v1/transcript/${transcriptShortcut.id}`,
+      ],
+      recallApiKey
+    );
+
+    if (transcriptResult.ok) {
+      downloadUrl = transcriptResult.data?.data?.download_url;
+      transcriptStatus = normalizeStatus(transcriptResult.data?.status?.code || transcriptStatus);
+    } else {
+      const retryable = RETRYABLE_TRANSCRIPT_STATUS.has(transcriptResult.status) || hasTranscriptNotReadyMessage(transcriptResult.message);
+      return {
+        ok: false as const,
+        status: transcriptResult.status,
+        message: transcriptResult.message,
+        retryable,
+      };
+    }
+  }
+
+  if (transcriptStatus && transcriptStatus !== "done") {
+    return {
+      ok: false as const,
+      status: transcriptStatus === "failed" ? 422 : 409,
+      message: `Transcript status is ${transcriptStatus}`,
+      retryable: transcriptStatus !== "failed",
+    };
+  }
+
+  if (!downloadUrl) {
+    return {
+      ok: false as const,
+      status: 404,
+      message: "Transcript download URL not available yet",
+      retryable: true,
+    };
+  }
+
+  return await fetchTranscriptPayload(downloadUrl, recallApiKey);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -66,7 +223,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Handle status change webhook from Recall.ai
     const botId = payload.data?.bot_id || payload.bot_id || payload.id;
     const rawStatus = payload.data?.status?.code || payload.status?.code || payload.event || payload.type;
     const status = normalizeStatus(rawStatus);
@@ -76,7 +232,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
     }
 
-    // Find meeting by bot_id
     const { data: meeting } = await supabase
       .from("meetings")
       .select("*")
@@ -88,45 +243,42 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
     }
 
-    // If bot is done / call ended, fetch transcript
     if (isDoneStatus(status)) {
-      // Update status to transcribing
-      await supabase.from("meetings").update({ status: "transcribing" }).eq("id", meeting.id);
+      await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
 
-      // Fetch transcript from Recall.ai
-      const transcriptUrls = [
-        `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript/`,
-        `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript`,
-      ];
+      const transcriptResult = await fetchTranscript(botId, RECALL_API_KEY);
 
-      let transcriptRes: Response | null = null;
-      for (const url of transcriptUrls) {
-        const candidate = await fetch(url, {
-          headers: { Authorization: `Token ${RECALL_API_KEY}` },
-        });
-        if (candidate.ok) {
-          transcriptRes = candidate;
-          break;
+      if (!transcriptResult.ok) {
+        if (transcriptResult.retryable) {
+          await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
+          return new Response(
+            JSON.stringify({ ok: true, pending_transcript: true, detail: transcriptResult.message }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
-      }
 
-      if (!transcriptRes) {
+        const suffix = transcriptResult.status ? ` (${transcriptResult.status})` : "";
         await supabase.from("meetings").update({
           status: "error",
-          error_message: "Failed to fetch transcript from Recall.ai",
+          error_message: `Falha ao buscar transcrição no Recall.ai${suffix}`,
         }).eq("id", meeting.id);
+
+        console.error("Failed to fetch transcript:", transcriptResult.status, transcriptResult.message);
+
         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
       }
 
-      const transcriptData = await transcriptRes.json();
+      const transcriptData = transcriptResult.data;
 
-      // Format transcript text
       let transcript = "";
       if (Array.isArray(transcriptData)) {
         transcript = transcriptData
           .map((segment: any) => {
-            const speaker = segment.speaker || "Speaker";
-            const words = segment.words?.map((w: any) => w.text).join(" ") || segment.text || "";
+            const participantName = segment?.participant?.name;
+            const speaker = participantName || segment?.speaker || "Speaker";
+            const words = Array.isArray(segment?.words)
+              ? segment.words.map((w: any) => w?.text).filter(Boolean).join(" ")
+              : segment?.text || "";
             return `${speaker}: ${words}`;
           })
           .join("\n\n");
@@ -145,17 +297,15 @@ serve(async (req) => {
         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
       }
 
-      // Truncate if too long
       const maxChars = 80000;
       const truncatedTranscript = transcript.length > maxChars ? transcript.slice(0, maxChars) + "\n\n[...transcrição truncada]" : transcript;
 
-      // Update transcript and status
       await supabase.from("meetings").update({
         transcript: truncatedTranscript,
         status: "summarizing",
+        error_message: null,
       }).eq("id", meeting.id);
 
-      // Generate summary via Lovable AI Gateway
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) {
         await supabase.from("meetings").update({
@@ -225,6 +375,7 @@ Use formatação Markdown. Seja conciso mas completo.`,
       await supabase.from("meetings").update({
         status: "done",
         summary,
+        error_message: null,
       }).eq("id", meeting.id);
 
     } else if (isErrorStatus(status)) {

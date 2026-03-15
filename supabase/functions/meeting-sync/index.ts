@@ -99,6 +99,11 @@ const fetchBotData = async (botId: string, recallApiKey: string): Promise<any | 
   return null;
 };
 
+const shouldRetryTranscribingNow = (updatedAt: string | null | undefined): boolean => {
+  if (!updatedAt) return true;
+  return Date.now() - new Date(updatedAt).getTime() > 20000;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -148,9 +153,9 @@ serve(async (req) => {
 
     let meetingsQuery = supabaseAdmin
       .from("meetings")
-      .select("id, bot_id, status, created_at")
+      .select("id, bot_id, status, created_at, updated_at")
       .eq("user_id", userId)
-      .in("status", ["pending", "recording"])
+      .in("status", ["pending", "recording", "transcribing"])
       .not("bot_id", "is", null);
 
     if (meetingId) {
@@ -167,6 +172,11 @@ serve(async (req) => {
 
     for (const meeting of meetings || []) {
       if (!meeting.bot_id) continue;
+
+      if (meeting.status === "transcribing" && !shouldRetryTranscribingNow(meeting.updated_at)) {
+        continue;
+      }
+
       inspected += 1;
 
       const botData = await fetchBotData(meeting.bot_id, RECALL_API_KEY);
