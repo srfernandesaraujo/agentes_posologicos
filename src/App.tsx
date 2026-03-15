@@ -27,6 +27,7 @@ import VirtualRoomChat from "./pages/VirtualRoomChat";
 import Marketplace from "./pages/Marketplace";
 import NotFound from "./pages/NotFound";
 import Flows from "./pages/Flows";
+import Meetings from "./pages/Meetings";
 import FlowEditor from "./pages/FlowEditor";
 import UserDashboard from "./pages/UserDashboard";
 import Contact from "./pages/Contact";
@@ -88,6 +89,7 @@ const App = () => (
               <Route path="/documentacao" element={<Documentation />} />
               <Route path="/fluxos" element={<Flows />} />
               <Route path="/fluxos/:flowId" element={<FlowEditor />} />
+              <Route path="/reunioes" element={<Meetings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

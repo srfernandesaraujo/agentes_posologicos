@@ -625,6 +625,48 @@ export type Database = {
           },
         ]
       }
+      meetings: {
+        Row: {
+          bot_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          meet_link: string
+          status: string
+          summary: string | null
+          title: string | null
+          transcript: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bot_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          meet_link: string
+          status?: string
+          summary?: string | null
+          title?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bot_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          meet_link?: string
+          status?: string
+          summary?: string | null
+          title?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
