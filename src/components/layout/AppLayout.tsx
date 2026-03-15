@@ -66,6 +66,7 @@ export function AppLayout() {
             <SidebarLink to="/conversas" icon={MessageSquare} label={t("nav.conversations")} count={conversationCount} />
             <SidebarLink to="/salas-virtuais" icon={DoorOpen} label={t("nav.virtualRooms")} />
             <SidebarLink to="/fluxos" icon={Workflow} label="Fluxos" />
+            <SidebarLink to="/reunioes" icon={Video} label="Reuniões" />
             <SidebarLink to="/marketplace" icon={Store} label="Marketplace" />
           </nav>
           <div className="mt-8 space-y-1">
