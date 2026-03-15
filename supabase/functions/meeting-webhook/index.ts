@@ -23,6 +23,8 @@ const ERROR_STATUSES = new Set([
   "recording_permission_denied",
 ]);
 
+const RETRYABLE_TRANSCRIPT_STATUS = new Set([404, 408, 409, 423, 425, 429, 500, 502, 503, 504]);
+
 const normalizeStatus = (value: unknown): string => {
   if (!value) return "";
   return String(value).toLowerCase().trim().replace(/^bot\./, "");
@@ -49,6 +51,56 @@ const isErrorStatus = (status: string): boolean => {
   );
 };
 
+const hasTranscriptNotReadyMessage = (message: string): boolean => {
+  const text = message.toLowerCase();
+  return (
+    text.includes("not ready") ||
+    text.includes("not available") ||
+    text.includes("analysis") ||
+    text.includes("processing") ||
+    text.includes("pending")
+  );
+};
+
+const fetchTranscript = async (botId: string, recallApiKey: string) => {
+  const transcriptUrls = [
+    `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript/`,
+    `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript`,
+  ];
+
+  let lastStatus = 0;
+  let lastMessage = "";
+  let retryable = false;
+
+  for (const url of transcriptUrls) {
+    const response = await fetch(url, {
+      headers: { Authorization: `Token ${recallApiKey}` },
+    });
+
+    if (response.ok) {
+      return { ok: true as const, data: await response.json() };
+    }
+
+    const errorBody = await response.text();
+    const currentRetryable = RETRYABLE_TRANSCRIPT_STATUS.has(response.status) || hasTranscriptNotReadyMessage(errorBody);
+
+    lastStatus = response.status;
+    lastMessage = errorBody;
+    retryable = retryable || currentRetryable;
+
+    if (!currentRetryable) {
+      break;
+    }
+  }
+
+  return {
+    ok: false as const,
+    status: lastStatus,
+    message: lastMessage,
+    retryable,
+  };
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -66,7 +118,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Handle status change webhook from Recall.ai
     const botId = payload.data?.bot_id || payload.bot_id || payload.id;
     const rawStatus = payload.data?.status?.code || payload.status?.code || payload.event || payload.type;
     const status = normalizeStatus(rawStatus);
@@ -76,7 +127,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
     }
 
-    // Find meeting by bot_id
     const { data: meeting } = await supabase
       .from("meetings")
       .select("*")
@@ -88,39 +138,33 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
     }
 
-    // If bot is done / call ended, fetch transcript
     if (isDoneStatus(status)) {
-      // Update status to transcribing
-      await supabase.from("meetings").update({ status: "transcribing" }).eq("id", meeting.id);
+      await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
 
-      // Fetch transcript from Recall.ai
-      const transcriptUrls = [
-        `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript/`,
-        `https://us-west-2.recall.ai/api/v1/bot/${botId}/transcript`,
-      ];
+      const transcriptResult = await fetchTranscript(botId, RECALL_API_KEY);
 
-      let transcriptRes: Response | null = null;
-      for (const url of transcriptUrls) {
-        const candidate = await fetch(url, {
-          headers: { Authorization: `Token ${RECALL_API_KEY}` },
-        });
-        if (candidate.ok) {
-          transcriptRes = candidate;
-          break;
+      if (!transcriptResult.ok) {
+        if (transcriptResult.retryable) {
+          await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
+          return new Response(
+            JSON.stringify({ ok: true, pending_transcript: true, detail: "Transcript not ready yet" }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
-      }
 
-      if (!transcriptRes) {
+        const suffix = transcriptResult.status ? ` (${transcriptResult.status})` : "";
         await supabase.from("meetings").update({
           status: "error",
-          error_message: "Failed to fetch transcript from Recall.ai",
+          error_message: `Falha ao buscar transcrição no Recall.ai${suffix}`,
         }).eq("id", meeting.id);
+
+        console.error("Failed to fetch transcript:", transcriptResult.status, transcriptResult.message);
+
         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
       }
 
-      const transcriptData = await transcriptRes.json();
+      const transcriptData = transcriptResult.data;
 
-      // Format transcript text
       let transcript = "";
       if (Array.isArray(transcriptData)) {
         transcript = transcriptData
@@ -145,17 +189,15 @@ serve(async (req) => {
         return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
       }
 
-      // Truncate if too long
       const maxChars = 80000;
       const truncatedTranscript = transcript.length > maxChars ? transcript.slice(0, maxChars) + "\n\n[...transcrição truncada]" : transcript;
 
-      // Update transcript and status
       await supabase.from("meetings").update({
         transcript: truncatedTranscript,
         status: "summarizing",
+        error_message: null,
       }).eq("id", meeting.id);
 
-      // Generate summary via Lovable AI Gateway
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) {
         await supabase.from("meetings").update({
@@ -225,6 +267,7 @@ Use formatação Markdown. Seja conciso mas completo.`,
       await supabase.from("meetings").update({
         status: "done",
         summary,
+        error_message: null,
       }).eq("id", meeting.id);
 
     } else if (isErrorStatus(status)) {
