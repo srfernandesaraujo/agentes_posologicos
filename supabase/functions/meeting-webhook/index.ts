@@ -410,9 +410,40 @@ Use formatação Markdown. Seja conciso mas completo.`,
       }).eq("id", meeting.id);
 
     } else if (isErrorStatus(status)) {
+      const botResult = await fetchRecallJson(
+        [
+          `https://us-west-2.recall.ai/api/v1/bot/${botId}/`,
+          `https://us-west-2.recall.ai/api/v1/bot/${botId}`,
+        ],
+        RECALL_API_KEY
+      );
+
+      const botData = botResult.ok ? botResult.data : payload.data?.bot || payload.bot || null;
+      const latestStatusChange = Array.isArray(botData?.status_changes) && botData.status_changes.length > 0
+        ? botData.status_changes[botData.status_changes.length - 1]
+        : null;
+
+      const statusCode = normalizeStatus(
+        payload.data?.status?.code || payload.status?.code || botData?.status?.code || latestStatusChange?.code || status
+      );
+      const subCode = normalizeSubCode(
+        payload.data?.status?.sub_code || payload.status?.sub_code || botData?.status?.sub_code || latestStatusChange?.sub_code
+      );
+      const rawMessage =
+        payload.data?.status?.message ||
+        payload.status?.message ||
+        botData?.status?.message ||
+        latestStatusChange?.message ||
+        botData?.error ||
+        "Erro no bot da reunião";
+
+      const errorMessage = buildHelpfulErrorMessage(statusCode, subCode, rawMessage);
+
+      console.error("meeting-webhook bot error details:", JSON.stringify({ botId, statusCode, subCode, rawMessage }).slice(0, 500));
+
       await supabase.from("meetings").update({
         status: "error",
-        error_message: payload.data?.status?.message || "Erro no bot da reunião",
+        error_message: errorMessage,
       }).eq("id", meeting.id);
     } else {
       console.log("Ignoring non-terminal status:", status || "unknown");
