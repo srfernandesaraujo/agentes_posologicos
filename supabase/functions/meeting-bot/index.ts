@@ -60,6 +60,12 @@ serve(async (req) => {
         meeting_url: meet_link.trim(),
         bot_name: "Agentes Posológicos - Ata",
         status_changes_webhook_url: webhookUrl,
+        automatic_leave: {
+          waiting_room_timeout: 600,
+          noone_joined_timeout: 1200,
+          in_call_not_recording_timeout: 900,
+          recording_permission_denied_timeout: 180,
+        },
       }),
     });
 

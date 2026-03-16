@@ -31,36 +31,44 @@ const normalizeStatus = (value: unknown): string => {
   return String(value).toLowerCase().trim().replace(/^bot\./, "");
 };
 
-const isDoneStatus = (status: string): boolean => {
-  if (!status) return false;
-  return (
-    DONE_STATUSES.has(status) ||
-    status.includes("call_ended") ||
-    status.endsWith("_done") ||
-    status === "left_call" ||
-    status.includes("completed")
-  );
+const normalizeSubCode = (value: unknown): string => {
+  if (!value) return "";
+  return String(value).toLowerCase().trim();
 };
 
-const isErrorStatus = (status: string): boolean => {
-  if (!status) return false;
-  return (
-    ERROR_STATUSES.has(status) ||
-    status.includes("fatal") ||
-    status.includes("error") ||
-    status.includes("failed")
-  );
+const FRIENDLY_ERROR_MESSAGES: Record<string, string> = {
+  call_ended_by_platform_waiting_room_timeout: "O bot ficou tempo demais na sala de espera do Google Meet e não foi admitido a tempo.",
+  timeout_exceeded_waiting_room: "O bot ficou na sala de espera por muito tempo e saiu automaticamente.",
+  bot_kicked_from_waiting_room: "O bot foi removido da sala de espera pelo organizador.",
+  bot_kicked_from_call: "O bot foi removido da reunião pelo organizador.",
+  timeout_exceeded_recording_permission_denied: "A gravação não foi autorizada a tempo no Google Meet.",
+  recording_permission_denied: "A permissão de gravação foi negada na reunião.",
+  meeting_not_started: "A reunião ainda não havia começado quando o bot tentou entrar.",
+  google_meet_bot_blocked: "O Google Meet bloqueou a entrada do bot nesta reunião.",
+  google_meet_sign_in_failed: "O Recall.ai não conseguiu autenticar o bot do Google Meet.",
+  google_meet_sign_in_captcha_failed: "O Google exigiu captcha para o bot entrar na reunião.",
+  failed_to_launch_in_time: "O Recall.ai demorou demais para iniciar o bot.",
+  bot_errored: "O bot encontrou um erro interno no Recall.ai.",
+  fatal: "O bot encontrou um erro fatal antes de concluir a reunião.",
+  error: "O bot finalizou com erro no provedor de reunião.",
 };
 
-const hasTranscriptNotReadyMessage = (message: string): boolean => {
-  const text = message.toLowerCase();
-  return (
-    text.includes("not ready") ||
-    text.includes("not available") ||
-    text.includes("analysis") ||
-    text.includes("processing") ||
-    text.includes("pending")
-  );
+const buildHelpfulErrorMessage = (statusCode: string, subCode: string, rawMessage: string) => {
+  const parts: string[] = [];
+  const friendly = FRIENDLY_ERROR_MESSAGES[subCode] || FRIENDLY_ERROR_MESSAGES[statusCode];
+
+  if (friendly) parts.push(friendly);
+  if (rawMessage && !parts.some((part) => part.toLowerCase() === rawMessage.toLowerCase())) {
+    parts.push(rawMessage);
+  }
+
+  if (
+    ["call_ended_by_platform_waiting_room_timeout", "timeout_exceeded_waiting_room", "bot_kicked_from_waiting_room", "google_meet_bot_blocked", "recording_permission_denied", "timeout_exceeded_recording_permission_denied"].includes(subCode)
+  ) {
+    parts.push("Abra o Google Meet, aceite o bot rapidamente e, se o Meet solicitar, autorize a gravação.");
+  }
+
+  return parts.filter(Boolean).join(" ") || "Bot finalizado com erro no Recall.ai.";
 };
 
 const hasExceededTranscribingWait = (updatedAt: string | null | undefined): boolean => {
@@ -242,7 +250,7 @@ serve(async (req) => {
       .from("meetings")
       .select("*")
       .eq("bot_id", botId)
-      .single();
+      .maybeSingle();
 
     if (!meeting) {
       console.log("No meeting found for bot_id:", botId);
@@ -402,9 +410,40 @@ Use formatação Markdown. Seja conciso mas completo.`,
       }).eq("id", meeting.id);
 
     } else if (isErrorStatus(status)) {
+      const botResult = await fetchRecallJson(
+        [
+          `https://us-west-2.recall.ai/api/v1/bot/${botId}/`,
+          `https://us-west-2.recall.ai/api/v1/bot/${botId}`,
+        ],
+        RECALL_API_KEY
+      );
+
+      const botData = botResult.ok ? botResult.data : payload.data?.bot || payload.bot || null;
+      const latestStatusChange = Array.isArray(botData?.status_changes) && botData.status_changes.length > 0
+        ? botData.status_changes[botData.status_changes.length - 1]
+        : null;
+
+      const statusCode = normalizeStatus(
+        payload.data?.status?.code || payload.status?.code || botData?.status?.code || latestStatusChange?.code || status
+      );
+      const subCode = normalizeSubCode(
+        payload.data?.status?.sub_code || payload.status?.sub_code || botData?.status?.sub_code || latestStatusChange?.sub_code
+      );
+      const rawMessage =
+        payload.data?.status?.message ||
+        payload.status?.message ||
+        botData?.status?.message ||
+        latestStatusChange?.message ||
+        botData?.error ||
+        "Erro no bot da reunião";
+
+      const errorMessage = buildHelpfulErrorMessage(statusCode, subCode, rawMessage);
+
+      console.error("meeting-webhook bot error details:", JSON.stringify({ botId, statusCode, subCode, rawMessage }).slice(0, 500));
+
       await supabase.from("meetings").update({
         status: "error",
-        error_message: payload.data?.status?.message || "Erro no bot da reunião",
+        error_message: errorMessage,
       }).eq("id", meeting.id);
     } else {
       console.log("Ignoring non-terminal status:", status || "unknown");

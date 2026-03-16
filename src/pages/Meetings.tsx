@@ -161,7 +161,7 @@ export default function Meetings() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Cole o link do Google Meet. O bot entrará como participante — o organizador precisará aceitá-lo.
+            Cole o link do Google Meet. O bot entrará como participante — o organizador precisa aceitá-lo rapidamente e, se o Meet solicitar, liberar a gravação.
           </p>
         </CardContent>
       </Card>
@@ -241,8 +241,15 @@ export default function Meetings() {
               </CardHeader>
               <CardContent>
                 {selectedMeeting.error_message && (
-                  <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
-                    {selectedMeeting.error_message}
+                  <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400 space-y-2">
+                    <div>{selectedMeeting.error_message}</div>
+                    {(selectedMeeting.error_message.toLowerCase().includes("sala de espera") || selectedMeeting.error_message.toLowerCase().includes("gravação") || selectedMeeting.error_message.toLowerCase().includes("google meet") || selectedMeeting.error_message.toLowerCase().includes("admit")) && (
+                      <ul className="list-disc pl-5 text-xs text-red-300/90 space-y-1">
+                        <li>Deixe a aba do Google Meet aberta para admitir o bot imediatamente.</li>
+                        <li>Se aparecer um pedido de consentimento, autorize a gravação.</li>
+                        <li>Evite iniciar o bot muito antes da reunião começar.</li>
+                      </ul>
+                    )}
                   </div>
                 )}
 
