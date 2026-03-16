@@ -3,7 +3,7 @@ import { useAgents, CATEGORIES, CATEGORY_COLORS } from "@/hooks/useAgents";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { usePurchasedAgents, useMarketplaceAgents } from "@/hooks/useMarketplace";
 import { getIcon } from "@/lib/icons";
-import { Bot, Search, ArrowRight, ShoppingBag, Sparkles, Compass, Coins } from "lucide-react";
+import { Bot, Search, ArrowRight, ShoppingBag, Sparkles, Coins } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -44,7 +44,7 @@ export default function Agents() {
       (!search || a.name.toLowerCase().includes(lowerSearch) || a.description.toLowerCase().includes(lowerSearch))
   );
 
-  const superAgent = useMemo(() => agents.find((a) => a.slug === "super-agente"), [agents]);
+  
 
   const agentsByCategory = useMemo(() => {
     const map: Record<string, typeof agents> = {};
@@ -204,27 +204,8 @@ export default function Agents() {
             ))}
           </div>
 
-          {/* Super Agent banner */}
-          {superAgent && !search && !activeCategory && (
-            <div
-              className="mb-6 group cursor-pointer rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 transition-all hover:border-primary/50"
-              onClick={() => navigate(`/chat/${superAgent.id}`)}
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/20 text-primary">
-                  <Compass className="h-6 w-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h2 className="font-display text-base font-bold text-foreground">{superAgent.name}</h2>
-                    <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase">Grátis</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{superAgent.description}</p>
-                </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-primary transition-transform group-hover:translate-x-1" />
-              </div>
-            </div>
-          )}
+
+
 
           {/* My Agents Section */}
           {hasMyAgents && (activeCategory === null || activeCategory === "__my__") && (

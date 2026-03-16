@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { OraculoWidget } from "@/components/oraculo/OraculoWidget";
 import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3, Mail, BookOpen, Workflow, Video } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,6 +83,7 @@ export function AppLayout() {
         </main>
       </div>
       <MobileBottomNav />
+      <OraculoWidget />
     </div>
   );
 }
