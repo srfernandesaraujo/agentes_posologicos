@@ -78,50 +78,53 @@ export function OraculoWidget() {
 
       if (!resp.ok) throw new Error("Erro ao consultar o Oráculo");
 
-      const body = resp.body;
-      if (!body) throw new Error("No body");
+      const contentType = resp.headers.get("content-type") || "";
 
-      const reader = body.getReader();
-      const decoder = new TextDecoder();
-      let assistantText = "";
-      let buffer = "";
+      // Handle JSON response (non-streaming)
+      if (contentType.includes("application/json")) {
+        const json = await resp.json();
+        const assistantText = json.response || json.content || json.output || json.choices?.[0]?.message?.content || "Desculpe, não consegui processar.";
+        setMessages([...allMessages, { role: "assistant", content: assistantText }]);
+      } else {
+        // Handle SSE streaming response
+        const body = resp.body;
+        if (!body) throw new Error("No body");
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let assistantText = "";
+        let buffer = "";
 
-        let newlineIndex: number;
-        while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-          let line = buffer.slice(0, newlineIndex);
-          buffer = buffer.slice(newlineIndex + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") break;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) {
-              assistantText += content;
-              setMessages([...allMessages, { role: "assistant", content: assistantText }]);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let newlineIndex: number;
+          while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+            let line = buffer.slice(0, newlineIndex);
+            buffer = buffer.slice(newlineIndex + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (!line.startsWith("data: ")) continue;
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]") break;
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                assistantText += content;
+                setMessages([...allMessages, { role: "assistant", content: assistantText }]);
+              }
+            } catch {
+              buffer = line + "\n" + buffer;
+              break;
             }
-          } catch {
-            buffer = line + "\n" + buffer;
-            break;
           }
         }
-      }
 
-      if (!assistantText) {
-        // Non-streaming fallback
-        try {
-          const json = JSON.parse(decoder.decode());
-          assistantText = json.response || json.content || "Desculpe, não consegui processar.";
-        } catch {
-          assistantText = "Desculpe, não consegui processar sua solicitação.";
+        if (!assistantText) {
+          setMessages([...allMessages, { role: "assistant", content: "Desculpe, não consegui processar sua solicitação." }]);
         }
-        setMessages([...allMessages, { role: "assistant", content: assistantText }]);
       }
     } catch (e) {
       console.error("Oráculo error:", e);
