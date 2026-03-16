@@ -250,7 +250,7 @@ serve(async (req) => {
       .from("meetings")
       .select("*")
       .eq("bot_id", botId)
-      .single();
+      .maybeSingle();
 
     if (!meeting) {
       console.log("No meeting found for bot_id:", botId);
