@@ -161,7 +161,7 @@ export default function Meetings() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Cole o link do Google Meet. O bot entrará como participante — o organizador precisará aceitá-lo.
+            Cole o link do Google Meet. O bot entrará como participante — o organizador precisa aceitá-lo rapidamente e, se o Meet solicitar, liberar a gravação.
           </p>
         </CardContent>
       </Card>
