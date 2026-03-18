@@ -302,6 +302,11 @@ function FlowNode({
       {node.input_prompt && !connectMode && (
         <span className="text-[10px] text-white/30 max-w-[180px] truncate">{node.input_prompt}</span>
       )}
+      {node.is_synthesizer && !connectMode && (
+        <span className="text-[10px] text-amber-300/80 font-medium flex items-center gap-1">
+          <Sparkles className="h-3 w-3" /> Sintetizador
+        </span>
+      )}
     </div>
   );
 }
