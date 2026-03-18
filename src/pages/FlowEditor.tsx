@@ -416,6 +416,12 @@ export default function FlowEditor() {
   const [execFinal, setExecFinal] = useState("");
   const [flowCompleted, setFlowCompleted] = useState(false);
 
+  // Parallel execution state
+  const [parallelLevels, setParallelLevels] = useState<ParallelLevel[]>([]);
+  const [parallelResults, setParallelResults] = useState<ParallelLevelResult[]>([]);
+  const [currentLevelIndex, setCurrentLevelIndex] = useState(-1);
+  const [editSynthesizer, setEditSynthesizer] = useState(false);
+
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ nodeId: string; offsetX: number; offsetY: number } | null>(null);
   const scrollEndRef = useRef<HTMLDivElement>(null);
