@@ -1192,9 +1192,19 @@ export default function FlowEditor() {
           <DialogHeader className="px-6 pt-5 pb-3">
             <DialogTitle className="flex items-center gap-2">
               Executar Fluxo
-              {currentStepIndex >= 0 && flowSteps.length > 0 && (
+              {isParallelMode && (
+                <Badge variant="outline" className="text-xs border-amber-400/30 text-amber-300 gap-1">
+                  <GitBranch className="h-3 w-3" /> Paralelo
+                </Badge>
+              )}
+              {currentStepIndex >= 0 && flowSteps.length > 0 && !isParallelMode && (
                 <Badge variant="outline" className="text-xs border-[hsl(var(--accent))]/30 text-[hsl(var(--accent))]">
                   Etapa {currentStepIndex + 1}/{flowSteps.length}
+                </Badge>
+              )}
+              {currentLevelIndex >= 0 && parallelLevels.length > 0 && (
+                <Badge variant="outline" className="text-xs border-[hsl(var(--accent))]/30 text-[hsl(var(--accent))]">
+                  Nível {currentLevelIndex + 1}/{parallelLevels.length}
                 </Badge>
               )}
               {flowCompleted && (
@@ -1208,37 +1218,82 @@ export default function FlowEditor() {
           {/* Sticky Pipeline Indicator */}
           <div className="sticky top-0 z-10 px-6 pb-3 bg-[hsl(220,25%,10%)] border-b border-white/10">
             <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <p className="text-xs text-white/40 mb-2">Pipeline de execução (faseado):</p>
-              <div className="flex flex-wrap items-center gap-1">
-                {(flowSteps.length > 0 ? flowSteps : nodes.sort((a, b) => a.sort_order - b.sort_order).map((n, i) => ({
-                  index: i,
-                  node_id: n.id,
-                  agent_id: n.agent_id,
-                  agent_type: n.agent_type,
-                  agent_name: getAgentInfo(n).name,
-                  input_prompt: n.input_prompt || "",
-                }))).map((step, i) => {
-                  const stepResult = stepResults.find(r => r.step_index === i);
-                  const isActive = currentStepIndex === i;
-                  const isDone = stepResult?.status === "completed";
-                  return (
-                    <div key={step.node_id} className="flex items-center gap-1">
-                      <div className={`flex items-center gap-1 rounded-md px-2 py-1 transition-all ${
-                        isActive ? "bg-[hsl(var(--accent))]/20 ring-1 ring-[hsl(var(--accent))]/40" :
-                        isDone ? "bg-green-500/10" :
-                        "bg-white/10"
-                      }`}>
-                        {stepResult?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
-                        {isDone && <span className="text-green-400 text-xs">✓</span>}
-                        <span className={`text-xs ${isDone ? "text-green-400" : isActive ? "text-[hsl(var(--accent))]" : "text-white/70"}`}>
-                          {step.agent_name}
-                        </span>
+              <p className="text-xs text-white/40 mb-2">
+                Pipeline de execução ({isParallelMode ? "paralelo" : "faseado"}):
+              </p>
+
+              {/* Parallel pipeline indicator */}
+              {isParallelMode && parallelLevels.length > 0 ? (
+                <div className="space-y-2">
+                  {parallelLevels.map((level, li) => {
+                    const levelResult = parallelResults.find(r => r.level_index === li);
+                    const isActive = currentLevelIndex === li;
+                    const allDone = levelResult?.results.every(r => r.status === "completed");
+                    return (
+                      <div key={li} className="flex items-center gap-2">
+                        <span className="text-[10px] text-white/30 w-12 shrink-0">Nível {li + 1}</span>
+                        <div className="flex flex-wrap gap-1">
+                          {level.steps.map((step) => {
+                            const sr = levelResult?.results.find(r => r.agent_name === step.agent_name);
+                            return (
+                              <div key={step.node_id} className={`flex items-center gap-1 rounded-md px-2 py-1 transition-all ${
+                                isActive && sr?.status === "running" ? "bg-[hsl(var(--accent))]/20 ring-1 ring-[hsl(var(--accent))]/40" :
+                                sr?.status === "completed" ? "bg-green-500/10" :
+                                sr?.status === "error" ? "bg-red-500/10" :
+                                "bg-white/10"
+                              }`}>
+                                {sr?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
+                                {sr?.status === "completed" && <span className="text-green-400 text-xs">✓</span>}
+                                {sr?.status === "error" && <span className="text-red-400 text-xs">✗</span>}
+                                {step.is_synthesizer && <Sparkles className="h-3 w-3 text-amber-300" />}
+                                <span className={`text-xs ${
+                                  sr?.status === "completed" ? "text-green-400" :
+                                  sr?.status === "error" ? "text-red-400" :
+                                  isActive ? "text-[hsl(var(--accent))]" : "text-white/70"
+                                }`}>
+                                  {step.agent_name}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {li < parallelLevels.length - 1 && <ChevronRight className="h-3 w-3 text-white/20 shrink-0" />}
                       </div>
-                      {i < (flowSteps.length || nodes.length) - 1 && <ChevronRight className="h-3 w-3 text-white/20" />}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-1">
+                  {(flowSteps.length > 0 ? flowSteps : nodes.sort((a, b) => a.sort_order - b.sort_order).map((n, i) => ({
+                    index: i,
+                    node_id: n.id,
+                    agent_id: n.agent_id,
+                    agent_type: n.agent_type,
+                    agent_name: getAgentInfo(n).name,
+                    input_prompt: n.input_prompt || "",
+                  }))).map((step, i) => {
+                    const stepResult = stepResults.find(r => r.step_index === i);
+                    const isActive = currentStepIndex === i;
+                    const isDone = stepResult?.status === "completed";
+                    return (
+                      <div key={step.node_id} className="flex items-center gap-1">
+                        <div className={`flex items-center gap-1 rounded-md px-2 py-1 transition-all ${
+                          isActive ? "bg-[hsl(var(--accent))]/20 ring-1 ring-[hsl(var(--accent))]/40" :
+                          isDone ? "bg-green-500/10" :
+                          "bg-white/10"
+                        }`}>
+                          {stepResult?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
+                          {isDone && <span className="text-green-400 text-xs">✓</span>}
+                          <span className={`text-xs ${isDone ? "text-green-400" : isActive ? "text-[hsl(var(--accent))]" : "text-white/70"}`}>
+                            {step.agent_name}
+                          </span>
+                        </div>
+                        {i < (flowSteps.length || nodes.length) - 1 && <ChevronRight className="h-3 w-3 text-white/20" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
