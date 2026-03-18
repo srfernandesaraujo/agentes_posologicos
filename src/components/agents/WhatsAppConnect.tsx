@@ -61,12 +61,14 @@ export function WhatsAppConnect({ agentId, agentName, onBack }: Props) {
 
     setSaving(true);
     try {
-      // Encrypt the API key
+      // Try to encrypt the API key; fall back to plain text if encryption is not configured
+      let keyToStore = evolutionApiKey;
       const { data: encrypted, error: encErr } = await supabase.rpc("encrypt_api_key", {
         p_key: evolutionApiKey,
       });
-
-      if (encErr) throw encErr;
+      if (!encErr && encrypted) {
+        keyToStore = encrypted as string;
+      }
 
       if (connectionId) {
         await supabase
