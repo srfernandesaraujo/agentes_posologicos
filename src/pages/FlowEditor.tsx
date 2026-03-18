@@ -1301,7 +1301,7 @@ export default function FlowEditor() {
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <div className="space-y-4">
               {/* Initial input */}
-              {stepResults.length === 0 && (
+              {stepResults.length === 0 && parallelResults.length === 0 && (
                 <>
                   <div>
                     <label className="text-sm text-white/60 mb-1 block">Entrada inicial</label>
@@ -1318,6 +1318,54 @@ export default function FlowEditor() {
                     {executing ? "Iniciando..." : "Iniciar Execução"}
                   </Button>
                 </>
+              )}
+
+              {/* Parallel results */}
+              {parallelResults.length > 0 && (
+                <div className="space-y-4">
+                  {parallelResults.map((levelResult) => (
+                    <div key={levelResult.level_index} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs border-white/20 text-white/50">
+                          Nível {levelResult.level_index + 1}
+                        </Badge>
+                        {levelResult.results.length > 1 && (
+                          <span className="text-[10px] text-white/30">{levelResult.results.length} agentes em paralelo</span>
+                        )}
+                      </div>
+                      <div className={levelResult.results.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-3" : ""}>
+                        {levelResult.results.map((result, ri) => (
+                          <div key={ri} className={`rounded-lg border p-4 ${
+                            result.status === "error" ? "border-red-500/30 bg-red-500/5" :
+                            result.status === "running" ? "border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5" :
+                            "border-white/10 bg-white/5"
+                          }`}>
+                            <div className="flex items-center gap-2 mb-3">
+                              {result.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
+                              {result.status === "completed" && <span className="text-green-400 text-xs">✓</span>}
+                              {result.status === "error" && <span className="text-red-400 text-xs">✗</span>}
+                              <span className="text-xs font-medium text-white/70">{result.agent_name}</span>
+                            </div>
+                            {result.output && result.status !== "error" && (
+                              <RenderContent content={result.output} />
+                            )}
+                            {result.status === "running" && !result.output && (
+                              <div className="flex items-center gap-2 py-4 justify-center">
+                                <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--accent))]" />
+                                <span className="text-sm text-white/40">Processando...</span>
+                              </div>
+                            )}
+                            {result.status === "error" && (
+                              <div className="mt-2 rounded bg-red-500/10 border border-red-500/20 p-2">
+                                <p className="text-xs text-red-400">❌ Erro: {result.output?.slice(0, 300)}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
 
               {/* Step results */}
