@@ -22,6 +22,7 @@ export interface AgentFlowNode {
   position_y: number;
   sort_order: number;
   input_prompt: string;
+  is_synthesizer: boolean;
   created_at: string;
   // joined
   agent_name?: string;
