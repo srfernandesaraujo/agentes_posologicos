@@ -76,7 +76,7 @@ export function WhatsAppConnect({ agentId, agentName, onBack }: Props) {
           .update({
             instance_name: instanceName.trim(),
             evolution_api_url: evolutionApiUrl.trim().replace(/\/$/, ""),
-            evolution_api_key_encrypted: encrypted,
+            evolution_api_key_encrypted: keyToStore,
             webhook_url: webhookUrl,
             service_type: "evolution",
             status: "active",
