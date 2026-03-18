@@ -61,12 +61,14 @@ export function WhatsAppConnect({ agentId, agentName, onBack }: Props) {
 
     setSaving(true);
     try {
-      // Encrypt the API key
+      // Try to encrypt the API key; fall back to plain text if encryption is not configured
+      let keyToStore = evolutionApiKey;
       const { data: encrypted, error: encErr } = await supabase.rpc("encrypt_api_key", {
         p_key: evolutionApiKey,
       });
-
-      if (encErr) throw encErr;
+      if (!encErr && encrypted) {
+        keyToStore = encrypted as string;
+      }
 
       if (connectionId) {
         await supabase
@@ -74,7 +76,7 @@ export function WhatsAppConnect({ agentId, agentName, onBack }: Props) {
           .update({
             instance_name: instanceName.trim(),
             evolution_api_url: evolutionApiUrl.trim().replace(/\/$/, ""),
-            evolution_api_key_encrypted: encrypted,
+            evolution_api_key_encrypted: keyToStore,
             webhook_url: webhookUrl,
             service_type: "evolution",
             status: "active",
@@ -88,7 +90,7 @@ export function WhatsAppConnect({ agentId, agentName, onBack }: Props) {
             agent_id: agentId,
             instance_name: instanceName.trim(),
             evolution_api_url: evolutionApiUrl.trim().replace(/\/$/, ""),
-            evolution_api_key_encrypted: encrypted,
+            evolution_api_key_encrypted: keyToStore,
             webhook_url: webhookUrl,
             service_type: "evolution",
             status: "active",
