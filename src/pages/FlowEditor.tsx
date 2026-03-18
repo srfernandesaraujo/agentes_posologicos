@@ -953,16 +953,30 @@ export default function FlowEditor() {
 
   // PDF export
   const handleExportPdf = () => {
-    if (!flow || stepResults.length === 0) return;
-    exportFlowPdf(
-      flow.name,
-      stepResults.map(r => ({
-        step_index: r.step_index,
-        agent_name: r.agent_name,
-        chatHistory: r.chatHistory.map(m => ({ role: m.role, content: m.content })),
-        output: r.output,
-      }))
-    );
+    if (!flow) return;
+
+    if (parallelResults.length > 0) {
+      // Convert parallel results to step format for PDF
+      const pdfSteps = parallelResults.flatMap((lr, li) =>
+        lr.results.map((r, ri) => ({
+          step_index: li * 100 + ri,
+          agent_name: `[Nível ${li + 1}] ${r.agent_name}`,
+          chatHistory: [{ role: "assistant" as const, content: r.output }],
+          output: r.output,
+        }))
+      );
+      exportFlowPdf(flow.name, pdfSteps);
+    } else if (stepResults.length > 0) {
+      exportFlowPdf(
+        flow.name,
+        stepResults.map(r => ({
+          step_index: r.step_index,
+          agent_name: r.agent_name,
+          chatHistory: r.chatHistory.map(m => ({ role: m.role, content: m.content })),
+          output: r.output,
+        }))
+      );
+    }
     toast.success("PDF gerado com sucesso!");
   };
 
