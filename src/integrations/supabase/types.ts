@@ -196,6 +196,7 @@ export type Database = {
           flow_id: string
           id: string
           input_prompt: string
+          is_synthesizer: boolean
           position_x: number
           position_y: number
           sort_order: number
@@ -207,6 +208,7 @@ export type Database = {
           flow_id: string
           id?: string
           input_prompt?: string
+          is_synthesizer?: boolean
           position_x?: number
           position_y?: number
           sort_order?: number
@@ -218,6 +220,7 @@ export type Database = {
           flow_id?: string
           id?: string
           input_prompt?: string
+          is_synthesizer?: boolean
           position_x?: number
           position_y?: number
           sort_order?: number
@@ -236,6 +239,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string
+          execution_mode: string
           id: string
           name: string
           status: string
@@ -245,6 +249,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string
+          execution_mode?: string
           id?: string
           name: string
           status?: string
@@ -254,6 +259,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string
+          execution_mode?: string
           id?: string
           name?: string
           status?: string
