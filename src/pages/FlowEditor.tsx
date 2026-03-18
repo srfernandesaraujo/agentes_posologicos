@@ -39,6 +39,21 @@ interface FlowStep {
   agent_type: string;
   agent_name: string;
   input_prompt: string;
+  is_synthesizer?: boolean;
+}
+
+interface ParallelLevel {
+  level_index: number;
+  steps: FlowStep[];
+}
+
+interface ParallelLevelResult {
+  level_index: number;
+  results: Array<{
+    agent_name: string;
+    output: string;
+    status: "completed" | "error" | "running";
+  }>;
 }
 
 interface StepResult {
