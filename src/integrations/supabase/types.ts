@@ -1199,7 +1199,10 @@ export type Database = {
         Row: {
           agent_id: string
           created_at: string
+          evolution_api_key_encrypted: string | null
+          evolution_api_url: string | null
           id: string
+          instance_name: string | null
           phone_number_id: string | null
           service_type: string
           status: string
@@ -1211,7 +1214,10 @@ export type Database = {
         Insert: {
           agent_id: string
           created_at?: string
+          evolution_api_key_encrypted?: string | null
+          evolution_api_url?: string | null
           id?: string
+          instance_name?: string | null
           phone_number_id?: string | null
           service_type?: string
           status?: string
@@ -1223,7 +1229,10 @@ export type Database = {
         Update: {
           agent_id?: string
           created_at?: string
+          evolution_api_key_encrypted?: string | null
+          evolution_api_url?: string | null
           id?: string
+          instance_name?: string | null
           phone_number_id?: string | null
           service_type?: string
           status?: string
@@ -1238,6 +1247,41 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "custom_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_conversations: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          remote_jid: string
+          role: string
+          whatsapp_connection_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          remote_jid: string
+          role?: string
+          whatsapp_connection_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          remote_jid?: string
+          role?: string
+          whatsapp_connection_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversations_whatsapp_connection_id_fkey"
+            columns: ["whatsapp_connection_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_connections"
             referencedColumns: ["id"]
           },
         ]
