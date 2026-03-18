@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
 
     if (contentType.includes("application/json")) {
       const json = await agentResp.json();
-      assistantText = json.response || json.content || json.message || "";
+      assistantText = json.output || json.response || json.content || json.message || "";
     } else {
       // SSE stream — collect all data chunks
       const fullText = await agentResp.text();
