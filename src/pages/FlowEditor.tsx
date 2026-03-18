@@ -594,6 +594,9 @@ export default function FlowEditor() {
     setExecFinal("");
     setExecutionId(null);
     setFlowCompleted(false);
+    setParallelLevels([]);
+    setParallelResults([]);
+    setCurrentLevelIndex(-1);
 
     try {
       const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
@@ -603,13 +606,143 @@ export default function FlowEditor() {
       if (data?.error) throw new Error(data.error);
 
       setExecutionId(data.execution_id);
-      setFlowSteps(data.steps);
 
-      await executeStep(0, data.steps, data.execution_id, execInput);
+      if (data.execution_mode === "parallel" && data.levels) {
+        // Parallel execution
+        const levels: ParallelLevel[] = data.levels.map((level: any[], idx: number) => ({
+          level_index: idx,
+          steps: level,
+        }));
+        setParallelLevels(levels);
+        await executeParallelLevels(levels, data.execution_id, execInput);
+      } else {
+        // Sequential execution
+        setFlowSteps(data.steps);
+        await executeStep(0, data.steps, data.execution_id, execInput);
+      }
     } catch (e: any) {
       toast.error(e.message || "Erro ao iniciar execução");
       setExecuting(false);
     }
+  };
+
+  // Parallel execution: process levels one by one, each level's steps in parallel
+  const executeParallelLevels = async (levels: ParallelLevel[], execId: string, initialInput: string) => {
+    let accumulatedOutputs: Array<{ agent_name: string; output: string }> = [];
+
+    for (let li = 0; li < levels.length; li++) {
+      const level = levels[li];
+      setCurrentLevelIndex(li);
+
+      // Check if this level has a synthesizer
+      const hasSynthesizer = level.steps.some(s => s.is_synthesizer);
+
+      if (hasSynthesizer && accumulatedOutputs.length > 0) {
+        // Synthesizer step
+        const synthStep = level.steps.find(s => s.is_synthesizer) || level.steps[0];
+
+        setParallelResults(prev => [...prev, {
+          level_index: li,
+          results: [{ agent_name: synthStep.agent_name, output: "", status: "running" }],
+        }]);
+
+        try {
+          const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
+            body: {
+              mode: "synthesize",
+              execution_id: execId,
+              node_id: synthStep.node_id,
+              agent_id: synthStep.agent_id,
+              parallel_outputs: accumulatedOutputs,
+              input_text: initialInput,
+              total_levels: levels.length,
+            },
+          });
+
+          if (error) throw error;
+          if (data?.status === "error") throw new Error(data.error || data.output);
+
+          const output = stripFlowSuggestions(data.output);
+          setParallelResults(prev => prev.map(pr =>
+            pr.level_index === li
+              ? { ...pr, results: [{ agent_name: synthStep.agent_name, output, status: "completed" }] }
+              : pr
+          ));
+          accumulatedOutputs = [{ agent_name: synthStep.agent_name, output }];
+        } catch (e: any) {
+          setParallelResults(prev => prev.map(pr =>
+            pr.level_index === li
+              ? { ...pr, results: [{ agent_name: synthStep.agent_name, output: e.message, status: "error" }] }
+              : pr
+          ));
+          toast.error(`Erro no sintetizador: ${e.message}`);
+          setExecuting(false);
+          return;
+        }
+      } else {
+        // Regular parallel level
+        setParallelResults(prev => [...prev, {
+          level_index: li,
+          results: level.steps.map(s => ({ agent_name: s.agent_name, output: "", status: "running" as const })),
+        }]);
+
+        try {
+          const inputForLevel = accumulatedOutputs.length > 0
+            ? accumulatedOutputs.map(o => `[${o.agent_name}]: ${o.output}`).join("\n---\n")
+            : initialInput;
+
+          const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
+            body: {
+              mode: "parallel-step",
+              execution_id: execId,
+              steps: level.steps,
+              input_text: inputForLevel,
+              level_index: li,
+              total_levels: levels.length,
+              all_levels: levels.map(l => l.steps),
+            },
+          });
+
+          if (error) throw error;
+
+          const results = data.results || [];
+          setParallelResults(prev => prev.map(pr =>
+            pr.level_index === li
+              ? { ...pr, results: results.map((r: any) => ({ agent_name: r.agent_name, output: stripFlowSuggestions(r.output), status: r.status })) }
+              : pr
+          ));
+
+          accumulatedOutputs = results
+            .filter((r: any) => r.status === "completed")
+            .map((r: any) => ({ agent_name: r.agent_name, output: r.output }));
+
+          if (results.some((r: any) => r.status === "error")) {
+            toast.error("Alguns agentes falharam neste nível");
+          }
+        } catch (e: any) {
+          setParallelResults(prev => prev.map(pr =>
+            pr.level_index === li
+              ? { ...pr, results: pr.results.map(r => ({ ...r, status: "error" as const, output: e.message })) }
+              : pr
+          ));
+          toast.error(`Erro no nível ${li + 1}: ${e.message}`);
+          setExecuting(false);
+          return;
+        }
+      }
+    }
+
+    // Complete
+    const finalOutput = accumulatedOutputs.map(o => o.output).join("\n\n---\n\n");
+    setExecFinal(finalOutput);
+    setFlowCompleted(true);
+    setExecuting(false);
+    setCurrentLevelIndex(-1);
+
+    await supabase.functions.invoke("agent-flow-execute", {
+      body: { mode: "complete", execution_id: execId, final_output: finalOutput, flow_id: flowId },
+    });
+    toast.success("Fluxo paralelo concluído com sucesso!");
   };
 
   const executeStep = async (
