@@ -393,6 +393,7 @@ export default function FlowEditor() {
   const deleteNode = useDeleteFlowNode();
   const addEdge = useAddFlowEdge();
   const deleteEdge = useDeleteFlowEdge();
+  const updateFlow = useUpdateFlow();
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [connectMode, setConnectMode] = useState(false);
