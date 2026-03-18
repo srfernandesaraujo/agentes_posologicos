@@ -1164,6 +1164,19 @@ export default function FlowEditor() {
               />
               <p className="text-xs text-white/30 mt-1">Esta instrução será adicionada ao contexto do agente durante a execução</p>
             </div>
+            {isParallelMode && (
+              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3">
+                <div>
+                  <label className="text-sm font-medium text-white">Agente Sintetizador</label>
+                  <p className="text-xs text-white/40 mt-0.5">Marca este nó como o consolidador final dos resultados paralelos</p>
+                </div>
+                <Switch
+                  checked={editSynthesizer}
+                  onCheckedChange={setEditSynthesizer}
+                  className="data-[state=checked]:bg-amber-500"
+                />
+              </div>
+            )}
             <Button onClick={saveConfig}>Salvar</Button>
           </div>
         </DialogContent>
