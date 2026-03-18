@@ -8,6 +8,7 @@ export interface AgentFlow {
   name: string;
   description: string;
   status: string;
+  execution_mode: string;
   created_at: string;
   updated_at: string;
 }

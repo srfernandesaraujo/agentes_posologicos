@@ -38,6 +38,40 @@ function topologicalSort(nodes: any[], edges: any[]): any[] {
   return executionOrder;
 }
 
+// BFS layering: group nodes by depth level for parallel execution
+function bfsLayers(nodes: any[], edges: any[]): any[][] {
+  const inDegree = new Map<string, number>();
+  const adjList = new Map<string, string[]>();
+  nodes.forEach((n: any) => {
+    inDegree.set(n.id, 0);
+    adjList.set(n.id, []);
+  });
+  edges.forEach((e: any) => {
+    inDegree.set(e.target_node_id, (inDegree.get(e.target_node_id) || 0) + 1);
+    adjList.get(e.source_node_id)?.push(e.target_node_id);
+  });
+
+  const layers: any[][] = [];
+  let currentLayer: string[] = [];
+  inDegree.forEach((deg, id) => { if (deg === 0) currentLayer.push(id); });
+
+  const nodeMap = new Map(nodes.map((n: any) => [n.id, n]));
+
+  while (currentLayer.length > 0) {
+    layers.push(currentLayer.map(id => nodeMap.get(id)!));
+    const nextLayer: string[] = [];
+    for (const id of currentLayer) {
+      for (const next of adjList.get(id) || []) {
+        inDegree.set(next, (inDegree.get(next) || 0) - 1);
+        if (inDegree.get(next) === 0) nextLayer.push(next);
+      }
+    }
+    currentLayer = nextLayer;
+  }
+
+  return layers;
+}
+
 async function authenticateUser(req: Request, supabaseUrl: string, supabaseAnonKey: string): Promise<string | null> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
@@ -71,7 +105,6 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     // ========== MODE: INIT ==========
-    // Creates execution record and returns ordered nodes with agent info
     if (mode === "init") {
       const { flow_id, initial_input } = body;
       if (!flow_id || !initial_input) {
@@ -80,16 +113,16 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Verify ownership
       const { data: flowData, error: flowError } = await supabase
-        .from("agent_flows").select("id, user_id").eq("id", flow_id).single();
+        .from("agent_flows").select("id, user_id, execution_mode").eq("id", flow_id).single();
       if (flowError || !flowData || flowData.user_id !== userId) {
         return new Response(JSON.stringify({ error: "Fluxo não encontrado ou sem permissão" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Load nodes and edges
+      const executionMode = flowData.execution_mode || "sequential";
+
       const [{ data: nodes, error: nodesErr }, { data: edges }] = await Promise.all([
         supabase.from("agent_flow_nodes").select("*").eq("flow_id", flow_id).order("sort_order"),
         supabase.from("agent_flow_edges").select("*").eq("flow_id", flow_id),
@@ -101,11 +134,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      const executionOrder = topologicalSort(nodes, edges || []);
-
       // Load agent details
-      const nativeIds = executionOrder.filter((n: any) => n.agent_type === "native").map((n: any) => n.agent_id);
-      const customIds = executionOrder.filter((n: any) => n.agent_type === "custom").map((n: any) => n.agent_id);
+      const nativeIds = nodes.filter((n: any) => n.agent_type === "native").map((n: any) => n.agent_id);
+      const customIds = nodes.filter((n: any) => n.agent_type === "custom").map((n: any) => n.agent_id);
       const [nativeRes, customRes] = await Promise.all([
         nativeIds.length ? supabase.from("agents").select("id, name, slug").in("id", nativeIds) : { data: [] },
         customIds.length ? supabase.from("custom_agents").select("id, name").in("id", customIds) : { data: [] },
@@ -115,8 +146,7 @@ Deno.serve(async (req) => {
       (nativeRes.data || []).forEach((a: any) => agentMap.set(a.id, { ...a, type: "native" }));
       (customRes.data || []).forEach((a: any) => agentMap.set(a.id, { ...a, type: "custom" }));
 
-      // Validate agents
-      for (const node of executionOrder) {
+      for (const node of nodes) {
         if (!agentMap.has(node.agent_id)) {
           return new Response(JSON.stringify({
             error: `Agente não encontrado (agent_id: ${node.agent_id}, tipo: ${node.agent_type})`,
@@ -124,14 +154,40 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Create execution record
       const { data: execution, error: execErr } = await supabase
         .from("agent_flow_executions")
         .insert({ flow_id, user_id: userId, status: "running", initial_input })
         .select().single();
       if (execErr) throw execErr;
 
-      // Return ordered steps with agent info
+      if (executionMode === "parallel") {
+        // BFS layering for parallel execution
+        const layers = bfsLayers(nodes, edges || []);
+        const levels = layers.map((layer, levelIdx) =>
+          layer.map((node: any) => {
+            const agent = agentMap.get(node.agent_id);
+            return {
+              node_id: node.id,
+              agent_id: node.agent_id,
+              agent_type: node.agent_type,
+              agent_name: agent?.name || "Agente",
+              input_prompt: node.input_prompt || "",
+              is_synthesizer: node.is_synthesizer || false,
+            };
+          })
+        );
+
+        return new Response(JSON.stringify({
+          execution_id: execution.id,
+          execution_mode: "parallel",
+          levels,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Sequential mode (default)
+      const executionOrder = topologicalSort(nodes, edges || []);
       const steps = executionOrder.map((node: any, index: number) => {
         const agent = agentMap.get(node.agent_id);
         return {
@@ -144,13 +200,230 @@ Deno.serve(async (req) => {
         };
       });
 
-      return new Response(JSON.stringify({ execution_id: execution.id, steps }), {
+      return new Response(JSON.stringify({ execution_id: execution.id, execution_mode: "sequential", steps }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // ========== MODE: PARALLEL-STEP ==========
+    // Executes multiple nodes in parallel (same level)
+    if (mode === "parallel-step") {
+      const { execution_id, steps: parallelSteps, input_text, level_index, total_levels, all_levels } = body;
+
+      if (!execution_id || !parallelSteps?.length || !input_text) {
+        return new Response(JSON.stringify({ error: "execution_id, steps e input_text são obrigatórios" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: exec } = await supabase
+        .from("agent_flow_executions").select("user_id").eq("id", execution_id).single();
+      if (!exec || exec.user_id !== userId) {
+        return new Response(JSON.stringify({ error: "Execução não encontrada ou sem permissão" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Execute all steps in this level in parallel
+      const results = await Promise.all(parallelSteps.map(async (step: any) => {
+        const { data: nodeResult } = await supabase
+          .from("agent_flow_node_results")
+          .insert({
+            execution_id, node_id: step.node_id, input_text, status: "running",
+            started_at: new Date().toISOString(),
+          })
+          .select().single();
+
+        try {
+          let contextMessage = input_text;
+          if (step.input_prompt) {
+            contextMessage = `${step.input_prompt}\n\n---\n\nConteúdo de entrada:\n${input_text}`;
+          }
+
+          // Build pipeline description
+          let pipelineDesc = "";
+          if (all_levels && Array.isArray(all_levels)) {
+            pipelineDesc = all_levels.map((level: any[], li: number) => {
+              const names = level.map((s: any) => s.agent_name).join(", ");
+              const marker = li === level_index ? " ← NÍVEL ATUAL" : "";
+              return `  Nível ${li + 1}: [${names}]${marker}`;
+            }).join("\n");
+          }
+
+          const isSynthesizer = step.is_synthesizer === true;
+
+          let flowInstruction = `\n\n<FLOW_MODE_INSTRUCTION>
+IMPORTANTE: Você está operando dentro de um FLUXO PARALELO DE AGENTES (Nível ${(level_index || 0) + 1} de ${total_levels || "?"}).
+${isSynthesizer ? "VOCÊ É O AGENTE SINTETIZADOR — sua tarefa é integrar e consolidar TODOS os resultados dos agentes anteriores em uma entrega única e coesa." : "Você é um dos agentes executando EM PARALELO neste nível."}
+
+PIPELINE COMPLETO:
+${pipelineDesc || "(não disponível)"}
+
+REGRAS OBRIGATÓRIAS DO MODO FLUXO:
+1. NÃO inicie com saudação, apresentação pessoal ou descrição do que você faz. Vá DIRETO ao conteúdo.
+2. NUNCA diga "me aguarde", "por favor aguarde enquanto processo" ou qualquer variação. PRODUZA o conteúdo diretamente.
+3. Se precisa de informações, faça perguntas CLARAS e OBJETIVAS. Comece a seção de perguntas com "PERGUNTAS PARA O USUÁRIO:" em linha separada.
+4. Quando tiver todas as informações, entregue sua resposta COMPLETA e DEFINITIVA imediatamente.
+5. NUNCA inclua sugestões de interação ou ofertas como "Posso te ajudar com...", "Deseja que eu...". TERMINANTEMENTE PROIBIDO.
+6. Use tabelas Markdown formatadas corretamente quando aplicável.
+7. Produza APENAS o que sua especialidade pede.
+</FLOW_MODE_INSTRUCTION>`;
+
+          const enrichedInput = contextMessage + flowInstruction;
+
+          const chatResponse = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({
+              agentId: step.agent_id,
+              input: enrichedInput,
+              userId,
+              conversationHistory: [],
+              skipCredits: true,
+              flowMode: true,
+            }),
+          });
+
+          const responseText = await chatResponse.text();
+          if (!chatResponse.ok) throw new Error(`Erro do agente: ${responseText}`);
+
+          let output = "";
+          try {
+            const json = JSON.parse(responseText);
+            output = json.output || json.response || responseText;
+          } catch {
+            output = responseText;
+          }
+
+          if (!output || output.trim().length === 0) throw new Error("Agente retornou resposta vazia");
+
+          await supabase.from("agent_flow_node_results").update({
+            output_text: output, status: "completed",
+            completed_at: new Date().toISOString(),
+          }).eq("id", nodeResult!.id);
+
+          return { node_id: step.node_id, agent_name: step.agent_name, output, status: "completed" };
+        } catch (e: any) {
+          await supabase.from("agent_flow_node_results").update({
+            output_text: e.message, status: "error",
+            completed_at: new Date().toISOString(),
+          }).eq("id", nodeResult!.id);
+
+          return { node_id: step.node_id, agent_name: step.agent_name, output: e.message, status: "error" };
+        }
+      }));
+
+      return new Response(JSON.stringify({ results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ========== MODE: SYNTHESIZE ==========
+    // Runs a synthesizer node with all parallel outputs as context
+    if (mode === "synthesize") {
+      const { execution_id, node_id, agent_id, parallel_outputs, input_text, total_levels } = body;
+
+      if (!execution_id || !node_id || !agent_id || !parallel_outputs) {
+        return new Response(JSON.stringify({ error: "Parâmetros obrigatórios faltando" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: exec } = await supabase
+        .from("agent_flow_executions").select("user_id").eq("id", execution_id).single();
+      if (!exec || exec.user_id !== userId) {
+        return new Response(JSON.stringify({ error: "Execução não encontrada" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Build synthesizer input
+      const parallelSection = parallel_outputs.map((po: any) =>
+        `[${po.agent_name}]:\n${po.output}`
+      ).join("\n---\n");
+
+      const synthInput = `${input_text || ""}
+
+<RESULTADOS_PARALELOS>
+${parallelSection}
+</RESULTADOS_PARALELOS>
+
+Sua tarefa: integrar e consolidar os resultados acima em uma entrega coesa e completa. Combine as perspectivas de cada agente de forma harmoniosa.`;
+
+      const { data: nodeResult } = await supabase
+        .from("agent_flow_node_results")
+        .insert({
+          execution_id, node_id, input_text: synthInput, status: "running",
+          started_at: new Date().toISOString(),
+        })
+        .select().single();
+
+      try {
+        const flowInstruction = `\n\n<FLOW_MODE_INSTRUCTION>
+IMPORTANTE: Você é o AGENTE SINTETIZADOR no fluxo paralelo.
+
+REGRAS:
+1. Você recebeu resultados de múltiplos agentes que trabalharam em paralelo.
+2. Sua tarefa é INTEGRAR todos os resultados em uma entrega ÚNICA e COESA.
+3. NÃO repita conteúdo idêntico — sintetize, combine e organize.
+4. NÃO inicie com saudação. Vá DIRETO ao conteúdo consolidado.
+5. Use formatação Markdown com tabelas quando aplicável.
+6. O resultado final deve ser MELHOR do que qualquer resultado individual.
+</FLOW_MODE_INSTRUCTION>`;
+
+        const chatResponse = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            agentId: agent_id,
+            input: synthInput + flowInstruction,
+            userId,
+            conversationHistory: [],
+            skipCredits: true,
+            flowMode: true,
+          }),
+        });
+
+        const responseText = await chatResponse.text();
+        if (!chatResponse.ok) throw new Error(`Erro do sintetizador: ${responseText}`);
+
+        let output = "";
+        try {
+          const json = JSON.parse(responseText);
+          output = json.output || json.response || responseText;
+        } catch {
+          output = responseText;
+        }
+
+        if (!output || output.trim().length === 0) throw new Error("Sintetizador retornou resposta vazia");
+
+        await supabase.from("agent_flow_node_results").update({
+          output_text: output, status: "completed",
+          completed_at: new Date().toISOString(),
+        }).eq("id", nodeResult!.id);
+
+        return new Response(JSON.stringify({ output, status: "completed" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (e: any) {
+        await supabase.from("agent_flow_node_results").update({
+          output_text: e.message, status: "error",
+          completed_at: new Date().toISOString(),
+        }).eq("id", nodeResult!.id);
+
+        return new Response(JSON.stringify({ output: e.message, status: "error", error: e.message }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // ========== MODE: STEP ==========
-    // Executes a single step
     if (mode === "step") {
       const { execution_id, node_id, agent_id, input_text, conversation_history, previous_stage_output, stage_number, total_stages, pipeline_context } = body;
 
@@ -160,7 +433,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Verify execution ownership
       const { data: exec } = await supabase
         .from("agent_flow_executions").select("user_id").eq("id", execution_id).single();
       if (!exec || exec.user_id !== userId) {
@@ -169,7 +441,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Create node result
       const { data: nodeResult } = await supabase
         .from("agent_flow_node_results")
         .insert({
@@ -179,10 +450,8 @@ Deno.serve(async (req) => {
         .select().single();
 
       try {
-        // Build history for agent-chat (supports follow-up within same step)
         const history = conversation_history || [];
 
-        // Build pipeline description so the agent knows its role
         let pipelineDesc = "";
         if (pipeline_context && Array.isArray(pipeline_context)) {
           pipelineDesc = pipeline_context.map((s: any, i: number) => {
@@ -191,7 +460,6 @@ Deno.serve(async (req) => {
           }).join("\n");
         }
 
-        // Build flow-mode context instruction
         let flowInstruction = `\n\n<FLOW_MODE_INSTRUCTION>
 IMPORTANTE: Você está operando dentro de um FLUXO SEQUENCIAL DE AGENTES (Etapa ${stage_number || "?"} de ${total_stages || "?"}).
 
@@ -272,7 +540,6 @@ ${previous_stage_output}
     }
 
     // ========== MODE: COMPLETE ==========
-    // Marks execution as completed
     if (mode === "complete") {
       const { execution_id, final_output, flow_id } = body;
       await supabase.from("agent_flow_executions").update({
