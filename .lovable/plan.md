@@ -1,68 +1,75 @@
 
 
-## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
+# Plano: Execução Paralela de Fluxos de Agentes
 
-### Problema
-Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
+## Conceito
 
-### Solucao
-Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
+Atualmente o fluxo executa etapas uma a uma (sequencial). A proposta é adicionar suporte a **execução paralela**: agentes sem dependência entre si rodam simultaneamente, e um **agente sintetizador** no final consolida todos os resultados em uma entrega única.
 
-### Como vai funcionar (fluxo do usuario)
-
-1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
-2. A fonte e criada com status "pending"
-3. O sistema chama automaticamente a Edge Function para extrair a transcricao
-4. A transcricao e salva no campo `content` e o status muda para "ready"
-5. O agente passa a usar o texto transcrito como contexto
-
-### Etapas de implementacao
-
-**1. Criar Edge Function `youtube-transcript`**
-
-Arquivo: `supabase/functions/youtube-transcript/index.ts`
-
-- Recebe `source_id` e `url` do YouTube
-- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
-- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
-- Extrai a transcrição em português (pt) ou inglês (en) como fallback
-- Limpa tags XML das legendas e formata como texto puro
-- Atualiza o `content` e `status` da fonte no banco usando service role
-- Trunca a 50.000 caracteres se necessário
-- Se nao houver legendas, salva mensagem informativa e marca status como "error"
-
-**2. Registrar funcao no `supabase/config.toml`**
-
-Adicionar:
 ```text
-[functions.youtube-transcript]
-verify_jwt = false
+Exemplo — Fluxo Paralelo:
+
+         ┌─── Agente A (pesquisa) ───┐
+Input ───┤                            ├──→ Sintetizador → Output Final
+         └─── Agente B (análise)  ───┘
+
+Exemplo — Misto (paralelo + sequencial):
+
+                ┌─── Agente A ───┐
+Input → Prep ───┤                ├──→ Sintetizador → Revisão → Output
+                └─── Agente B ───┘
 ```
 
-**3. Atualizar `KnowledgeDetail.tsx`**
+## O que muda
 
-Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
+### 1. Banco de Dados
+- Adicionar coluna `execution_mode` (`sequential` | `parallel`) na tabela `agent_flows` (default: `sequential`)
+- Adicionar coluna `is_synthesizer` (boolean, default false) na tabela `agent_flow_nodes` para marcar o nó final que consolida os resultados paralelos
+
+### 2. Edge Function `agent-flow-execute`
+- No mode `init`: agrupar nós por **nível de profundidade** (BFS layers) usando as edges — nós sem dependências ficam no mesmo nível e rodam em paralelo
+- Retornar `levels` (array de arrays de steps) em vez de um array linear
+- Novo mode `parallel-step`: recebe uma lista de steps do mesmo nível, executa todos com `Promise.all`, e retorna todos os resultados
+- No nó sintetizador: concatenar todos os outputs paralelos como contexto de entrada
+
+### 3. Frontend `FlowEditor.tsx`
+- Adicionar toggle "Sequencial / Paralelo" no editor do fluxo
+- Na execução paralela, mostrar os agentes do mesmo nível lado a lado com indicador de progresso simultâneo
+- O sintetizador aparece como etapa final, recebendo todos os outputs
+- Adaptar a UI de resultados para exibir outputs paralelos em colunas/tabs antes do resultado final
+
+### 4. Instrução de Fluxo para Agentes Paralelos
+- Agentes paralelos recebem apenas o input inicial (não há "etapa anterior")
+- O sintetizador recebe uma instrução especial: `<RESULTADOS_PARALELOS>` com todos os outputs numerados, e a instrução de consolidar/integrar
+
+## Detalhes Técnicos
+
+**Agrupamento por níveis (BFS)**:
 ```text
-await supabase.functions.invoke("youtube-transcript", {
-  body: { source_id: newSource.id, url: sourceUrl }
-});
+Nível 0: nós sem dependências de entrada (in-degree = 0)
+Nível 1: nós cujas dependências estão todas no nível 0
+Nível N: nós cujas dependências estão em níveis < N
 ```
 
-Mostrar toast informando que a transcrição esta sendo extraída.
+Nós no mesmo nível executam em paralelo via `Promise.all`. Nós em níveis diferentes executam sequencialmente (o nível 1 espera o nível 0 terminar).
 
-**4. Atualizar `DocumentManager.tsx`**
+**Payload do sintetizador**:
+```text
+<RESULTADOS_PARALELOS>
+[Agente A]: {output_a}
+---
+[Agente B]: {output_b}
+</RESULTADOS_PARALELOS>
 
-Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
+Sua tarefa: integrar e consolidar os resultados acima em uma entrega coesa.
+```
 
-### Detalhes tecnicos da extracao
+**Compatibilidade**: fluxos existentes continuam funcionando sem alteração (default `sequential`).
 
-A Edge Function vai:
-1. Fazer fetch da pagina do video YouTube
-2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
-3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
-4. Fazer fetch do XML de legendas
-5. Parsear as tags `<text>` removendo timestamps e tags HTML
-6. Concatenar todo o texto como conteudo limpo
-
-Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
+## Arquivos Modificados
+- `supabase/migrations/` — nova migration para `execution_mode` e `is_synthesizer`
+- `supabase/functions/agent-flow-execute/index.ts` — lógica de níveis e execução paralela
+- `src/pages/FlowEditor.tsx` — UI do toggle, execução paralela, exibição de resultados
+- `src/hooks/useAgentFlows.ts` — tipos atualizados
+- `src/integrations/supabase/types.ts` — será atualizado automaticamente
 
