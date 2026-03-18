@@ -565,13 +565,23 @@ export default function FlowEditor() {
   const openConfig = () => {
     if (!selectedNode) return;
     setEditPrompt(selectedNode.input_prompt || "");
+    setEditSynthesizer(selectedNode.is_synthesizer || false);
     setConfigOpen(true);
   };
 
   const saveConfig = async () => {
     if (!selectedNode || !flowId) return;
-    await updateNode.mutateAsync({ id: selectedNode.id, flow_id: flowId, input_prompt: editPrompt });
+    await updateNode.mutateAsync({ id: selectedNode.id, flow_id: flowId, input_prompt: editPrompt, is_synthesizer: editSynthesizer });
     setConfigOpen(false);
+  };
+
+  const isParallelMode = flow?.execution_mode === "parallel";
+
+  const toggleExecutionMode = async () => {
+    if (!flow) return;
+    const newMode = isParallelMode ? "sequential" : "parallel";
+    await updateFlow.mutateAsync({ id: flow.id, execution_mode: newMode });
+    toast.success(`Modo alterado para ${newMode === "parallel" ? "Paralelo" : "Sequencial"}`);
   };
 
   // Phased execution
