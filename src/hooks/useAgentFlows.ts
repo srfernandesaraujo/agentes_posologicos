@@ -128,6 +128,21 @@ export function useDeleteFlow() {
   });
 }
 
+export function useUpdateFlow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { id: string; execution_mode?: string }) => {
+      const { id, ...updates } = params;
+      const { error } = await supabase.from("agent_flows").update(updates as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["agent-flow", vars.id] });
+      qc.invalidateQueries({ queryKey: ["agent-flows"] });
+    },
+  });
+}
+
 export function useAddFlowNode() {
   const qc = useQueryClient();
   return useMutation({
