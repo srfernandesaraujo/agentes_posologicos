@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
 
     // Ignore messages sent by the bot itself
     if (data.key.fromMe === true) {
+      console.log("[whatsapp-webhook] Skipped: fromMe=true (message sent by this number, not received)");
       return new Response(JSON.stringify({ ok: true, skipped: "fromMe" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -39,6 +40,7 @@ Deno.serve(async (req) => {
     // Ignore group messages
     const remoteJid: string = data.key.remoteJid || "";
     if (remoteJid.endsWith("@g.us")) {
+      console.log("[whatsapp-webhook] Skipped: group message from", remoteJid);
       return new Response(JSON.stringify({ ok: true, skipped: "group" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
