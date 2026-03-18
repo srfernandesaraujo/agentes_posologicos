@@ -1,95 +1,68 @@
 
 
-## Plan: Integração WhatsApp via Evolution API
+## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
 
-### Problema Atual
-O `agent-chat` espera um payload `{ agentId, input, isCustomAgent }` com header `Authorization: Bearer <token>`. A Evolution API envia um payload completamente diferente (formato próprio com `event`, `data.key.remoteJid`, `data.message.conversation`, etc.) e sem nenhum header de autenticação Supabase. Além disso, não existe lógica para enviar a resposta de volta ao WhatsApp.
+### Problema
+Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
 
-### Solução
-Criar uma nova Edge Function dedicada (`whatsapp-webhook`) que atua como ponte entre a Evolution API e o `agent-chat`.
+### Solucao
+Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
 
-### Arquitetura
+### Como vai funcionar (fluxo do usuario)
 
+1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
+2. A fonte e criada com status "pending"
+3. O sistema chama automaticamente a Edge Function para extrair a transcricao
+4. A transcricao e salva no campo `content` e o status muda para "ready"
+5. O agente passa a usar o texto transcrito como contexto
+
+### Etapas de implementacao
+
+**1. Criar Edge Function `youtube-transcript`**
+
+Arquivo: `supabase/functions/youtube-transcript/index.ts`
+
+- Recebe `source_id` e `url` do YouTube
+- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
+- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
+- Extrai a transcrição em português (pt) ou inglês (en) como fallback
+- Limpa tags XML das legendas e formata como texto puro
+- Atualiza o `content` e `status` da fonte no banco usando service role
+- Trunca a 50.000 caracteres se necessário
+- Se nao houver legendas, salva mensagem informativa e marca status como "error"
+
+**2. Registrar funcao no `supabase/config.toml`**
+
+Adicionar:
 ```text
-WhatsApp → Evolution API → whatsapp-webhook → agent-chat → whatsapp-webhook → Evolution API → WhatsApp
-```
-
-### Implementação
-
-**1. Nova Edge Function `supabase/functions/whatsapp-webhook/index.ts`**
-
-- Recebe o payload da Evolution API (sem auth)
-- Detecta o evento `messages.upsert` e extrai:
-  - `data.key.remoteJid` (número do remetente)
-  - `data.message.conversation` ou `data.message.extendedTextMessage.text` (texto da mensagem)
-  - `data.pushName` (nome do contato)
-- Ignora mensagens enviadas pelo próprio bot (`data.key.fromMe === true`) e mensagens de grupo
-- Busca na tabela `whatsapp_connections` qual `agent_id` está vinculado ao webhook, usando o campo `webhook_url` ou um novo campo `instance_name`
-- Chama o `agent-chat` internamente via `fetch` usando a `SUPABASE_SERVICE_ROLE_KEY` como Authorization (já suportado pelo agent-chat como "server call") e passando o `user_id` do dono do agente no body
-- Mantém histórico de conversa por `remoteJid` em uma nova tabela `whatsapp_conversations`
-- Envia a resposta de volta ao WhatsApp via Evolution API usando o endpoint `POST /message/sendText/{instance}`
-
-**2. Nova tabela `whatsapp_conversations`**
-
-Armazena o histórico de mensagens por número do WhatsApp para manter contexto:
-- `id`, `whatsapp_connection_id`, `remote_jid` (número), `role` (user/assistant), `content`, `created_at`
-- Limita a 20 mensagens por conversa (as mais recentes) ao enviar para o agent-chat
-
-**3. Campos adicionais em `whatsapp_connections`**
-
-- `instance_name` — nome da instância na Evolution API (necessário para enviar respostas)
-- `evolution_api_url` — URL base da Evolution API do usuário (ex: `https://api.evolution.com`)
-- `api_key` (encrypted) — API key da Evolution API para autenticar as chamadas de envio
-
-**4. Atualizar `WhatsAppConnect.tsx`**
-
-Adicionar campos para o usuário informar:
-- URL da Evolution API
-- Nome da instância
-- API Key da Evolution API
-- Instruções claras de configuração
-
-**5. Configuração em `supabase/config.toml`**
-
-```toml
-[functions.whatsapp-webhook]
+[functions.youtube-transcript]
 verify_jwt = false
 ```
 
-### Seção Técnica — Payload Evolution API
+**3. Atualizar `KnowledgeDetail.tsx`**
 
-O webhook da Evolution API envia eventos assim:
-```json
-{
-  "event": "messages.upsert",
-  "instance": "minha-instancia",
-  "data": {
-    "key": {
-      "remoteJid": "5511999999999@s.whatsapp.net",
-      "fromMe": false,
-      "id": "..."
-    },
-    "pushName": "João",
-    "message": {
-      "conversation": "Qual o mecanismo de ação do omeprazol?"
-    }
-  }
-}
+Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
+```text
+await supabase.functions.invoke("youtube-transcript", {
+  body: { source_id: newSource.id, url: sourceUrl }
+});
 ```
 
-A resposta é enviada via:
-```
-POST {evolution_api_url}/message/sendText/{instance_name}
-Headers: { "apikey": "...", "Content-Type": "application/json" }
-Body: { "number": "5511999999999", "text": "Resposta do agente..." }
-```
+Mostrar toast informando que a transcrição esta sendo extraída.
 
-### Fluxo Resumido
+**4. Atualizar `DocumentManager.tsx`**
 
-1. Aluno manda mensagem no WhatsApp
-2. Evolution API dispara webhook para `whatsapp-webhook`
-3. A função identifica o agente vinculado, carrega últimas 20 mensagens do histórico
-4. Chama `agent-chat` com o contexto completo
-5. Salva pergunta e resposta no histórico
-6. Envia resposta de volta ao WhatsApp via Evolution API
+Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
+
+### Detalhes tecnicos da extracao
+
+A Edge Function vai:
+1. Fazer fetch da pagina do video YouTube
+2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
+3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
+4. Fazer fetch do XML de legendas
+5. Parsear as tags `<text>` removendo timestamps e tags HTML
+6. Concatenar todo o texto como conteudo limpo
+
+Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
 
