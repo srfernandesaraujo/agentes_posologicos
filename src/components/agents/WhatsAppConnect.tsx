@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Smartphone, Copy, Check } from "lucide-react";
+import { ArrowLeft, Smartphone, Copy, Check, Save, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -16,72 +16,106 @@ interface Props {
 export function WhatsAppConnect({ agentId, agentName, onBack }: Props) {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [webhookUrl, setWebhookUrl] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [instanceName, setInstanceName] = useState("");
+  const [evolutionApiUrl, setEvolutionApiUrl] = useState("");
+  const [evolutionApiKey, setEvolutionApiKey] = useState("");
+  const [isConfigured, setIsConfigured] = useState(false);
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "kmpwowdvljizswkhwhtq";
-  const generatedWebhookUrl = `https://${projectId}.supabase.co/functions/v1/agent-chat`;
+  const webhookUrl = `https://${projectId}.supabase.co/functions/v1/whatsapp-webhook`;
 
-  const handleGenerateWebhook = async () => {
+  // Load existing connection
+  useEffect(() => {
     if (!user) return;
-    setLoading(true);
-    try {
-      // Save/update the whatsapp connection with webhook info
-      const { data: existing } = await supabase
+    (async () => {
+      const { data } = await supabase
         .from("whatsapp_connections" as any)
-        .select("id")
+        .select("id, instance_name, evolution_api_url, status")
         .eq("agent_id", agentId)
         .eq("user_id", user.id)
+        .eq("service_type", "evolution")
         .maybeSingle();
 
-      if (existing) {
+      if (data) {
+        const d = data as any;
+        setConnectionId(d.id);
+        setInstanceName(d.instance_name || "");
+        setEvolutionApiUrl(d.evolution_api_url || "");
+        if (d.instance_name && d.evolution_api_url && d.status === "active") {
+          setIsConfigured(true);
+        }
+      }
+    })();
+  }, [user, agentId]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    if (!instanceName.trim() || !evolutionApiUrl.trim() || !evolutionApiKey.trim()) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Encrypt the API key
+      const { data: encrypted, error: encErr } = await supabase.rpc("encrypt_api_key", {
+        p_key: evolutionApiKey,
+      });
+
+      if (encErr) throw encErr;
+
+      if (connectionId) {
         await supabase
           .from("whatsapp_connections" as any)
           .update({
-            webhook_url: generatedWebhookUrl,
+            instance_name: instanceName.trim(),
+            evolution_api_url: evolutionApiUrl.trim().replace(/\/$/, ""),
+            evolution_api_key_encrypted: encrypted,
+            webhook_url: webhookUrl,
             service_type: "evolution",
             status: "active",
           } as any)
-          .eq("id", (existing as any).id);
+          .eq("id", connectionId);
       } else {
-        await supabase
+        const { data: newConn } = await supabase
           .from("whatsapp_connections" as any)
           .insert({
             user_id: user.id,
             agent_id: agentId,
-            webhook_url: generatedWebhookUrl,
+            instance_name: instanceName.trim(),
+            evolution_api_url: evolutionApiUrl.trim().replace(/\/$/, ""),
+            evolution_api_key_encrypted: encrypted,
+            webhook_url: webhookUrl,
             service_type: "evolution",
             status: "active",
-          } as any);
+          } as any)
+          .select("id")
+          .single();
+
+        if (newConn) setConnectionId((newConn as any).id);
       }
 
-      setWebhookUrl(generatedWebhookUrl);
-      toast.success("Webhook gerado com sucesso!");
-    } catch {
-      toast.error("Erro ao gerar webhook");
+      setIsConfigured(true);
+      setEvolutionApiKey(""); // Clear key from state after saving
+      toast.success("Configuração salva com sucesso!");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Erro ao salvar configuração");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
+    setCopied(label);
     toast.success("Copiado!");
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(null), 2000);
   };
-
-  const payloadExample = JSON.stringify(
-    {
-      agentId: agentId,
-      input: "mensagem do usuário",
-      isCustomAgent: true,
-      isVirtualRoom: false,
-    },
-    null,
-    2
-  );
 
   return (
     <div className="space-y-6">
@@ -95,39 +129,82 @@ export function WhatsAppConnect({ agentId, agentName, onBack }: Props) {
         </div>
         <div>
           <h3 className="text-xl font-bold text-white">WhatsApp via Evolution API</h3>
-          <p className="text-sm text-white/50">Configure o webhook no seu Evolution API para conectar este agente</p>
+          <p className="text-sm text-white/50">
+            Conecte o agente <strong className="text-white">{agentName || "IA"}</strong> ao WhatsApp
+          </p>
         </div>
       </div>
 
-      {!webhookUrl ? (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
-            <h4 className="text-sm font-semibold text-white">Como funciona:</h4>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-white/60">
-              <li>Clique em "Gerar Webhook" para criar a URL do endpoint</li>
-              <li>No painel do Evolution API, configure esta URL como webhook da instância</li>
-              <li>As mensagens recebidas no WhatsApp serão encaminhadas para o agente <strong className="text-white">{agentName || "IA"}</strong></li>
-              <li>O agente processará e responderá automaticamente</li>
-            </ol>
+      {/* Step 1: Configure Evolution API */}
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-4">
+        <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-xs text-primary font-bold">1</span>
+          Configurar Evolution API
+        </h4>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-white/60">URL da Evolution API *</label>
+            <Input
+              placeholder="https://sua-evolution-api.com"
+              value={evolutionApiUrl}
+              onChange={(e) => setEvolutionApiUrl(e.target.value)}
+              className="border-white/10 bg-white/[0.05] text-white text-sm"
+            />
           </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-white/60">Nome da Instância *</label>
+            <Input
+              placeholder="minha-instancia"
+              value={instanceName}
+              onChange={(e) => setInstanceName(e.target.value)}
+              className="border-white/10 bg-white/[0.05] text-white text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-white/60">
+              API Key da Evolution API * {isConfigured && <span className="text-[hsl(142,70%,45%)]">(já salva — preencha apenas para alterar)</span>}
+            </label>
+            <Input
+              type="password"
+              placeholder={isConfigured ? "••••••••••" : "Sua API Key"}
+              value={evolutionApiKey}
+              onChange={(e) => setEvolutionApiKey(e.target.value)}
+              className="border-white/10 bg-white/[0.05] text-white text-sm"
+            />
+          </div>
+
           <Button
-            onClick={handleGenerateWebhook}
-            disabled={loading}
-            className="w-full bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,38%)] text-white border-0 gap-2"
+            onClick={handleSave}
+            disabled={saving || (!evolutionApiKey.trim() && !isConfigured)}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
           >
-            {loading ? (
+            {saving ? (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
             ) : (
-              <Smartphone className="h-4 w-4" />
+              <Save className="h-4 w-4" />
             )}
-            Gerar Webhook
+            {isConfigured ? "Atualizar Configuração" : "Salvar Configuração"}
           </Button>
         </div>
-      ) : (
-        <div className="space-y-5">
-          {/* Webhook URL */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-white/70">URL do Webhook</label>
+      </div>
+
+      {/* Step 2: Webhook URL */}
+      <div className={`rounded-xl border p-5 space-y-3 ${isConfigured ? "border-white/10 bg-white/[0.03]" : "border-white/5 bg-white/[0.01] opacity-50"}`}>
+        <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-xs text-primary font-bold">2</span>
+          Configurar Webhook na Evolution API
+        </h4>
+
+        {isConfigured && (
+          <div className="space-y-3">
+            <p className="text-xs text-white/50">
+              Copie a URL abaixo e cole no campo de <strong>Webhook URL</strong> da sua instância na Evolution API.
+              Marque o evento <code className="bg-white/10 px-1 rounded text-[hsl(142,70%,45%)]">MESSAGES_UPSERT</code>.
+            </p>
+
             <div className="flex items-center gap-2">
               <Input
                 value={webhookUrl}
@@ -137,40 +214,43 @@ export function WhatsAppConnect({ agentId, agentName, onBack }: Props) {
               <Button
                 size="icon"
                 variant="outline"
-                onClick={() => handleCopy(webhookUrl)}
+                onClick={() => handleCopy(webhookUrl, "webhook")}
                 className="shrink-0 border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
               >
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copied === "webhook" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
           </div>
+        )}
+      </div>
 
-          {/* Payload example */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-white/70">Payload de exemplo (POST JSON)</label>
-            <div className="relative">
-              <pre className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-xs text-white/70 font-mono overflow-x-auto">
-                {payloadExample}
-              </pre>
-              <button
-                onClick={() => handleCopy(payloadExample)}
-                className="absolute top-2 right-2 text-white/30 hover:text-white transition-colors"
-              >
-                <Copy className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
+      {/* Step 3: Instructions */}
+      <div className={`rounded-xl border p-5 space-y-3 ${isConfigured ? "border-white/10 bg-white/[0.03]" : "border-white/5 bg-white/[0.01] opacity-50"}`}>
+        <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-xs text-primary font-bold">3</span>
+          Como funciona
+        </h4>
 
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-            <p className="text-xs text-amber-300/80">
-              <strong>Dica:</strong> No Evolution API, configure este webhook como endpoint de mensagens recebidas. 
-              O campo <code className="bg-white/10 px-1 rounded">input</code> deve conter o texto da mensagem do usuário.
+        {isConfigured && (
+          <ol className="list-decimal list-inside space-y-2 text-sm text-white/60">
+            <li>Cole a URL do webhook na configuração da sua instância <strong className="text-white">{instanceName}</strong></li>
+            <li>Marque apenas o evento <code className="bg-white/10 px-1 rounded">MESSAGES_UPSERT</code></li>
+            <li>Quando um aluno enviar uma mensagem no WhatsApp, o agente responderá automaticamente</li>
+            <li>O histórico das últimas 20 mensagens é mantido para contexto</li>
+          </ol>
+        )}
+      </div>
+
+      {/* Status badge */}
+      {isConfigured && (
+        <div className="rounded-xl border border-[hsl(142,70%,45%)]/30 bg-[hsl(142,70%,45%)]/5 p-4 flex items-center gap-3">
+          <div className="h-3 w-3 rounded-full bg-[hsl(142,70%,45%)] animate-pulse" />
+          <div>
+            <p className="text-sm font-medium text-[hsl(142,70%,45%)]">Integração Ativa</p>
+            <p className="text-xs text-white/50">
+              Instância: <strong className="text-white">{instanceName}</strong> • Agente: <strong className="text-white">{agentName || "IA"}</strong>
             </p>
           </div>
-
-          <Button variant="ghost" onClick={() => setWebhookUrl("")} className="text-white/40 hover:text-white hover:bg-white/10">
-            Gerar novo webhook
-          </Button>
         </div>
       )}
     </div>
