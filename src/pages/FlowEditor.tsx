@@ -9,6 +9,7 @@ import {
   useDeleteFlowNode,
   useAddFlowEdge,
   useDeleteFlowEdge,
+  useUpdateFlow,
   AgentFlowNode,
   AgentFlowEdge,
 } from "@/hooks/useAgentFlows";
@@ -20,8 +21,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, Download } from "lucide-react";
+import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, Download, GitBranch, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
@@ -37,6 +39,21 @@ interface FlowStep {
   agent_type: string;
   agent_name: string;
   input_prompt: string;
+  is_synthesizer?: boolean;
+}
+
+interface ParallelLevel {
+  level_index: number;
+  steps: FlowStep[];
+}
+
+interface ParallelLevelResult {
+  level_index: number;
+  results: Array<{
+    agent_name: string;
+    output: string;
+    status: "completed" | "error" | "running";
+  }>;
 }
 
 interface StepResult {
@@ -285,6 +302,11 @@ function FlowNode({
       {node.input_prompt && !connectMode && (
         <span className="text-[10px] text-white/30 max-w-[180px] truncate">{node.input_prompt}</span>
       )}
+      {node.is_synthesizer && !connectMode && (
+        <span className="text-[10px] text-amber-300/80 font-medium flex items-center gap-1">
+          <Sparkles className="h-3 w-3" /> Sintetizador
+        </span>
+      )}
     </div>
   );
 }
@@ -371,6 +393,7 @@ export default function FlowEditor() {
   const deleteNode = useDeleteFlowNode();
   const addEdge = useAddFlowEdge();
   const deleteEdge = useDeleteFlowEdge();
+  const updateFlow = useUpdateFlow();
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [connectMode, setConnectMode] = useState(false);
@@ -392,6 +415,12 @@ export default function FlowEditor() {
   const [sendingChat, setSendingChat] = useState(false);
   const [execFinal, setExecFinal] = useState("");
   const [flowCompleted, setFlowCompleted] = useState(false);
+
+  // Parallel execution state
+  const [parallelLevels, setParallelLevels] = useState<ParallelLevel[]>([]);
+  const [parallelResults, setParallelResults] = useState<ParallelLevelResult[]>([]);
+  const [currentLevelIndex, setCurrentLevelIndex] = useState(-1);
+  const [editSynthesizer, setEditSynthesizer] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ nodeId: string; offsetX: number; offsetY: number } | null>(null);
@@ -536,13 +565,23 @@ export default function FlowEditor() {
   const openConfig = () => {
     if (!selectedNode) return;
     setEditPrompt(selectedNode.input_prompt || "");
+    setEditSynthesizer(selectedNode.is_synthesizer || false);
     setConfigOpen(true);
   };
 
   const saveConfig = async () => {
     if (!selectedNode || !flowId) return;
-    await updateNode.mutateAsync({ id: selectedNode.id, flow_id: flowId, input_prompt: editPrompt });
+    await updateNode.mutateAsync({ id: selectedNode.id, flow_id: flowId, input_prompt: editPrompt, is_synthesizer: editSynthesizer });
     setConfigOpen(false);
+  };
+
+  const isParallelMode = flow?.execution_mode === "parallel";
+
+  const toggleExecutionMode = async () => {
+    if (!flow) return;
+    const newMode = isParallelMode ? "sequential" : "parallel";
+    await updateFlow.mutateAsync({ id: flow.id, execution_mode: newMode });
+    toast.success(`Modo alterado para ${newMode === "parallel" ? "Paralelo" : "Sequencial"}`);
   };
 
   // Phased execution
@@ -555,6 +594,9 @@ export default function FlowEditor() {
     setExecFinal("");
     setExecutionId(null);
     setFlowCompleted(false);
+    setParallelLevels([]);
+    setParallelResults([]);
+    setCurrentLevelIndex(-1);
 
     try {
       const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
@@ -564,13 +606,143 @@ export default function FlowEditor() {
       if (data?.error) throw new Error(data.error);
 
       setExecutionId(data.execution_id);
-      setFlowSteps(data.steps);
 
-      await executeStep(0, data.steps, data.execution_id, execInput);
+      if (data.execution_mode === "parallel" && data.levels) {
+        // Parallel execution
+        const levels: ParallelLevel[] = data.levels.map((level: any[], idx: number) => ({
+          level_index: idx,
+          steps: level,
+        }));
+        setParallelLevels(levels);
+        await executeParallelLevels(levels, data.execution_id, execInput);
+      } else {
+        // Sequential execution
+        setFlowSteps(data.steps);
+        await executeStep(0, data.steps, data.execution_id, execInput);
+      }
     } catch (e: any) {
       toast.error(e.message || "Erro ao iniciar execução");
       setExecuting(false);
     }
+  };
+
+  // Parallel execution: process levels one by one, each level's steps in parallel
+  const executeParallelLevels = async (levels: ParallelLevel[], execId: string, initialInput: string) => {
+    let accumulatedOutputs: Array<{ agent_name: string; output: string }> = [];
+
+    for (let li = 0; li < levels.length; li++) {
+      const level = levels[li];
+      setCurrentLevelIndex(li);
+
+      // Check if this level has a synthesizer
+      const hasSynthesizer = level.steps.some(s => s.is_synthesizer);
+
+      if (hasSynthesizer && accumulatedOutputs.length > 0) {
+        // Synthesizer step
+        const synthStep = level.steps.find(s => s.is_synthesizer) || level.steps[0];
+
+        setParallelResults(prev => [...prev, {
+          level_index: li,
+          results: [{ agent_name: synthStep.agent_name, output: "", status: "running" }],
+        }]);
+
+        try {
+          const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
+            body: {
+              mode: "synthesize",
+              execution_id: execId,
+              node_id: synthStep.node_id,
+              agent_id: synthStep.agent_id,
+              parallel_outputs: accumulatedOutputs,
+              input_text: initialInput,
+              total_levels: levels.length,
+            },
+          });
+
+          if (error) throw error;
+          if (data?.status === "error") throw new Error(data.error || data.output);
+
+          const output = stripFlowSuggestions(data.output);
+          setParallelResults(prev => prev.map(pr =>
+            pr.level_index === li
+              ? { ...pr, results: [{ agent_name: synthStep.agent_name, output, status: "completed" }] }
+              : pr
+          ));
+          accumulatedOutputs = [{ agent_name: synthStep.agent_name, output }];
+        } catch (e: any) {
+          setParallelResults(prev => prev.map(pr =>
+            pr.level_index === li
+              ? { ...pr, results: [{ agent_name: synthStep.agent_name, output: e.message, status: "error" }] }
+              : pr
+          ));
+          toast.error(`Erro no sintetizador: ${e.message}`);
+          setExecuting(false);
+          return;
+        }
+      } else {
+        // Regular parallel level
+        setParallelResults(prev => [...prev, {
+          level_index: li,
+          results: level.steps.map(s => ({ agent_name: s.agent_name, output: "", status: "running" as const })),
+        }]);
+
+        try {
+          const inputForLevel = accumulatedOutputs.length > 0
+            ? accumulatedOutputs.map(o => `[${o.agent_name}]: ${o.output}`).join("\n---\n")
+            : initialInput;
+
+          const { data, error } = await supabase.functions.invoke("agent-flow-execute", {
+            body: {
+              mode: "parallel-step",
+              execution_id: execId,
+              steps: level.steps,
+              input_text: inputForLevel,
+              level_index: li,
+              total_levels: levels.length,
+              all_levels: levels.map(l => l.steps),
+            },
+          });
+
+          if (error) throw error;
+
+          const results = data.results || [];
+          setParallelResults(prev => prev.map(pr =>
+            pr.level_index === li
+              ? { ...pr, results: results.map((r: any) => ({ agent_name: r.agent_name, output: stripFlowSuggestions(r.output), status: r.status })) }
+              : pr
+          ));
+
+          accumulatedOutputs = results
+            .filter((r: any) => r.status === "completed")
+            .map((r: any) => ({ agent_name: r.agent_name, output: r.output }));
+
+          if (results.some((r: any) => r.status === "error")) {
+            toast.error("Alguns agentes falharam neste nível");
+          }
+        } catch (e: any) {
+          setParallelResults(prev => prev.map(pr =>
+            pr.level_index === li
+              ? { ...pr, results: pr.results.map(r => ({ ...r, status: "error" as const, output: e.message })) }
+              : pr
+          ));
+          toast.error(`Erro no nível ${li + 1}: ${e.message}`);
+          setExecuting(false);
+          return;
+        }
+      }
+    }
+
+    // Complete
+    const finalOutput = accumulatedOutputs.map(o => o.output).join("\n\n---\n\n");
+    setExecFinal(finalOutput);
+    setFlowCompleted(true);
+    setExecuting(false);
+    setCurrentLevelIndex(-1);
+
+    await supabase.functions.invoke("agent-flow-execute", {
+      body: { mode: "complete", execution_id: execId, final_output: finalOutput, flow_id: flowId },
+    });
+    toast.success("Fluxo paralelo concluído com sucesso!");
   };
 
   const executeStep = async (
@@ -781,16 +953,30 @@ export default function FlowEditor() {
 
   // PDF export
   const handleExportPdf = () => {
-    if (!flow || stepResults.length === 0) return;
-    exportFlowPdf(
-      flow.name,
-      stepResults.map(r => ({
-        step_index: r.step_index,
-        agent_name: r.agent_name,
-        chatHistory: r.chatHistory.map(m => ({ role: m.role, content: m.content })),
-        output: r.output,
-      }))
-    );
+    if (!flow) return;
+
+    if (parallelResults.length > 0) {
+      // Convert parallel results to step format for PDF
+      const pdfSteps = parallelResults.flatMap((lr, li) =>
+        lr.results.map((r, ri) => ({
+          step_index: li * 100 + ri,
+          agent_name: `[Nível ${li + 1}] ${r.agent_name}`,
+          chatHistory: [{ role: "assistant" as const, content: r.output }],
+          output: r.output,
+        }))
+      );
+      exportFlowPdf(flow.name, pdfSteps);
+    } else if (stepResults.length > 0) {
+      exportFlowPdf(
+        flow.name,
+        stepResults.map(r => ({
+          step_index: r.step_index,
+          agent_name: r.agent_name,
+          chatHistory: r.chatHistory.map(m => ({ role: m.role, content: m.content })),
+          output: r.output,
+        }))
+      );
+    }
     toast.success("PDF gerado com sucesso!");
   };
 
@@ -809,7 +995,20 @@ export default function FlowEditor() {
             {flow.description && <p className="text-xs text-white/40">{flow.description}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Execution Mode Toggle */}
+          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5">
+            <span className="text-xs text-white/50">Sequencial</span>
+            <Switch
+              checked={isParallelMode}
+              onCheckedChange={toggleExecutionMode}
+              className="data-[state=checked]:bg-[hsl(var(--accent))]"
+            />
+            <span className="text-xs text-white/50 flex items-center gap-1">
+              <GitBranch className="h-3 w-3" /> Paralelo
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -864,6 +1063,7 @@ export default function FlowEditor() {
             <Play className="h-4 w-4" />
             Executar
           </Button>
+          </div>
         </div>
       </div>
 
@@ -978,6 +1178,19 @@ export default function FlowEditor() {
               />
               <p className="text-xs text-white/30 mt-1">Esta instrução será adicionada ao contexto do agente durante a execução</p>
             </div>
+            {isParallelMode && (
+              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3">
+                <div>
+                  <label className="text-sm font-medium text-white">Agente Sintetizador</label>
+                  <p className="text-xs text-white/40 mt-0.5">Marca este nó como o consolidador final dos resultados paralelos</p>
+                </div>
+                <Switch
+                  checked={editSynthesizer}
+                  onCheckedChange={setEditSynthesizer}
+                  className="data-[state=checked]:bg-amber-500"
+                />
+              </div>
+            )}
             <Button onClick={saveConfig}>Salvar</Button>
           </div>
         </DialogContent>
@@ -993,9 +1206,19 @@ export default function FlowEditor() {
           <DialogHeader className="px-6 pt-5 pb-3">
             <DialogTitle className="flex items-center gap-2">
               Executar Fluxo
-              {currentStepIndex >= 0 && flowSteps.length > 0 && (
+              {isParallelMode && (
+                <Badge variant="outline" className="text-xs border-amber-400/30 text-amber-300 gap-1">
+                  <GitBranch className="h-3 w-3" /> Paralelo
+                </Badge>
+              )}
+              {currentStepIndex >= 0 && flowSteps.length > 0 && !isParallelMode && (
                 <Badge variant="outline" className="text-xs border-[hsl(var(--accent))]/30 text-[hsl(var(--accent))]">
                   Etapa {currentStepIndex + 1}/{flowSteps.length}
+                </Badge>
+              )}
+              {currentLevelIndex >= 0 && parallelLevels.length > 0 && (
+                <Badge variant="outline" className="text-xs border-[hsl(var(--accent))]/30 text-[hsl(var(--accent))]">
+                  Nível {currentLevelIndex + 1}/{parallelLevels.length}
                 </Badge>
               )}
               {flowCompleted && (
@@ -1009,37 +1232,82 @@ export default function FlowEditor() {
           {/* Sticky Pipeline Indicator */}
           <div className="sticky top-0 z-10 px-6 pb-3 bg-[hsl(220,25%,10%)] border-b border-white/10">
             <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <p className="text-xs text-white/40 mb-2">Pipeline de execução (faseado):</p>
-              <div className="flex flex-wrap items-center gap-1">
-                {(flowSteps.length > 0 ? flowSteps : nodes.sort((a, b) => a.sort_order - b.sort_order).map((n, i) => ({
-                  index: i,
-                  node_id: n.id,
-                  agent_id: n.agent_id,
-                  agent_type: n.agent_type,
-                  agent_name: getAgentInfo(n).name,
-                  input_prompt: n.input_prompt || "",
-                }))).map((step, i) => {
-                  const stepResult = stepResults.find(r => r.step_index === i);
-                  const isActive = currentStepIndex === i;
-                  const isDone = stepResult?.status === "completed";
-                  return (
-                    <div key={step.node_id} className="flex items-center gap-1">
-                      <div className={`flex items-center gap-1 rounded-md px-2 py-1 transition-all ${
-                        isActive ? "bg-[hsl(var(--accent))]/20 ring-1 ring-[hsl(var(--accent))]/40" :
-                        isDone ? "bg-green-500/10" :
-                        "bg-white/10"
-                      }`}>
-                        {stepResult?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
-                        {isDone && <span className="text-green-400 text-xs">✓</span>}
-                        <span className={`text-xs ${isDone ? "text-green-400" : isActive ? "text-[hsl(var(--accent))]" : "text-white/70"}`}>
-                          {step.agent_name}
-                        </span>
+              <p className="text-xs text-white/40 mb-2">
+                Pipeline de execução ({isParallelMode ? "paralelo" : "faseado"}):
+              </p>
+
+              {/* Parallel pipeline indicator */}
+              {isParallelMode && parallelLevels.length > 0 ? (
+                <div className="space-y-2">
+                  {parallelLevels.map((level, li) => {
+                    const levelResult = parallelResults.find(r => r.level_index === li);
+                    const isActive = currentLevelIndex === li;
+                    const allDone = levelResult?.results.every(r => r.status === "completed");
+                    return (
+                      <div key={li} className="flex items-center gap-2">
+                        <span className="text-[10px] text-white/30 w-12 shrink-0">Nível {li + 1}</span>
+                        <div className="flex flex-wrap gap-1">
+                          {level.steps.map((step) => {
+                            const sr = levelResult?.results.find(r => r.agent_name === step.agent_name);
+                            return (
+                              <div key={step.node_id} className={`flex items-center gap-1 rounded-md px-2 py-1 transition-all ${
+                                isActive && sr?.status === "running" ? "bg-[hsl(var(--accent))]/20 ring-1 ring-[hsl(var(--accent))]/40" :
+                                sr?.status === "completed" ? "bg-green-500/10" :
+                                sr?.status === "error" ? "bg-red-500/10" :
+                                "bg-white/10"
+                              }`}>
+                                {sr?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
+                                {sr?.status === "completed" && <span className="text-green-400 text-xs">✓</span>}
+                                {sr?.status === "error" && <span className="text-red-400 text-xs">✗</span>}
+                                {step.is_synthesizer && <Sparkles className="h-3 w-3 text-amber-300" />}
+                                <span className={`text-xs ${
+                                  sr?.status === "completed" ? "text-green-400" :
+                                  sr?.status === "error" ? "text-red-400" :
+                                  isActive ? "text-[hsl(var(--accent))]" : "text-white/70"
+                                }`}>
+                                  {step.agent_name}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {li < parallelLevels.length - 1 && <ChevronRight className="h-3 w-3 text-white/20 shrink-0" />}
                       </div>
-                      {i < (flowSteps.length || nodes.length) - 1 && <ChevronRight className="h-3 w-3 text-white/20" />}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-1">
+                  {(flowSteps.length > 0 ? flowSteps : nodes.sort((a, b) => a.sort_order - b.sort_order).map((n, i) => ({
+                    index: i,
+                    node_id: n.id,
+                    agent_id: n.agent_id,
+                    agent_type: n.agent_type,
+                    agent_name: getAgentInfo(n).name,
+                    input_prompt: n.input_prompt || "",
+                  }))).map((step, i) => {
+                    const stepResult = stepResults.find(r => r.step_index === i);
+                    const isActive = currentStepIndex === i;
+                    const isDone = stepResult?.status === "completed";
+                    return (
+                      <div key={step.node_id} className="flex items-center gap-1">
+                        <div className={`flex items-center gap-1 rounded-md px-2 py-1 transition-all ${
+                          isActive ? "bg-[hsl(var(--accent))]/20 ring-1 ring-[hsl(var(--accent))]/40" :
+                          isDone ? "bg-green-500/10" :
+                          "bg-white/10"
+                        }`}>
+                          {stepResult?.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
+                          {isDone && <span className="text-green-400 text-xs">✓</span>}
+                          <span className={`text-xs ${isDone ? "text-green-400" : isActive ? "text-[hsl(var(--accent))]" : "text-white/70"}`}>
+                            {step.agent_name}
+                          </span>
+                        </div>
+                        {i < (flowSteps.length || nodes.length) - 1 && <ChevronRight className="h-3 w-3 text-white/20" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1047,7 +1315,7 @@ export default function FlowEditor() {
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <div className="space-y-4">
               {/* Initial input */}
-              {stepResults.length === 0 && (
+              {stepResults.length === 0 && parallelResults.length === 0 && (
                 <>
                   <div>
                     <label className="text-sm text-white/60 mb-1 block">Entrada inicial</label>
@@ -1064,6 +1332,54 @@ export default function FlowEditor() {
                     {executing ? "Iniciando..." : "Iniciar Execução"}
                   </Button>
                 </>
+              )}
+
+              {/* Parallel results */}
+              {parallelResults.length > 0 && (
+                <div className="space-y-4">
+                  {parallelResults.map((levelResult) => (
+                    <div key={levelResult.level_index} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs border-white/20 text-white/50">
+                          Nível {levelResult.level_index + 1}
+                        </Badge>
+                        {levelResult.results.length > 1 && (
+                          <span className="text-[10px] text-white/30">{levelResult.results.length} agentes em paralelo</span>
+                        )}
+                      </div>
+                      <div className={levelResult.results.length > 1 ? "grid grid-cols-1 md:grid-cols-2 gap-3" : ""}>
+                        {levelResult.results.map((result, ri) => (
+                          <div key={ri} className={`rounded-lg border p-4 ${
+                            result.status === "error" ? "border-red-500/30 bg-red-500/5" :
+                            result.status === "running" ? "border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5" :
+                            "border-white/10 bg-white/5"
+                          }`}>
+                            <div className="flex items-center gap-2 mb-3">
+                              {result.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-[hsl(var(--accent))]" />}
+                              {result.status === "completed" && <span className="text-green-400 text-xs">✓</span>}
+                              {result.status === "error" && <span className="text-red-400 text-xs">✗</span>}
+                              <span className="text-xs font-medium text-white/70">{result.agent_name}</span>
+                            </div>
+                            {result.output && result.status !== "error" && (
+                              <RenderContent content={result.output} />
+                            )}
+                            {result.status === "running" && !result.output && (
+                              <div className="flex items-center gap-2 py-4 justify-center">
+                                <Loader2 className="h-5 w-5 animate-spin text-[hsl(var(--accent))]" />
+                                <span className="text-sm text-white/40">Processando...</span>
+                              </div>
+                            )}
+                            {result.status === "error" && (
+                              <div className="mt-2 rounded bg-red-500/10 border border-red-500/20 p-2">
+                                <p className="text-xs text-red-400">❌ Erro: {result.output?.slice(0, 300)}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
 
               {/* Step results */}

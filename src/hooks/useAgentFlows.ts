@@ -8,6 +8,7 @@ export interface AgentFlow {
   name: string;
   description: string;
   status: string;
+  execution_mode: string;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +22,7 @@ export interface AgentFlowNode {
   position_y: number;
   sort_order: number;
   input_prompt: string;
+  is_synthesizer: boolean;
   created_at: string;
   // joined
   agent_name?: string;
@@ -126,6 +128,21 @@ export function useDeleteFlow() {
   });
 }
 
+export function useUpdateFlow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { id: string; execution_mode?: string }) => {
+      const { id, ...updates } = params;
+      const { error } = await supabase.from("agent_flows").update(updates as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["agent-flow", vars.id] });
+      qc.invalidateQueries({ queryKey: ["agent-flows"] });
+    },
+  });
+}
+
 export function useAddFlowNode() {
   const qc = useQueryClient();
   return useMutation({
@@ -153,9 +170,9 @@ export function useAddFlowNode() {
 export function useUpdateFlowNode() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { id: string; flow_id: string; position_x?: number; position_y?: number; sort_order?: number; input_prompt?: string }) => {
+    mutationFn: async (params: { id: string; flow_id: string; position_x?: number; position_y?: number; sort_order?: number; input_prompt?: string; is_synthesizer?: boolean }) => {
       const { id, flow_id, ...updates } = params;
-      const { error } = await supabase.from("agent_flow_nodes").update(updates).eq("id", id);
+      const { error } = await supabase.from("agent_flow_nodes").update(updates as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ["flow-nodes", vars.flow_id] }),
