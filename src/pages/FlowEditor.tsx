@@ -981,7 +981,20 @@ export default function FlowEditor() {
             {flow.description && <p className="text-xs text-white/40">{flow.description}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Execution Mode Toggle */}
+          <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5">
+            <span className="text-xs text-white/50">Sequencial</span>
+            <Switch
+              checked={isParallelMode}
+              onCheckedChange={toggleExecutionMode}
+              className="data-[state=checked]:bg-[hsl(var(--accent))]"
+            />
+            <span className="text-xs text-white/50 flex items-center gap-1">
+              <GitBranch className="h-3 w-3" /> Paralelo
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
