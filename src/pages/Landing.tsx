@@ -6,6 +6,7 @@ import { Bot, ArrowRight, Pill, BookOpen, FlaskConical, Video, MessageSquare, Se
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
+import { SalesAgentWidget } from "@/components/sales/SalesAgentWidget";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -260,6 +261,7 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+      <SalesAgentWidget />
     </div>
   );
 }
