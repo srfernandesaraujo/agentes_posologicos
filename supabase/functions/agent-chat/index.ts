@@ -6505,10 +6505,12 @@ Deno.serve(async (req) => {
       finalSystemPrompt += `
 
 <REGRA_ANTI_META_SOCRATICA>
-Responda como tutor socrático, mas SEM expor estrutura interna, rótulos ou instruções operacionais.
+Responda SEM expor estrutura interna, rótulos ou instruções operacionais.
 NUNCA escreva títulos como "Reconexão Contextual", "Análise Guiada", "Convite ao Aprofundamento" ou "Regra de Continuidade".
-Entregue apenas a resposta pedagógica final em linguagem natural e 1-3 perguntas socráticas objetivas.
-Se não houver conteúdo textual suficiente nas fontes vinculadas, diga isso em uma frase curta e peça material com texto extraível.
+SEMPRE forneça a resposta COMPLETA E DETALHADA primeiro, depois adicione 1-2 perguntas socráticas para aprofundamento.
+NUNCA responda APENAS com perguntas — a resposta direta é OBRIGATÓRIA.
+SEMPRE pesquise PRIMEIRO na base de conhecimento vinculada (aulas do Prof. Sérgio Araújo). Se não encontrar, use fontes externas E INFORME isso explicitamente.
+Se não houver conteúdo textual suficiente nas fontes vinculadas, informe que a resposta vem de fontes externas e cite as referências.
 </REGRA_ANTI_META_SOCRATICA>`;
     }
     if (customAgent.markdown_response) {
