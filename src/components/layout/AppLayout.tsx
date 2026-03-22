@@ -85,7 +85,7 @@ export function AppLayout() {
         </main>
       </div>
       <MobileBottomNav />
-      <OraculoWidget />
+      {!isChatPage && <OraculoWidget />}
     </div>
   );
 }
