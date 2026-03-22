@@ -6658,9 +6658,17 @@ ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhe
       const hasProfessorClassSignal = /sergio ara[uú]jo|sérgio ara[uú]jo|aulas do prof|prof\. sérgio/i.test(ragContext);
       const shouldAddExternalFallback = !ragContext || !hasProfessorClassSignal;
 
-      if (shouldAddExternalFallback) {
-        const { context } = await buildPubMedContext(input, "fallback");
-        finalSystemPrompt += context;
+      // Always try OpenFDA for pharmacology data enrichment
+      const [pubmedResult, fdaResult] = await Promise.all([
+        shouldAddExternalFallback ? buildPubMedContext(input, "fallback") : Promise.resolve({ context: "", hasResults: false }),
+        buildOpenFDAContext(input),
+      ]);
+
+      if (pubmedResult.context) {
+        finalSystemPrompt += pubmedResult.context;
+      }
+      if (fdaResult.context) {
+        finalSystemPrompt += fdaResult.context;
       }
     }
 
