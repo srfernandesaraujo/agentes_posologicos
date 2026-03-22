@@ -6524,6 +6524,17 @@ Deno.serve(async (req) => {
     if (ragContext) {
       finalSystemPrompt += ragContext;
     }
+
+    if (isSocraticTutor) {
+      const hasProfessorClassSignal = /sergio ara[uú]jo|sérgio ara[uú]jo|aulas do prof|prof\. sérgio/i.test(ragContext);
+      const shouldAddExternalFallback = !ragContext || !hasProfessorClassSignal;
+
+      if (shouldAddExternalFallback) {
+        const { context } = await buildPubMedContext(input, "fallback");
+        finalSystemPrompt += context;
+      }
+    }
+
     if (isSocraticTutor) {
       finalSystemPrompt += `
 
@@ -6535,6 +6546,8 @@ NUNCA responda APENAS com perguntas — a resposta direta é OBRIGATÓRIA.
 SEMPRE pesquise PRIMEIRO na base de conhecimento vinculada (aulas do Prof. Sérgio Araújo). Se não encontrar, use fontes externas E INFORME isso explicitamente.
 Se não houver conteúdo textual suficiente nas fontes vinculadas, informe que a resposta vem de fontes externas e cite as referências.
 Quando a resposta vier de fonte externa, a seção `**Referências externas utilizadas:**` é obrigatória e deve conter referências específicas, não genéricas.
+Se houver bloco <PUBMED_ARTICLES_CONTEXT>, use-o para montar referências reais com PMID, título, revista, ano e link.
+Se você usar informação externa e omitir a seção `**Referências externas utilizadas:**`, sua resposta estará incorreta.
 </REGRA_ANTI_META_SOCRATICA>`;
     }
     if (customAgent.markdown_response) {
