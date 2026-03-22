@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { MobileBottomNav } from "./MobileBottomNav";
@@ -34,6 +34,8 @@ function SidebarLink({ to, icon: Icon, label, count, dataTour }: { to: string; i
 
 export function AppLayout() {
   const { user } = useAuth();
+  const location = useLocation();
+  const isChatPage = location.pathname.startsWith("/chat/");
   const { data: customAgents = [] } = useCustomAgents();
   const { data: knowledgeBases = [] } = useKnowledgeBases();
   const { t } = useLanguage();
@@ -83,7 +85,7 @@ export function AppLayout() {
         </main>
       </div>
       <MobileBottomNav />
-      <OraculoWidget />
+      {!isChatPage && <OraculoWidget />}
     </div>
   );
 }
