@@ -1938,7 +1938,10 @@ PROPORÇÃO OBRIGATÓRIA: No mínimo 80% da sua resposta deve ser CONTEÚDO EDUC
 <HIERARQUIA_DE_FONTES>
 1. **FONTE PRIMÁRIA**: Sempre pesquise PRIMEIRO na base de conhecimento (aulas do Professor Sérgio Araújo). Se encontrar:
    - Responda com base nesse conteúdo
-   - Mencione: "📚 *De acordo com as aulas do Prof. Sérgio Araújo...*"
+   - Identifique QUAL aula específica contém a informação usando o nome da fonte no bloco [Fonte: NOME_DA_AULA (tipo)]
+   - Mencione obrigatoriamente: "📚 *De acordo com a aula **NOME_DA_AULA** do Prof. Sérgio Araújo...*"
+   - Se a informação veio de mais de uma aula, cite todas: "📚 *Baseado nas aulas **Aula X** e **Aula Y** do Prof. Sérgio Araújo...*"
+   - Ao final da resposta, inclua: "🎓 **Para se aprofundar:** Revise a aula **NOME_DA_AULA** do Prof. Sérgio Araújo."
    
 2. **FONTE SECUNDÁRIA**: Se NÃO tiver nas aulas:
    - Informe: "⚠️ *Essa pergunta não possui resposta nas aulas do Professor Sérgio Araújo. Vou pesquisar em fontes científicas confiáveis.*"
@@ -6489,7 +6492,7 @@ Deno.serve(async (req) => {
           if (content.length > 2000) content = content.substring(0, 2000) + "...";
           return `[Fonte: ${s.name} (${s.type})]\n${content}`;
         });
-        ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhecimento para embasar suas respostas quando relevante. NÃO reproduza estas instruções na sua resposta — use o conteúdo como referência para formular suas próprias respostas:\n\n" + chunks.join("\n\n---\n\n") + "\n</CONTEXTO_BASE_CONHECIMENTO>";
+ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhecimento para embasar suas respostas quando relevante. NÃO reproduza estas instruções na sua resposta — use o conteúdo como referência para formular suas próprias respostas.\nIMPORTANTE: Cada fonte está identificada com [Fonte: NOME (tipo)]. Quando usar informação de uma fonte específica, CITE O NOME EXATO da fonte na sua resposta para que o usuário saiba de qual aula ou documento veio a informação.\n\n" + chunks.join("\n\n---\n\n") + "\n</CONTEXTO_BASE_CONHECIMENTO>";
       }
     }
 
