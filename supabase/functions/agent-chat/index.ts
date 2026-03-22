@@ -29,6 +29,138 @@ Isso se aplica a TODAS as tabelas, sem exceção.
 </REGRA_GLOBAL_FORMATACAO_TABELAS>
 `;
 
+const PUBMED_PT_TO_EN: Record<string, string> = {
+  "efeitos adversos": "adverse effects",
+  "efeitos colaterais": "side effects",
+  "segurança": "safety",
+  "eficácia": "efficacy",
+  "interações medicamentosas": "drug interactions",
+  "reações adversas": "adverse reactions",
+  "mecanismo de ação": "mechanism of action",
+  "farmacocinética": "pharmacokinetics",
+  "farmacodinâmica": "pharmacodynamics",
+  "tratamento": "treatment",
+  "diagnóstico": "diagnosis",
+  "prevenção": "prevention",
+  "revisão sistemática": "systematic review",
+  "meta-análise": "meta-analysis",
+  "ensaio clínico": "clinical trial",
+  "contraindicações": "contraindications",
+  "posologia": "dosage",
+  "toxicidade": "toxicity",
+  "mortalidade": "mortality",
+  "morbidade": "morbidity",
+  "prevalência": "prevalence",
+  "incidência": "incidence",
+  "risco cardiovascular": "cardiovascular risk",
+  "insuficiência renal": "renal insufficiency",
+  "insuficiência hepática": "hepatic insufficiency",
+  "diabetes": "diabetes",
+  "hipertensão": "hypertension",
+  "obesidade": "obesity",
+  "câncer": "cancer",
+  "inflamação": "inflammation",
+  "dor": "pain",
+  "ansiedade": "anxiety",
+  "depressão": "depression",
+  "gravidez": "pregnancy",
+  "idosos": "elderly",
+  "crianças": "children",
+  "pediatria": "pediatrics",
+  "geriatria": "geriatrics",
+};
+
+async function buildPubMedContext(
+  userInput: string,
+  mode: "specialist" | "fallback" = "fallback",
+) {
+  try {
+    let translatedQuery = userInput.toLowerCase();
+
+    for (const [pt, en] of Object.entries(PUBMED_PT_TO_EN)) {
+      translatedQuery = translatedQuery.replace(new RegExp(pt, "gi"), en);
+    }
+
+    translatedQuery = translatedQuery
+      .replace(/\b(da|do|de|das|dos|na|no|nas|nos|em|para|com|por|ao|à|um|uma|uns|umas|o|a|os|as|que|quais|são|é|qual|sobre|entre|como|uso|usar|utilização)\b/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const limitedQuery = translatedQuery.substring(0, 300);
+    const retmax = mode === "specialist" ? 15 : 8;
+    const abstractLimit = mode === "specialist" ? 15000 : 8000;
+
+    const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(limitedQuery)}&retmode=json&retmax=${retmax}&sort=relevance`;
+    console.log(`PubMed ESearch (${mode}):`, esearchUrl);
+
+    const esearchResp = await fetch(esearchUrl);
+    const esearchData = await esearchResp.json();
+    let pmids: string[] = esearchData?.esearchresult?.idlist || [];
+
+    if (pmids.length === 0) {
+      const simplifiedQuery = translatedQuery
+        .split(" ")
+        .filter((word) => word.length > 3)
+        .slice(0, 5)
+        .join(" ");
+
+      const fallbackUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(simplifiedQuery)}&retmode=json&retmax=${retmax}&sort=relevance`;
+      console.log(`PubMed fallback search (${mode}):`, fallbackUrl);
+
+      const fallbackResp = await fetch(fallbackUrl);
+      const fallbackData = await fallbackResp.json();
+      pmids = fallbackData?.esearchresult?.idlist || [];
+    }
+
+    if (pmids.length === 0) {
+      const noResultsContext = mode === "specialist"
+        ? `\n\n<PUBMED_ARTICLES_CONTEXT>\nNenhum artigo encontrado para a busca "${translatedQuery}". Termos originais do usuário: "${userInput}". Informe ao usuário que a busca não retornou resultados e sugira termos em inglês mais específicos para uma nova busca.\n</PUBMED_ARTICLES_CONTEXT>`
+        : `\n\n<PUBMED_ARTICLES_CONTEXT>\nNenhum artigo relevante foi encontrado em tempo real no PubMed para a busca "${translatedQuery}". Se você precisar usar fontes externas, diga explicitamente que a busca em tempo real não retornou resultados suficientes e NÃO invente referências, PMID, DOI, autores, títulos ou links.\n</PUBMED_ARTICLES_CONTEXT>`;
+
+      console.log(`PubMed: no articles found for "${translatedQuery}"`);
+      return { context: noResultsContext, hasResults: false };
+    }
+
+    const esummaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmids.join(",")}&retmode=json`;
+    const esummaryResp = await fetch(esummaryUrl);
+    const esummaryData = await esummaryResp.json();
+
+    const efetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmids.join(",")}&rettype=abstract&retmode=text`;
+    const efetchResp = await fetch(efetchUrl);
+    const abstractsText = await efetchResp.text();
+
+    let pubmedContext = `\n\n<PUBMED_ARTICLES_CONTEXT>\nBusca PubMed em tempo real: "${translatedQuery}"\nTotal de artigos encontrados: ${pmids.length}\n\n`;
+
+    for (const pmid of pmids) {
+      const article = esummaryData?.result?.[pmid];
+      if (!article) continue;
+
+      const authors = (article.authors || []).map((a: any) => a.name).slice(0, 5).join(", ");
+      const authorsStr = article.authors?.length > 5 ? `${authors} et al.` : authors;
+      const pubTypes = (article.pubtype || []).join(", ");
+
+      pubmedContext += `---\nPMID: ${pmid}\nTítulo: ${article.title || "N/A"}\nAutores: ${authorsStr}\nRevista: ${article.fulljournalname || article.source || "N/A"}\nAno: ${(article.pubdate || "").substring(0, 4)}\nTipo de publicação: ${pubTypes || "N/A"}\nDOI: ${article.elocationid || "N/A"}\nLink: https://pubmed.ncbi.nlm.nih.gov/${pmid}/\n\n`;
+    }
+
+    if (abstractsText.length > 100) {
+      pubmedContext += `\n\nRESUMOS COMPLETOS DOS ARTIGOS:\n${abstractsText.substring(0, abstractLimit)}`;
+    }
+
+    pubmedContext += "\n</PUBMED_ARTICLES_CONTEXT>";
+    console.log(`PubMed: found ${pmids.length} articles for query "${translatedQuery}"`);
+
+    return { context: pubmedContext, hasResults: true };
+  } catch (pubmedError) {
+    console.error("PubMed API error:", pubmedError.message);
+
+    const errorContext = mode === "specialist"
+      ? "\n\n<PUBMED_ARTICLES_CONTEXT>\nErro ao consultar PubMed. Responda com base no seu conhecimento e informe que a busca em tempo real falhou temporariamente.\n</PUBMED_ARTICLES_CONTEXT>"
+      : "\n\n<PUBMED_ARTICLES_CONTEXT>\nErro ao consultar PubMed em tempo real. Se você usar fontes externas, informe claramente que a busca automática falhou e NÃO invente referências.\n</PUBMED_ARTICLES_CONTEXT>";
+
+    return { context: errorContext, hasResults: false };
+  }
+}
+
 const AGENT_PROMPTS: Record<string, string> = {
   "interacoes-cardiovascular": `Você é um Co-Piloto de Decisão Clínica em Cardiologia Preventiva e Farmacologia Clínica.
 
