@@ -161,6 +161,132 @@ async function buildPubMedContext(
   }
 }
 
+// ===== OpenFDA Integration =====
+const DRUG_NAME_MAP: Record<string, string> = {
+  "omeprazol": "omeprazole", "losartana": "losartan", "metformina": "metformin",
+  "atenolol": "atenolol", "sinvastatina": "simvastatin", "amoxicilina": "amoxicillin",
+  "dipirona": "metamizole", "paracetamol": "acetaminophen", "ibuprofeno": "ibuprofen",
+  "diclofenaco": "diclofenac", "captopril": "captopril", "enalapril": "enalapril",
+  "hidroclorotiazida": "hydrochlorothiazide", "furosemida": "furosemide",
+  "prednisona": "prednisone", "prednisolona": "prednisolone", "dexametasona": "dexamethasone",
+  "fluoxetina": "fluoxetine", "sertralina": "sertraline", "amitriptilina": "amitriptyline",
+  "carbamazepina": "carbamazepine", "fenitoína": "phenytoin", "diazepam": "diazepam",
+  "clonazepam": "clonazepam", "rivotril": "clonazepam", "warfarina": "warfarin",
+  "clopidogrel": "clopidogrel", "insulina": "insulin", "levotiroxina": "levothyroxine",
+  "ciprofloxacino": "ciprofloxacin", "azitromicina": "azithromycin",
+  "cefalexina": "cephalexin", "metronidazol": "metronidazole",
+  "anlodipino": "amlodipine", "propranolol": "propranolol", "espironolactona": "spironolactone",
+  "ranitidina": "ranitidine", "pantoprazol": "pantoprazole", "esomeprazol": "esomeprazole",
+  "tramadol": "tramadol", "morfina": "morphine", "codeína": "codeine",
+  "haloperidol": "haloperidol", "risperidona": "risperidone", "olanzapina": "olanzapine",
+  "lítio": "lithium", "valproato": "valproic acid", "gabapentina": "gabapentin",
+  "metoclopramida": "metoclopramide", "ondansetrona": "ondansetron",
+  "salbutamol": "albuterol", "formoterol": "formoterol", "montelucaste": "montelukast",
+};
+
+async function buildOpenFDAContext(userInput: string): Promise<{ context: string; hasResults: boolean }> {
+  try {
+    let query = userInput.toLowerCase();
+
+    // Extract drug name from input
+    let drugName = "";
+    for (const [pt, en] of Object.entries(DRUG_NAME_MAP)) {
+      if (query.includes(pt)) {
+        drugName = en;
+        break;
+      }
+    }
+
+    // If no mapped drug found, try to extract a likely drug term
+    if (!drugName) {
+      // Remove common Portuguese stop words and question patterns
+      const cleaned = query
+        .replace(/\b(qual|quais|são|é|o|a|os|as|do|da|dos|das|de|em|para|com|por|que|como|sobre|efeitos?|adversos?|colaterais?|reações?|mecanismo|ação|indicações?|contraindicações?|interações?|medicamentosas?|farmacocinética|farmacodinâmica)\b/gi, " ")
+        .replace(/\s+/g, " ").trim();
+      const words = cleaned.split(" ").filter(w => w.length > 3);
+      if (words.length > 0) {
+        // Use first significant word as potential drug name
+        drugName = words[0];
+      }
+    }
+
+    if (!drugName) {
+      return { context: "", hasResults: false };
+    }
+
+    console.log(`OpenFDA: searching for drug "${drugName}"`);
+
+    // Fetch adverse events
+    const adverseUrl = `https://api.fda.gov/drug/event.json?search=patient.drug.openfda.generic_name:"${encodeURIComponent(drugName)}"&count=patient.reaction.reactionmeddrapt.exact&limit=15`;
+    // Fetch drug labeling info
+    const labelUrl = `https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${encodeURIComponent(drugName)}"&limit=1`;
+
+    const [adverseResp, labelResp] = await Promise.all([
+      fetch(adverseUrl).catch(() => null),
+      fetch(labelUrl).catch(() => null),
+    ]);
+
+    let fdaContext = `\n\n<OPENFDA_CONTEXT>\nDados FDA em tempo real para: ${drugName}\n`;
+    let hasData = false;
+
+    // Parse adverse events
+    if (adverseResp && adverseResp.ok) {
+      const adverseData = await adverseResp.json();
+      const reactions = adverseData?.results || [];
+      if (reactions.length > 0) {
+        hasData = true;
+        fdaContext += `\n**Reações adversas mais reportadas ao FDA (FAERS):**\n`;
+        fdaContext += `| Reação | Nº de Relatos |\n|---|---|\n`;
+        for (const r of reactions.slice(0, 15)) {
+          fdaContext += `| ${r.term} | ${r.count} |\n`;
+        }
+        fdaContext += `\nFonte: FDA Adverse Event Reporting System (FAERS) - https://api.fda.gov\n`;
+      }
+    }
+
+    // Parse labeling
+    if (labelResp && labelResp.ok) {
+      const labelData = await labelResp.json();
+      const label = labelData?.results?.[0];
+      if (label) {
+        hasData = true;
+        const sections: { key: string; title: string }[] = [
+          { key: "indications_and_usage", title: "Indicações (FDA Label)" },
+          { key: "contraindications", title: "Contraindicações (FDA Label)" },
+          { key: "warnings_and_cautions", title: "Advertências (FDA Label)" },
+          { key: "drug_interactions", title: "Interações Medicamentosas (FDA Label)" },
+          { key: "mechanism_of_action", title: "Mecanismo de Ação (FDA Label)" },
+          { key: "pharmacodynamics", title: "Farmacodinâmica (FDA Label)" },
+          { key: "pharmacokinetics", title: "Farmacocinética (FDA Label)" },
+        ];
+
+        for (const sec of sections) {
+          const content = label[sec.key];
+          if (content && Array.isArray(content) && content[0]) {
+            const text = content[0].substring(0, 1500);
+            fdaContext += `\n**${sec.title}:**\n${text}\n`;
+          }
+        }
+        fdaContext += `\nFonte: FDA Drug Labeling (DailyMed/OpenFDA) - https://api.fda.gov\n`;
+      }
+    }
+
+    if (!hasData) {
+      console.log(`OpenFDA: no data found for "${drugName}"`);
+      return { context: "", hasResults: false };
+    }
+
+    fdaContext += `\nIMPORTANTE: Quando usar dados do FDA na resposta, cite explicitamente: "🏥 *Dados do FDA (OpenFDA/FAERS)...*"\n`;
+    fdaContext += `</OPENFDA_CONTEXT>`;
+
+    console.log(`OpenFDA: found data for "${drugName}"`);
+    return { context: fdaContext, hasResults: true };
+  } catch (err) {
+    console.error("OpenFDA API error:", (err as Error).message);
+    return { context: "", hasResults: false };
+  }
+}
+
 const AGENT_PROMPTS: Record<string, string> = {
   "interacoes-cardiovascular": `Você é um Co-Piloto de Decisão Clínica em Cardiologia Preventiva e Farmacologia Clínica.
 
@@ -1949,9 +2075,16 @@ PROPORÇÃO OBRIGATÓRIA: No mínimo 80% da sua resposta deve ser CONTEÚDO EDUC
    - É OBRIGATÓRIO encerrar com a seção **Referências externas utilizadas:**
    - Nessa seção, liste 2 a 5 referências específicas realmente usadas na resposta
    - Para artigos do PubMed, cite no formato: - Autor et al. (Ano). Título. Revista. PMID: XXXXX. Link: https://pubmed.ncbi.nlm.nih.gov/XXXXX/
+   - Para dados do FDA, cite: "🏥 Dados do FDA (OpenFDA/FAERS) — https://api.fda.gov"
    - Para livros/guias, cite edição ou organização responsável quando souber
    - NUNCA diga apenas "fontes confiáveis" sem especificar quais são
    - NUNCA invente referência; se a busca externa falhar, informe isso explicitamente
+
+3. **DADOS FDA (ENRIQUECIMENTO)**: Sempre que houver um bloco <OPENFDA_CONTEXT> disponível:
+   - Use os dados de reações adversas do FAERS para complementar a resposta com dados epidemiológicos reais
+   - Use os dados de bula (FDA Label) para enriquecer mecanismo de ação, farmacocinética, interações e contraindicações
+   - Cite explicitamente: "🏥 *De acordo com dados do FDA (OpenFDA/FAERS)...*"
+   - Esses dados complementam tanto a fonte primária quanto a secundária
 </HIERARQUIA_DE_FONTES>
 
 <ESTRUTURA_RESPOSTA_OBRIGATORIA>
@@ -6532,9 +6665,17 @@ ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhe
       const hasProfessorClassSignal = /sergio ara[uú]jo|sérgio ara[uú]jo|aulas do prof|prof\. sérgio/i.test(ragContext);
       const shouldAddExternalFallback = !ragContext || !hasProfessorClassSignal;
 
-      if (shouldAddExternalFallback) {
-        const { context } = await buildPubMedContext(input, "fallback");
-        finalSystemPrompt += context;
+      // Always try OpenFDA for pharmacology data enrichment
+      const [pubmedResult, fdaResult] = await Promise.all([
+        shouldAddExternalFallback ? buildPubMedContext(input, "fallback") : Promise.resolve({ context: "", hasResults: false }),
+        buildOpenFDAContext(input),
+      ]);
+
+      if (pubmedResult.context) {
+        finalSystemPrompt += pubmedResult.context;
+      }
+      if (fdaResult.context) {
+        finalSystemPrompt += fdaResult.context;
       }
     }
 
