@@ -34,6 +34,8 @@ function SidebarLink({ to, icon: Icon, label, count, dataTour }: { to: string; i
 
 export function AppLayout() {
   const { user } = useAuth();
+  const location = useLocation();
+  const isChatPage = location.pathname.startsWith("/chat/");
   const { data: customAgents = [] } = useCustomAgents();
   const { data: knowledgeBases = [] } = useKnowledgeBases();
   const { t } = useLanguage();
