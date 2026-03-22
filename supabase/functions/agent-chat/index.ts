@@ -2075,9 +2075,16 @@ PROPORÇÃO OBRIGATÓRIA: No mínimo 80% da sua resposta deve ser CONTEÚDO EDUC
    - É OBRIGATÓRIO encerrar com a seção **Referências externas utilizadas:**
    - Nessa seção, liste 2 a 5 referências específicas realmente usadas na resposta
    - Para artigos do PubMed, cite no formato: - Autor et al. (Ano). Título. Revista. PMID: XXXXX. Link: https://pubmed.ncbi.nlm.nih.gov/XXXXX/
+   - Para dados do FDA, cite: "🏥 Dados do FDA (OpenFDA/FAERS) — https://api.fda.gov"
    - Para livros/guias, cite edição ou organização responsável quando souber
    - NUNCA diga apenas "fontes confiáveis" sem especificar quais são
    - NUNCA invente referência; se a busca externa falhar, informe isso explicitamente
+
+3. **DADOS FDA (ENRIQUECIMENTO)**: Sempre que houver um bloco <OPENFDA_CONTEXT> disponível:
+   - Use os dados de reações adversas do FAERS para complementar a resposta com dados epidemiológicos reais
+   - Use os dados de bula (FDA Label) para enriquecer mecanismo de ação, farmacocinética, interações e contraindicações
+   - Cite explicitamente: "🏥 *De acordo com dados do FDA (OpenFDA/FAERS)...*"
+   - Esses dados complementam tanto a fonte primária quanto a secundária
 </HIERARQUIA_DE_FONTES>
 
 <ESTRUTURA_RESPOSTA_OBRIGATORIA>
