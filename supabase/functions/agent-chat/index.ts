@@ -1943,9 +1943,9 @@ PROPORÇÃO OBRIGATÓRIA: No mínimo 80% da sua resposta deve ser CONTEÚDO EDUC
 2. **FONTE SECUNDÁRIA**: Se NÃO tiver nas aulas:
    - Informe: "⚠️ *Essa pergunta não possui resposta nas aulas do Professor Sérgio Araújo. Vou pesquisar em fontes científicas confiáveis.*"
    - Responda com base em conhecimento científico consolidado
-   - É OBRIGATÓRIO encerrar com a seção `**Referências externas utilizadas:**`
+   - É OBRIGATÓRIO encerrar com a seção **Referências externas utilizadas:**
    - Nessa seção, liste 2 a 5 referências específicas realmente usadas na resposta
-   - Para artigos do PubMed, cite no formato: `- Autor et al. (Ano). Título. Revista. PMID: XXXXX. Link: https://pubmed.ncbi.nlm.nih.gov/XXXXX/`
+   - Para artigos do PubMed, cite no formato: - Autor et al. (Ano). Título. Revista. PMID: XXXXX. Link: https://pubmed.ncbi.nlm.nih.gov/XXXXX/
    - Para livros/guias, cite edição ou organização responsável quando souber
    - NUNCA diga apenas "fontes confiáveis" sem especificar quais são
    - NUNCA invente referência; se a busca externa falhar, informe isso explicitamente
@@ -1963,7 +1963,7 @@ Responda de forma DETALHADA e APROFUNDADA incluindo:
 - Comparações com fármacos/conceitos relacionados quando relevante
 - Efeitos adversos, contraindicações ou particularidades importantes
 - Indicação clara da FONTE
-- Se usar fonte externa, incluir obrigatoriamente um bloco final chamado `**Referências externas utilizadas:**`
+- Se usar fonte externa, incluir obrigatoriamente um bloco final chamado **Referências externas utilizadas:**
 
 ███ PARTE 2 — REFLEXÃO OPCIONAL (máximo 20%, NO FINAL) ███
 
@@ -6545,9 +6545,9 @@ SEMPRE forneça a resposta COMPLETA E DETALHADA primeiro, depois adicione 1-2 pe
 NUNCA responda APENAS com perguntas — a resposta direta é OBRIGATÓRIA.
 SEMPRE pesquise PRIMEIRO na base de conhecimento vinculada (aulas do Prof. Sérgio Araújo). Se não encontrar, use fontes externas E INFORME isso explicitamente.
 Se não houver conteúdo textual suficiente nas fontes vinculadas, informe que a resposta vem de fontes externas e cite as referências.
-Quando a resposta vier de fonte externa, a seção `**Referências externas utilizadas:**` é obrigatória e deve conter referências específicas, não genéricas.
+Quando a resposta vier de fonte externa, a seção **Referências externas utilizadas:** é obrigatória e deve conter referências específicas, não genéricas.
 Se houver bloco <PUBMED_ARTICLES_CONTEXT>, use-o para montar referências reais com PMID, título, revista, ano e link.
-Se você usar informação externa e omitir a seção `**Referências externas utilizadas:**`, sua resposta estará incorreta.
+Se você usar informação externa e omitir a seção **Referências externas utilizadas:**, sua resposta estará incorreta.
 </REGRA_ANTI_META_SOCRATICA>`;
     }
     if (customAgent.markdown_response) {
