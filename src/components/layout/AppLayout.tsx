@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { MobileBottomNav } from "./MobileBottomNav";
