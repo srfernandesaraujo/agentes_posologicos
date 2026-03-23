@@ -7059,18 +7059,41 @@ ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhe
       const hasProfessorClassSignal = /sergio ara[uú]jo|sérgio ara[uú]jo|aulas do prof|prof\. sérgio/i.test(ragContext);
       const shouldAddExternalFallback = !ragContext || !hasProfessorClassSignal;
 
-      // Always try OpenFDA for pharmacology data enrichment
-      const [pubmedResult, fdaResult] = await Promise.all([
-        shouldAddExternalFallback ? buildPubMedContext(input, "fallback") : Promise.resolve({ context: "", hasResults: false }),
-        buildOpenFDAContext(input),
-      ]);
+      // Detect query intent for smart source orchestration
+      const intents = detectQueryIntent(input);
+      const selectedSources = selectSourcesForIntents(intents);
+      console.log(`Tutor orchestration - intents: ${intents.join(",")}, sources: ${JSON.stringify(selectedSources)}`);
 
-      if (pubmedResult.context) {
-        finalSystemPrompt += pubmedResult.context;
+      // Build promise array with timeout wrapper
+      const withTimeout = (promise: Promise<any>, ms: number) =>
+        Promise.race([promise, new Promise(resolve => setTimeout(() => resolve({ context: "", hasResults: false }), ms))]);
+
+      const sourcePromises: Promise<{ context: string; hasResults: boolean }>[] = [
+        // PubMed (always if external fallback needed)
+        shouldAddExternalFallback ? withTimeout(buildPubMedContext(input, "fallback"), 5000) : Promise.resolve({ context: "", hasResults: false }),
+        // OpenFDA (always for pharmacology enrichment)
+        withTimeout(buildOpenFDAContext(input), 5000),
+        // New sources - conditionally activated
+        selectedSources.dailymed ? withTimeout(buildDailyMedContext(input), 5000) : Promise.resolve({ context: "", hasResults: false }),
+        selectedSources.chembl ? withTimeout(buildChEMBLContext(input), 5000) : Promise.resolve({ context: "", hasResults: false }),
+        selectedSources.kegg ? withTimeout(buildKEGGContext(input), 5000) : Promise.resolve({ context: "", hasResults: false }),
+        selectedSources.pharmgkb ? withTimeout(buildPharmGKBContext(input), 5000) : Promise.resolve({ context: "", hasResults: false }),
+        selectedSources.clinicaltrials ? withTimeout(buildClinicalTrialsContext(input), 5000) : Promise.resolve({ context: "", hasResults: false }),
+        selectedSources.uniprot ? withTimeout(buildUniProtContext(input), 5000) : Promise.resolve({ context: "", hasResults: false }),
+      ];
+
+      const [pubmedResult, fdaResult, dailymedResult, chemblResult, keggResult, pharmgkbResult, clinicalTrialsResult, uniprotResult] = await Promise.all(sourcePromises);
+
+      // Append all results that have data
+      const allResults = [pubmedResult, fdaResult, dailymedResult, chemblResult, keggResult, pharmgkbResult, clinicalTrialsResult, uniprotResult];
+      for (const result of allResults) {
+        if (result.context) {
+          finalSystemPrompt += result.context;
+        }
       }
-      if (fdaResult.context) {
-        finalSystemPrompt += fdaResult.context;
-      }
+
+      const activeSources = allResults.filter(r => r.hasResults).length;
+      console.log(`Tutor: ${activeSources} external sources returned data`);
     }
 
     if (isSocraticTutor) {
@@ -7083,9 +7106,21 @@ SEMPRE forneça a resposta COMPLETA E DETALHADA primeiro, depois adicione 1-2 pe
 NUNCA responda APENAS com perguntas — a resposta direta é OBRIGATÓRIA.
 SEMPRE pesquise PRIMEIRO na base de conhecimento vinculada (aulas do Prof. Sérgio Araújo). Se não encontrar, use fontes externas E INFORME isso explicitamente.
 Se não houver conteúdo textual suficiente nas fontes vinculadas, informe que a resposta vem de fontes externas e cite as referências.
-Quando a resposta vier de fonte externa, a seção **Referências externas utilizadas:** é obrigatória e deve conter referências específicas, não genéricas.
-Se houver bloco <PUBMED_ARTICLES_CONTEXT>, use-o para montar referências reais com PMID, título, revista, ano e link.
-Se você usar informação externa e omitir a seção **Referências externas utilizadas:**, sua resposta estará incorreta.
+
+FONTES DISPONÍVEIS E PREFIXOS OBRIGATÓRIOS:
+- 📚 Aulas do Prof. Sérgio Araújo — fonte primária (base de conhecimento vinculada)
+- 🔬 PubMed — artigos científicos (cite PMID e link)
+- 🏥 FDA/OpenFDA — dados de segurança e bulas (FAERS)
+- 💊 DailyMed (NLM) — bula FDA oficial completa
+- 🧬 PharmGKB — farmacogenômica (cite PharmGKB ID)
+- ⚗️ ChEMBL — bioatividade e SAR (cite ChEMBL ID)
+- 🗺️ KEGG — vias metabólicas e alvos (cite KEGG ID)
+- 🏥 ClinicalTrials.gov — ensaios clínicos (cite NCT ID)
+- 🎯 UniProt — alvos proteicos (cite UniProt ID)
+
+Quando usar dados de qualquer fonte, USE O PREFIXO CORRESPONDENTE no texto.
+A seção **📖 Referências:** ao final é OBRIGATÓRIA quando fontes externas forem usadas. Liste cada fonte com seu identificador e link.
+Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAILYMED_CONTEXT>, <CHEMBL_CONTEXT>, <KEGG_CONTEXT>, <PHARMGKB_CONTEXT>, <CLINICALTRIALS_CONTEXT>, <UNIPROT_CONTEXT>), use-os para montar referências REAIS — NUNCA invente referências.
 </REGRA_ANTI_META_SOCRATICA>`;
     }
     if (customAgent.markdown_response) {
