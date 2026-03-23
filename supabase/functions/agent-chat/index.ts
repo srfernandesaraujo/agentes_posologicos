@@ -287,6 +287,400 @@ async function buildOpenFDAContext(userInput: string): Promise<{ context: string
   }
 }
 
+// ===== DailyMed Integration (NLM) =====
+async function buildDailyMedContext(userInput: string): Promise<{ context: string; hasResults: boolean }> {
+  try {
+    let drugName = extractDrugName(userInput);
+    if (!drugName) return { context: "", hasResults: false };
+
+    console.log(`DailyMed: searching for "${drugName}"`);
+    const searchUrl = `https://dailymed.nlm.nih.gov/dailymed/services/v2/spls.json?drug_name=${encodeURIComponent(drugName)}&pagesize=1`;
+    const searchResp = await fetch(searchUrl);
+    if (!searchResp.ok) { await searchResp.text(); return { context: "", hasResults: false }; }
+    const searchData = await searchResp.json();
+    const spls = searchData?.data || [];
+    if (spls.length === 0) return { context: "", hasResults: false };
+
+    const setId = spls[0].setid;
+    const detailUrl = `https://dailymed.nlm.nih.gov/dailymed/services/v2/spls/${setId}.json`;
+    const detailResp = await fetch(detailUrl);
+    if (!detailResp.ok) { await detailResp.text(); return { context: "", hasResults: false }; }
+    const detailData = await detailResp.json();
+
+    let ctx = `\n\n<DAILYMED_CONTEXT>\n💊 Dados DailyMed (NLM/FDA) para: ${drugName}\n`;
+    ctx += `Título: ${spls[0].title || "N/A"}\n`;
+    ctx += `SetID: ${setId}\n`;
+    ctx += `Link: https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${setId}\n`;
+
+    // Extract key sections from the XML-based content if available
+    const sections = detailData?.data?.sections || [];
+    const importantSections = ["INDICATIONS & USAGE", "CONTRAINDICATIONS", "WARNINGS", "DRUG INTERACTIONS", 
+      "CLINICAL PHARMACOLOGY", "MECHANISM OF ACTION", "PHARMACOKINETICS", "PHARMACODYNAMICS",
+      "DOSAGE AND ADMINISTRATION", "ADVERSE REACTIONS"];
+    
+    for (const sec of sections) {
+      const title = (sec.title || "").toUpperCase();
+      if (importantSections.some(s => title.includes(s))) {
+        const text = (sec.text || "").replace(/<[^>]*>/g, "").substring(0, 1200);
+        if (text.length > 30) {
+          ctx += `\n**${sec.title}:**\n${text}\n`;
+        }
+      }
+    }
+
+    ctx += `\nFonte: DailyMed (National Library of Medicine) - https://dailymed.nlm.nih.gov\n`;
+    ctx += `</DAILYMED_CONTEXT>`;
+    console.log(`DailyMed: found data for "${drugName}"`);
+    return { context: ctx, hasResults: true };
+  } catch (err) {
+    console.error("DailyMed error:", (err as Error).message);
+    return { context: "", hasResults: false };
+  }
+}
+
+// ===== ChEMBL Integration (EBI) =====
+async function buildChEMBLContext(userInput: string): Promise<{ context: string; hasResults: boolean }> {
+  try {
+    let drugName = extractDrugName(userInput);
+    if (!drugName) return { context: "", hasResults: false };
+
+    console.log(`ChEMBL: searching for "${drugName}"`);
+    const url = `https://www.ebi.ac.uk/chembl/api/data/molecule/search.json?q=${encodeURIComponent(drugName)}&limit=1`;
+    const resp = await fetch(url);
+    if (!resp.ok) { await resp.text(); return { context: "", hasResults: false }; }
+    const data = await resp.json();
+    const molecules = data?.molecules || [];
+    if (molecules.length === 0) return { context: "", hasResults: false };
+
+    const mol = molecules[0];
+    let ctx = `\n\n<CHEMBL_CONTEXT>\n⚗️ Dados ChEMBL (EBI) para: ${drugName}\n`;
+    ctx += `ChEMBL ID: ${mol.molecule_chembl_id || "N/A"}\n`;
+    ctx += `Nome: ${mol.pref_name || "N/A"}\n`;
+    ctx += `Tipo: ${mol.molecule_type || "N/A"}\n`;
+    ctx += `Peso Molecular: ${mol.molecule_properties?.full_mwt || "N/A"}\n`;
+    ctx += `Fórmula: ${mol.molecule_properties?.full_molformula || "N/A"}\n`;
+    ctx += `LogP (ALogP): ${mol.molecule_properties?.alogp || "N/A"}\n`;
+    ctx += `Regra de Lipinski: ${mol.molecule_properties?.num_lipinski_ro5_violations === 0 ? "Aprovado" : `${mol.molecule_properties?.num_lipinski_ro5_violations || "N/A"} violação(ões)`}\n`;
+    ctx += `Biodisponibilidade oral: ${mol.molecule_properties?.ro3_pass === "Y" ? "Favorável" : "N/A"}\n`;
+    ctx += `Fase clínica máxima: ${mol.max_phase || "N/A"}\n`;
+    
+    if (mol.molecule_chembl_id) {
+      // Fetch activity data
+      try {
+        const actUrl = `https://www.ebi.ac.uk/chembl/api/data/activity.json?molecule_chembl_id=${mol.molecule_chembl_id}&limit=10`;
+        const actResp = await fetch(actUrl);
+        if (actResp.ok) {
+          const actData = await actResp.json();
+          const activities = actData?.activities || [];
+          if (activities.length > 0) {
+            ctx += `\n**Dados de Bioatividade:**\n| Alvo | Tipo | Valor | Unidade |\n|---|---|---|---|\n`;
+            for (const act of activities.slice(0, 10)) {
+              ctx += `| ${act.target_pref_name || "N/A"} | ${act.standard_type || "N/A"} | ${act.standard_value || "N/A"} | ${act.standard_units || "N/A"} |\n`;
+            }
+          }
+        } else { await actResp.text(); }
+      } catch (_) { /* ignore activity fetch errors */ }
+    }
+
+    ctx += `\nFonte: ChEMBL (European Bioinformatics Institute) - https://www.ebi.ac.uk/chembl/\n`;
+    ctx += `Link: https://www.ebi.ac.uk/chembl/compound_report_card/${mol.molecule_chembl_id}/\n`;
+    ctx += `</CHEMBL_CONTEXT>`;
+    console.log(`ChEMBL: found data for "${drugName}"`);
+    return { context: ctx, hasResults: true };
+  } catch (err) {
+    console.error("ChEMBL error:", (err as Error).message);
+    return { context: "", hasResults: false };
+  }
+}
+
+// ===== KEGG Integration =====
+async function buildKEGGContext(userInput: string): Promise<{ context: string; hasResults: boolean }> {
+  try {
+    let drugName = extractDrugName(userInput);
+    if (!drugName) return { context: "", hasResults: false };
+
+    console.log(`KEGG: searching for "${drugName}"`);
+    const findUrl = `https://rest.kegg.jp/find/drug/${encodeURIComponent(drugName)}`;
+    const findResp = await fetch(findUrl);
+    if (!findResp.ok) { await findResp.text(); return { context: "", hasResults: false }; }
+    const findText = await findResp.text();
+    const lines = findText.trim().split("\n").filter(l => l.length > 0);
+    if (lines.length === 0) return { context: "", hasResults: false };
+
+    const drugId = lines[0].split("\t")[0]; // e.g., "dr:D00106"
+    const keggId = drugId.replace("dr:", "");
+
+    const getUrl = `https://rest.kegg.jp/get/${keggId}`;
+    const getResp = await fetch(getUrl);
+    if (!getResp.ok) { await getResp.text(); return { context: "", hasResults: false }; }
+    const drugData = await getResp.text();
+
+    let ctx = `\n\n<KEGG_CONTEXT>\n🗺️ Dados KEGG para: ${drugName}\n`;
+    ctx += `KEGG Drug ID: ${keggId}\n`;
+    ctx += `Link: https://www.kegg.jp/entry/${keggId}\n\n`;
+
+    // Parse key fields from KEGG flat file format
+    const keggSections = ["NAME", "FORMULA", "EXACT_MASS", "MOL_WEIGHT", "TARGET", "METABOLISM", "INTERACTION", "PATHWAY", "PRODUCT", "EFFICACY", "DISEASE"];
+    let currentSection = "";
+    let sectionContent: Record<string, string> = {};
+
+    for (const line of drugData.split("\n")) {
+      const sectionMatch = line.match(/^([A-Z_]+)\s+(.*)/);
+      if (sectionMatch && keggSections.includes(sectionMatch[1])) {
+        currentSection = sectionMatch[1];
+        sectionContent[currentSection] = sectionMatch[2];
+      } else if (currentSection && line.startsWith("            ")) {
+        sectionContent[currentSection] += " " + line.trim();
+      }
+    }
+
+    for (const [key, value] of Object.entries(sectionContent)) {
+      if (value && value.length > 2) {
+        ctx += `**${key}:** ${value.substring(0, 800)}\n\n`;
+      }
+    }
+
+    ctx += `\nFonte: KEGG DRUG Database - https://www.kegg.jp\n`;
+    ctx += `</KEGG_CONTEXT>`;
+    console.log(`KEGG: found data for "${drugName}"`);
+    return { context: ctx, hasResults: true };
+  } catch (err) {
+    console.error("KEGG error:", (err as Error).message);
+    return { context: "", hasResults: false };
+  }
+}
+
+// ===== PharmGKB Integration =====
+async function buildPharmGKBContext(userInput: string): Promise<{ context: string; hasResults: boolean }> {
+  try {
+    let drugName = extractDrugName(userInput);
+    if (!drugName) return { context: "", hasResults: false };
+
+    console.log(`PharmGKB: searching for "${drugName}"`);
+    const url = `https://api.pharmgkb.org/v1/data/chemical?name=${encodeURIComponent(drugName)}&view=max`;
+    const resp = await fetch(url);
+    if (!resp.ok) { await resp.text(); return { context: "", hasResults: false }; }
+    const data = await resp.json();
+    const chemicals = data?.data || [];
+    if (chemicals.length === 0) return { context: "", hasResults: false };
+
+    const chem = chemicals[0];
+    let ctx = `\n\n<PHARMGKB_CONTEXT>\n🧬 Dados PharmGKB (Farmacogenômica) para: ${drugName}\n`;
+    ctx += `PharmGKB ID: ${chem.id || "N/A"}\n`;
+    ctx += `Nome: ${chem.name || "N/A"}\n`;
+    ctx += `Link: https://www.pharmgkb.org/chemical/${chem.id}\n`;
+
+    if (chem.summaryMarkdown) {
+      ctx += `\n**Resumo:**\n${chem.summaryMarkdown.substring(0, 2000)}\n`;
+    }
+
+    // Clinical annotations
+    if (chem.clinicalAnnotations && chem.clinicalAnnotations.length > 0) {
+      ctx += `\n**Anotações Clínicas Farmacogenômicas:**\n`;
+      for (const ann of chem.clinicalAnnotations.slice(0, 5)) {
+        ctx += `- Gene: ${ann.gene || "N/A"} | Variante: ${ann.variant || "N/A"} | Nível de Evidência: ${ann.levelOfEvidence || "N/A"}\n`;
+        if (ann.summary) ctx += `  ${ann.summary.substring(0, 300)}\n`;
+      }
+    }
+
+    // Guidelines
+    if (chem.guidelines && chem.guidelines.length > 0) {
+      ctx += `\n**Guidelines de Dosagem (CPIC/DPWG):**\n`;
+      for (const g of chem.guidelines.slice(0, 3)) {
+        ctx += `- ${g.name || g.source || "Guideline"}: ${g.summaryMarkdown?.substring(0, 500) || "Ver link"}\n`;
+      }
+    }
+
+    ctx += `\nFonte: PharmGKB (Stanford University) - https://www.pharmgkb.org\n`;
+    ctx += `</PHARMGKB_CONTEXT>`;
+    console.log(`PharmGKB: found data for "${drugName}"`);
+    return { context: ctx, hasResults: true };
+  } catch (err) {
+    console.error("PharmGKB error:", (err as Error).message);
+    return { context: "", hasResults: false };
+  }
+}
+
+// ===== ClinicalTrials.gov Integration =====
+async function buildClinicalTrialsContext(userInput: string): Promise<{ context: string; hasResults: boolean }> {
+  try {
+    let drugName = extractDrugName(userInput);
+    if (!drugName) return { context: "", hasResults: false };
+
+    console.log(`ClinicalTrials: searching for "${drugName}"`);
+    const url = `https://clinicaltrials.gov/api/v2/studies?query.term=${encodeURIComponent(drugName)}&pageSize=5&sort=LastUpdatePostDate:desc`;
+    const resp = await fetch(url);
+    if (!resp.ok) { await resp.text(); return { context: "", hasResults: false }; }
+    const data = await resp.json();
+    const studies = data?.studies || [];
+    if (studies.length === 0) return { context: "", hasResults: false };
+
+    let ctx = `\n\n<CLINICALTRIALS_CONTEXT>\n🏥 Ensaios Clínicos (ClinicalTrials.gov) para: ${drugName}\n`;
+    ctx += `Total de estudos encontrados: ${data?.totalCount || studies.length}\n\n`;
+
+    for (const study of studies) {
+      const proto = study.protocolSection || {};
+      const id = proto.identificationModule || {};
+      const status = proto.statusModule || {};
+      const design = proto.designModule || {};
+      const desc = proto.descriptionModule || {};
+
+      ctx += `---\n`;
+      ctx += `NCT ID: ${id.nctId || "N/A"}\n`;
+      ctx += `Título: ${id.briefTitle || "N/A"}\n`;
+      ctx += `Status: ${status.overallStatus || "N/A"}\n`;
+      ctx += `Fase: ${(design.phases || []).join(", ") || "N/A"}\n`;
+      ctx += `Descrição: ${(desc.briefSummary || "").substring(0, 500)}\n`;
+      ctx += `Link: https://clinicaltrials.gov/study/${id.nctId}\n\n`;
+    }
+
+    ctx += `Fonte: ClinicalTrials.gov (U.S. National Library of Medicine)\n`;
+    ctx += `</CLINICALTRIALS_CONTEXT>`;
+    console.log(`ClinicalTrials: found ${studies.length} studies for "${drugName}"`);
+    return { context: ctx, hasResults: true };
+  } catch (err) {
+    console.error("ClinicalTrials error:", (err as Error).message);
+    return { context: "", hasResults: false };
+  }
+}
+
+// ===== UniProt Integration =====
+async function buildUniProtContext(userInput: string): Promise<{ context: string; hasResults: boolean }> {
+  try {
+    let drugName = extractDrugName(userInput);
+    if (!drugName) return { context: "", hasResults: false };
+
+    console.log(`UniProt: searching for "${drugName}"`);
+    const url = `https://rest.uniprot.org/uniprotkb/search?query=${encodeURIComponent(drugName)}+AND+organism_id:9606&format=json&size=3`;
+    const resp = await fetch(url, { headers: { "Accept": "application/json" } });
+    if (!resp.ok) { await resp.text(); return { context: "", hasResults: false }; }
+    const data = await resp.json();
+    const results = data?.results || [];
+    if (results.length === 0) return { context: "", hasResults: false };
+
+    let ctx = `\n\n<UNIPROT_CONTEXT>\n🎯 Alvos Proteicos (UniProt) relacionados a: ${drugName}\n\n`;
+
+    for (const protein of results) {
+      const name = protein.proteinDescription?.recommendedName?.fullName?.value || "N/A";
+      const gene = (protein.genes || []).map((g: any) => g.geneName?.value).filter(Boolean).join(", ") || "N/A";
+      const accession = protein.primaryAccession || "N/A";
+      const func = (protein.comments || []).find((c: any) => c.commentType === "FUNCTION");
+      const subcell = (protein.comments || []).find((c: any) => c.commentType === "SUBCELLULAR LOCATION");
+
+      ctx += `---\n`;
+      ctx += `Proteína: ${name}\n`;
+      ctx += `Gene: ${gene}\n`;
+      ctx += `UniProt ID: ${accession}\n`;
+      ctx += `Link: https://www.uniprot.org/uniprot/${accession}\n`;
+      if (func?.texts?.[0]?.value) {
+        ctx += `Função: ${func.texts[0].value.substring(0, 600)}\n`;
+      }
+      if (subcell?.subcellularLocations) {
+        const locs = subcell.subcellularLocations.map((l: any) => l.location?.value).filter(Boolean).join(", ");
+        ctx += `Localização: ${locs}\n`;
+      }
+      ctx += `\n`;
+    }
+
+    ctx += `Fonte: UniProt (Swiss-Prot/TrEMBL) - https://www.uniprot.org\n`;
+    ctx += `</UNIPROT_CONTEXT>`;
+    console.log(`UniProt: found ${results.length} proteins for "${drugName}"`);
+    return { context: ctx, hasResults: true };
+  } catch (err) {
+    console.error("UniProt error:", (err as Error).message);
+    return { context: "", hasResults: false };
+  }
+}
+
+// ===== Helper: extract drug name from user input =====
+function extractDrugName(userInput: string): string {
+  const query = userInput.toLowerCase();
+  for (const [pt, en] of Object.entries(DRUG_NAME_MAP)) {
+    if (query.includes(pt)) return en;
+  }
+  // Fallback: try to extract a significant word
+  const cleaned = query
+    .replace(/\b(qual|quais|são|é|o|a|os|as|do|da|dos|das|de|em|para|com|por|que|como|sobre|efeitos?|adversos?|colaterais?|reações?|mecanismo|ação|indicações?|contraindicações?|interações?|medicamentosas?|farmacocinética|farmacodinâmica|farmacogenômica|farmacogenética|alvo|molecular|proteína|enzima|receptor|via|metabólica|bioatividade|ensaio|clínico|evidência)\b/gi, " ")
+    .replace(/\s+/g, " ").trim();
+  const words = cleaned.split(" ").filter(w => w.length > 3);
+  return words.length > 0 ? words[0] : "";
+}
+
+// ===== Smart Source Orchestration for Tutor =====
+function detectQueryIntent(userInput: string): string[] {
+  const q = userInput.toLowerCase();
+  const intents: string[] = [];
+
+  // Mechanism of action
+  if (/mecanismo|ação|funciona|atua|receptor|alvo|pathway|via de sinalização|sinalização/i.test(q)) {
+    intents.push("mechanism");
+  }
+  // Adverse effects
+  if (/efeito|adverso|colateral|reação|toxicidade|segurança|risco/i.test(q)) {
+    intents.push("adverse");
+  }
+  // Drug interactions
+  if (/interaç|interage|associaç|combina|junto com|cyp|metabolismo|enzima/i.test(q)) {
+    intents.push("interactions");
+  }
+  // Pharmacogenomics
+  if (/farmacogenôm|farmacogenét|genétic|polimorfismo|cyp2d6|cyp2c19|cyp3a4|variante|genótipo|metabolizador/i.test(q)) {
+    intents.push("pharmacogenomics");
+  }
+  // Clinical evidence
+  if (/ensaio|clínico|estudo|evidência|pesquisa|trial|comparaç|eficácia|efetividade/i.test(q)) {
+    intents.push("clinical_evidence");
+  }
+  // Molecular target
+  if (/alvo|proteína|receptor|ligante|afinidade|seletividade|ic50|ki\b|ec50|bioatividade/i.test(q)) {
+    intents.push("molecular_target");
+  }
+  // Pharmacokinetics
+  if (/farmacocinética|absorção|distribuição|metabolismo|excreção|meia.vida|biodisponibilidade|pk\b/i.test(q)) {
+    intents.push("pharmacokinetics");
+  }
+
+  // If no specific intent detected, use general set
+  if (intents.length === 0) intents.push("general");
+
+  return intents;
+}
+
+function selectSourcesForIntents(intents: string[]): { dailymed: boolean; chembl: boolean; kegg: boolean; pharmgkb: boolean; clinicaltrials: boolean; uniprot: boolean } {
+  const sources = { dailymed: false, chembl: false, kegg: false, pharmgkb: false, clinicaltrials: false, uniprot: false };
+
+  for (const intent of intents) {
+    switch (intent) {
+      case "mechanism":
+        sources.dailymed = true; sources.kegg = true; sources.chembl = true;
+        break;
+      case "adverse":
+        sources.dailymed = true;
+        break;
+      case "interactions":
+        sources.dailymed = true; sources.kegg = true; sources.pharmgkb = true;
+        break;
+      case "pharmacogenomics":
+        sources.pharmgkb = true;
+        break;
+      case "clinical_evidence":
+        sources.clinicaltrials = true;
+        break;
+      case "molecular_target":
+        sources.uniprot = true; sources.chembl = true;
+        break;
+      case "pharmacokinetics":
+        sources.dailymed = true; sources.kegg = true;
+        break;
+      case "general":
+        sources.dailymed = true; sources.kegg = true;
+        break;
+    }
+  }
+
+  return sources;
+}
+
 const AGENT_PROMPTS: Record<string, string> = {
   "interacoes-cardiovascular": `Você é um Co-Piloto de Decisão Clínica em Cardiologia Preventiva e Farmacologia Clínica.
 
