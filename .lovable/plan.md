@@ -1,68 +1,98 @@
 
 
-## Extrair Transcrição Automática do YouTube para Fontes de Conhecimento
+# Plano: Superfontes para o Tutor de Farmacologia
 
-### Problema
-Quando o usuario adiciona uma URL do YouTube como fonte de conhecimento, o sistema salva apenas a URL sem extrair o conteudo textual. O agente nao consegue usar essa fonte porque o campo `content` fica vazio.
+## Fontes de Alto Impacto com APIs Abertas
 
-### Solucao
-Criar uma Edge Function `youtube-transcript` que extrai a transcrição automática (legendas) do YouTube e salva como conteudo textual da fonte. Apos a criacao da fonte, o frontend chama automaticamente essa funcao para processar o video.
+| Fonte | O que traz | API |
+|-------|-----------|-----|
+| **DrugBank** (via DailyMed) | Bulas completas FDA, mecanismos, farmacocinética, interações | REST gratuita (NLM) |
+| **KEGG DRUG/Pathway** | Vias metabólicas, alvos moleculares, mapas de sinalização | REST gratuita |
+| **ChEMBL (EBI)** | Dados de bioatividade, IC50, afinidade por receptores, SAR | REST gratuita |
+| **PharmGKB** | Farmacogenômica — variantes genéticas que alteram resposta a fármacos | REST gratuita |
+| **ClinicalTrials.gov** | Ensaios clínicos ativos/concluídos, evidência translacional | REST v2 gratuita |
+| **Cochrane/PubMed Systematic Reviews** | Meta-análises e revisões sistemáticas filtradas | Via PubMed (já integrado) |
+| **WHO ICD/ATC** | Classificação ATC completa com DDD (doses diárias definidas) | Dados estáticos |
+| **UniProt** | Proteínas-alvo dos fármacos, estrutura, função | REST gratuita |
 
-### Como vai funcionar (fluxo do usuario)
+## Impacto por Fonte
 
-1. Usuario adiciona uma URL do YouTube como fonte de conhecimento
-2. A fonte e criada com status "pending"
-3. O sistema chama automaticamente a Edge Function para extrair a transcricao
-4. A transcricao e salva no campo `content` e o status muda para "ready"
-5. O agente passa a usar o texto transcrito como contexto
-
-### Etapas de implementacao
-
-**1. Criar Edge Function `youtube-transcript`**
-
-Arquivo: `supabase/functions/youtube-transcript/index.ts`
-
-- Recebe `source_id` e `url` do YouTube
-- Extrai o `video_id` da URL (suporta formatos youtube.com/watch?v=, youtu.be/, etc.)
-- Busca a pagina do video para encontrar os dados de legendas disponíveis (captions/timedtext)
-- Extrai a transcrição em português (pt) ou inglês (en) como fallback
-- Limpa tags XML das legendas e formata como texto puro
-- Atualiza o `content` e `status` da fonte no banco usando service role
-- Trunca a 50.000 caracteres se necessário
-- Se nao houver legendas, salva mensagem informativa e marca status como "error"
-
-**2. Registrar funcao no `supabase/config.toml`**
-
-Adicionar:
 ```text
-[functions.youtube-transcript]
-verify_jwt = false
+Nível de "superpoder":
+
+DrugBank/DailyMed  ████████████ Bulas + interações + PK completa
+KEGG Pathway       ██████████   Visualização de vias metabólicas
+ChEMBL             █████████    Dados quantitativos de bioatividade
+PharmGKB           █████████    Farmacogenômica (medicina personalizada)
+ClinicalTrials.gov ████████     Evidência clínica em tempo real
+UniProt            ███████      Alvos moleculares detalhados
 ```
 
-**3. Atualizar `KnowledgeDetail.tsx`**
+## Implementação
 
-Apos criar uma fonte do tipo "youtube", chamar automaticamente a Edge Function:
+### 1. Novas funções de busca no `agent-chat`
+
+Adicionar ao `agent-chat/index.ts` funções análogas às já existentes (`buildPubMedContext`, `buildOpenFDAContext`):
+
+- **`buildDailyMedContext(drug)`** — Consulta `https://dailymed.nlm.nih.gov/dailymed/services/v2/spls.json?drug_name=X` para obter bulas FDA completas com mecanismo de ação, farmacocinética, contraindicações e interações
+- **`buildChEMBLContext(drug)`** — Consulta `https://www.ebi.ac.uk/chembl/api/data/molecule/search?q=X` para dados de bioatividade (IC50, Ki, EC50), alvos moleculares e relação estrutura-atividade
+- **`buildKEGGContext(drug)`** — Consulta `https://rest.kegg.jp/find/drug/X` e `https://rest.kegg.jp/get/DXXXXX` para vias metabólicas, enzimas CYP envolvidas e mapas de pathway
+- **`buildPharmGKBContext(drug)`** — Consulta `https://api.pharmgkb.org/v1/data/chemical?name=X` para variantes farmacogenômicas, recomendações de dosagem baseadas em genótipo e guidelines CPIC
+- **`buildClinicalTrialsContext(drug)`** — Consulta `https://clinicaltrials.gov/api/v2/studies?query.term=X&filter.overallStatus=RECRUITING` para ensaios clínicos relevantes em andamento
+- **`buildUniProtContext(target)`** — Consulta `https://rest.uniprot.org/uniprotkb/search?query=X+AND+organism_id:9606` para detalhes dos alvos proteicos (função, localização, estrutura)
+
+### 2. Orquestração inteligente no `agent-chat`
+
+Em vez de chamar todas as fontes sempre (seria lento e caro), implementar detecção de contexto:
+
+- **Pergunta sobre mecanismo de ação** → PubMed + DailyMed + KEGG + ChEMBL
+- **Pergunta sobre efeitos adversos** → OpenFDA + DailyMed + PubMed
+- **Pergunta sobre interações** → DailyMed + KEGG (enzimas CYP) + PharmGKB
+- **Pergunta sobre farmacogenômica** → PharmGKB + PubMed
+- **Pergunta sobre evidência clínica** → PubMed (filtro systematic review) + ClinicalTrials.gov
+- **Pergunta sobre alvo molecular** → UniProt + ChEMBL + KEGG Pathway
+
+Usar keywords no input do usuário para ativar seletivamente cada fonte via `Promise.all` (paralelo).
+
+### 3. Atualização do prompt do tutor
+
+Expandir a seção de fontes e prefixos de citação:
+
+- `📚 Aulas do Prof. Sérgio Araújo` — fonte primária (já existe)
+- `🔬 PubMed` — artigos científicos (já existe)
+- `🏥 FDA/OpenFDA` — dados de segurança (já existe)
+- `💊 DailyMed (NLM)` — bula FDA oficial
+- `🧬 PharmGKB` — farmacogenômica
+- `⚗️ ChEMBL` — bioatividade e SAR
+- `🗺️ KEGG` — vias metabólicas
+- `🏥 ClinicalTrials.gov` — ensaios clínicos
+- `🎯 UniProt` — alvos proteicos
+
+### 4. Formato de resposta enriquecido
+
+O tutor passará a estruturar respostas complexas em seções quando múltiplas fontes forem consultadas:
+
 ```text
-await supabase.functions.invoke("youtube-transcript", {
-  body: { source_id: newSource.id, url: sourceUrl }
-});
+📚 Base do Prof. Sérgio Araújo: [conteúdo da aula]
+🎓 Para aprofundar: Aula "Farmacologia dos IBPs"
+
+💊 Dados complementares (DailyMed): [farmacocinética detalhada]
+🧬 Farmacogenômica (PharmGKB): [variantes CYP2C19]
+⚗️ Bioatividade (ChEMBL): [IC50, seletividade]
+
+📖 Referências:
+- PubMed: PMID 12345678
+- PharmGKB: PA12345
+- ClinicalTrials: NCT01234567
 ```
 
-Mostrar toast informando que a transcrição esta sendo extraída.
+## Arquivos Modificados
 
-**4. Atualizar `DocumentManager.tsx`**
+- `supabase/functions/agent-chat/index.ts` — novas funções de busca + orquestração inteligente + prompt atualizado
 
-Aplicar a mesma logica quando uma fonte YouTube e adicionada via gerenciador de documentos do agente, chamando a Edge Function apos a criacao.
+## Observações
 
-### Detalhes tecnicos da extracao
-
-A Edge Function vai:
-1. Fazer fetch da pagina do video YouTube
-2. Extrair o JSON `ytInitialPlayerResponse` que contem os dados de captions
-3. Buscar a URL da track de legendas automaticas (ASR) ou manuais
-4. Fazer fetch do XML de legendas
-5. Parsear as tags `<text>` removendo timestamps e tags HTML
-6. Concatenar todo o texto como conteudo limpo
-
-Fallback: se a API interna do YouTube nao retornar legendas, a funcao marca a fonte com status "error" e conteudo explicativo.
+- Todas as APIs listadas são **gratuitas e abertas** — não requerem API keys
+- O mapeamento PT→EN de termos farmacológicos já existente será reutilizado e expandido
+- O tempo de resposta será controlado com `Promise.race` (timeout de 5s por fonte) para não degradar a experiência
 
