@@ -697,6 +697,7 @@ export default function FlowEditor() {
               execution_id: execId,
               steps: level.steps,
               input_text: inputForLevel,
+              initial_input: initialInput,
               level_index: li,
               total_levels: levels.length,
               all_levels: levels.map(l => l.steps),
@@ -745,6 +746,8 @@ export default function FlowEditor() {
     toast.success("Fluxo paralelo concluído com sucesso!");
   };
 
+  const initialInputRef = useRef<string>("");
+
   const executeStep = async (
     stepIndex: number,
     steps: FlowStep[],
@@ -752,6 +755,10 @@ export default function FlowEditor() {
     inputText: string,
     history: Array<{ role: "user" | "assistant"; content: string }> = []
   ) => {
+    // Store initial input on first step
+    if (stepIndex === 0) {
+      initialInputRef.current = inputText;
+    }
     if (stepIndex >= steps.length) {
       // All steps done
       const lastResult = stepResults[stepResults.length - 1] || null;
@@ -799,6 +806,7 @@ export default function FlowEditor() {
           node_id: step.node_id,
           agent_id: step.agent_id,
           input_text: contextMessage,
+          initial_input: initialInputRef.current,
           conversation_history: history,
           previous_stage_output: previousStageOutput,
           stage_number: stepIndex + 1,
@@ -887,6 +895,7 @@ export default function FlowEditor() {
           node_id: step.node_id,
           agent_id: step.agent_id,
           input_text: userMessage,
+          initial_input: initialInputRef.current,
           conversation_history: priorHistory,
           previous_stage_output: previousStageOutput,
           stage_number: stepIndex + 1,

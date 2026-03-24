@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     // ========== MODE: PARALLEL-STEP ==========
     // Executes multiple nodes in parallel (same level)
     if (mode === "parallel-step") {
-      const { execution_id, steps: parallelSteps, input_text, level_index, total_levels, all_levels } = body;
+      const { execution_id, steps: parallelSteps, input_text, level_index, total_levels, all_levels, initial_input } = body;
 
       if (!execution_id || !parallelSteps?.length || !input_text) {
         return new Response(JSON.stringify({ error: "execution_id, steps e input_text são obrigatórios" }), {
@@ -252,7 +252,15 @@ Deno.serve(async (req) => {
 
           const isSynthesizer = step.is_synthesizer === true;
 
-          let flowInstruction = `\n\n<FLOW_MODE_INSTRUCTION>
+          const topicAnchor = initial_input || input_text;
+
+          let flowInstruction = `\n\n<TEMA_ORIGINAL_DO_FLUXO>
+O tema/solicitação ORIGINAL do usuário que iniciou este fluxo é:
+"${topicAnchor}"
+REGRA CRÍTICA DE COERÊNCIA: TODO o seu conteúdo DEVE estar 100% alinhado com este tema original. NUNCA desvie do tema.
+</TEMA_ORIGINAL_DO_FLUXO>
+
+<FLOW_MODE_INSTRUCTION>
 IMPORTANTE: Você está operando dentro de um FLUXO PARALELO DE AGENTES (Nível ${(level_index || 0) + 1} de ${total_levels || "?"}).
 ${isSynthesizer ? "VOCÊ É O AGENTE SINTETIZADOR — sua tarefa é integrar e consolidar TODOS os resultados dos agentes anteriores em uma entrega única e coesa." : "Você é um dos agentes executando EM PARALELO neste nível."}
 
@@ -268,6 +276,7 @@ REGRAS OBRIGATÓRIAS DO MODO FLUXO:
 6. Use tabelas Markdown formatadas corretamente quando aplicável.
 7. Produza APENAS o que sua especialidade pede.
 8. Sua resposta deve ter no MÍNIMO 800 palavras de conteúdo substantivo.
+9. COERÊNCIA TEMÁTICA: TODO o seu output deve ser sobre EXATAMENTE o tema em <TEMA_ORIGINAL_DO_FLUXO>.
 </FLOW_MODE_INSTRUCTION>`;
 
           const enrichedInput = contextMessage + flowInstruction;
@@ -426,7 +435,7 @@ REGRAS:
 
     // ========== MODE: STEP ==========
     if (mode === "step") {
-      const { execution_id, node_id, agent_id, input_text, conversation_history, previous_stage_output, stage_number, total_stages, pipeline_context } = body;
+      const { execution_id, node_id, agent_id, input_text, conversation_history, previous_stage_output, stage_number, total_stages, pipeline_context, initial_input } = body;
 
       if (!execution_id || !node_id || !agent_id || !input_text) {
         return new Response(JSON.stringify({ error: "execution_id, node_id, agent_id e input_text são obrigatórios" }), {
@@ -461,7 +470,16 @@ REGRAS:
           }).join("\n");
         }
 
-        let flowInstruction = `\n\n<FLOW_MODE_INSTRUCTION>
+        // Build topic anchor from initial_input
+        const topicAnchor = initial_input || input_text;
+
+        let flowInstruction = `\n\n<TEMA_ORIGINAL_DO_FLUXO>
+O tema/solicitação ORIGINAL do usuário que iniciou este fluxo é:
+"${topicAnchor}"
+REGRA CRÍTICA DE COERÊNCIA: TODO o seu conteúdo DEVE estar 100% alinhado com este tema original. Se o tema é sobre semaglutida, você DEVE falar sobre semaglutida. Se é sobre educação, fale sobre educação. NUNCA desvie do tema original. Qualquer desvio temático é considerado uma FALHA GRAVE.
+</TEMA_ORIGINAL_DO_FLUXO>
+
+<FLOW_MODE_INSTRUCTION>
 IMPORTANTE: Você está operando dentro de um FLUXO SEQUENCIAL DE AGENTES (Etapa ${stage_number || "?"} de ${total_stages || "?"}).
 
 PIPELINE COMPLETO:
@@ -480,11 +498,12 @@ REGRAS OBRIGATÓRIAS DO MODO FLUXO:
 10. Você é o agente da Etapa ${stage_number}. Produza APENAS o que sua especialidade pede. Não produza conteúdo que pertence a outras etapas.
 11. NÃO mencione que algo "já foi fornecido", "já foi respondido" ou "já foi entregue" na etapa anterior. Simplesmente use a informação e produza seu conteúdo.
 12. Sua resposta deve ter no MÍNIMO 800 palavras de conteúdo substantivo (exceto se a tarefa for naturalmente curta como classificação ou validação).
+13. COERÊNCIA TEMÁTICA: Releia o <TEMA_ORIGINAL_DO_FLUXO> antes de produzir qualquer conteúdo. TODO o seu output deve ser sobre EXATAMENTE aquele tema. Não misture temas nem faça analogias extensas com outros assuntos.
 </FLOW_MODE_INSTRUCTION>`;
 
         if (previous_stage_output && (stage_number || 0) > 1) {
           flowInstruction += `\n\n<RESULTADO_ETAPA_ANTERIOR>
-O resultado da etapa anterior do fluxo é apresentado abaixo. Sua resposta DEVE ser complementar a este conteúdo, integrando-o e construindo sobre ele. NÃO repita o conteúdo anterior, mas referencie-o e expanda com sua especialidade.
+O resultado da etapa anterior do fluxo é apresentado abaixo. Sua resposta DEVE ser complementar a este conteúdo, integrando-o e construindo sobre ele. NÃO repita o conteúdo anterior, mas referencie-o e expanda com sua especialidade. MANTENHA O MESMO TEMA — o tema é: "${topicAnchor}"
 ---
 ${previous_stage_output}
 </RESULTADO_ETAPA_ANTERIOR>`;
