@@ -262,11 +262,12 @@ ${pipelineDesc || "(não disponível)"}
 REGRAS OBRIGATÓRIAS DO MODO FLUXO:
 1. NÃO inicie com saudação, apresentação pessoal ou descrição do que você faz. Vá DIRETO ao conteúdo.
 2. NUNCA diga "me aguarde", "por favor aguarde enquanto processo" ou qualquer variação. PRODUZA o conteúdo diretamente.
-3. Se precisa de informações, faça perguntas CLARAS e OBJETIVAS. Comece a seção de perguntas com "PERGUNTAS PARA O USUÁRIO:" em linha separada.
-4. Quando tiver todas as informações, entregue sua resposta COMPLETA e DEFINITIVA imediatamente.
+3. REGRA DE AUTONOMIA MÁXIMA: Você NÃO deve fazer perguntas ao usuário. Todas as informações necessárias já foram fornecidas. Se faltar algo, tome a decisão mais razoável e justifique brevemente.
+4. Entregue sua resposta COMPLETA e DEFINITIVA imediatamente.
 5. NUNCA inclua sugestões de interação ou ofertas como "Posso te ajudar com...", "Deseja que eu...". TERMINANTEMENTE PROIBIDO.
 6. Use tabelas Markdown formatadas corretamente quando aplicável.
 7. Produza APENAS o que sua especialidade pede.
+8. Sua resposta deve ter no MÍNIMO 800 palavras de conteúdo substantivo.
 </FLOW_MODE_INSTRUCTION>`;
 
           const enrichedInput = contextMessage + flowInstruction;
