@@ -1,98 +1,83 @@
 
 
-# Plano: Superfontes para o Tutor de Farmacologia
+# Plano: Fluxos de IA Premium — Qualidade, Autonomia e Auto-detecção de Modo
 
-## Fontes de Alto Impacto com APIs Abertas
+## Problemas Identificados
 
-| Fonte | O que traz | API |
-|-------|-----------|-----|
-| **DrugBank** (via DailyMed) | Bulas completas FDA, mecanismos, farmacocinética, interações | REST gratuita (NLM) |
-| **KEGG DRUG/Pathway** | Vias metabólicas, alvos moleculares, mapas de sinalização | REST gratuita |
-| **ChEMBL (EBI)** | Dados de bioatividade, IC50, afinidade por receptores, SAR | REST gratuita |
-| **PharmGKB** | Farmacogenômica — variantes genéticas que alteram resposta a fármacos | REST gratuita |
-| **ClinicalTrials.gov** | Ensaios clínicos ativos/concluídos, evidência translacional | REST v2 gratuita |
-| **Cochrane/PubMed Systematic Reviews** | Meta-análises e revisões sistemáticas filtradas | Via PubMed (já integrado) |
-| **WHO ICD/ATC** | Classificação ATC completa com DDD (doses diárias definidas) | Dados estáticos |
-| **UniProt** | Proteínas-alvo dos fármacos, estrutura, função | REST gratuita |
+1. **Prompts fracos**: O `agent-flow-plan` gera `input_prompt` genéricos e superficiais, sem instruções detalhadas para cada agente
+2. **Agentes fazem perguntas no meio do fluxo**: Interrompem a execução pedindo esclarecimentos que poderiam ser coletados no início
+3. **Modo sequencial/paralelo é manual**: O usuário precisa escolher, mas a IA deveria decidir automaticamente com base na descrição
+4. **Agentes sem acesso a ferramentas externas**: Quando o fluxo precisa de pesquisa (PubMed, web), os prompts gerados não incluem instruções para usar as capacidades disponíveis
 
-## Impacto por Fonte
+## Solução
 
-```text
-Nível de "superpoder":
+### 1. Reescrever o prompt do `agent-flow-plan` (Edge Function)
 
-DrugBank/DailyMed  ████████████ Bulas + interações + PK completa
-KEGG Pathway       ██████████   Visualização de vias metabólicas
-ChEMBL             █████████    Dados quantitativos de bioatividade
-PharmGKB           █████████    Farmacogenômica (medicina personalizada)
-ClinicalTrials.gov ████████     Evidência clínica em tempo real
-UniProt            ███████      Alvos moleculares detalhados
+O system prompt atual é simples demais. Será substituído por um prompt avançado que:
+
+- **Gera prompts completos** para cada agente (500-1000 palavras cada), com `<OBJETIVO>`, `<INSTRUCOES>`, `<FORMATO_SAIDA>`, `<LIMITACOES>`
+- **Injeta instruções de ferramentas**: Quando um agente precisa pesquisar, o prompt gerado incluirá instruções explícitas (ex: "Busque no PubMed usando...", "Consulte fontes acadêmicas...")
+- **Força autonomia total**: Cada prompt terá a instrução "NÃO faça perguntas ao usuário. Use as informações fornecidas pelo pipeline e sua expertise para tomar decisões. Se faltar informação, assuma a alternativa mais razoável e justifique sua escolha."
+- **Coleta de perguntas upfront**: Se algum agente realmente precisar de informações do usuário, o planner deve compilar TODAS as perguntas de todos os agentes e retorná-las em um campo `preflight_questions` no JSON
+- **Auto-detecção de modo**: O planner analisará o pipeline e determinará `execution_mode` automaticamente (`sequential` ou `parallel`) baseado na dependência entre as etapas. Retorna no JSON junto com o plano
+
+Nova estrutura do tool call:
+```json
+{
+  "flow_name": "...",
+  "flow_description": "...",
+  "execution_mode": "sequential | parallel",
+  "preflight_questions": ["Qual o público-alvo?", "Qual o tom desejado?"],
+  "nodes": [
+    {
+      "agent_id": "...",
+      "agent_type": "native | custom | new",
+      "input_prompt": "Instrução curta de contexto para o nó",
+      "new_agent_name": "...",
+      "new_agent_description": "...",
+      "new_agent_prompt": "<PROMPT COMPLETO E DETALHADO>",
+      "is_synthesizer": false
+    }
+  ]
+}
 ```
 
-## Implementação
+Usar modelo `google/gemini-2.5-pro` em vez de `gemini-3-flash-preview` para qualidade superior na geração do plano.
 
-### 1. Novas funções de busca no `agent-chat`
+### 2. Atualizar o frontend (`Flows.tsx`) — Preflight Questions
 
-Adicionar ao `agent-chat/index.ts` funções análogas às já existentes (`buildPubMedContext`, `buildOpenFDAContext`):
+Após o planner retornar, se houver `preflight_questions`:
+- Exibir um segundo step no dialog mostrando as perguntas antes de criar o fluxo
+- O usuário responde todas de uma vez
+- As respostas são injetadas como contexto global no `flow.description` e nos `input_prompt` de cada nó
 
-- **`buildDailyMedContext(drug)`** — Consulta `https://dailymed.nlm.nih.gov/dailymed/services/v2/spls.json?drug_name=X` para obter bulas FDA completas com mecanismo de ação, farmacocinética, contraindicações e interações
-- **`buildChEMBLContext(drug)`** — Consulta `https://www.ebi.ac.uk/chembl/api/data/molecule/search?q=X` para dados de bioatividade (IC50, Ki, EC50), alvos moleculares e relação estrutura-atividade
-- **`buildKEGGContext(drug)`** — Consulta `https://rest.kegg.jp/find/drug/X` e `https://rest.kegg.jp/get/DXXXXX` para vias metabólicas, enzimas CYP envolvidas e mapas de pathway
-- **`buildPharmGKBContext(drug)`** — Consulta `https://api.pharmgkb.org/v1/data/chemical?name=X` para variantes farmacogenômicas, recomendações de dosagem baseadas em genótipo e guidelines CPIC
-- **`buildClinicalTrialsContext(drug)`** — Consulta `https://clinicaltrials.gov/api/v2/studies?query.term=X&filter.overallStatus=RECRUITING` para ensaios clínicos relevantes em andamento
-- **`buildUniProtContext(target)`** — Consulta `https://rest.uniprot.org/uniprotkb/search?query=X+AND+organism_id:9606` para detalhes dos alvos proteicos (função, localização, estrutura)
+### 3. Atualizar `agent-flow-plan` — Salvar `execution_mode` automaticamente
 
-### 2. Orquestração inteligente no `agent-chat`
-
-Em vez de chamar todas as fontes sempre (seria lento e caro), implementar detecção de contexto:
-
-- **Pergunta sobre mecanismo de ação** → PubMed + DailyMed + KEGG + ChEMBL
-- **Pergunta sobre efeitos adversos** → OpenFDA + DailyMed + PubMed
-- **Pergunta sobre interações** → DailyMed + KEGG (enzimas CYP) + PharmGKB
-- **Pergunta sobre farmacogenômica** → PharmGKB + PubMed
-- **Pergunta sobre evidência clínica** → PubMed (filtro systematic review) + ClinicalTrials.gov
-- **Pergunta sobre alvo molecular** → UniProt + ChEMBL + KEGG Pathway
-
-Usar keywords no input do usuário para ativar seletivamente cada fonte via `Promise.all` (paralelo).
-
-### 3. Atualização do prompt do tutor
-
-Expandir a seção de fontes e prefixos de citação:
-
-- `📚 Aulas do Prof. Sérgio Araújo` — fonte primária (já existe)
-- `🔬 PubMed` — artigos científicos (já existe)
-- `🏥 FDA/OpenFDA` — dados de segurança (já existe)
-- `💊 DailyMed (NLM)` — bula FDA oficial
-- `🧬 PharmGKB` — farmacogenômica
-- `⚗️ ChEMBL` — bioatividade e SAR
-- `🗺️ KEGG` — vias metabólicas
-- `🏥 ClinicalTrials.gov` — ensaios clínicos
-- `🎯 UniProt` — alvos proteicos
-
-### 4. Formato de resposta enriquecido
-
-O tutor passará a estruturar respostas complexas em seções quando múltiplas fontes forem consultadas:
-
-```text
-📚 Base do Prof. Sérgio Araújo: [conteúdo da aula]
-🎓 Para aprofundar: Aula "Farmacologia dos IBPs"
-
-💊 Dados complementares (DailyMed): [farmacocinética detalhada]
-🧬 Farmacogenômica (PharmGKB): [variantes CYP2C19]
-⚗️ Bioatividade (ChEMBL): [IC50, seletividade]
-
-📖 Referências:
-- PubMed: PMID 12345678
-- PharmGKB: PA12345
-- ClinicalTrials: NCT01234567
+Quando o planner decidir o modo, salvar diretamente na tabela `agent_flows`:
+```sql
+INSERT INTO agent_flows (user_id, name, description, execution_mode) VALUES (...)
 ```
+
+Além disso, para modo paralelo, posicionar os nós no canvas corretamente (lado a lado no mesmo nível) e marcar o último nó como `is_synthesizer = true`.
+
+### 4. Reforçar autonomia no `agent-flow-execute`
+
+Adicionar ao `FLOW_MODE_INSTRUCTION` (já existente) uma regra extra mais forte:
+```
+REGRA DE AUTONOMIA MÁXIMA: Você NÃO deve fazer perguntas ao usuário durante a execução do fluxo.
+Todas as informações necessárias já foram fornecidas no input inicial e no contexto do pipeline.
+Se alguma informação estiver faltando, tome a decisão mais razoável e justifique brevemente.
+```
+
+### 5. Remover toggle manual de modo
+
+O toggle "Sequencial / Paralelo" na UI do `FlowEditor.tsx` será removido para fluxos gerados por IA (pois o modo é auto-determinado). Para fluxos manuais, manter o toggle.
 
 ## Arquivos Modificados
 
-- `supabase/functions/agent-chat/index.ts` — novas funções de busca + orquestração inteligente + prompt atualizado
-
-## Observações
-
-- Todas as APIs listadas são **gratuitas e abertas** — não requerem API keys
-- O mapeamento PT→EN de termos farmacológicos já existente será reutilizado e expandido
-- O tempo de resposta será controlado com `Promise.race` (timeout de 5s por fonte) para não degradar a experiência
+| Arquivo | Mudança |
+|---------|---------|
+| `supabase/functions/agent-flow-plan/index.ts` | Prompt premium, auto-detecção de modo, preflight questions, modelo superior |
+| `supabase/functions/agent-flow-execute/index.ts` | Regra de autonomia reforçada no FLOW_MODE_INSTRUCTION |
+| `src/pages/Flows.tsx` | UI de preflight questions, salvamento de respostas como contexto |
 
