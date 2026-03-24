@@ -745,6 +745,8 @@ export default function FlowEditor() {
     toast.success("Fluxo paralelo concluído com sucesso!");
   };
 
+  const initialInputRef = React.useRef<string>("");
+
   const executeStep = async (
     stepIndex: number,
     steps: FlowStep[],
@@ -752,6 +754,10 @@ export default function FlowEditor() {
     inputText: string,
     history: Array<{ role: "user" | "assistant"; content: string }> = []
   ) => {
+    // Store initial input on first step
+    if (stepIndex === 0) {
+      initialInputRef.current = inputText;
+    }
     if (stepIndex >= steps.length) {
       // All steps done
       const lastResult = stepResults[stepResults.length - 1] || null;
