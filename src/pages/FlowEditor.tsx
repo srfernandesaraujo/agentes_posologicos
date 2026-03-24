@@ -697,6 +697,7 @@ export default function FlowEditor() {
               execution_id: execId,
               steps: level.steps,
               input_text: inputForLevel,
+              initial_input: initialInput,
               level_index: li,
               total_levels: levels.length,
               all_levels: levels.map(l => l.steps),
