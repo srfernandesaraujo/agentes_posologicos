@@ -745,7 +745,7 @@ export default function FlowEditor() {
     toast.success("Fluxo paralelo concluído com sucesso!");
   };
 
-  const initialInputRef = React.useRef<string>("");
+  const initialInputRef = useRef<string>("");
 
   const executeStep = async (
     stepIndex: number,
