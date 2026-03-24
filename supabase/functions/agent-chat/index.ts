@@ -6354,30 +6354,65 @@ Deno.serve(async (req) => {
       });
     };
 
-    // Special case: prompt generation
+    // Special case: prompt generation (Premium Agent Creator)
     if (agentId === "__generate_prompt__") {
       const promptMessages = [
         { role: "system", content: PROMPT_GENERATOR_PROMPT },
         { role: "user", content: input },
       ];
 
-      // Helper to call OpenAI-compatible endpoint
-      const callOpenAICompatible = async (endpoint: string, apiKey: string, model: string, authPrefix = "Bearer") => {
+      const createAgentTool = {
+        type: "function",
+        function: {
+          name: "create_agent",
+          description: "Retorna o agente estruturado com nome, descrição e prompt de sistema premium.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "Nome profissional e descritivo do agente (2-8 palavras)" },
+              description: { type: "string", description: "Descrição concisa do agente (1-2 frases, 100-200 caracteres)" },
+              system_prompt: { type: "string", description: "O system prompt completo e detalhado (1000-2000 palavras)" },
+            },
+            required: ["name", "description", "system_prompt"],
+            additionalProperties: false,
+          },
+        },
+      };
+
+      // Helper to call OpenAI-compatible endpoint with tool calling
+      const callOpenAICompatiblePremium = async (endpoint: string, apiKey: string, model: string, authPrefix = "Bearer") => {
         const resp = await fetch(endpoint, {
           method: "POST",
           headers: {
             Authorization: `${authPrefix} ${apiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ model, messages: promptMessages }),
+          body: JSON.stringify({
+            model,
+            messages: promptMessages,
+            tools: [createAgentTool],
+            tool_choice: { type: "function", function: { name: "create_agent" } },
+          }),
         });
         if (!resp.ok) throw new Error(`${resp.status} ${await resp.text()}`);
         const data = await resp.json();
-        return data.choices?.[0]?.message?.content || "";
+        
+        // Extract tool call result
+        const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+        if (toolCall?.function?.arguments) {
+          try {
+            return JSON.parse(toolCall.function.arguments);
+          } catch {
+            // If JSON parse fails, return raw content as fallback
+          }
+        }
+        // Fallback: return plain text as system_prompt only
+        const plainOutput = data.choices?.[0]?.message?.content || "";
+        return { name: "", description: "", system_prompt: plainOutput };
       };
 
-      // Helper to call Anthropic
-      const callAnthropic = async (apiKey: string, model: string) => {
+      // Helper to call Anthropic with tool calling
+      const callAnthropicPremium = async (apiKey: string, model: string) => {
         const resp = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -6387,14 +6422,23 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             model,
-            max_tokens: 4096,
+            max_tokens: 8192,
             system: PROMPT_GENERATOR_PROMPT,
             messages: [{ role: "user", content: input }],
+            tools: [{
+              name: "create_agent",
+              description: "Retorna o agente estruturado com nome, descrição e prompt de sistema premium.",
+              input_schema: createAgentTool.function.parameters,
+            }],
+            tool_choice: { type: "tool", name: "create_agent" },
           }),
         });
         if (!resp.ok) throw new Error(`${resp.status} ${await resp.text()}`);
         const data = await resp.json();
-        return data.content?.[0]?.text || "";
+        const toolUse = data.content?.find((b: any) => b.type === "tool_use");
+        if (toolUse?.input) return toolUse.input;
+        const textBlock = data.content?.find((b: any) => b.type === "text");
+        return { name: "", description: "", system_prompt: textBlock?.text || "" };
       };
 
       // Try user's own API keys first
@@ -6409,47 +6453,47 @@ Deno.serve(async (req) => {
         if (userKeys && userKeys.length > 0) {
           for (const uk of userKeys) {
             try {
-              const DEFAULT_MODELS: Record<string, string> = {
+              const PREMIUM_MODELS: Record<string, string> = {
                 openai: "gpt-4o",
                 anthropic: "claude-sonnet-4-20250514",
                 groq: "llama-3.3-70b-versatile",
-                openrouter: "google/gemini-2.5-flash",
-                google: "gemini-2.5-flash",
+                openrouter: "google/gemini-2.5-pro",
+                google: "gemini-2.5-pro",
               };
-              const model = DEFAULT_MODELS[uk.provider] || "gpt-4o";
-              let output: string;
+              const model = PREMIUM_MODELS[uk.provider] || "gpt-4o";
 
               const decryptedKey = await decryptApiKey(uk.api_key_encrypted);
+              let result: any;
               if (uk.provider === "anthropic") {
-                output = await callAnthropic(decryptedKey, model);
+                result = await callAnthropicPremium(decryptedKey, model);
               } else {
                 const endpoint = PROVIDER_ENDPOINTS[uk.provider];
                 if (!endpoint) continue;
-                output = await callOpenAICompatible(endpoint, decryptedKey, model);
+                result = await callOpenAICompatiblePremium(endpoint, decryptedKey, model);
               }
 
-              console.log(`Prompt generation: used user's ${uk.provider} key`);
-              return new Response(JSON.stringify({ output }), {
+              console.log(`Premium prompt generation: used user's ${uk.provider} key`);
+              return new Response(JSON.stringify({ output: result.system_prompt || "", agent_meta: { name: result.name || "", description: result.description || "" } }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
               });
             } catch (e) {
-              console.warn(`Prompt gen with ${uk.provider} failed:`, e.message);
+              console.warn(`Premium prompt gen with ${uk.provider} failed:`, e.message);
               continue;
             }
           }
         }
       }
 
-      // Fallback: try Lovable AI Gateway
+      // Fallback: Lovable AI Gateway with premium model
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (LOVABLE_API_KEY) {
         try {
-          const output = await callOpenAICompatible(
+          const result = await callOpenAICompatiblePremium(
             "https://ai.gateway.lovable.dev/v1/chat/completions",
             LOVABLE_API_KEY,
-            "google/gemini-2.5-flash"
+            "google/gemini-2.5-pro"
           );
-          return new Response(JSON.stringify({ output }), {
+          return new Response(JSON.stringify({ output: result.system_prompt || "", agent_meta: { name: result.name || "", description: result.description || "" } }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         } catch (e) {
