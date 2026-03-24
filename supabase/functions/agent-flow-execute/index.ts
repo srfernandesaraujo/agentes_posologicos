@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     // ========== MODE: PARALLEL-STEP ==========
     // Executes multiple nodes in parallel (same level)
     if (mode === "parallel-step") {
-      const { execution_id, steps: parallelSteps, input_text, level_index, total_levels, all_levels } = body;
+      const { execution_id, steps: parallelSteps, input_text, level_index, total_levels, all_levels, initial_input } = body;
 
       if (!execution_id || !parallelSteps?.length || !input_text) {
         return new Response(JSON.stringify({ error: "execution_id, steps e input_text são obrigatórios" }), {
