@@ -426,7 +426,7 @@ REGRAS:
 
     // ========== MODE: STEP ==========
     if (mode === "step") {
-      const { execution_id, node_id, agent_id, input_text, conversation_history, previous_stage_output, stage_number, total_stages, pipeline_context } = body;
+      const { execution_id, node_id, agent_id, input_text, conversation_history, previous_stage_output, stage_number, total_stages, pipeline_context, initial_input } = body;
 
       if (!execution_id || !node_id || !agent_id || !input_text) {
         return new Response(JSON.stringify({ error: "execution_id, node_id, agent_id e input_text são obrigatórios" }), {
