@@ -6441,7 +6441,26 @@ Deno.serve(async (req) => {
         return { name: "", description: "", system_prompt: textBlock?.text || "" };
       };
 
-      // Try user's own API keys first
+      // === PRIORITY 1: Lovable AI Gateway (strongest, most reliable) ===
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (LOVABLE_API_KEY) {
+        try {
+          const result = await callOpenAICompatiblePremium(
+            "https://ai.gateway.lovable.dev/v1/chat/completions",
+            LOVABLE_API_KEY,
+            "google/gemini-2.5-pro"
+          );
+          console.log("Premium prompt generation: used Lovable AI Gateway (gemini-2.5-pro)");
+          return new Response(JSON.stringify({ output: result.system_prompt || "", agent_meta: { name: result.name || "", description: result.description || "" } }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (e) {
+          console.warn("Lovable AI gateway failed:", e.message);
+        }
+      }
+
+      // === PRIORITY 2: User's own STRONG API keys (skip Groq — too weak for prompt engineering) ===
+      const SKIP_PROVIDERS_FOR_PROMPT_GEN = ["groq"]; // Models too weak for premium prompt generation
       if (userId) {
         const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         const { data: userKeys } = await serviceClient
@@ -6452,11 +6471,14 @@ Deno.serve(async (req) => {
 
         if (userKeys && userKeys.length > 0) {
           for (const uk of userKeys) {
+            if (SKIP_PROVIDERS_FOR_PROMPT_GEN.includes(uk.provider)) {
+              console.log(`Skipping ${uk.provider} for premium prompt gen (model too weak)`);
+              continue;
+            }
             try {
               const PREMIUM_MODELS: Record<string, string> = {
                 openai: "gpt-4o",
                 anthropic: "claude-sonnet-4-20250514",
-                groq: "llama-3.3-70b-versatile",
                 openrouter: "google/gemini-2.5-pro",
                 google: "gemini-2.5-pro",
               };
@@ -6484,24 +6506,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Fallback: Lovable AI Gateway with premium model
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (LOVABLE_API_KEY) {
-        try {
-          const result = await callOpenAICompatiblePremium(
-            "https://ai.gateway.lovable.dev/v1/chat/completions",
-            LOVABLE_API_KEY,
-            "google/gemini-2.5-pro"
-          );
-          return new Response(JSON.stringify({ output: result.system_prompt || "", agent_meta: { name: result.name || "", description: result.description || "" } }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        } catch (e) {
-          console.warn("Lovable AI gateway also failed:", e.message);
-        }
-      }
-
-      return new Response(JSON.stringify({ error: "Nenhum provedor de IA disponível. Configure uma chave API em Configurações." }), {
+      return new Response(JSON.stringify({ error: "Nenhum provedor de IA disponível para geração premium. Verifique sua conexão." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
