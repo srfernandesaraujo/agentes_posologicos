@@ -805,6 +805,7 @@ export default function FlowEditor() {
           node_id: step.node_id,
           agent_id: step.agent_id,
           input_text: contextMessage,
+          initial_input: initialInputRef.current,
           conversation_history: history,
           previous_stage_output: previousStageOutput,
           stage_number: stepIndex + 1,
