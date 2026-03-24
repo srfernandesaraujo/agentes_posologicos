@@ -87,18 +87,21 @@ export default function MyAgents() {
 
     setGenerating(true);
     try {
-      // Generate system prompt via AI
+      // Generate system prompt via AI (Premium)
       const { data: promptData, error: promptError } = await supabase.functions.invoke("agent-chat", {
         body: { agentId: "__generate_prompt__", input: aiPrompt },
       });
       if (promptError) throw promptError;
 
       const generatedPrompt = promptData?.output || "";
+      const agentMeta = promptData?.agent_meta || {};
+      const agentName = agentMeta.name?.trim() || aiPrompt.slice(0, 60).trim();
+      const agentDescription = agentMeta.description?.trim() || aiPrompt.trim();
 
-      // Create agent with AI-generated content
+      // Create agent with AI-generated name and description
       const agent = await createAgent.mutateAsync({
-        name: aiPrompt.slice(0, 60).trim(),
-        description: aiPrompt.trim(),
+        name: agentName,
+        description: agentDescription,
       });
 
       // Update with generated system prompt
@@ -118,7 +121,7 @@ export default function MyAgents() {
         refetchCredits();
       }
 
-      toast.success("Agente criado com IA! Revise o prompt gerado.");
+      toast.success("Agente premium criado com IA!");
       setShowCreate(false);
       setAiPrompt("");
       navigate(`/meus-agentes/${agent.id}`);
