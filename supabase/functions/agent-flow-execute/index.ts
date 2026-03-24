@@ -252,7 +252,15 @@ Deno.serve(async (req) => {
 
           const isSynthesizer = step.is_synthesizer === true;
 
-          let flowInstruction = `\n\n<FLOW_MODE_INSTRUCTION>
+          const topicAnchor = initial_input || input_text;
+
+          let flowInstruction = `\n\n<TEMA_ORIGINAL_DO_FLUXO>
+O tema/solicitação ORIGINAL do usuário que iniciou este fluxo é:
+"${topicAnchor}"
+REGRA CRÍTICA DE COERÊNCIA: TODO o seu conteúdo DEVE estar 100% alinhado com este tema original. NUNCA desvie do tema.
+</TEMA_ORIGINAL_DO_FLUXO>
+
+<FLOW_MODE_INSTRUCTION>
 IMPORTANTE: Você está operando dentro de um FLUXO PARALELO DE AGENTES (Nível ${(level_index || 0) + 1} de ${total_levels || "?"}).
 ${isSynthesizer ? "VOCÊ É O AGENTE SINTETIZADOR — sua tarefa é integrar e consolidar TODOS os resultados dos agentes anteriores em uma entrega única e coesa." : "Você é um dos agentes executando EM PARALELO neste nível."}
 
@@ -268,6 +276,7 @@ REGRAS OBRIGATÓRIAS DO MODO FLUXO:
 6. Use tabelas Markdown formatadas corretamente quando aplicável.
 7. Produza APENAS o que sua especialidade pede.
 8. Sua resposta deve ter no MÍNIMO 800 palavras de conteúdo substantivo.
+9. COERÊNCIA TEMÁTICA: TODO o seu output deve ser sobre EXATAMENTE o tema em <TEMA_ORIGINAL_DO_FLUXO>.
 </FLOW_MODE_INSTRUCTION>`;
 
           const enrichedInput = contextMessage + flowInstruction;
