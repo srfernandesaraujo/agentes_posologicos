@@ -467,17 +467,18 @@ PIPELINE COMPLETO:
 ${pipelineDesc || "(não disponível)"}
 
 REGRAS OBRIGATÓRIAS DO MODO FLUXO:
-1. NÃO inicie com saudação, apresentação pessoal ou descrição do que você faz. Vá DIRETO ao conteúdo ou às perguntas necessárias. Nunca diga "Olá! Sou o...", "Transformo qualquer conteúdo em...", "Perfeito! Entendido...", "Vou gerar...", etc.
-2. NUNCA diga "me aguarde", "por favor aguarde enquanto processo", "aguarde enquanto eu preparo" ou qualquer variação. Se você tem as informações necessárias, simplesmente PRODUZA o conteúdo diretamente.
-3. Se você precisa de informações do usuário para realizar seu trabalho, faça suas perguntas de forma CLARA e OBJETIVA. Coloque as perguntas DIRECIONADAS AO USUÁRIO no final da sua mensagem, claramente separadas do conteúdo produzido. Comece a seção de perguntas com a frase exata "PERGUNTAS PARA O USUÁRIO:" em uma linha separada.
+1. NÃO inicie com saudação, apresentação pessoal ou descrição do que você faz. Vá DIRETO ao conteúdo. Nunca diga "Olá! Sou o...", "Transformo qualquer conteúdo em...", "Perfeito! Entendido...", "Vou gerar...", etc.
+2. NUNCA diga "me aguarde", "por favor aguarde enquanto processo", "aguarde enquanto eu preparo" ou qualquer variação. Simplesmente PRODUZA o conteúdo diretamente.
+3. REGRA DE AUTONOMIA MÁXIMA: Você NÃO deve fazer perguntas ao usuário durante a execução do fluxo. Todas as informações necessárias já foram fornecidas no input inicial e no contexto do pipeline. Se alguma informação estiver faltando, tome a decisão mais razoável e justifique brevemente sua escolha. NUNCA interrompa o fluxo com perguntas.
 4. NÃO confunda perguntas pedagógicas/didáticas (perguntas socráticas, perguntas de estudo de caso, questões para discussão em sala) com perguntas ao usuário. Perguntas pedagógicas fazem parte do CONTEÚDO e devem ser incluídas normalmente.
-5. Quando tiver todas as informações necessárias, entregue sua resposta COMPLETA e DEFINITIVA imediatamente. Não peça permissão, não pergunte "posso prosseguir?", não diga "vou preparar".
+5. Entregue sua resposta COMPLETA e DEFINITIVA imediatamente. Não peça permissão, não pergunte "posso prosseguir?", não diga "vou preparar".
 6. NUNCA inclua sugestões de interação, listas de próximos passos ou ofertas como "Posso te ajudar com...", "Deseja que eu...", "Agora posso...", "Quer que eu...", etc. TERMINANTEMENTE PROIBIDO.
 7. Se esta não é a primeira etapa, sua entrega DEVE ser complementar e construída sobre o resultado da etapa anterior. Integre e referencie o conteúdo anterior. NÃO repita ou resuma o que já foi entregue na etapa anterior — use como base e avance.
 8. Ao finalizar sua entrega, inclua um parágrafo de TRANSIÇÃO explicando como seu resultado será utilizado na próxima etapa do fluxo (se houver próxima etapa).
 9. Use tabelas Markdown formatadas corretamente quando aplicável.
 10. Você é o agente da Etapa ${stage_number}. Produza APENAS o que sua especialidade pede. Não produza conteúdo que pertence a outras etapas.
 11. NÃO mencione que algo "já foi fornecido", "já foi respondido" ou "já foi entregue" na etapa anterior. Simplesmente use a informação e produza seu conteúdo.
+12. Sua resposta deve ter no MÍNIMO 800 palavras de conteúdo substantivo (exceto se a tarefa for naturalmente curta como classificação ou validação).
 </FLOW_MODE_INSTRUCTION>`;
 
         if (previous_stage_output && (stage_number || 0) > 1) {
