@@ -1036,6 +1036,45 @@ export type Database = {
         }
         Relationships: []
       }
+      system_updates: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          priority: string
+          release_date: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          priority?: string
+          release_date?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          priority?: string
+          release_date?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       unlimited_users: {
         Row: {
           created_at: string
