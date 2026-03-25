@@ -60,6 +60,16 @@ serve(async (req) => {
         meeting_url: meet_link.trim(),
         bot_name: "Agentes Posológicos - Ata",
         status_changes_webhook_url: webhookUrl,
+        recording_config: {
+          transcript: {
+            provider: {
+              recallai_streaming: {
+                mode: "prioritize_low_latency",
+                language_code: "pt",
+              },
+            },
+          },
+        },
         automatic_leave: {
           waiting_room_timeout: 600,
           noone_joined_timeout: 1200,
