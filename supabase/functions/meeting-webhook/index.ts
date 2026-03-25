@@ -173,19 +173,28 @@ const fetchTranscriptPayload = async (downloadUrl: string, recallApiKey: string)
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
 
-  if (authenticatedResponse.ok) {
-    return { ok: true as const, data: await authenticatedResponse.json() };
+    if (authenticatedResponse.ok) {
+      return { ok: true as const, data: await authenticatedResponse.json() };
+    }
+
+    const detail = await authenticatedResponse.text();
+    const retryable = RETRYABLE_TRANSCRIPT_STATUS.has(authenticatedResponse.status) || hasTranscriptNotReadyMessage(detail);
+
+    return {
+      ok: false as const,
+      status: authenticatedResponse.status,
+      message: detail,
+      retryable,
+    };
+  } catch (e) {
+    console.error("[meeting-webhook] transcript auth fetch error:", e instanceof Error ? e.message : e);
+    return {
+      ok: false as const,
+      status: 408,
+      message: e instanceof Error ? e.message : "Fetch timeout/error",
+      retryable: true,
+    };
   }
-
-  const detail = await authenticatedResponse.text();
-  const retryable = RETRYABLE_TRANSCRIPT_STATUS.has(authenticatedResponse.status) || hasTranscriptNotReadyMessage(detail);
-
-  return {
-    ok: false as const,
-    status: authenticatedResponse.status,
-    message: detail,
-    retryable,
-  };
 };
 
 const fetchTranscript = async (botId: string, recallApiKey: string) => {
