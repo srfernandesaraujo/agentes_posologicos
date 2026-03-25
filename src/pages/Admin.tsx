@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Shield, Users, Bot, Coins, Search, Plus, ToggleLeft, DoorOpen, Clock, Edit2,
-  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown,
+  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown, Rocket,
 } from "lucide-react";
+import { SystemUpdatesManager } from "@/components/admin/SystemUpdatesManager";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
 import {
