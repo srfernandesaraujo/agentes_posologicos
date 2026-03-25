@@ -147,6 +147,7 @@ export default function UserDashboard() {
 
   return (
     <div className="container max-w-6xl py-8">
+      <RoadmapBanner />
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-slide-up">
         <div>
           <h1 className="font-display text-3xl font-bold text-white flex items-center gap-3">

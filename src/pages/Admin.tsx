@@ -588,6 +588,11 @@ export default function Admin() {
             )}
           </div>
         </TabsContent>
+
+        {/* PIPELINE TAB */}
+        <TabsContent value="updates" className="space-y-4">
+          <SystemUpdatesManager />
+        </TabsContent>
       </Tabs>
 
       {/* Room Edit Dialog */}
