@@ -294,6 +294,9 @@ export default function Admin() {
           <TabsTrigger value="unlimited" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
             <Crown className="h-4 w-4 mr-1.5" /> Convidados
           </TabsTrigger>
+          <TabsTrigger value="updates" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+            <Rocket className="h-4 w-4 mr-1.5" /> Pipeline
+          </TabsTrigger>
         </TabsList>
 
         {/* DASHBOARD TAB */}
