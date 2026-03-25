@@ -103,24 +103,33 @@ const hasExceededTranscribingWait = (updatedAt: string | null | undefined): bool
   return Date.now() - new Date(updatedAt).getTime() > MAX_TRANSCRIBING_WAIT_MS;
 };
 
+const FETCH_TIMEOUT_MS = 8000;
+
 const fetchRecallJson = async (urls: string[], recallApiKey: string) => {
   let lastStatus = 0;
   let lastMessage = "";
 
   for (const url of urls) {
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Token ${recallApiKey}`,
-        Accept: "application/json",
-      },
-    });
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Token ${recallApiKey}`,
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
 
-    if (response.ok) {
-      return { ok: true as const, data: await response.json() };
+      if (response.ok) {
+        return { ok: true as const, data: await response.json() };
+      }
+
+      lastStatus = response.status;
+      lastMessage = await response.text();
+    } catch (e) {
+      console.error(`[meeting-webhook] fetch error for ${url}:`, e instanceof Error ? e.message : e);
+      lastStatus = 408;
+      lastMessage = e instanceof Error ? e.message : "Fetch timeout/error";
     }
-
-    lastStatus = response.status;
-    lastMessage = await response.text();
   }
 
   return { ok: false as const, status: lastStatus, message: lastMessage };
@@ -142,34 +151,50 @@ const extractTranscriptShortcut = (botData: any): any | null => {
 };
 
 const fetchTranscriptPayload = async (downloadUrl: string, recallApiKey: string) => {
-  const directResponse = await fetch(downloadUrl, {
-    headers: { Accept: "application/json" },
-  });
+  try {
+    const directResponse = await fetch(downloadUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
 
-  if (directResponse.ok) {
-    return { ok: true as const, data: await directResponse.json() };
+    if (directResponse.ok) {
+      return { ok: true as const, data: await directResponse.json() };
+    }
+  } catch (e) {
+    console.error("[meeting-webhook] transcript direct fetch error:", e instanceof Error ? e.message : e);
   }
 
-  const authenticatedResponse = await fetch(downloadUrl, {
-    headers: {
-      Authorization: `Token ${recallApiKey}`,
-      Accept: "application/json",
-    },
-  });
+  try {
+    const authenticatedResponse = await fetch(downloadUrl, {
+      headers: {
+        Authorization: `Token ${recallApiKey}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
 
-  if (authenticatedResponse.ok) {
-    return { ok: true as const, data: await authenticatedResponse.json() };
+    if (authenticatedResponse.ok) {
+      return { ok: true as const, data: await authenticatedResponse.json() };
+    }
+
+    const detail = await authenticatedResponse.text();
+    const retryable = RETRYABLE_TRANSCRIPT_STATUS.has(authenticatedResponse.status) || hasTranscriptNotReadyMessage(detail);
+
+    return {
+      ok: false as const,
+      status: authenticatedResponse.status,
+      message: detail,
+      retryable,
+    };
+  } catch (e) {
+    console.error("[meeting-webhook] transcript auth fetch error:", e instanceof Error ? e.message : e);
+    return {
+      ok: false as const,
+      status: 408,
+      message: e instanceof Error ? e.message : "Fetch timeout/error",
+      retryable: true,
+    };
   }
-
-  const detail = await authenticatedResponse.text();
-  const retryable = RETRYABLE_TRANSCRIPT_STATUS.has(authenticatedResponse.status) || hasTranscriptNotReadyMessage(detail);
-
-  return {
-    ok: false as const,
-    status: authenticatedResponse.status,
-    message: detail,
-    retryable,
-  };
 };
 
 const fetchTranscript = async (botId: string, recallApiKey: string) => {
@@ -285,6 +310,7 @@ serve(async (req) => {
     }
 
     if (isDoneStatus(status)) {
+      console.log(`[meeting-webhook] Processing DONE status for bot ${botId}, meeting ${meeting.id}, current status: ${meeting.status}`);
       const alreadyTranscribing = meeting.status === "transcribing";
       const transcribingSince = alreadyTranscribing ? meeting.updated_at : new Date().toISOString();
 
@@ -292,6 +318,7 @@ serve(async (req) => {
         await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
       }
 
+      console.log("[meeting-webhook] Fetching transcript from Recall.ai...");
       const transcriptResult = await fetchTranscript(botId, RECALL_API_KEY);
 
       if (!transcriptResult.ok) {
