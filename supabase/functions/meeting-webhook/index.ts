@@ -26,6 +26,33 @@ const ERROR_STATUSES = new Set([
 const RETRYABLE_TRANSCRIPT_STATUS = new Set([404, 408, 409, 423, 425, 429, 500, 502, 503, 504]);
 const MAX_TRANSCRIBING_WAIT_MS = 15 * 60 * 1000;
 
+const isDoneStatus = (status: string): boolean => {
+  if (!status) return false;
+  return (
+    DONE_STATUSES.has(status) ||
+    status.includes("call_ended") ||
+    status.endsWith("_done") ||
+    status === "left_call" ||
+    status.includes("completed")
+  );
+};
+
+const isErrorStatus = (status: string): boolean => {
+  if (!status) return false;
+  return (
+    ERROR_STATUSES.has(status) ||
+    status.includes("fatal") ||
+    status.includes("error") ||
+    status.includes("failed")
+  );
+};
+
+const hasTranscriptNotReadyMessage = (text: string): boolean => {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return lower.includes("not ready") || lower.includes("pending") || lower.includes("processing");
+};
+
 const normalizeStatus = (value: unknown): string => {
   if (!value) return "";
   return String(value).toLowerCase().trim().replace(/^bot\./, "");
