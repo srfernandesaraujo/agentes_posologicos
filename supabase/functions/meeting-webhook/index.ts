@@ -151,20 +151,27 @@ const extractTranscriptShortcut = (botData: any): any | null => {
 };
 
 const fetchTranscriptPayload = async (downloadUrl: string, recallApiKey: string) => {
-  const directResponse = await fetch(downloadUrl, {
-    headers: { Accept: "application/json" },
-  });
+  try {
+    const directResponse = await fetch(downloadUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
 
-  if (directResponse.ok) {
-    return { ok: true as const, data: await directResponse.json() };
+    if (directResponse.ok) {
+      return { ok: true as const, data: await directResponse.json() };
+    }
+  } catch (e) {
+    console.error("[meeting-webhook] transcript direct fetch error:", e instanceof Error ? e.message : e);
   }
 
-  const authenticatedResponse = await fetch(downloadUrl, {
-    headers: {
-      Authorization: `Token ${recallApiKey}`,
-      Accept: "application/json",
-    },
-  });
+  try {
+    const authenticatedResponse = await fetch(downloadUrl, {
+      headers: {
+        Authorization: `Token ${recallApiKey}`,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
 
   if (authenticatedResponse.ok) {
     return { ok: true as const, data: await authenticatedResponse.json() };
