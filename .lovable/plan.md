@@ -1,56 +1,62 @@
 
 
-# Fix: Meeting Webhook Missing Function Definitions
+# Fix: Meeting Bot Stuck in "Transcribing" -- Split Processing Pipeline
 
 ## Root Cause
 
-The `meeting-webhook` Edge Function crashes with **`ReferenceError: isDoneStatus is not defined`** every time Recall.ai sends the "done" webhook. The logs show this error repeating dozens of times — the bot finished recording, Recall.ai sent the completion webhook, but the function crashes before it can fetch the transcript and generate the meeting minutes.
+The logs show the `meeting-webhook` function is being **killed by Supabase before it finishes**. Every 8-10 seconds:
+1. Function boots (~30ms)
+2. Starts fetching transcript from Recall.ai
+3. Gets shut down before the response arrives
 
-Three functions are used but never defined in `meeting-webhook/index.ts`:
-- `isDoneStatus()` (line 260)
-- `isErrorStatus()` (line 412)
-- `hasTranscriptNotReadyMessage()` (lines 138, 192)
+The function tries to do too much in one invocation: fetch bot data + fetch transcript + call AI for summary. This exceeds the edge function wall time limit.
 
-## Fix
+Meanwhile, `meeting-sync` keeps calling the webhook every 15s from the frontend poll, creating an infinite retry loop that never succeeds.
 
-Add the three missing function definitions to `supabase/functions/meeting-webhook/index.ts`, matching the logic from `meeting-sync`:
+## Fix: Move Transcript Fetch Into meeting-sync
 
-```typescript
-const isDoneStatus = (status: string): boolean => {
-  if (!status) return false;
-  return (
-    DONE_STATUSES.has(status) ||
-    status.includes("call_ended") ||
-    status.endsWith("_done") ||
-    status === "left_call" ||
-    status.includes("completed")
-  );
-};
+Instead of `meeting-sync` calling `meeting-webhook` (which then tries to do everything), `meeting-sync` will handle the transcript fetch and summary generation directly, in smaller steps:
 
-const isErrorStatus = (status: string): boolean => {
-  if (!status) return false;
-  return (
-    ERROR_STATUSES.has(status) ||
-    status.includes("fatal") ||
-    status.includes("error") ||
-    status.includes("failed")
-  );
-};
+**Step 1**: When `meeting-sync` detects a "done" bot, it fetches the transcript directly and saves it to the DB (status: "transcribing" -> save transcript -> status: "summarizing"). This is one sync cycle.
 
-const hasTranscriptNotReadyMessage = (text: string): boolean => {
-  if (!text) return false;
-  const lower = text.toLowerCase();
-  return lower.includes("not ready") || lower.includes("pending") || lower.includes("processing");
-};
+**Step 2**: On the next sync cycle, for meetings in "summarizing" status that have a transcript but no summary, `meeting-sync` calls `meeting-summary` (which already exists as a separate function).
+
+This ensures no single function call needs more than one external API call.
+
+### Architecture Change
+
+```text
+BEFORE (broken):
+  meeting-sync -> meeting-webhook (fetch transcript + AI summary = TIMEOUT)
+
+AFTER (fixed):
+  meeting-sync cycle 1: detect done -> fetch transcript -> save to DB
+  meeting-sync cycle 2: detect summarizing -> call meeting-summary -> done
 ```
 
-These will be inserted after the existing constant definitions (after line 27) and before the `normalizeStatus` function.
-
-After deploying, the existing stuck meeting (bot_id `aa8d5e5f-...`) should be processed on the next sync cycle (every 15 seconds) and the transcript + AI-generated minutes will be produced.
-
-## File Changed
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/meeting-webhook/index.ts` | Add 3 missing function definitions, redeploy |
+| `supabase/functions/meeting-sync/index.ts` | Add transcript fetching logic directly; handle "summarizing" meetings by calling meeting-summary; stop delegating to webhook |
+| `supabase/functions/meeting-webhook/index.ts` | Simplify to only handle status updates (done/error) -- set status to "transcribing" without trying to fetch transcript |
+
+## Implementation Details
+
+### meeting-webhook (simplified)
+- On "done" status: just update meeting to `status: "transcribing"`, return immediately
+- On "error" status: update with error message (keep existing logic)
+- Remove all transcript fetching and AI summary code from this function
+
+### meeting-sync (enhanced)
+- Query meetings in `["pending", "recording", "transcribing", "summarizing"]`
+- For `pending`/`recording`: fetch bot status from Recall, update if done/error
+- For `transcribing`: fetch transcript from Recall directly (reuse fetchTranscript logic), save to DB, set status to "summarizing"
+- For `summarizing`: call `meeting-summary` function via internal service-role call
+- Keep existing timeout protections (15min max wait)
+
+### Key technical points
+- Move `fetchRecallJson`, `extractTranscriptShortcut`, `fetchTranscriptPayload`, `fetchTranscript` helper functions into `meeting-sync`
+- `meeting-summary` already exists and works -- just need to call it with service role auth pattern
+- Each sync cycle does at most ONE external API call per meeting, staying within edge function limits
 
