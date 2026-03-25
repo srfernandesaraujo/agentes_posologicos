@@ -64,7 +64,7 @@ serve(async (req) => {
           transcript: {
             provider: {
               recallai_streaming: {
-                mode: "prioritize_low_latency",
+                mode: "prioritize_accuracy",
                 language_code: "pt",
               },
             },
