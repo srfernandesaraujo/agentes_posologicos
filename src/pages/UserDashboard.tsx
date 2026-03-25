@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useMemo } from "react";
 import { Coins, BarChart3, Activity, Bot, FileText, TrendingDown, Calendar } from "lucide-react";
+import { RoadmapBanner } from "@/components/admin/RoadmapBanner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -146,6 +147,7 @@ export default function UserDashboard() {
 
   return (
     <div className="container max-w-6xl py-8">
+      <RoadmapBanner />
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-slide-up">
         <div>
           <h1 className="font-display text-3xl font-bold text-white flex items-center gap-3">

@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Shield, Users, Bot, Coins, Search, Plus, ToggleLeft, DoorOpen, Clock, Edit2,
-  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown,
+  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown, Rocket,
 } from "lucide-react";
+import { SystemUpdatesManager } from "@/components/admin/SystemUpdatesManager";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
 import {
@@ -292,6 +293,9 @@ export default function Admin() {
           </TabsTrigger>
           <TabsTrigger value="unlimited" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
             <Crown className="h-4 w-4 mr-1.5" /> Convidados
+          </TabsTrigger>
+          <TabsTrigger value="updates" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+            <Rocket className="h-4 w-4 mr-1.5" /> Pipeline
           </TabsTrigger>
         </TabsList>
 
@@ -583,6 +587,11 @@ export default function Admin() {
               ))
             )}
           </div>
+        </TabsContent>
+
+        {/* PIPELINE TAB */}
+        <TabsContent value="updates" className="space-y-4">
+          <SystemUpdatesManager />
         </TabsContent>
       </Tabs>
 
