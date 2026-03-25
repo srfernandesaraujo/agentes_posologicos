@@ -310,6 +310,7 @@ serve(async (req) => {
     }
 
     if (isDoneStatus(status)) {
+      console.log(`[meeting-webhook] Processing DONE status for bot ${botId}, meeting ${meeting.id}, current status: ${meeting.status}`);
       const alreadyTranscribing = meeting.status === "transcribing";
       const transcribingSince = alreadyTranscribing ? meeting.updated_at : new Date().toISOString();
 
@@ -317,6 +318,7 @@ serve(async (req) => {
         await supabase.from("meetings").update({ status: "transcribing", error_message: null }).eq("id", meeting.id);
       }
 
+      console.log("[meeting-webhook] Fetching transcript from Recall.ai...");
       const transcriptResult = await fetchTranscript(botId, RECALL_API_KEY);
 
       if (!transcriptResult.ok) {
