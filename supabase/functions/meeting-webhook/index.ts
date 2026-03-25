@@ -103,24 +103,33 @@ const hasExceededTranscribingWait = (updatedAt: string | null | undefined): bool
   return Date.now() - new Date(updatedAt).getTime() > MAX_TRANSCRIBING_WAIT_MS;
 };
 
+const FETCH_TIMEOUT_MS = 8000;
+
 const fetchRecallJson = async (urls: string[], recallApiKey: string) => {
   let lastStatus = 0;
   let lastMessage = "";
 
   for (const url of urls) {
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Token ${recallApiKey}`,
-        Accept: "application/json",
-      },
-    });
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Token ${recallApiKey}`,
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
 
-    if (response.ok) {
-      return { ok: true as const, data: await response.json() };
+      if (response.ok) {
+        return { ok: true as const, data: await response.json() };
+      }
+
+      lastStatus = response.status;
+      lastMessage = await response.text();
+    } catch (e) {
+      console.error(`[meeting-webhook] fetch error for ${url}:`, e instanceof Error ? e.message : e);
+      lastStatus = 408;
+      lastMessage = e instanceof Error ? e.message : "Fetch timeout/error";
     }
-
-    lastStatus = response.status;
-    lastMessage = await response.text();
   }
 
   return { ok: false as const, status: lastStatus, message: lastMessage };
