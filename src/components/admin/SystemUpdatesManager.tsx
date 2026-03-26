@@ -259,7 +259,7 @@ export function SystemUpdatesManager() {
             variant="outline"
             onClick={handleGenerateRoadmap}
             disabled={generating}
-            className="gap-2"
+            className="gap-2 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {generating ? "Gerando..." : "Gerar Roadmap IA"}
