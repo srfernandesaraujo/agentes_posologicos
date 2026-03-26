@@ -284,8 +284,10 @@ export default function Meetings() {
                           <Copy className="h-3 w-3 mr-1" /> Copiar
                         </Button>
                       </div>
-                      <div className="prose prose-invert prose-sm max-w-none bg-white/5 rounded-lg p-4 border border-white/10 max-h-[60vh] overflow-y-auto whitespace-pre-wrap">
-                        {selectedMeeting.summary || "Nenhuma ata disponível."}
+                      <div className="prose prose-invert prose-sm max-w-none bg-white/5 rounded-lg p-4 border border-white/10 max-h-[60vh] overflow-y-auto text-gray-100 prose-headings:text-white prose-strong:text-white prose-li:text-gray-200">
+                        {selectedMeeting.summary ? (
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedMeeting.summary}</ReactMarkdown>
+                        ) : "Nenhuma ata disponível."}
                       </div>
                     </TabsContent>
                     <TabsContent value="transcript" className="mt-4">
