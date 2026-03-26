@@ -7,9 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus, Edit2, Trash2, Rocket, Lightbulb, Wrench, Clock, CheckCircle2, AlertCircle,
-  ArrowUpCircle, ArrowRightCircle, ArrowDownCircle, Search,
+  ArrowUpCircle, ArrowRightCircle, ArrowDownCircle, Sparkles, Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -28,10 +29,10 @@ interface SystemUpdate {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
-  released: { label: "Lançado", icon: CheckCircle2, color: "hsl(152,60%,42%)" },
-  in_progress: { label: "Em Desenvolvimento", icon: Clock, color: "hsl(199,89%,48%)" },
-  planned: { label: "Planejado", icon: Lightbulb, color: "hsl(38,92%,50%)" },
-  idea: { label: "Ideia", icon: AlertCircle, color: "hsl(280,60%,55%)" },
+  released: { label: "Lançado", icon: CheckCircle2, color: "hsl(var(--success))" },
+  in_progress: { label: "Em Desenvolvimento", icon: Clock, color: "hsl(var(--primary))" },
+  planned: { label: "Planejado", icon: Lightbulb, color: "hsl(var(--warning))" },
+  idea: { label: "Ideia", icon: AlertCircle, color: "hsl(var(--cat-pesquisa))" },
 };
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: any }> = {
@@ -42,17 +43,22 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: any }> = {
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
-  high: { label: "Alta", icon: ArrowUpCircle, color: "hsl(14,90%,58%)" },
-  medium: { label: "Média", icon: ArrowRightCircle, color: "hsl(38,92%,50%)" },
-  low: { label: "Baixa", icon: ArrowDownCircle, color: "hsl(174,62%,47%)" },
+  high: { label: "Alta", icon: ArrowUpCircle, color: "hsl(var(--destructive))" },
+  medium: { label: "Média", icon: ArrowRightCircle, color: "hsl(var(--warning))" },
+  low: { label: "Baixa", icon: ArrowDownCircle, color: "hsl(var(--accent))" },
+};
+
+const PRIORITY_BADGE_CLASSES: Record<string, string> = {
+  high: "bg-red-100 text-red-700 border-red-200",
+  medium: "bg-amber-100 text-amber-700 border-amber-200",
+  low: "bg-emerald-100 text-emerald-700 border-emerald-200",
 };
 
 export function SystemUpdatesManager() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<SystemUpdate | null>(null);
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [generating, setGenerating] = useState(false);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -73,6 +79,9 @@ export function SystemUpdatesManager() {
       return data as unknown as SystemUpdate[];
     },
   });
+
+  const changelogItems = updates.filter((u) => u.status === "released");
+  const roadmapItems = updates.filter((u) => u.status !== "released");
 
   const upsertMutation = useMutation({
     mutationFn: async () => {
@@ -113,6 +122,39 @@ export function SystemUpdatesManager() {
     onError: () => toast.error("Erro ao remover"),
   });
 
+  const concludeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("system_updates" as any)
+        .update({
+          status: "released",
+          release_date: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system-updates"] });
+      toast.success("Atualização concluída e adicionada ao changelog!");
+    },
+    onError: () => toast.error("Erro ao concluir"),
+  });
+
+  const handleGenerateRoadmap = async () => {
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-roadmap");
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["system-updates"] });
+      toast.success(`${data?.count || 0} sugestões de roadmap geradas!`);
+    } catch (e: any) {
+      toast.error("Erro ao gerar roadmap: " + (e.message || "erro desconhecido"));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const openNew = () => {
     setEditing(null);
     setTitle("");
@@ -140,171 +182,153 @@ export function SystemUpdatesManager() {
     setEditing(null);
   };
 
-  const filtered = updates.filter((u) => {
-    if (filterStatus !== "all" && u.status !== filterStatus) return false;
-    if (search && !u.title.toLowerCase().includes(search.toLowerCase()) && !u.description.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const renderCard = (u: SystemUpdate, showConclude: boolean) => {
+    const priCfg = PRIORITY_CONFIG[u.priority] || PRIORITY_CONFIG.medium;
+    const statusCfg = STATUS_CONFIG[u.status] || STATUS_CONFIG.planned;
 
-  // Group by status for timeline view
-  const grouped = {
-    idea: filtered.filter((u) => u.status === "idea"),
-    planned: filtered.filter((u) => u.status === "planned"),
-    in_progress: filtered.filter((u) => u.status === "in_progress"),
-    released: filtered.filter((u) => u.status === "released"),
+    return (
+      <div
+        key={u.id}
+        className="group flex items-start gap-4 rounded-xl border border-border bg-card p-4 hover:shadow-md transition-all"
+        style={{ borderLeftWidth: "4px", borderLeftColor: statusCfg.color }}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h4 className="font-semibold text-foreground">{u.title}</h4>
+            <Badge className={`text-xs font-medium border ${PRIORITY_BADGE_CLASSES[u.priority] || PRIORITY_BADGE_CLASSES.medium}`}>
+              {priCfg.label}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground line-clamp-2 ml-6">{u.description}</p>
+          {u.release_date && u.status === "released" && (
+            <p className="text-xs text-muted-foreground/70 mt-1 ml-6">
+              {format(new Date(u.release_date), "dd MMM yyyy", { locale: ptBR })}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {showConclude && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() => concludeMutation.mutate(u.id)}
+              disabled={concludeMutation.isPending}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Concluir
+            </Button>
+          )}
+          {!showConclude && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => openEdit(u)}
+            >
+              <Edit2 className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            onClick={() => deleteMutation.mutate(u.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-            <Input
-              placeholder="Buscar atualização..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
-            />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Rocket className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-bold text-foreground">Pipeline de Atualizações</h2>
           </div>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[160px] border-white/10 bg-white/[0.05] text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
-              <SelectItem value="all">Todos</SelectItem>
-              {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-                <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <p className="text-sm text-muted-foreground mt-1">Histórico de funcionalidades e planejamento futuro do sistema.</p>
         </div>
-        <Button onClick={openNew} className="gap-2 bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,40%)] text-white">
-          <Plus className="h-4 w-4" /> Nova Atualização
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleGenerateRoadmap}
+            disabled={generating}
+            className="gap-2"
+          >
+            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {generating ? "Gerando..." : "Gerar Roadmap IA"}
+          </Button>
+          <Button onClick={openNew} className="gap-2">
+            <Plus className="h-4 w-4" /> Nova Entrada
+          </Button>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
-          const count = updates.filter((u) => u.status === key).length;
-          const Icon = cfg.icon;
-          return (
-            <button
-              key={key}
-              onClick={() => setFilterStatus(filterStatus === key ? "all" : key)}
-              className={`rounded-xl border p-4 text-left transition-colors ${
-                filterStatus === key ? "border-white/30 bg-white/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <Icon className="h-4 w-4" style={{ color: cfg.color }} />
-                <span className="text-xs text-white/50">{cfg.label}</span>
-              </div>
-              <p className="text-2xl font-bold text-white">{count}</p>
-            </button>
-          );
-        })}
-      </div>
+      {/* Tabs */}
+      <Tabs defaultValue="changelog" className="w-full">
+        <TabsList className="bg-muted">
+          <TabsTrigger value="changelog" className="gap-1.5">
+            <CheckCircle2 className="h-4 w-4" />
+            Changelog ({changelogItems.length})
+          </TabsTrigger>
+          <TabsTrigger value="roadmap" className="gap-1.5">
+            <Lightbulb className="h-4 w-4" />
+            Roadmap ({roadmapItems.length})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Timeline */}
-      {isLoading ? (
-        <div className="flex justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(174,62%,47%)] border-t-transparent" />
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {(["in_progress", "planned", "idea", "released"] as const).map((statusKey) => {
-            const items = grouped[statusKey];
-            if (items.length === 0) return null;
-            const cfg = STATUS_CONFIG[statusKey];
-            const Icon = cfg.icon;
-            return (
-              <div key={statusKey}>
-                <div className="flex items-center gap-2 mb-4">
-                  <Icon className="h-5 w-5" style={{ color: cfg.color }} />
-                  <h3 className="text-lg font-semibold text-white">{cfg.label}</h3>
-                  <Badge variant="secondary" className="bg-white/10 text-white/60">{items.length}</Badge>
-                </div>
-                <div className="space-y-3">
-                  {items.map((u) => {
-                    const catCfg = CATEGORY_CONFIG[u.category] || CATEGORY_CONFIG.feature;
-                    const priCfg = PRIORITY_CONFIG[u.priority] || PRIORITY_CONFIG.medium;
-                    const CatIcon = catCfg.icon;
-                    const PriIcon = priCfg.icon;
-                    return (
-                      <div
-                        key={u.id}
-                        className="group flex items-start gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.06] transition-colors"
-                      >
-                        <div
-                          className="mt-1 h-3 w-3 rounded-full shrink-0 ring-4 ring-white/5"
-                          style={{ backgroundColor: cfg.color }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <h4 className="font-semibold text-white">{u.title}</h4>
-                            <Badge variant="outline" className="text-xs border-white/10 text-white/50 gap-1">
-                              <CatIcon className="h-3 w-3" /> {catCfg.label}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs border-white/10 gap-1" style={{ color: priCfg.color, borderColor: priCfg.color + "40" }}>
-                              <PriIcon className="h-3 w-3" /> {priCfg.label}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-white/50 line-clamp-2">{u.description}</p>
-                          {u.release_date && (
-                            <p className="text-xs text-white/30 mt-1">
-                              {format(new Date(u.release_date), "dd MMM yyyy", { locale: ptBR })}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/40 hover:text-white hover:bg-white/10" onClick={() => openEdit(u)}>
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-white/40 hover:text-red-400 hover:bg-red-500/10"
-                            onClick={() => deleteMutation.mutate(u.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        {isLoading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <>
+            <TabsContent value="changelog" className="space-y-3 mt-4">
+              {changelogItems.length === 0 ? (
+                <p className="text-center text-muted-foreground py-12">Nenhuma atualização lançada ainda.</p>
+              ) : (
+                changelogItems.map((u) => renderCard(u, false))
+              )}
+            </TabsContent>
+
+            <TabsContent value="roadmap" className="space-y-3 mt-4">
+              {roadmapItems.length === 0 ? (
+                <p className="text-center text-muted-foreground py-12">Nenhum item no roadmap. Clique em "Gerar Roadmap IA" para sugestões.</p>
+              ) : (
+                roadmapItems.map((u) => renderCard(u, true))
+              )}
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="border-white/10 bg-[hsl(220,25%,8%)] text-white sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar Atualização" : "Nova Atualização"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm text-white/60 mb-1 block">Título</label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} className="border-white/10 bg-white/[0.05] text-white" placeholder="Ex: Sistema de Chat Avançado" />
+              <label className="text-sm text-muted-foreground mb-1 block">Título</label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Sistema de Chat Avançado" />
             </div>
             <div>
-              <label className="text-sm text-white/60 mb-1 block">Descrição</label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="border-white/10 bg-white/[0.05] text-white min-h-[80px]" placeholder="Descreva a atualização..." />
+              <label className="text-sm text-muted-foreground mb-1 block">Descrição</label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[80px]" placeholder="Descreva a atualização..." />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-sm text-white/60 mb-1 block">Categoria</label>
+                <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="border-white/10 bg-white/[0.05] text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
                     {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
                       <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
                     ))}
@@ -312,12 +336,10 @@ export function SystemUpdatesManager() {
                 </Select>
               </div>
               <div>
-                <label className="text-sm text-white/60 mb-1 block">Status</label>
+                <label className="text-sm text-muted-foreground mb-1 block">Status</label>
                 <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className="border-white/10 bg-white/[0.05] text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
                     {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
                       <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
                     ))}
@@ -325,12 +347,10 @@ export function SystemUpdatesManager() {
                 </Select>
               </div>
               <div>
-                <label className="text-sm text-white/60 mb-1 block">Prioridade</label>
+                <label className="text-sm text-muted-foreground mb-1 block">Prioridade</label>
                 <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger className="border-white/10 bg-white/[0.05] text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
                     {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
                       <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
                     ))}
@@ -339,15 +359,13 @@ export function SystemUpdatesManager() {
               </div>
             </div>
             <div>
-              <label className="text-sm text-white/60 mb-1 block">Data de lançamento</label>
-              <Input type="datetime-local" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} className="border-white/10 bg-white/[0.05] text-white" />
+              <label className="text-sm text-muted-foreground mb-1 block">Data de lançamento</label>
+              <Input type="datetime-local" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeDialog} className="border-white/10 text-white/60 hover:bg-white/10 hover:text-white">
-              Cancelar
-            </Button>
-            <Button onClick={() => upsertMutation.mutate()} disabled={!title.trim() || upsertMutation.isPending} className="bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,40%)] text-white">
+            <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
+            <Button onClick={() => upsertMutation.mutate()} disabled={!title.trim() || upsertMutation.isPending}>
               {upsertMutation.isPending ? "Salvando..." : editing ? "Salvar" : "Registrar"}
             </Button>
           </DialogFooter>
