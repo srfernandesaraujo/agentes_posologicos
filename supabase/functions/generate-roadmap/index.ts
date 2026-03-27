@@ -100,28 +100,115 @@ Para cada sugestão, retorne um JSON array com objetos contendo:
 
 Retorne APENAS o JSON array, sem markdown ou texto adicional.`;
 
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
+    // Try user's own API keys first, fallback to Lovable gateway
+    const { data: userKeys } = await supabase
+      .from("user_api_keys")
+      .select("provider, api_key_encrypted")
+      .eq("user_id", user.id);
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.8,
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      throw new Error(`AI API error: ${aiResponse.status} ${errText}`);
+    const decryptedKeys: Record<string, string> = {};
+    if (userKeys) {
+      for (const k of userKeys) {
+        try {
+          const { data: decrypted } = await supabase.rpc("decrypt_api_key", { p_encrypted: k.api_key_encrypted });
+          if (decrypted) decryptedKeys[k.provider] = decrypted;
+        } catch { /* ignore */ }
+      }
     }
 
-    const aiData = await aiResponse.json();
-    const content = aiData.choices?.[0]?.message?.content || "";
+    const requestBody = JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.8,
+    });
+
+    let content = "";
+    let aiSuccess = false;
+
+    // 1) Try OpenAI key
+    if (!aiSuccess && decryptedKeys["openai"]) {
+      try {
+        console.log("Trying OpenAI user key...");
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${decryptedKeys["openai"]}`, "Content-Type": "application/json" },
+          body: requestBody,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          content = data.choices?.[0]?.message?.content || "";
+          aiSuccess = true;
+          console.log("OpenAI user key succeeded");
+        } else {
+          console.log("OpenAI user key failed:", res.status);
+        }
+      } catch (e) { console.log("OpenAI user key error:", e); }
+    }
+
+    // 2) Try Groq key
+    if (!aiSuccess && decryptedKeys["groq"]) {
+      try {
+        console.log("Trying Groq user key...");
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${decryptedKeys["groq"]}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.8,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          content = data.choices?.[0]?.message?.content || "";
+          aiSuccess = true;
+          console.log("Groq user key succeeded");
+        } else {
+          console.log("Groq user key failed:", res.status);
+        }
+      } catch (e) { console.log("Groq user key error:", e); }
+    }
+
+    // 3) Try Google key
+    if (!aiSuccess && decryptedKeys["google"]) {
+      try {
+        console.log("Trying Google user key...");
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${decryptedKeys["google"]}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.8 },
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          aiSuccess = true;
+          console.log("Google user key succeeded");
+        } else {
+          console.log("Google user key failed:", res.status);
+        }
+      } catch (e) { console.log("Google user key error:", e); }
+    }
+
+    // 4) Fallback: Lovable AI Gateway
+    if (!aiSuccess) {
+      if (!LOVABLE_API_KEY) throw new Error("Nenhuma API key disponível e LOVABLE_API_KEY não configurada");
+      console.log("Falling back to Lovable AI Gateway...");
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: requestBody,
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Lovable Gateway error: ${res.status} ${errText}`);
+      }
+      const data = await res.json();
+      content = data.choices?.[0]?.message?.content || "";
+      console.log("Lovable AI Gateway succeeded");
+    }
 
     // Parse JSON from response
     let suggestions: any[];
