@@ -253,7 +253,7 @@ export function MessageActions({ content, agentName, messageRef, sessionId, mess
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={handleCopyCode} variant="outline" className="flex-1 border-white/20 text-white hover:bg-white/10">
+                <Button onClick={handleCopyCode} variant="outline" className="flex-1 border-white/30 text-white bg-white/10 hover:bg-white/20">
                   <Copy className="h-3.5 w-3.5 mr-1" />
                   Copiar código
                 </Button>
