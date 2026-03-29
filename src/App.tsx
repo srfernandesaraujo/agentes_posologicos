@@ -66,6 +66,7 @@ const App = () => (
             <Route path="/termos" element={<TermsOfService />} />
             <Route path="/privacidade" element={<PrivacyPolicy />} />
             <Route path="/cookies" element={<CookiePolicy />} />
+            <Route path="/verificar" element={<VerifyCertificate />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
