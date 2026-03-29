@@ -779,7 +779,7 @@ export default function Chat() {
                   )}
                   <div className={`relative group ${msg.role === "assistant" ? "max-w-[85%]" : ""}`}>
                     {msg.role === "assistant" && (
-                      <MessageActions content={msg.content} agentName={agent?.name || "Agente"} messageRef={contentRef} />
+                      <MessageActions content={msg.content} agentName={agent?.name || "Agente"} messageRef={contentRef} sessionId={sessionId} messageId={msg.id} />
                     )}
                     <div
                       ref={msg.role === "assistant" ? contentRef : undefined}
