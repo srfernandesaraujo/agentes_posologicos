@@ -528,6 +528,45 @@ export type Database = {
         }
         Relationships: []
       }
+      content_certificates: {
+        Row: {
+          agent_name: string
+          content_hash: string
+          content_preview: string
+          created_at: string
+          id: string
+          message_id: string | null
+          metadata: Json | null
+          session_id: string | null
+          user_id: string
+          verification_code: string
+        }
+        Insert: {
+          agent_name?: string
+          content_hash: string
+          content_preview?: string
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          session_id?: string | null
+          user_id: string
+          verification_code: string
+        }
+        Update: {
+          agent_name?: string
+          content_hash?: string
+          content_preview?: string
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          session_id?: string | null
+          user_id?: string
+          verification_code?: string
+        }
+        Relationships: []
+      }
       credits_ledger: {
         Row: {
           amount: number
