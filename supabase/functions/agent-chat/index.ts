@@ -1382,6 +1382,16 @@ Para cada par de medicamentos:
 RELATÓRIO DE AUDITORIA DE PRESCRIÇÃO
 ==================================================
 
+0) DADOS DO PACIENTE (se disponíveis)
+SEMPRE inclua no início do relatório uma seção com os dados do paciente no seguinte formato:
+Paciente: [Nome]
+Idade: [X] anos
+Peso: [X] kg
+Alergias: [lista separada por vírgula, ou "Não informadas"]
+Função renal: [ClCr ou TFG, ou "Não informada"]
+Função hepática: [se alterada, ou "Normal/Não informada"]
+Comorbidades: [lista separada por vírgula, ou "Não informadas"]
+
 1) RESUMO DA PRESCRIÇÃO ANALISADA
 Tabela com: Medicamento | Dose | Via | Frequência
 
@@ -1401,10 +1411,16 @@ Verificação de adequação posológica para perfil do paciente.
 4) DUPLICIDADES TERAPÊUTICAS
 Identificação de classes terapêuticas repetidas.
 
-5) PLANO DE INTERVENÇÃO FARMACÊUTICA
-Lista priorizada de ações recomendadas ao prescritor.
+5) SCORE DE SEGURANÇA
+Atribua um Score de Segurança de 0 a 100 para a prescrição analisada, no formato:
+Score de Segurança: XX/100
+Onde 100 = prescrição sem alertas e 0 = múltiplos alertas críticos.
 
-6) REFERÊNCIAS E FONTES DE CONSULTA
+6) PLANO DE INTERVENÇÃO FARMACÊUTICA
+Lista NUMERADA e priorizada de ações recomendadas ao prescritor.
+Cada item deve começar com número seguido de ponto (1. Ação..., 2. Ação...).
+
+7) REFERÊNCIAS E FONTES DE CONSULTA
 Ao final de cada relatório, OBRIGATORIAMENTE inclua uma seção de referências contendo:
 - Bases de dados e fontes utilizadas para embasar as interações identificadas (ex: Micromedex, UpToDate, Drugs.com, Medscape Drug Interaction Checker, BNF - British National Formulary)
 - Links ou indicações de onde o profissional pode verificar cada interação reportada
@@ -1423,7 +1439,7 @@ Ao final de cada relatório, OBRIGATORIAMENTE inclua uma seção de referências
 
 Adapte as referências conforme os medicamentos e interações específicas analisadas. Cite artigos ou guidelines específicos quando disponíveis.
 
-7) REGRA DE CONTINUIDADE
+8) REGRA DE CONTINUIDADE
 Agora posso te ajudar com:
 1. Analisar outra prescrição
 2. Detalhar mecanismo de uma interação específica
