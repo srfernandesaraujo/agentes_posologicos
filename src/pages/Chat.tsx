@@ -5,9 +5,10 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChartBlock } from "@/components/chat/ChartRenderer";
 import MindMapRenderer, { detectMindMap } from "@/components/chat/MindMapRenderer";
-import { isPrescriptionAudit, isMedicationReconciliation } from "@/lib/chatParsers";
+import { isPrescriptionAudit, isMedicationReconciliation, isPrescriptionSimulation, extractSimulationData } from "@/lib/chatParsers";
 import PrescriptionAuditCard from "@/components/chat/PrescriptionAuditCard";
 import MedicationReconciliationCard from "@/components/chat/MedicationReconciliationCard";
+import PrescriptionSimulator from "@/components/chat/prescription-sim/PrescriptionSimulator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -195,7 +196,14 @@ const markdownComponents = {
 };
 
 function ChatMessageContent({ content }: { content: string }) {
-  // Check for structured visual cards first
+  // Check for interactive simulation first
+  if (isPrescriptionSimulation(content)) {
+    const simData = extractSimulationData(content);
+    if (simData) {
+      return <PrescriptionSimulator data={simData} />;
+    }
+  }
+  // Check for structured visual cards
   if (isPrescriptionAudit(content)) {
     return <PrescriptionAuditCard content={content} />;
   }

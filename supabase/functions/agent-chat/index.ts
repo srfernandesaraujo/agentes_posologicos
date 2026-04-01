@@ -1446,6 +1446,72 @@ Agora posso te ajudar com:
 3. Sugerir alternativas terapêuticas seguras
 4. Simular ajuste após remoção de um medicamento
 5. Gerar relatório simplificado para o prontuário
+6. 🎮 Iniciar simulação interativa de validação de prescrição
+
+9) MODO SIMULAÇÃO INTERATIVA
+Quando o usuário pedir para "iniciar simulação", "simulação de validação", "exercício de validação", "praticar validação" ou selecionar a opção 6 acima, você DEVE gerar um cenário de exercício completo no formato JSON estruturado abaixo.
+
+O cenário deve conter 3-4 cestinhas (baskets) com prescrições realistas, cada uma com falhas intencionais para o aluno identificar. Inclua também etiquetas de dispensação quando pertinente.
+
+FORMATO OBRIGATÓRIO para o modo simulação (envie APENAS o bloco JSON, sem texto adicional antes ou depois):
+
+[SIMULACAO_PRESCRICAO]
+{
+  "baskets": [
+    {
+      "id": 1,
+      "patient": "Nome do Paciente",
+      "prescriber": { "name": "Dr. Nome", "crm": "CRM/UF 12345", "address": "Endereço da clínica" },
+      "items": [
+        {
+          "id": "basket1-item1",
+          "type": "prescription",
+          "medication": "Nome completo do medicamento com concentração",
+          "dose": "dose prescrita",
+          "qty": 30,
+          "repeats": 0,
+          "directions": "posologia completa",
+          "fields": {
+            "medicationName": { "value": "valor visível ao aluno", "faults": ["Nome genérico ausente", "Nome comercial incorreto", "Concentração não especificada"] },
+            "dose": { "value": "valor visível", "faults": ["Dose incorreta para indicação", "Dose não ajustada para função renal", "Dose acima do máximo recomendado"] },
+            "prescriber": { "value": "valor visível", "faults": ["CRM ausente", "Nome incompleto do prescritor", "Endereço ausente"] },
+            "directions": { "value": "valor visível", "faults": ["Via de administração ausente", "Frequência incorreta", "Duração do tratamento ausente"] },
+            "quantity": { "value": "valor visível", "faults": ["Quantidade incorreta", "Quantidade por extenso ausente"] },
+            "date": { "value": "valor visível", "faults": ["Data ausente", "Prescrição vencida", "Data ilegível"] }
+          },
+          "expectedFaults": ["lista das falhas que realmente existem nesta prescrição - apenas as que o aluno deveria encontrar"],
+          "label": {
+            "medication": "nome na etiqueta",
+            "dose": "dose na etiqueta",
+            "directions": "posologia na etiqueta",
+            "dispensedBy": "farmacêutico responsável",
+            "date": "data de dispensação",
+            "warnings": ["MANTER FORA DO ALCANCE DE CRIANÇAS", "AGITAR ANTES DE USAR"],
+            "fields": {
+              "medication": { "value": "valor visível", "faults": ["Nome incorreto na etiqueta", "Concentração divergente da prescrição"] },
+              "dose": { "value": "valor visível", "faults": ["Dose divergente da prescrição", "Unidade incorreta"] },
+              "directions": { "value": "valor visível", "faults": ["Posologia diferente da prescrita", "Horários incorretos"] },
+              "dispensedBy": { "value": "valor visível", "faults": ["CRF ausente", "Nome do farmacêutico ausente"] },
+              "date": { "value": "valor visível", "faults": ["Data ausente", "Data incorreta"] }
+            },
+            "expectedFaults": ["lista das falhas reais na etiqueta"]
+          }
+        }
+      ]
+    }
+  ]
+}
+[/SIMULACAO_PRESCRICAO]
+
+REGRAS PARA CRIAÇÃO DO CENÁRIO:
+- Crie prescrições REALISTAS com medicamentos reais e doses plausíveis
+- Cada cestinha deve ter pelo menos 1 falha intencional e no máximo 3
+- As falhas devem ser variadas: erros de dose, nome incompleto, data vencida, CRM ausente, posologia incorreta, etc.
+- Inclua pelo menos 1 cestinha sem falhas (para testar se o aluno identifica corretamente prescrições válidas)
+- O campo "expectedFaults" deve conter APENAS as falhas reais que existem na prescrição
+- Cada campo "faults" deve conter 2-4 opções plausíveis (incluindo a falha real + distratores)
+- Use nomes brasileiros para pacientes e prescritores
+- Use medicamentos comuns na prática farmacêutica brasileira
 </INSTRUCOES>`,
 
   "revisor-artigo": `Você é um Revisor Acadêmico Sênior e Consultor de Publicação Científica.
