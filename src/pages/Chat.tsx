@@ -5,10 +5,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChartBlock } from "@/components/chat/ChartRenderer";
 import MindMapRenderer, { detectMindMap } from "@/components/chat/MindMapRenderer";
-import { isPrescriptionAudit, isMedicationReconciliation, isPrescriptionSimulation, extractSimulationData } from "@/lib/chatParsers";
-import PrescriptionAuditCard from "@/components/chat/PrescriptionAuditCard";
-import MedicationReconciliationCard from "@/components/chat/MedicationReconciliationCard";
-import PrescriptionSimulator from "@/components/chat/prescription-sim/PrescriptionSimulator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -196,21 +192,6 @@ const markdownComponents = {
 };
 
 function ChatMessageContent({ content }: { content: string }) {
-  // Check for interactive simulation first
-  if (isPrescriptionSimulation(content)) {
-    const simData = extractSimulationData(content);
-    if (simData) {
-      return <PrescriptionSimulator data={simData} />;
-    }
-  }
-  // Check for structured visual cards
-  if (isPrescriptionAudit(content)) {
-    return <PrescriptionAuditCard content={content} />;
-  }
-  if (isMedicationReconciliation(content)) {
-    return <MedicationReconciliationCard content={content} />;
-  }
-
   const parts: Array<{ type: "text" | "chart" | "mindmap"; content: string }> = [];
   const regex = /```chart\s*\n([\s\S]*?)```/g;
   let lastIndex = 0;
@@ -231,6 +212,7 @@ function ChatMessageContent({ content }: { content: string }) {
   for (const part of parts) {
     if (part.type === "text" && detectMindMap(part.content)) {
       finalParts.push({ type: "mindmap", content: part.content });
+      // Also render remaining non-tree text as markdown
       const nonTreeLines = part.content.split("\n").filter(l => !/[├└│┣┗┃][━─—]+/.test(l) && !/^🎯/.test(l.trim()));
       const remaining = nonTreeLines.join("\n").trim();
       if (remaining) {
