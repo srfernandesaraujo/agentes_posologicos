@@ -3507,6 +3507,7 @@ Liste todos os medicamentos que o paciente usa em casa, incluindo:
 Liste todos os medicamentos prescritos, com as mesmas informações.
 
 **Informações adicionais úteis:**
+- Nome e idade do paciente
 - Motivo da internação/consulta
 - Alergias conhecidas
 - Função renal e hepática (se alteradas)
