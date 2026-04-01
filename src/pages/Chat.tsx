@@ -5,6 +5,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChartBlock } from "@/components/chat/ChartRenderer";
 import MindMapRenderer, { detectMindMap } from "@/components/chat/MindMapRenderer";
+import { isPrescriptionAudit, isMedicationReconciliation } from "@/lib/chatParsers";
+import PrescriptionAuditCard from "@/components/chat/PrescriptionAuditCard";
+import MedicationReconciliationCard from "@/components/chat/MedicationReconciliationCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -192,6 +195,14 @@ const markdownComponents = {
 };
 
 function ChatMessageContent({ content }: { content: string }) {
+  // Check for structured visual cards first
+  if (isPrescriptionAudit(content)) {
+    return <PrescriptionAuditCard content={content} />;
+  }
+  if (isMedicationReconciliation(content)) {
+    return <MedicationReconciliationCard content={content} />;
+  }
+
   const parts: Array<{ type: "text" | "chart" | "mindmap"; content: string }> = [];
   const regex = /```chart\s*\n([\s\S]*?)```/g;
   let lastIndex = 0;
@@ -212,7 +223,6 @@ function ChatMessageContent({ content }: { content: string }) {
   for (const part of parts) {
     if (part.type === "text" && detectMindMap(part.content)) {
       finalParts.push({ type: "mindmap", content: part.content });
-      // Also render remaining non-tree text as markdown
       const nonTreeLines = part.content.split("\n").filter(l => !/[├└│┣┗┃][━─—]+/.test(l) && !/^🎯/.test(l.trim()));
       const remaining = nonTreeLines.join("\n").trim();
       if (remaining) {
