@@ -195,6 +195,14 @@ const markdownComponents = {
 };
 
 function ChatMessageContent({ content }: { content: string }) {
+  // Check for structured visual cards first
+  if (isPrescriptionAudit(content)) {
+    return <PrescriptionAuditCard content={content} />;
+  }
+  if (isMedicationReconciliation(content)) {
+    return <MedicationReconciliationCard content={content} />;
+  }
+
   const parts: Array<{ type: "text" | "chart" | "mindmap"; content: string }> = [];
   const regex = /```chart\s*\n([\s\S]*?)```/g;
   let lastIndex = 0;
@@ -215,7 +223,6 @@ function ChatMessageContent({ content }: { content: string }) {
   for (const part of parts) {
     if (part.type === "text" && detectMindMap(part.content)) {
       finalParts.push({ type: "mindmap", content: part.content });
-      // Also render remaining non-tree text as markdown
       const nonTreeLines = part.content.split("\n").filter(l => !/[├└│┣┗┃][━─—]+/.test(l) && !/^🎯/.test(l.trim()));
       const remaining = nonTreeLines.join("\n").trim();
       if (remaining) {
