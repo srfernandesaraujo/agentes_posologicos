@@ -1,3 +1,28 @@
+import type { SimulationData } from "@/components/chat/prescription-sim/types";
+
+/**
+ * Detects if content contains a prescription simulation scenario
+ */
+export function isPrescriptionSimulation(content: string): boolean {
+  return content.includes("[SIMULACAO_PRESCRICAO]") && content.includes("[/SIMULACAO_PRESCRICAO]");
+}
+
+/**
+ * Extract simulation JSON data from content
+ */
+export function extractSimulationData(content: string): SimulationData | null {
+  try {
+    const match = content.match(/\[SIMULACAO_PRESCRICAO\]\s*([\s\S]*?)\s*\[\/SIMULACAO_PRESCRICAO\]/);
+    if (!match) return null;
+    const jsonStr = match[1].trim();
+    const data = JSON.parse(jsonStr) as SimulationData;
+    if (!data.baskets || !Array.isArray(data.baskets)) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Detects if content is a Prescription Audit report
  */

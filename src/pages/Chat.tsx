@@ -196,7 +196,14 @@ const markdownComponents = {
 };
 
 function ChatMessageContent({ content }: { content: string }) {
-  // Check for structured visual cards first
+  // Check for interactive simulation first
+  if (isPrescriptionSimulation(content)) {
+    const simData = extractSimulationData(content);
+    if (simData) {
+      return <PrescriptionSimulator data={simData} />;
+    }
+  }
+  // Check for structured visual cards
   if (isPrescriptionAudit(content)) {
     return <PrescriptionAuditCard content={content} />;
   }
