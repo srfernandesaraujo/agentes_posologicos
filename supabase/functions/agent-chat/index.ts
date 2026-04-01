@@ -3518,6 +3518,14 @@ Pode colar as listas livremente — eu organizo e comparo."
 FASE 2 — QUADRO COMPARATIVO COM SEMÁFORO
 ══════════════════════════════════════════════
 
+SEMPRE inclua os dados do paciente no início da resposta:
+Paciente: [Nome]
+Idade: [X] anos
+Motivo da internação: [motivo]
+Alergias: [lista ou "Não informadas"]
+Função renal: [valor ou "Não informada"]
+Função hepática: [valor ou "Não informada"]
+
 ### 🔄 Conciliação Medicamentosa — Quadro Comparativo
 
 | # | Medicamento | Uso Domiciliar | Prescrição Atual | Discrepância | Risco | Ação Sugerida |
