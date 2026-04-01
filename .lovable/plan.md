@@ -1,62 +1,114 @@
 
 
-# Fix: Meeting Bot Stuck in "Transcribing" -- Split Processing Pipeline
+## Plano: Renderização Visual para Módulos de Validação da Prescrição e Farmácia Hospitalar
 
-## Root Cause
+### Problema
+Os módulos de Validação da Prescrição (Auditor de Prescrição) e Farmácia Hospitalar (Conciliador Medicamentoso e outros) exibem seus resultados como markdown puro, sem a riqueza visual que o Simulador de Farmácia Comunitária possui. O objetivo é criar componentes visuais ricos que renderizem os dados estruturados desses agentes como cards interativos, mantendo a identidade visual da plataforma.
 
-The logs show the `meeting-webhook` function is being **killed by Supabase before it finishes**. Every 8-10 seconds:
-1. Function boots (~30ms)
-2. Starts fetching transcript from Recall.ai
-3. Gets shut down before the response arrives
+### Proposta Visual
 
-The function tries to do too much in one invocation: fetch bot data + fetch transcript + call AI for summary. This exceeds the edge function wall time limit.
-
-Meanwhile, `meeting-sync` keeps calling the webhook every 15s from the frontend poll, creating an infinite retry loop that never succeeds.
-
-## Fix: Move Transcript Fetch Into meeting-sync
-
-Instead of `meeting-sync` calling `meeting-webhook` (which then tries to do everything), `meeting-sync` will handle the transcript fetch and summary generation directly, in smaller steps:
-
-**Step 1**: When `meeting-sync` detects a "done" bot, it fetches the transcript directly and saves it to the DB (status: "transcribing" -> save transcript -> status: "summarizing"). This is one sync cycle.
-
-**Step 2**: On the next sync cycle, for meetings in "summarizing" status that have a transcript but no summary, `meeting-sync` calls `meeting-summary` (which already exists as a separate function).
-
-This ensures no single function call needs more than one external API call.
-
-### Architecture Change
+**Módulo 1 — Validação da Prescrição (Auditor de Prescrição)**
 
 ```text
-BEFORE (broken):
-  meeting-sync -> meeting-webhook (fetch transcript + AI summary = TIMEOUT)
-
-AFTER (fixed):
-  meeting-sync cycle 1: detect done -> fetch transcript -> save to DB
-  meeting-sync cycle 2: detect summarizing -> call meeting-summary -> done
+┌─────────────────────────────────────────────┐
+│ 📋 RELATÓRIO DE AUDITORIA DE PRESCRIÇÃO     │
+│─────────────────────────────────────────────│
+│ ┌──────────────────────────────────────────┐│
+│ │ 👤 Card do Paciente                      ││
+│ │ Avatar · Nome · Idade · Peso             ││
+│ │ Alergias: badge vermelho                 ││
+│ │ Função Renal: badge · Comorbidades: tags ││
+│ └──────────────────────────────────────────┘│
+│                                             │
+│ ┌──────────────────────────────────────────┐│
+│ │ 💊 Prescrição Analisada                  ││
+│ │ Tabela estilizada com cada medicamento   ││
+│ │ Dose | Via | Frequência                  ││
+│ └──────────────────────────────────────────┘│
+│                                             │
+│ ┌──────────────────────────────────────────┐│
+│ │ ⚠️ Alertas de Segurança                  ││
+│ │ 🔴 Card vermelho: Alerta crítico        ││
+│ │ 🟡 Card amarelo: Monitoramento          ││
+│ │ 🟢 Card verde: Informativo              ││
+│ └──────────────────────────────────────────┘│
+│                                             │
+│ 📊 Score de Segurança: ████████░░ 78%       │
+│ 📝 Plano de Intervenção (lista numerada)    │
+└─────────────────────────────────────────────┘
 ```
 
-## Files Changed
+**Módulo 2 — Farmácia Hospitalar (Conciliador Medicamentoso)**
 
-| File | Change |
-|------|--------|
-| `supabase/functions/meeting-sync/index.ts` | Add transcript fetching logic directly; handle "summarizing" meetings by calling meeting-summary; stop delegating to webhook |
-| `supabase/functions/meeting-webhook/index.ts` | Simplify to only handle status updates (done/error) -- set status to "transcribing" without trying to fetch transcript |
+```text
+┌─────────────────────────────────────────────┐
+│ 🔄 CONCILIAÇÃO MEDICAMENTOSA               │
+│─────────────────────────────────────────────│
+│ ┌──────────────────────────────────────────┐│
+│ │ 👤 Card do Paciente                      ││
+│ │ Avatar · Nome · Idade · Motivo Internação││
+│ │ Alergias · Função Renal/Hepática         ││
+│ └──────────────────────────────────────────┘│
+│                                             │
+│ ┌─────────────┐  ↔  ┌─────────────────────┐│
+│ │ 🏠 Uso      │     │ 🏥 Prescrição       ││
+│ │ Domiciliar  │     │ Hospitalar           ││
+│ │ - Med A 10mg│     │ - Med A 20mg ⚠️     ││
+│ │ - Med B 5mg │     │ - Med C 100mg ➕    ││
+│ │ - Med D 25mg│     │ (Med D omitido) ❌  ││
+│ └─────────────┘     └─────────────────────┘│
+│                                             │
+│ ┌──────────────────────────────────────────┐│
+│ │ 📊 Resumo Visual                         ││
+│ │ 🟢 Conciliados: 5  │ 🟡 Atenção: 2     ││
+│ │ 🔴 Alto Risco: 1   │ Total: 8           ││
+│ └──────────────────────────────────────────┘│
+│                                             │
+│ ⚠️ Alertas de Alta Vigilância              │
+│ 💡 Recomendações ao Prescritor             │
+└─────────────────────────────────────────────┘
+```
 
-## Implementation Details
+### Implementação Técnica
 
-### meeting-webhook (simplified)
-- On "done" status: just update meeting to `status: "transcribing"`, return immediately
-- On "error" status: update with error message (keep existing logic)
-- Remove all transcript fetching and AI summary code from this function
+**1. Componentes visuais** (`src/components/chat/`)
+- `PrescriptionAuditCard.tsx` — Detecta e renderiza o "RELATÓRIO DE AUDITORIA DE PRESCRIÇÃO" com:
+  - Card do paciente com avatar gerado (iniciais), dados demográficos e badges de alergias
+  - Tabela de medicamentos estilizada com ícones por via de administração
+  - Cards coloridos de alertas (vermelho/amarelo/verde) com bordas e backgrounds distintos
+  - Barra de score de segurança visual
+  - Seção de intervenção com checklist visual
 
-### meeting-sync (enhanced)
-- Query meetings in `["pending", "recording", "transcribing", "summarizing"]`
-- For `pending`/`recording`: fetch bot status from Recall, update if done/error
-- For `transcribing`: fetch transcript from Recall directly (reuse fetchTranscript logic), save to DB, set status to "summarizing"
-- For `summarizing`: call `meeting-summary` function via internal service-role call
-- Keep existing timeout protections (15min max wait)
+- `MedicationReconciliationCard.tsx` — Detecta e renderiza a "CONCILIAÇÃO MEDICAMENTOSA" com:
+  - Card do paciente com avatar e dados de internação
+  - Layout lado a lado (desktop) / empilhado (mobile) comparando listas domiciliar vs hospitalar
+  - Badges visuais de discrepância (❌ Omissão, ➕ Adição, 📊 Dose diferente, 🔄 Substituição)
+  - Dashboard de resumo com contadores coloridos
+  - Cards de alta vigilância com destaque vermelho
 
-### Key technical points
-- Move `fetchRecallJson`, `extractTranscriptShortcut`, `fetchTranscriptPayload`, `fetchTranscript` helper functions into `meeting-sync`
-- `meeting-summary` already exists and works -- just need to call it with service role auth pattern
-- Each sync cycle does at most ONE external API call per meeting, staying within edge function limits
+**2. Parser de detecção** (`src/lib/chatParsers.ts`)
+- Funções que detectam padrões no markdown: `isPrescriptionAudit(content)`, `isMedicationReconciliation(content)`
+- Parsers que extraem dados estruturados do texto: paciente, medicamentos, alertas, resumo
+
+**3. Integração no Chat** (`src/pages/Chat.tsx`)
+- Atualizar `ChatMessageContent` para verificar se o conteúdo corresponde a um dos formatos visuais antes de renderizar como markdown puro
+- Manter fallback para markdown caso o parser não consiga extrair os dados
+
+**4. Ajuste nos prompts dos agentes** (`supabase/functions/agent-chat/index.ts`)
+- Adicionar marcadores estruturais nos prompts do `auditor-prescricao` e `conciliador-medicamentoso` para facilitar o parsing (ex: `[PACIENTE]Nome|Idade|Peso[/PACIENTE]`)
+- Garantir que os dados do paciente sempre sejam emitidos em formato parseável
+
+### Elementos Visuais Compartilhados
+- Avatar do paciente gerado por iniciais (círculo colorido com letras)
+- Badges de risco com cores do semáforo (vermelho/amarelo/verde) usando os tokens CSS existentes
+- Cards com `glass-card` e bordas temáticas
+- Gradients consistentes com o design system (teal/blue)
+- Responsivo: cards empilham em mobile
+
+### Arquivos Modificados/Criados
+1. **Criar** `src/components/chat/PrescriptionAuditCard.tsx`
+2. **Criar** `src/components/chat/MedicationReconciliationCard.tsx`
+3. **Criar** `src/lib/chatParsers.ts`
+4. **Editar** `src/pages/Chat.tsx` — integrar os novos renderers no `ChatMessageContent`
+5. **Editar** `supabase/functions/agent-chat/index.ts` — adicionar marcadores estruturais nos prompts
 
