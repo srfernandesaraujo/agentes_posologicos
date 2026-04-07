@@ -42,6 +42,12 @@ export const LLM_PROVIDERS = [
     url: "https://aistudio.google.com/apikey",
     models: ["gemini-2.5-flash", "gemini-2.5-pro"],
   },
+  {
+    id: "nvidia",
+    name: "NVIDIA Nemotron",
+    url: "https://build.nvidia.com/nvidia/llama-3_1-nemotron-ultra-253b-v1",
+    models: ["nvidia/llama-3.1-nemotron-ultra-253b-v1", "nvidia/llama-3.3-nemotron-super-49b-v1"],
+  },
 ] as const;
 
 export function useApiKeys() {
