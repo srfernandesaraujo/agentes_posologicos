@@ -7416,6 +7416,20 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
       "Authorization": `Bearer ${userApiKey}`,
     };
 
+    // Groq does not support multimodal content — flatten files to text-only
+    const TEXT_ONLY_PROVIDERS = ["groq"];
+    let userContent: any;
+    if (TEXT_ONLY_PROVIDERS.includes(customAgent.provider)) {
+      if (files && files.length > 0) {
+        const { textContent } = processFilesForAI(files);
+        userContent = input + textContent;
+      } else {
+        userContent = input;
+      }
+    } else {
+      userContent = buildUserMessage(input, files);
+    }
+
     const aiResponse = await fetch(endpoint, {
       method: "POST",
       headers,
@@ -7425,7 +7439,7 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
         messages: [
           { role: "system", content: finalSystemPrompt },
           ...(conversationHistory || []),
-          { role: "user", content: buildUserMessage(input, files) },
+          { role: "user", content: userContent },
         ],
       }),
     });
