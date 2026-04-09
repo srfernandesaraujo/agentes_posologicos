@@ -5903,6 +5903,20 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1/messages",
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
   google: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+  nvidia: "https://integrate.api.nvidia.com/v1/chat/completions",
+};
+
+// Priority order for trying user API keys — Google first, Lovable AI Gateway is the absolute last resort
+const PROVIDER_PRIORITY_ORDER = ["google", "openai", "anthropic", "groq", "nvidia", "openrouter"];
+
+// Default models per provider
+const DEFAULT_MODELS_PER_PROVIDER: Record<string, string> = {
+  google: "gemini-2.5-flash",
+  openai: "gpt-4o",
+  anthropic: "claude-sonnet-4-20250514",
+  groq: "llama-3.3-70b-versatile",
+  nvidia: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+  openrouter: "google/gemini-2.5-flash",
 };
 
 // Process uploaded files into content parts for multimodal AI
