@@ -7027,9 +7027,13 @@ Deno.serve(async (req) => {
 
                 if (aiResponse.ok) {
                   const data = await aiResponse.json();
-                  const output = data.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-                  const usage = extractUsage(data);
-                  return await successResponse(output, { provider, model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+                  const output = data.choices?.[0]?.message?.content || "";
+                  if (!output.trim()) {
+                    console.error(`Native ${provider} returned empty content — trying next provider`);
+                  } else {
+                    const usage = extractUsage(data);
+                    return await successResponse(output, { provider, model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+                  }
                 }
                 const errText = await aiResponse.text();
                 console.error(`User ${provider} key failed: ${aiResponse.status} ${errText} - trying next provider`);
