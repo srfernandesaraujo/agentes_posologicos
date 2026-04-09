@@ -7009,9 +7009,13 @@ Deno.serve(async (req) => {
 
                 if (anthropicResponse.ok) {
                   const data = await anthropicResponse.json();
-                  const output = data.content?.[0]?.text || "Sem resposta.";
-                  const usage = extractAnthropicUsage(data);
-                  return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+                  const output = data.content?.[0]?.text || "";
+                  if (!output.trim()) {
+                    console.error(`Native anthropic returned empty content — trying next provider`);
+                  } else {
+                    const usage = extractAnthropicUsage(data);
+                    return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+                  }
                 }
                 const errText = await anthropicResponse.text();
                 console.error(`User ${provider} key failed: ${anthropicResponse.status} ${errText} - trying next provider`);
