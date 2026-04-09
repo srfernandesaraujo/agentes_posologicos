@@ -6960,36 +6960,33 @@ Deno.serve(async (req) => {
         { role: "user", content: userContent },
       ];
 
-      // Check if user has their own API key configured
+      // Try ALL user API keys in priority order (Google first, then others)
       // Use room owner's API keys as fallback for virtual rooms
       const apiKeyLookupId = userId || (typeof roomOwnerId !== "undefined" ? roomOwnerId : null);
       if (apiKeyLookupId) {
         const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-        const { data: userKeys } = await serviceClient
+        const { data: allUserKeys } = await serviceClient
           .from("user_api_keys")
           .select("provider, api_key_encrypted")
-          .eq("user_id", apiKeyLookupId)
-          .order("updated_at", { ascending: false })
-          .limit(1);
+          .eq("user_id", apiKeyLookupId);
 
-        if (userKeys && userKeys.length > 0) {
-          const userKey = userKeys[0];
-          const provider = userKey.provider;
-          const apiKey = await decryptApiKey(userKey.api_key_encrypted);
-          const endpoint = PROVIDER_ENDPOINTS[provider];
+        if (allUserKeys && allUserKeys.length > 0) {
+          // Sort keys by priority order
+          const sortedKeys = [...allUserKeys].sort((a, b) => {
+            const aIdx = PROVIDER_PRIORITY_ORDER.indexOf(a.provider);
+            const bIdx = PROVIDER_PRIORITY_ORDER.indexOf(b.provider);
+            return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+          });
 
-          // Default models per provider for native agents
-          const DEFAULT_MODELS: Record<string, string> = {
-            openai: "gpt-4o",
-            anthropic: "claude-sonnet-4-20250514",
-            groq: "llama-3.3-70b-versatile",
-            openrouter: "google/gemini-2.5-flash",
-            google: "gemini-2.5-flash",
-          };
-          const model = DEFAULT_MODELS[provider] || "gpt-4o";
+          for (const userKey of sortedKeys) {
+            const provider = userKey.provider;
+            const endpoint = PROVIDER_ENDPOINTS[provider];
+            if (!endpoint) continue;
 
-          if (endpoint) {
-            console.log(`Native agent: using ${userId ? "user's" : "room owner's"} ${provider} key`);
+            const model = DEFAULT_MODELS_PER_PROVIDER[provider] || "gpt-4o";
+            const apiKey = await decryptApiKey(userKey.api_key_encrypted);
+
+            console.log(`Native agent: trying ${userId ? "user's" : "room owner's"} ${provider} key (priority order)`);
             try {
               if (provider === "anthropic") {
                 const anthropicResponse = await fetch(endpoint, {
@@ -7017,7 +7014,7 @@ Deno.serve(async (req) => {
                   return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
                 }
                 const errText = await anthropicResponse.text();
-                console.error(`User Anthropic key failed: ${anthropicResponse.status} ${errText} - falling back to native`);
+                console.error(`User ${provider} key failed: ${anthropicResponse.status} ${errText} - trying next provider`);
               } else {
                 const aiResponse = await fetch(endpoint, {
                   method: "POST",
@@ -7035,12 +7032,13 @@ Deno.serve(async (req) => {
                   return await successResponse(output, { provider, model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
                 }
                 const errText = await aiResponse.text();
-                console.error(`User ${provider} key failed: ${aiResponse.status} ${errText} - falling back to native`);
+                console.error(`User ${provider} key failed: ${aiResponse.status} ${errText} - trying next provider`);
               }
             } catch (e) {
-              console.error(`User API key error (${provider}):`, e.message, "- falling back to native");
+              console.error(`User API key error (${provider}):`, e.message, "- trying next provider");
             }
           }
+          console.log("All user API keys failed for native agent, falling back to Lovable AI Gateway");
         }
       }
 
