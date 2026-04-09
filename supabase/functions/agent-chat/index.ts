@@ -7256,83 +7256,19 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
       finalSystemPrompt += "\n\nSempre formate suas respostas em Markdown para melhor legibilidade.";
     }
 
-    // Get user's API key for the provider (use agent owner's key for virtual rooms)
+    // Get ALL user API keys and try in priority order (agent's own provider first, then Google, then others)
     const keyOwnerId = userId || customAgent.user_id;
-    const { data: apiKeyRow } = await serviceClient
+    const { data: allApiKeys } = await serviceClient
       .from("user_api_keys")
-      .select("api_key_encrypted")
-      .eq("user_id", keyOwnerId)
-      .eq("provider", customAgent.provider)
-      .single();
+      .select("provider, api_key_encrypted")
+      .eq("user_id", keyOwnerId);
 
-    // If no API key configured, fallback to Lovable AI Gateway
-    if (!apiKeyRow) {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          temperature: Number(customAgent.temperature),
-          messages: [
-            { role: "system", content: finalSystemPrompt },
-            ...(conversationHistory || []),
-            { role: "user", content: buildUserMessage(input, files) },
-          ],
-        }),
-      });
-
-      if (!aiResponse.ok) {
-        const status = aiResponse.status;
-        if (status === 429) {
-          return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (status === 402) {
-          return new Response(JSON.stringify({ error: "Créditos esgotados." }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        const errText = await aiResponse.text();
-        console.error("AI gateway error (custom fallback):", status, errText);
-        return new Response(JSON.stringify({ error: "Erro ao consultar o modelo de IA." }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const aiData = await aiResponse.json();
-      const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-      const usage = extractUsage(aiData);
-      return await successResponse(output, { provider: "lovable", model: "google/gemini-3-flash-preview", tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
-    }
-
-    const userApiKey = await decryptApiKey(apiKeyRow.api_key_encrypted);
-    const endpoint = PROVIDER_ENDPOINTS[customAgent.provider];
-
-    if (!endpoint) {
-      return new Response(JSON.stringify({ error: "Provedor não suportado" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Helper: fallback to Lovable AI Gateway
-    const fallbackToNative = async () => {
+    // Helper: call Lovable AI Gateway as absolute last resort
+    const fallbackToLovable = async () => {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-      console.log("Falling back to native Lovable AI Gateway");
+      console.log("All user API keys exhausted — falling back to Lovable AI Gateway (last resort)");
       const nativeResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -7363,7 +7299,7 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
           });
         }
         const errText = await nativeResponse.text();
-        console.error("Native fallback error:", status, errText);
+        console.error("Lovable AI Gateway error:", status, errText);
         return new Response(JSON.stringify({ error: "Erro ao consultar o modelo de IA." }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -7378,94 +7314,138 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
       });
     };
 
-    // Handle Anthropic separately (different API format)
-    if (customAgent.provider === "anthropic") {
-      const anthropicResponse = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "x-api-key": userApiKey,
-          "Content-Type": "application/json",
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: customAgent.model,
-          max_tokens: 4096,
-          temperature: Number(customAgent.temperature),
-          system: finalSystemPrompt,
-          messages: [
-            ...(conversationHistory || []),
-            { role: "user", content: typeof buildUserMessage(input, files) === "string" ? buildUserMessage(input, files) : input },
-          ],
-        }),
-      });
+    // Helper: try a single provider key
+    const tryProviderKey = async (provider: string, apiKey: string, model: string): Promise<Response | null> => {
+      const endpoint = PROVIDER_ENDPOINTS[provider];
+      if (!endpoint) return null;
 
-      if (!anthropicResponse.ok) {
-        const errText = await anthropicResponse.text();
-        console.error("Anthropic error:", anthropicResponse.status, errText, "- falling back to native");
-        return await fallbackToNative();
+      console.log(`Custom agent: trying ${provider} key (model: ${model})`);
+      try {
+        if (provider === "anthropic") {
+          const anthropicResponse = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "x-api-key": apiKey,
+              "Content-Type": "application/json",
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model,
+              max_tokens: 4096,
+              temperature: Number(customAgent.temperature),
+              system: finalSystemPrompt,
+              messages: [
+                ...(conversationHistory || []),
+                { role: "user", content: typeof buildUserMessage(input, files) === "string" ? buildUserMessage(input, files) : input },
+              ],
+            }),
+          });
+
+          if (anthropicResponse.ok) {
+            const data = await anthropicResponse.json();
+            const output = data.content?.[0]?.text || "Sem resposta.";
+            const usage = extractAnthropicUsage(data);
+            return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+          }
+          const errText = await anthropicResponse.text();
+          console.error(`${provider} key failed: ${anthropicResponse.status} ${errText} - trying next provider`);
+          return null;
+        }
+
+        // Groq does not support multimodal content — flatten files to text-only
+        const TEXT_ONLY_PROVIDERS = ["groq"];
+        let userContent: any;
+        if (TEXT_ONLY_PROVIDERS.includes(provider)) {
+          if (files && files.length > 0) {
+            const { textContent } = processFilesForAI(files);
+            userContent = input + textContent;
+          } else {
+            userContent = input;
+          }
+        } else {
+          userContent = buildUserMessage(input, files);
+        }
+
+        // Remap model if incompatible with provider
+        const PROVIDER_SUPPORTED_MODELS: Record<string, string[]> = {
+          groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
+        };
+        let effectiveModel = model;
+        const supportedList = PROVIDER_SUPPORTED_MODELS[provider];
+        if (supportedList && !supportedList.includes(effectiveModel)) {
+          console.log(`Model "${effectiveModel}" not supported by ${provider}, remapping to ${supportedList[0]}`);
+          effectiveModel = supportedList[0];
+        }
+
+        const aiResponse = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: effectiveModel,
+            temperature: Number(customAgent.temperature),
+            messages: [
+              { role: "system", content: finalSystemPrompt },
+              ...(conversationHistory || []),
+              { role: "user", content: userContent },
+            ],
+          }),
+        });
+
+        if (aiResponse.ok) {
+          const data = await aiResponse.json();
+          const output = data.choices?.[0]?.message?.content || "Sem resposta do modelo.";
+          const usage = extractUsage(data);
+          return await successResponse(output, { provider, model: effectiveModel, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+        }
+        const errText = await aiResponse.text();
+        console.error(`${provider} key failed: ${aiResponse.status} ${errText} - trying next provider`);
+        return null;
+      } catch (e) {
+        console.error(`${provider} key error:`, e.message, "- trying next provider");
+        return null;
+      }
+    };
+
+    if (allApiKeys && allApiKeys.length > 0) {
+      // Build ordered list: agent's configured provider first, then rest by priority
+      const agentProvider = customAgent.provider;
+      const orderedKeys: { provider: string; api_key_encrypted: string; model: string }[] = [];
+
+      // First: the agent's own configured provider with its specific model
+      const agentProviderKey = allApiKeys.find(k => k.provider === agentProvider);
+      if (agentProviderKey) {
+        orderedKeys.push({ ...agentProviderKey, model: customAgent.model });
       }
 
-      const anthropicData = await anthropicResponse.json();
-      const output = anthropicData.content?.[0]?.text || "Sem resposta.";
-      const anthropicUsage = extractAnthropicUsage(anthropicData);
-      return await successResponse(output, { provider: "anthropic", model: customAgent.model, tokensInput: anthropicUsage.tokensInput, tokensOutput: anthropicUsage.tokensOutput });
-    }
+      // Then: all other providers in priority order with default models
+      const otherKeys = allApiKeys
+        .filter(k => k.provider !== agentProvider)
+        .sort((a, b) => {
+          const aIdx = PROVIDER_PRIORITY_ORDER.indexOf(a.provider);
+          const bIdx = PROVIDER_PRIORITY_ORDER.indexOf(b.provider);
+          return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+        });
 
-    // Remap model if incompatible with provider
-    const PROVIDER_SUPPORTED_MODELS: Record<string, string[]> = {
-      groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
-    };
-    let effectiveModel = customAgent.model;
-    const supportedList = PROVIDER_SUPPORTED_MODELS[customAgent.provider];
-    if (supportedList && !supportedList.includes(effectiveModel)) {
-      console.log(`Model "${effectiveModel}" not supported by ${customAgent.provider}, remapping to ${supportedList[0]}`);
-      effectiveModel = supportedList[0];
-    }
-
-    // OpenAI-compatible API (OpenAI, Groq, OpenRouter, Google)
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${userApiKey}`,
-    };
-
-    // Groq does not support multimodal content — flatten files to text-only
-    const TEXT_ONLY_PROVIDERS = ["groq"];
-    let userContent: any;
-    if (TEXT_ONLY_PROVIDERS.includes(customAgent.provider)) {
-      if (files && files.length > 0) {
-        const { textContent } = processFilesForAI(files);
-        userContent = input + textContent;
-      } else {
-        userContent = input;
+      for (const k of otherKeys) {
+        orderedKeys.push({ ...k, model: DEFAULT_MODELS_PER_PROVIDER[k.provider] || "gpt-4o" });
       }
+
+      for (const keyInfo of orderedKeys) {
+        const decryptedKey = await decryptApiKey(keyInfo.api_key_encrypted);
+        const result = await tryProviderKey(keyInfo.provider, decryptedKey, keyInfo.model);
+        if (result) return result;
+      }
+
+      console.log("All user API keys failed for custom agent, falling back to Lovable AI Gateway");
     } else {
-      userContent = buildUserMessage(input, files);
+      console.log("No user API keys found, using Lovable AI Gateway directly");
     }
 
-    const aiResponse = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: effectiveModel,
-        temperature: Number(customAgent.temperature),
-        messages: [
-          { role: "system", content: finalSystemPrompt },
-          ...(conversationHistory || []),
-          { role: "user", content: userContent },
-        ],
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error(`${customAgent.provider} error:`, aiResponse.status, errText, "- falling back to native");
-      return await fallbackToNative();
-    }
-
-    const aiData = await aiResponse.json();
-    const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-    const finalUsage = extractUsage(aiData);
-    return await successResponse(output, { provider: customAgent.provider, model: effectiveModel, tokensInput: finalUsage.tokensInput, tokensOutput: finalUsage.tokensOutput });
+    // Absolute last resort: Lovable AI Gateway
+    return await fallbackToLovable();
   } catch (err) {
     console.error("agent-chat error:", err);
     return new Response(JSON.stringify({ error: err.message }), {
