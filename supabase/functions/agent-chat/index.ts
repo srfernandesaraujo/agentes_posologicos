@@ -7343,7 +7343,11 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
 
           if (anthropicResponse.ok) {
             const data = await anthropicResponse.json();
-            const output = data.content?.[0]?.text || "Sem resposta.";
+            const output = data.content?.[0]?.text || "";
+            if (!output.trim()) {
+              console.error(`anthropic returned empty content — trying next provider`);
+              return null;
+            }
             const usage = extractAnthropicUsage(data);
             return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
           }
