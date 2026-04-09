@@ -7396,7 +7396,12 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
 
         if (aiResponse.ok) {
           const data = await aiResponse.json();
-          const output = data.choices?.[0]?.message?.content || "Sem resposta do modelo.";
+          const output = data.choices?.[0]?.message?.content || "";
+          // Treat empty or generic fallback content as failure — try next provider
+          if (!output.trim()) {
+            console.error(`${provider} returned empty content — trying next provider`);
+            return null;
+          }
           const usage = extractUsage(data);
           return await successResponse(output, { provider, model: effectiveModel, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
         }
