@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
 
     // Ignore messages sent by the bot itself
     if (data.key.fromMe === true) {
-      console.log("[whatsapp-webhook] Skipped: fromMe=true (message sent by this number, not received)");
+      console.log("[whatsapp-webhook] Skipped: fromMe=true");
       return new Response(JSON.stringify({ ok: true, skipped: "fromMe" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
 
     if (connError || !connection) {
       console.error("[whatsapp-webhook] No connection found for instance:", instanceName, connError);
-      return new Response(JSON.stringify({ ok: false, error: "No connection found for instance" }), {
+      return new Response(JSON.stringify({ ok: false, error: "No connection found" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -107,17 +107,20 @@ Deno.serve(async (req) => {
       console.warn("[whatsapp-webhook] Could not decrypt API key, using raw value:", e);
     }
 
-    // Load last 20 messages for context
+    // Load last 10 messages for context (reduced from 20 to avoid TPM limits)
     const { data: history } = await supabase
       .from("whatsapp_conversations")
       .select("role, content")
       .eq("whatsapp_connection_id", connection.id)
       .eq("remote_jid", remoteJid)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(10);
 
-    // Build conversation history (reversed to chronological order)
-    const conversationHistory = (history || []).reverse();
+    // Build structured conversation history (reversed to chronological order)
+    const conversationHistory = (history || []).reverse().map((m: any) => ({
+      role: m.role === "user" ? "user" : "assistant",
+      content: m.content,
+    }));
 
     // Save the incoming user message
     await supabase.from("whatsapp_conversations").insert({
@@ -127,18 +130,7 @@ Deno.serve(async (req) => {
       content: messageText,
     });
 
-    // Build input with context
-    let fullInput = messageText;
-    if (conversationHistory.length > 0) {
-      const contextLines = conversationHistory
-        .map((m: any) => `${m.role === "user" ? "Aluno" : "Tutor"}: ${m.content}`)
-        .join("\n");
-      fullInput = `[Histórico da conversa]\n${contextLines}\n\n[Mensagem atual]\nAluno (${pushName}): ${messageText}`;
-    } else {
-      fullInput = `Aluno (${pushName}): ${messageText}`;
-    }
-
-    // Call agent-chat via internal fetch
+    // Call agent-chat via internal fetch — send structured conversationHistory
     console.log("[whatsapp-webhook] Calling agent-chat for agent:", agent_id);
 
     const agentChatUrl = `${supabaseUrl}/functions/v1/agent-chat`;
@@ -150,17 +142,50 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         agentId: agent_id,
-        input: fullInput,
+        input: messageText,
+        conversationHistory,
         isCustomAgent: true,
         userId: user_id,
-        skipCredits: false,
+        skipCredits: true,
       }),
     });
+
+    // Helper to send a WhatsApp reply
+    const sendWhatsAppReply = async (text: string) => {
+      const sendUrl = `${evolution_api_url.replace(/\/$/, "")}/message/sendText/${instanceName}`;
+      console.log("[whatsapp-webhook] Sending reply to:", sendUrl);
+      const sendResp = await fetch(sendUrl, {
+        method: "POST",
+        headers: {
+          apikey: evolutionApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          number: phoneNumber,
+          text,
+        }),
+      });
+      if (!sendResp.ok) {
+        const sendErr = await sendResp.text();
+        console.error("[whatsapp-webhook] Failed to send WhatsApp reply:", sendResp.status, sendErr);
+      } else {
+        await sendResp.text();
+        console.log("[whatsapp-webhook] Reply sent successfully to", phoneNumber);
+      }
+    };
 
     if (!agentResp.ok) {
       const errText = await agentResp.text();
       console.error("[whatsapp-webhook] agent-chat error:", agentResp.status, errText);
-      return new Response(JSON.stringify({ ok: false, error: "agent-chat failed" }), {
+
+      // Send a friendly error message to the user instead of silently failing
+      const errorMessage = agentResp.status === 429
+        ? "⏳ O sistema está com muitas requisições no momento. Tente novamente em alguns segundos."
+        : "⚠️ Desculpe, ocorreu um erro temporário. Tente enviar sua mensagem novamente em alguns instantes.";
+
+      await sendWhatsAppReply(errorMessage);
+
+      return new Response(JSON.stringify({ ok: false, error: "agent-chat failed", status: agentResp.status }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -187,15 +212,14 @@ Deno.serve(async (req) => {
             if (parsed.content) assistantText += parsed.content;
             if (parsed.response) assistantText = parsed.response;
           } catch {
-            // If not JSON, it's raw text
             assistantText += payload;
           }
         }
       }
     }
 
-    if (!assistantText.trim()) {
-      assistantText = "Desculpe, não consegui gerar uma resposta. Tente novamente.";
+    if (!assistantText.trim() || assistantText === "Sem resposta do modelo." || assistantText === "Sem resposta.") {
+      assistantText = "Desculpe, não consegui gerar uma resposta no momento. Tente novamente em alguns instantes.";
     }
 
     // Save assistant response to history
@@ -213,7 +237,7 @@ Deno.serve(async (req) => {
       .eq("whatsapp_connection_id", connection.id)
       .eq("remote_jid", remoteJid)
       .order("created_at", { ascending: false })
-      .range(40, 1000);
+      .range(30, 1000);
 
     if (allMsgs && allMsgs.length > 0) {
       const idsToDelete = allMsgs.map((m: any) => m.id);
@@ -221,28 +245,7 @@ Deno.serve(async (req) => {
     }
 
     // Send response back via Evolution API
-    const sendUrl = `${evolution_api_url.replace(/\/$/, "")}/message/sendText/${instanceName}`;
-    console.log("[whatsapp-webhook] Sending reply to:", sendUrl);
-
-    const sendResp = await fetch(sendUrl, {
-      method: "POST",
-      headers: {
-        apikey: evolutionApiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        number: phoneNumber,
-        text: assistantText,
-      }),
-    });
-
-    if (!sendResp.ok) {
-      const sendErr = await sendResp.text();
-      console.error("[whatsapp-webhook] Failed to send WhatsApp reply:", sendResp.status, sendErr);
-    } else {
-      await sendResp.text(); // consume body
-      console.log("[whatsapp-webhook] Reply sent successfully to", phoneNumber);
-    }
+    await sendWhatsAppReply(assistantText);
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -255,4 +258,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-
