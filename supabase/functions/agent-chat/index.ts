@@ -7009,9 +7009,13 @@ Deno.serve(async (req) => {
 
                 if (anthropicResponse.ok) {
                   const data = await anthropicResponse.json();
-                  const output = data.content?.[0]?.text || "Sem resposta.";
-                  const usage = extractAnthropicUsage(data);
-                  return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+                  const output = data.content?.[0]?.text || "";
+                  if (!output.trim()) {
+                    console.error(`Native anthropic returned empty content — trying next provider`);
+                  } else {
+                    const usage = extractAnthropicUsage(data);
+                    return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+                  }
                 }
                 const errText = await anthropicResponse.text();
                 console.error(`User ${provider} key failed: ${anthropicResponse.status} ${errText} - trying next provider`);
@@ -7027,9 +7031,13 @@ Deno.serve(async (req) => {
 
                 if (aiResponse.ok) {
                   const data = await aiResponse.json();
-                  const output = data.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-                  const usage = extractUsage(data);
-                  return await successResponse(output, { provider, model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+                  const output = data.choices?.[0]?.message?.content || "";
+                  if (!output.trim()) {
+                    console.error(`Native ${provider} returned empty content — trying next provider`);
+                  } else {
+                    const usage = extractUsage(data);
+                    return await successResponse(output, { provider, model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+                  }
                 }
                 const errText = await aiResponse.text();
                 console.error(`User ${provider} key failed: ${aiResponse.status} ${errText} - trying next provider`);
@@ -7343,7 +7351,11 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
 
           if (anthropicResponse.ok) {
             const data = await anthropicResponse.json();
-            const output = data.content?.[0]?.text || "Sem resposta.";
+            const output = data.content?.[0]?.text || "";
+            if (!output.trim()) {
+              console.error(`anthropic returned empty content — trying next provider`);
+              return null;
+            }
             const usage = extractAnthropicUsage(data);
             return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
           }
@@ -7396,7 +7408,12 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
 
         if (aiResponse.ok) {
           const data = await aiResponse.json();
-          const output = data.choices?.[0]?.message?.content || "Sem resposta do modelo.";
+          const output = data.choices?.[0]?.message?.content || "";
+          // Treat empty or generic fallback content as failure — try next provider
+          if (!output.trim()) {
+            console.error(`${provider} returned empty content — trying next provider`);
+            return null;
+          }
           const usage = extractUsage(data);
           return await successResponse(output, { provider, model: effectiveModel, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
         }
