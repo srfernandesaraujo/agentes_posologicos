@@ -9,6 +9,7 @@ export interface ApiKey {
   api_key_encrypted: string;
   created_at: string;
   updated_at: string;
+  key_expires_at: string | null;
 }
 
 export const LLM_PROVIDERS = [
@@ -43,10 +44,23 @@ export const LLM_PROVIDERS = [
     models: ["gemini-2.5-flash", "gemini-2.5-pro"],
   },
   {
-    id: "nvidia",
-    name: "NVIDIA Nemotron",
+    id: "nvidia-gptos",
+    name: "NVIDIA GPTOS",
     url: "https://build.nvidia.com/nvidia/llama-3_1-nemotron-ultra-253b-v1",
-    models: ["nvidia/llama-3.1-nemotron-ultra-253b-v1", "nvidia/llama-3.3-nemotron-super-49b-v1"],
+    models: ["nvidia/llama-3.1-nemotron-ultra-253b-v1"],
+  },
+  {
+    id: "nvidia-deepseek",
+    name: "NVIDIA DeepSeek",
+    url: "https://build.nvidia.com/deepseek-ai/deepseek-r1",
+    models: ["deepseek-ai/deepseek-r1"],
+  },
+  {
+    id: "github",
+    name: "GitHub Models",
+    url: "https://github.com/marketplace/models",
+    models: ["gpt-4o", "gpt-4o-mini", "Meta-Llama-3.1-405B-Instruct", "Mistral-Large-2"],
+    expiresInDays: 30,
   },
 ] as const;
 
