@@ -39,6 +39,35 @@ export default function Settings() {
     }
   };
 
+  const handleTest = async (provider: string) => {
+    setTesting(provider);
+    setTestResult((prev) => {
+      const next = { ...prev };
+      delete next[provider];
+      return next;
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke("test-api-key", {
+        body: { provider },
+      });
+      if (error) {
+        setTestResult((prev) => ({ ...prev, [provider]: { ok: false, error: error.message } }));
+        toast.error(`Erro ao testar ${provider}`);
+      } else if (data?.success) {
+        setTestResult((prev) => ({ ...prev, [provider]: { ok: true } }));
+        toast.success(`✅ ${provider} funcionando!`);
+      } else {
+        setTestResult((prev) => ({ ...prev, [provider]: { ok: false, error: data?.error?.slice(0, 80) || "Falha desconhecida" } }));
+        toast.error(`❌ ${provider} falhou: ${data?.error?.slice(0, 80) || "Erro"}`);
+      }
+    } catch {
+      setTestResult((prev) => ({ ...prev, [provider]: { ok: false, error: "Erro de rede" } }));
+      toast.error("Erro de rede ao testar chave");
+    } finally {
+      setTesting(null);
+    }
+  };
+
   const getExistingKey = (provider: string) =>
     keys.find((k) => k.provider === provider);
 
