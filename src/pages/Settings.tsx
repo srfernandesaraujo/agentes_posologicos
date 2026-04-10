@@ -4,7 +4,8 @@ import { useApiKeys, LLM_PROVIDERS } from "@/hooks/useApiKeys";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Check, Trash2, Key, AlertTriangle } from "lucide-react";
+import { ExternalLink, Check, Trash2, Key, AlertTriangle, FlaskConical, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -12,6 +13,8 @@ export default function Settings() {
   const { data: keys = [], upsertKey, deleteKey } = useApiKeys();
   const [editing, setEditing] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, { ok: boolean; error?: string }>>({});
 
   const handleSave = async (provider: string) => {
     if (!inputValue.trim()) return;
@@ -33,6 +36,35 @@ export default function Settings() {
       toast.success("Chave API removida");
     } catch {
       toast.error("Erro ao remover chave API");
+    }
+  };
+
+  const handleTest = async (provider: string) => {
+    setTesting(provider);
+    setTestResult((prev) => {
+      const next = { ...prev };
+      delete next[provider];
+      return next;
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke("test-api-key", {
+        body: { provider },
+      });
+      if (error) {
+        setTestResult((prev) => ({ ...prev, [provider]: { ok: false, error: error.message } }));
+        toast.error(`Erro ao testar ${provider}`);
+      } else if (data?.success) {
+        setTestResult((prev) => ({ ...prev, [provider]: { ok: true } }));
+        toast.success(`✅ ${provider} funcionando!`);
+      } else {
+        setTestResult((prev) => ({ ...prev, [provider]: { ok: false, error: data?.error?.slice(0, 80) || "Falha desconhecida" } }));
+        toast.error(`❌ ${provider} falhou: ${data?.error?.slice(0, 80) || "Erro"}`);
+      }
+    } catch {
+      setTestResult((prev) => ({ ...prev, [provider]: { ok: false, error: "Erro de rede" } }));
+      toast.error("Erro de rede ao testar chave");
+    } finally {
+      setTesting(null);
     }
   };
 
@@ -163,6 +195,24 @@ export default function Settings() {
                   <div className="flex-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white/50 font-mono">
                     ••••••••••••••••
                   </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleTest(provider.id)}
+                    disabled={testing === provider.id}
+                    className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/10"
+                    title="Testar chave"
+                  >
+                    {testing === provider.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : testResult[provider.id]?.ok === true ? (
+                      <Check className="h-4 w-4 text-emerald-400" />
+                    ) : testResult[provider.id]?.ok === false ? (
+                      <AlertTriangle className="h-4 w-4 text-red-400" />
+                    ) : (
+                      <FlaskConical className="h-4 w-4" />
+                    )}
+                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"
