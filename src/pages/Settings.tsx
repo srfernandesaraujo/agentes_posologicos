@@ -198,6 +198,24 @@ export default function Settings() {
                   <Button
                     size="sm"
                     variant="ghost"
+                    onClick={() => handleTest(provider.id)}
+                    disabled={testing === provider.id}
+                    className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/10"
+                    title="Testar chave"
+                  >
+                    {testing === provider.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : testResult[provider.id]?.ok === true ? (
+                      <Check className="h-4 w-4 text-emerald-400" />
+                    ) : testResult[provider.id]?.ok === false ? (
+                      <AlertTriangle className="h-4 w-4 text-red-400" />
+                    ) : (
+                      <FlaskConical className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     onClick={() => { setEditing(provider.id); setInputValue(""); }}
                     className="text-white/60 hover:text-white hover:bg-white/10"
                   >
