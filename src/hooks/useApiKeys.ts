@@ -84,9 +84,9 @@ export function useApiKeys() {
   });
 
   const upsertKey = useMutation({
-    mutationFn: async ({ provider, apiKey }: { provider: string; apiKey: string }) => {
+    mutationFn: async ({ provider, apiKey, expiresInDays }: { provider: string; apiKey: string; expiresInDays?: number }) => {
       const { data, error } = await supabase.functions.invoke("manage-api-keys", {
-        body: { action: "upsert", provider, apiKey },
+        body: { action: "upsert", provider, apiKey, expiresInDays },
       });
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);

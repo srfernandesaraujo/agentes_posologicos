@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     }
 
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
-    const { action, provider, apiKey } = await req.json();
+    const { action, provider, apiKey, expiresInDays } = await req.json();
 
     if (action === "upsert") {
       if (!provider || !apiKey) {
@@ -66,11 +66,16 @@ Deno.serve(async (req) => {
 
       const encrypted = data as string;
 
+      // Calculate expiration date if provided
+      const keyExpiresAt = expiresInDays
+        ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
+
       // Upsert using service role (since we revoked INSERT/UPDATE from authenticated)
       const { error: upsertError } = await serviceClient
         .from("user_api_keys")
         .upsert(
-          { user_id: user.id, provider, api_key_encrypted: encrypted },
+          { user_id: user.id, provider, api_key_encrypted: encrypted, key_expires_at: keyExpiresAt },
           { onConflict: "user_id,provider" }
         );
 
