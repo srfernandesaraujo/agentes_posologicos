@@ -23,7 +23,7 @@ const DEFAULT_MODELS: Record<string, string> = {
   anthropic: "claude-sonnet-4-20250514",
   groq: "llama-3.3-70b-versatile",
   "nvidia-gptos": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-  "nvidia-deepseek": "deepseek-ai/deepseek-r1",
+  "nvidia-deepseek": "deepseek-ai/deepseek-v3.2",
   github: "gpt-4o",
   openrouter: "google/gemini-2.5-flash",
 };
