@@ -13,6 +13,8 @@ export default function Settings() {
   const { data: keys = [], upsertKey, deleteKey } = useApiKeys();
   const [editing, setEditing] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, { ok: boolean; error?: string }>>({});
 
   const handleSave = async (provider: string) => {
     if (!inputValue.trim()) return;
