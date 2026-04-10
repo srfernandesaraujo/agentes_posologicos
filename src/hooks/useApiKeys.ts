@@ -52,8 +52,8 @@ export const LLM_PROVIDERS = [
   {
     id: "nvidia-deepseek",
     name: "NVIDIA DeepSeek",
-    url: "https://build.nvidia.com/deepseek-ai/deepseek-r1",
-    models: ["deepseek-ai/deepseek-r1"],
+    url: "https://build.nvidia.com/deepseek-ai/deepseek-v3_2",
+    models: ["deepseek-ai/deepseek-v3.2"],
   },
   {
     id: "github",
