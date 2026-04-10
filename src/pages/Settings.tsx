@@ -4,7 +4,8 @@ import { useApiKeys, LLM_PROVIDERS } from "@/hooks/useApiKeys";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Check, Trash2, Key, AlertTriangle } from "lucide-react";
+import { ExternalLink, Check, Trash2, Key, AlertTriangle, FlaskConical, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export default function Settings() {
