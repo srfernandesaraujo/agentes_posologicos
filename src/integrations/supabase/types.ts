@@ -1143,6 +1143,7 @@ export type Database = {
           api_key_encrypted: string
           created_at: string
           id: string
+          key_expires_at: string | null
           provider: string
           updated_at: string
           user_id: string
@@ -1151,6 +1152,7 @@ export type Database = {
           api_key_encrypted: string
           created_at?: string
           id?: string
+          key_expires_at?: string | null
           provider: string
           updated_at?: string
           user_id: string
@@ -1159,6 +1161,7 @@ export type Database = {
           api_key_encrypted?: string
           created_at?: string
           id?: string
+          key_expires_at?: string | null
           provider?: string
           updated_at?: string
           user_id?: string

@@ -1,0 +1,1 @@
+ALTER TABLE public.user_api_keys ADD COLUMN key_expires_at timestamp with time zone DEFAULT NULL;

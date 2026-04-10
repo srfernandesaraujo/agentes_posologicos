@@ -5903,11 +5903,13 @@ const PROVIDER_ENDPOINTS: Record<string, string> = {
   anthropic: "https://api.anthropic.com/v1/messages",
   openrouter: "https://openrouter.ai/api/v1/chat/completions",
   google: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-  nvidia: "https://integrate.api.nvidia.com/v1/chat/completions",
+  "nvidia-gptos": "https://integrate.api.nvidia.com/v1/chat/completions",
+  "nvidia-deepseek": "https://integrate.api.nvidia.com/v1/chat/completions",
+  github: "https://models.inference.ai.azure.com/chat/completions",
 };
 
 // Priority order for trying user API keys — Google first, Lovable AI Gateway is the absolute last resort
-const PROVIDER_PRIORITY_ORDER = ["google", "openai", "anthropic", "groq", "nvidia", "openrouter"];
+const PROVIDER_PRIORITY_ORDER = ["google", "openai", "anthropic", "groq", "nvidia-gptos", "nvidia-deepseek", "github", "openrouter"];
 
 // Default models per provider
 const DEFAULT_MODELS_PER_PROVIDER: Record<string, string> = {
@@ -5915,7 +5917,9 @@ const DEFAULT_MODELS_PER_PROVIDER: Record<string, string> = {
   openai: "gpt-4o",
   anthropic: "claude-sonnet-4-20250514",
   groq: "llama-3.3-70b-versatile",
-  nvidia: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+  "nvidia-gptos": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+  "nvidia-deepseek": "deepseek-ai/deepseek-r1",
+  github: "gpt-4o",
   openrouter: "google/gemini-2.5-flash",
 };
 
