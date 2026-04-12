@@ -466,30 +466,51 @@ export default function Admin() {
             />
           </div>
           <div className="space-y-2">
-            {filteredProfiles.map((profile) => (
-              <div key={profile.id} className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{profile.display_name || "Sem nome"}</p>
-                  <p className="text-xs text-white/30 truncate">{profile.user_id}</p>
+            {filteredProfiles.map((profile) => {
+              const subscriberInfo = analytics?.stripe?.subscribers?.find(
+                (s) => s.email?.toLowerCase() === (profile.display_name?.includes("@") ? profile.display_name.toLowerCase() : "")
+              );
+              // Also try matching by checking if any subscriber email corresponds to this user
+              const isUnlimited = unlimitedUsers.some((u: any) => u.email?.toLowerCase() === profile.display_name?.toLowerCase());
+
+              return (
+                <div key={profile.id} className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-white truncate">{profile.display_name || "Sem nome"}</p>
+                      {subscriberInfo && (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-[hsl(38,92%,50%)]/20 text-[hsl(38,92%,50%)]">
+                          <Crown className="h-3 w-3" />
+                          {PRODUCT_NAMES[subscriberInfo.product_id] || "Assinante"}
+                        </span>
+                      )}
+                      {isUnlimited && (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-purple-500/20 text-purple-400">
+                          ∞ Ilimitado
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-white/30 truncate">{profile.user_id}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm" variant="outline"
+                      className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white gap-1"
+                      onClick={() => grantCredits.mutate({ userId: profile.user_id, amount: 10 })}
+                    >
+                      <Plus className="h-3 w-3" /><Coins className="h-3 w-3" />10
+                    </Button>
+                    <Button
+                      size="sm" variant="outline"
+                      className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white gap-1"
+                      onClick={() => grantCredits.mutate({ userId: profile.user_id, amount: 50 })}
+                    >
+                      <Plus className="h-3 w-3" /><Coins className="h-3 w-3" />50
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm" variant="outline"
-                    className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white gap-1"
-                    onClick={() => grantCredits.mutate({ userId: profile.user_id, amount: 10 })}
-                  >
-                    <Plus className="h-3 w-3" /><Coins className="h-3 w-3" />10
-                  </Button>
-                  <Button
-                    size="sm" variant="outline"
-                    className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white gap-1"
-                    onClick={() => grantCredits.mutate({ userId: profile.user_id, amount: 50 })}
-                  >
-                    <Plus className="h-3 w-3" /><Coins className="h-3 w-3" />50
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </TabsContent>
 
