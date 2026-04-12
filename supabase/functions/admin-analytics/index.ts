@@ -36,14 +36,23 @@ serve(async (req) => {
     });
 
     // Active subscriptions
-    const activeSubscriptions = await stripe.subscriptions.list({ status: "active", limit: 100 });
+    const activeSubscriptions = await stripe.subscriptions.list({ status: "active", limit: 100, expand: ["data.customer"] });
     const canceledSubscriptions = await stripe.subscriptions.list({ status: "canceled", limit: 100 });
 
-    // Count by product
+    // Count by product + gather subscriber details
     const subsByProduct: Record<string, number> = {};
+    const subscribers: Array<{ email: string; product_id: string; status: string; current_period_end: string }> = [];
     for (const sub of activeSubscriptions.data) {
       const productId = sub.items.data[0]?.price?.product as string;
       subsByProduct[productId] = (subsByProduct[productId] || 0) + 1;
+      const customer = sub.customer as any;
+      const email = customer?.email || customer?.id || "desconhecido";
+      subscribers.push({
+        email,
+        product_id: productId,
+        status: "active",
+        current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+      });
     }
 
     // MRR calculation
