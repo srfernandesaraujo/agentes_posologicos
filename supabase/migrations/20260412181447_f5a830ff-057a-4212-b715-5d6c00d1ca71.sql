@@ -1,0 +1,2 @@
+INSERT INTO public.credits_ledger (user_id, amount, type, description, reference_id)
+VALUES ('8c7ee98f-d815-47a7-891f-6ad8da494504', 100, 'purchase', 'Créditos do plano Pro (100 créditos) - correção manual', 'manual-fix-2026-04-12');
