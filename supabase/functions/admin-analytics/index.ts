@@ -135,6 +135,7 @@ serve(async (req) => {
         subscriptionsByProduct: subsByProduct,
         mrrCents,
         revenueThisMonthCents: revenueThisMonth,
+        subscribers,
       },
       users: {
         total: totalUsers || 0,
