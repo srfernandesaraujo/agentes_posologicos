@@ -62,6 +62,7 @@ export default function Admin() {
           subscriptionsByProduct: Record<string, number>;
           mrrCents: number;
           revenueThisMonthCents: number;
+          subscribers: Array<{ email: string; product_id: string; status: string; current_period_end: string }>;
         };
         users: { total: number; newThisWeek: number };
         usage: {
