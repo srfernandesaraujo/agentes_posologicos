@@ -1,0 +1,2 @@
+ALTER TABLE public.credits_ledger DROP CONSTRAINT IF EXISTS credits_ledger_type_check;
+ALTER TABLE public.credits_ledger ADD CONSTRAINT credits_ledger_type_check CHECK (type IN ('purchase', 'usage', 'bonus', 'subscription', 'admin'));
