@@ -63,6 +63,18 @@ export default function Admin() {
           mrrCents: number;
           revenueThisMonthCents: number;
           subscribers: Array<{ email: string; product_id: string; status: string; current_period_end: string }>;
+          subscriberDetails: Array<{
+            email: string;
+            product_id: string;
+            current_period_end: string;
+            user_id: string | null;
+            credits_used: number;
+            credits_balance: number;
+            sessions_count: number;
+            agents_used: Record<string, number>;
+            member_since: string | null;
+            last_sign_in: string | null;
+          }>;
         };
         users: { total: number; newThisWeek: number };
         usage: {
@@ -424,6 +436,101 @@ export default function Admin() {
                   </div>
                 </div>
               </div>
+
+              {/* Per-Subscriber Metrics */}
+              {analytics.stripe.subscriberDetails && analytics.stripe.subscriberDetails.length > 0 && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                  <h3 className="mb-4 text-sm font-semibold text-white/70 flex items-center gap-2">
+                    <Crown className="h-4 w-4 text-[hsl(38,92%,50%)]" />
+                    Métricas Individuais de Assinantes
+                  </h3>
+                  <div className="space-y-3">
+                    {analytics.stripe.subscriberDetails.map((sub, idx) => {
+                      const planName = PRODUCT_NAMES[sub.product_id] || "Plano";
+                      const topAgents = Object.entries(sub.agents_used)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 5);
+                      const memberSince = sub.member_since
+                        ? new Date(sub.member_since)
+                        : null;
+                      const daysSinceJoin = memberSince
+                        ? Math.floor((Date.now() - memberSince.getTime()) / (1000 * 60 * 60 * 24))
+                        : null;
+                      const lastSignIn = sub.last_sign_in
+                        ? new Date(sub.last_sign_in)
+                        : null;
+
+                      return (
+                        <div key={idx} className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4 space-y-3">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(38,92%,50%)]/20">
+                                <Mail className="h-4 w-4 text-[hsl(38,92%,50%)]" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-white">{sub.email}</p>
+                                <p className="text-[10px] text-white/30">{sub.user_id?.slice(0, 8) || "N/A"}</p>
+                              </div>
+                            </div>
+                            <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold bg-[hsl(38,92%,50%)]/20 text-[hsl(38,92%,50%)]">
+                              <Crown className="h-3 w-3" />
+                              {planName}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-2.5 text-center">
+                              <p className="text-[10px] text-white/40 mb-0.5">Créditos Usados</p>
+                              <p className="text-sm font-bold text-[hsl(14,90%,58%)]">{sub.credits_used.toFixed(1)}</p>
+                            </div>
+                            <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-2.5 text-center">
+                              <p className="text-[10px] text-white/40 mb-0.5">Saldo Restante</p>
+                              <p className="text-sm font-bold text-[hsl(152,60%,42%)]">{sub.credits_balance.toFixed(1)}</p>
+                            </div>
+                            <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-2.5 text-center">
+                              <p className="text-[10px] text-white/40 mb-0.5">Sessões de Chat</p>
+                              <p className="text-sm font-bold text-[hsl(199,89%,48%)]">{sub.sessions_count}</p>
+                            </div>
+                            <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-2.5 text-center">
+                              <p className="text-[10px] text-white/40 mb-0.5">Tempo na Plataforma</p>
+                              <p className="text-sm font-bold text-[hsl(174,62%,47%)]">
+                                {daysSinceJoin !== null ? `${daysSinceJoin}d` : "N/A"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-white/40">
+                            {memberSince && (
+                              <span>Membro desde: <span className="text-white/60">{memberSince.toLocaleDateString("pt-BR")}</span></span>
+                            )}
+                            {lastSignIn && (
+                              <span>Último login: <span className="text-white/60">{lastSignIn.toLocaleDateString("pt-BR")}</span></span>
+                            )}
+                            {sub.current_period_end && (
+                              <span>Renova em: <span className="text-white/60">{new Date(sub.current_period_end).toLocaleDateString("pt-BR")}</span></span>
+                            )}
+                          </div>
+
+                          {topAgents.length > 0 && (
+                            <div>
+                              <p className="text-[10px] text-white/40 mb-1.5">Ferramentas mais usadas:</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {topAgents.map(([name, count]) => (
+                                  <span key={name} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] bg-white/[0.06] text-white/60 border border-white/[0.06]">
+                                    <Bot className="h-3 w-3 text-[hsl(174,62%,47%)]" />
+                                    {name.length > 25 ? name.slice(0, 25) + "…" : name}
+                                    <span className="font-semibold text-white/80">({count})</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           ) : null}
         </TabsContent>
