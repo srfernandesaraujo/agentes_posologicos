@@ -63,6 +63,18 @@ export default function Admin() {
           mrrCents: number;
           revenueThisMonthCents: number;
           subscribers: Array<{ email: string; product_id: string; status: string; current_period_end: string }>;
+          subscriberDetails: Array<{
+            email: string;
+            product_id: string;
+            current_period_end: string;
+            user_id: string | null;
+            credits_used: number;
+            credits_balance: number;
+            sessions_count: number;
+            agents_used: Record<string, number>;
+            member_since: string | null;
+            last_sign_in: string | null;
+          }>;
         };
         users: { total: number; newThisWeek: number };
         usage: {
