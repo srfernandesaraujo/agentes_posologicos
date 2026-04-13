@@ -47,11 +47,20 @@ serve(async (req) => {
       subsByProduct[productId] = (subsByProduct[productId] || 0) + 1;
       const customer = sub.customer as any;
       const email = customer?.email || customer?.id || "desconhecido";
+      let periodEnd = "";
+      try {
+        const ts = sub.current_period_end;
+        if (ts && typeof ts === "number") {
+          periodEnd = new Date(ts * 1000).toISOString();
+        } else if (ts && typeof ts === "string") {
+          periodEnd = ts;
+        }
+      } catch { /* ignore */ }
       subscribers.push({
         email,
         product_id: productId,
         status: "active",
-        current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+        current_period_end: periodEnd,
       });
     }
 
