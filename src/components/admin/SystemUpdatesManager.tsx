@@ -155,7 +155,11 @@ export function SystemUpdatesManager() {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       queryClient.invalidateQueries({ queryKey: ["system-updates"] });
-      toast.success(data?.message || `${data?.count || 0} sugestões de roadmap geradas!`);
+      if ((data?.count || 0) > 0) {
+        toast.success(data?.message || `${data.count} sugestões de roadmap geradas!`);
+      } else {
+        toast.info(data?.message || "Nenhuma nova sugestão foi criada agora.");
+      }
     } catch (e: any) {
       toast.error("Erro ao gerar roadmap: " + (e.message || "erro desconhecido"));
     } finally {
