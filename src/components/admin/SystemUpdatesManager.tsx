@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,6 +57,7 @@ const PRIORITY_BADGE_CLASSES: Record<string, string> = {
 
 export function SystemUpdatesManager() {
   const queryClient = useQueryClient();
+  const { session } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<SystemUpdate | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -144,10 +146,16 @@ export function SystemUpdatesManager() {
   const handleGenerateRoadmap = async () => {
     setGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-roadmap");
+      if (!session?.access_token) throw new Error("Sessão expirada. Faça login novamente.");
+
+      const { data, error } = await supabase.functions.invoke("generate-roadmap", {
+        body: {},
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       queryClient.invalidateQueries({ queryKey: ["system-updates"] });
-      toast.success(`${data?.count || 0} sugestões de roadmap geradas!`);
+      toast.success(data?.message || `${data?.count || 0} sugestões de roadmap geradas!`);
     } catch (e: any) {
       toast.error("Erro ao gerar roadmap: " + (e.message || "erro desconhecido"));
     } finally {
