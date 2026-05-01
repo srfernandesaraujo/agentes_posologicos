@@ -6118,18 +6118,50 @@ Deno.serve(async (req) => {
         });
       }
       for (const f of files) {
-        if (!f || typeof f.name !== "string" || typeof f.base64 !== "string") {
+        if (!f || typeof f.name !== "string" || (typeof f.base64 !== "string" && typeof f.url !== "string")) {
           return new Response(JSON.stringify({ error: "Arquivo inválido no payload" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        // Limit base64 size (~50MB file = ~67MB base64)
-        if (f.base64.length > 70_000_000) {
+        // Limit inline base64 size (~5MB file = ~7MB base64)
+        if (typeof f.base64 === "string" && f.base64.length > 7_000_000) {
           return new Response(JSON.stringify({ error: `Arquivo ${f.name} excede o tamanho máximo` }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
+        }
+      }
+
+      // For files sent as URL, fetch them server-side and convert to base64
+      // (bypasses the ~10MB request body limit while keeping the multimodal
+      // pipeline downstream untouched).
+      for (const f of files) {
+        if (!f.base64 && typeof f.url === "string") {
+          try {
+            const r = await fetch(f.url);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const buf = new Uint8Array(await r.arrayBuffer());
+            // Cap remote downloads at 100MB to avoid runaway memory
+            if (buf.byteLength > 100 * 1024 * 1024) {
+              throw new Error("arquivo remoto excede 100MB");
+            }
+            // Encode to base64 in chunks to avoid stack overflow on large files
+            let binary = "";
+            const chunk = 0x8000;
+            for (let i = 0; i < buf.length; i += chunk) {
+              binary += String.fromCharCode(...buf.subarray(i, i + chunk));
+            }
+            f.base64 = btoa(binary);
+            if (!f.type) f.type = r.headers.get("content-type") || "application/octet-stream";
+            console.log(`Fetched remote attachment ${f.name}: ${buf.byteLength} bytes`);
+          } catch (e: any) {
+            console.error(`Failed to fetch remote attachment ${f.name}:`, e?.message || e);
+            return new Response(JSON.stringify({ error: `Falha ao baixar arquivo ${f.name}: ${e?.message || "erro desconhecido"}` }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
         }
       }
     }
