@@ -6124,8 +6124,8 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        // Limit base64 size (~10MB file = ~13.3MB base64)
-        if (f.base64.length > 15_000_000) {
+        // Limit base64 size (~50MB file = ~67MB base64)
+        if (f.base64.length > 70_000_000) {
           return new Response(JSON.stringify({ error: `Arquivo ${f.name} excede o tamanho máximo` }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
