@@ -377,10 +377,10 @@ export default function Chat() {
     if (valid.length < files.length) {
       toast.error("Alguns arquivos não são suportados e foram ignorados.");
     }
-    // Limit: max 10MB per file, max 3 files
+    // Limit: max 50MB per file, max 3 files
     const sizeFiltered = valid.filter(f => {
-      if (f.size > 10 * 1024 * 1024) {
-        toast.error(`Arquivo ${f.name} excede 10MB e foi ignorado.`);
+      if (f.size > 50 * 1024 * 1024) {
+        toast.error(`Arquivo ${f.name} excede 50MB e foi ignorado.`);
         return false;
       }
       return true;
