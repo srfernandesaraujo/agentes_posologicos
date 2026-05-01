@@ -413,8 +413,12 @@ export default function Chat() {
     mutationFn: async (text: string) => {
       if (!user || !agent) throw new Error("Sessão não encontrada");
 
-      // Build files array as base64 for the edge function
-      const filesPayload: { name: string; type: string; base64: string }[] = [];
+      // Build files array for the edge function. Large files are uploaded to
+      // Storage and sent as a signed URL to bypass the ~10MB body limit of
+      // Supabase Edge Functions, preserving the agent's multimodal quality.
+      const filesPayload: { name: string; type: string; base64?: string; url?: string }[] = [];
+      const uploadedPaths: string[] = [];
+      const INLINE_BASE64_LIMIT = 4 * 1024 * 1024; // <=4MB → enviar inline; acima, via Storage
       let textFileContext = "";
       if (attachedFiles.length > 0) {
         for (const f of attachedFiles) {
@@ -429,13 +433,29 @@ export default function Chat() {
           } else if (isSpreadsheet) {
             textFileContext += `\n\n[Arquivo Excel anexado: ${f.name} (${(f.size / 1024).toFixed(1)}KB) - Converta para CSV para melhor processamento]`;
           } else {
-            // Convert to base64 for multimodal processing (PDF, DOCX, images, RTF, XML)
+            const mime = f.type || `application/${ext}`;
             try {
-              const base64 = await fileToBase64(f);
-              filesPayload.push({ name: f.name, type: f.type || `application/${ext}`, base64 });
-            } catch (err) {
-              console.error(`Failed to convert ${f.name} to base64:`, err);
-              textFileContext += `\n\n[Erro ao processar arquivo: ${f.name}]`;
+              if (f.size <= INLINE_BASE64_LIMIT) {
+                // Inline base64 (rápido, evita upload extra para arquivos pequenos)
+                const base64 = await fileToBase64(f);
+                filesPayload.push({ name: f.name, type: mime, base64 });
+              } else {
+                // Upload para Storage e envia signed URL (suporta arquivos grandes)
+                const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${f.name.replace(/[^\w.\-]/g, "_")}`;
+                const { error: upErr } = await supabase.storage
+                  .from("chat-attachments")
+                  .upload(path, f, { contentType: mime, upsert: false });
+                if (upErr) throw upErr;
+                uploadedPaths.push(path);
+                const { data: signed, error: signErr } = await supabase.storage
+                  .from("chat-attachments")
+                  .createSignedUrl(path, 60 * 30); // 30 min
+                if (signErr || !signed?.signedUrl) throw signErr || new Error("Falha ao gerar URL");
+                filesPayload.push({ name: f.name, type: mime, url: signed.signedUrl });
+              }
+            } catch (err: any) {
+              console.error(`Failed to prepare ${f.name}:`, err);
+              textFileContext += `\n\n[Erro ao processar arquivo: ${f.name} — ${err?.message || "falha desconhecida"}]`;
             }
           }
         }
