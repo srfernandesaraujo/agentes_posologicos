@@ -498,29 +498,34 @@ export default function Chat() {
 
       const cost = isCustom ? CUSTOM_AGENT_INTERACTION_COST : (builtInAgent?.credit_cost || 1);
       
-      const { data, error: fnError } = await supabase.functions.invoke("agent-chat", {
-        body: { 
-          agentId: actualAgentId, 
-          input: fullInput, 
+      // Call the edge function via direct fetch so we can read the real
+      // error body (supabase.functions.invoke swallows non-2xx response bodies).
+      const { data: { session: _sess } } = await supabase.auth.getSession();
+      const token = _sess?.access_token;
+      const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`;
+      const resp = await fetch(fnUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          agentId: actualAgentId,
+          input: fullInput,
           conversationHistory,
           creditCost: hasFreeAccess ? 0 : cost,
           ...(filesPayload.length > 0 ? { files: filesPayload } : {}),
-        },
+        }),
       });
-
-      if (fnError) {
-        // supabase-js may put the parsed body in data even on error
-        let errorMsg = "Erro ao consultar o agente";
-        if (data?.error) {
-          errorMsg = data.error;
-        } else if (typeof data === "string") {
-          try {
-            const parsed = JSON.parse(data);
-            errorMsg = parsed.error || errorMsg;
-          } catch { /* ignore */ }
-        } else if (fnError.message && !fnError.message.includes("non-2xx")) {
-          errorMsg = fnError.message;
-        }
+      const rawText = await resp.text();
+      let data: any = null;
+      try { data = rawText ? JSON.parse(rawText) : null; } catch { data = rawText; }
+      if (!resp.ok) {
+        const errorMsg =
+          (data && typeof data === "object" && data.error) ||
+          (typeof data === "string" && data) ||
+          `Erro ao consultar o agente (HTTP ${resp.status})`;
         throw new Error(errorMsg);
       }
 
