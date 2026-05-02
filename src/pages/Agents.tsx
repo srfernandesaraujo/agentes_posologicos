@@ -103,7 +103,10 @@ export default function Agents() {
               placeholder="Buscar agente..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-9 pl-8 text-sm bg-secondary border-border"
+              className="h-9 pl-8 text-sm bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
             />
           </div>
 
@@ -173,7 +176,10 @@ export default function Agents() {
               placeholder="Buscar agente..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
+              className="pl-10 text-foreground placeholder:text-muted-foreground"
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
             />
           </div>
 
