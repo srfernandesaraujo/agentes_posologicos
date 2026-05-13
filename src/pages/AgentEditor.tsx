@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AutoFineTuningPanel } from "@/components/agents/AutoFineTuningPanel";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -258,6 +259,7 @@ export default function AgentEditor() {
           <TabsTrigger value="conversations" className="text-white/60 data-[state=active]:text-white data-[state=active]:bg-white/10">Conversas</TabsTrigger>
           <TabsTrigger value="config" className="text-white/60 data-[state=active]:text-white data-[state=active]:bg-white/10">Configurações</TabsTrigger>
           <TabsTrigger value="publish" className="text-white/60 data-[state=active]:text-white data-[state=active]:bg-white/10">Publicar</TabsTrigger>
+          <TabsTrigger value="tuning" className="text-white/60 data-[state=active]:text-white data-[state=active]:bg-white/10">Otimização</TabsTrigger>
         </TabsList>
 
         {/* CONVERSATIONS TAB */}
