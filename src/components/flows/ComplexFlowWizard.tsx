@@ -168,21 +168,21 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
 
         {step === "overview" && (
           <div className="space-y-3">
-            <p className="text-sm text-white/60">
+            <p className="text-sm text-white/80">
               Crie pipelines com roteamento condicional: enriquecimento → roteador → esteiras paralelas → consolidador.
             </p>
             <div>
-              <Label>Nome do fluxo</Label>
-              <Input value={flowName} onChange={(e) => setFlowName(e.target.value)} placeholder="Ex: Compras hospitalares — RP/Inex/Pregão" className="bg-white/5 border-white/10" />
+              <Label className="text-white/90">Nome do fluxo</Label>
+              <Input value={flowName} onChange={(e) => setFlowName(e.target.value)} placeholder="Ex: Compras hospitalares — RP/Inex/Pregão" className="bg-white/5 border-white/20 text-white placeholder:text-white/40" />
             </div>
             <div>
-              <Label>Objetivo final</Label>
-              <Textarea value={flowObjective} onChange={(e) => setFlowObjective(e.target.value)} placeholder="Ex: A partir da planilha de estoque, produzir os documentos de aquisição (RP, Inexigibilidade ou Pregão) prontos para o gestor." className="min-h-[100px] bg-white/5 border-white/10" />
+              <Label className="text-white/90">Objetivo final</Label>
+              <Textarea value={flowObjective} onChange={(e) => setFlowObjective(e.target.value)} placeholder="Ex: A partir da planilha de estoque, produzir os documentos de aquisição (RP, Inexigibilidade ou Pregão) prontos para o gestor." className="min-h-[100px] bg-white/5 border-white/20 text-white placeholder:text-white/40" />
             </div>
             <div>
-              <Label>Tipo de input inicial</Label>
+              <Label className="text-white/90">Tipo de input inicial</Label>
               <Select value={inputType} onValueChange={setInputType}>
-                <SelectTrigger className="bg-white/5 border-white/10"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="bg-white/5 border-white/20 text-white"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="text">Texto livre</SelectItem>
                   <SelectItem value="spreadsheet">Planilha (Excel/CSV)</SelectItem>
@@ -201,15 +201,15 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
 
         {step === "agents" && (
           <div className="space-y-4">
-            <p className="text-sm text-white/60">Descreva cada agente do pipeline. Para criar esteiras paralelas, marque um agente como <span className="text-[hsl(var(--accent))]">Roteador</span> e declare os rótulos das esteiras.</p>
+            <p className="text-sm text-white/80">Descreva cada agente do pipeline. Para criar esteiras paralelas, marque um agente como <span className="text-[hsl(var(--accent))] font-medium">Roteador</span> e declare os rótulos das esteiras.</p>
             {agents.map((a, i) => {
               const allowedBranches = availableBranchesAt(i);
               return (
                 <Card key={i} className="bg-white/5 border-white/10 p-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline">Agente {i + 1}</Badge>
-                      <Badge variant="secondary" className="text-xs">esteira: {a.branch}</Badge>
+                      <Badge variant="outline" className="border-white/30 text-white">Agente {i + 1}</Badge>
+                      <Badge variant="secondary" className="text-xs bg-white/10 text-white">esteira: {a.branch}</Badge>
                       {a.is_router && <Badge className="bg-[hsl(var(--accent))]/20 text-[hsl(var(--accent))] text-xs">Roteador</Badge>}
                       {a.is_synthesizer && <Badge className="bg-emerald-500/20 text-emerald-300 text-xs">Consolidador</Badge>}
                     </div>
@@ -221,13 +221,13 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs">Nome</Label>
-                      <Input value={a.name} onChange={(e) => updateAgent(i, { name: e.target.value })} className="bg-white/5 border-white/10" placeholder="Ex: Analista de Estoque" />
+                      <Label className="text-xs text-white/90">Nome</Label>
+                      <Input value={a.name} onChange={(e) => updateAgent(i, { name: e.target.value })} className="bg-white/5 border-white/20 text-white placeholder:text-white/40" placeholder="Ex: Analista de Estoque" />
                     </div>
                     <div>
-                      <Label className="text-xs">Esteira</Label>
+                      <Label className="text-xs text-white/90">Esteira</Label>
                       <Select value={a.branch} onValueChange={(v) => updateAgent(i, { branch: v })}>
-                        <SelectTrigger className="bg-white/5 border-white/10"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="bg-white/5 border-white/20 text-white"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {allowedBranches.map((b) => (<SelectItem key={b} value={b}>{b}</SelectItem>))}
                         </SelectContent>
@@ -235,44 +235,44 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
                     </div>
                   </div>
                   <div>
-                    <Label className="text-xs">O que faz</Label>
-                    <Textarea value={a.role} onChange={(e) => updateAgent(i, { role: e.target.value })} placeholder="Ex: Lê a planilha, consulta consumo médio mensal e adiciona coluna GAP de aquisição." className="min-h-[60px] bg-white/5 border-white/10" />
+                    <Label className="text-xs text-white/90">O que faz</Label>
+                    <Textarea value={a.role} onChange={(e) => updateAgent(i, { role: e.target.value })} placeholder="Ex: Lê a planilha, consulta consumo médio mensal e adiciona coluna GAP de aquisição." className="min-h-[60px] bg-white/5 border-white/20 text-white placeholder:text-white/40" />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs">Recebe de (opcional)</Label>
-                      <Input value={a.receives_from} onChange={(e) => updateAgent(i, { receives_from: e.target.value })} className="bg-white/5 border-white/10" placeholder={i === 0 ? "input do usuário" : agents[i - 1]?.name || "etapa anterior"} />
+                      <Label className="text-xs text-white/90">Recebe de (opcional)</Label>
+                      <Input value={a.receives_from} onChange={(e) => updateAgent(i, { receives_from: e.target.value })} className="bg-white/5 border-white/20 text-white placeholder:text-white/40" placeholder={i === 0 ? "input do usuário" : agents[i - 1]?.name || "etapa anterior"} />
                     </div>
                     <div>
-                      <Label className="text-xs">Produz</Label>
-                      <Input value={a.produces} onChange={(e) => updateAgent(i, { produces: e.target.value })} className="bg-white/5 border-white/10" placeholder="Ex: Documento DFD, Justificativa, ETP, TR" />
+                      <Label className="text-xs text-white/90">Produz</Label>
+                      <Input value={a.produces} onChange={(e) => updateAgent(i, { produces: e.target.value })} className="bg-white/5 border-white/20 text-white placeholder:text-white/40" placeholder="Ex: Documento DFD, Justificativa, ETP, TR" />
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-4 pt-1">
                     <div className="flex items-center gap-2">
                       <Switch checked={a.is_router} onCheckedChange={(v) => updateAgent(i, { is_router: v, is_synthesizer: v ? false : a.is_synthesizer })} />
-                      <Label className="text-xs">Roteador (cria esteiras)</Label>
+                      <Label className="text-xs text-white/90">Roteador (cria esteiras)</Label>
                     </div>
                     <div className="flex items-center gap-2">
                       <Switch checked={a.is_synthesizer} onCheckedChange={(v) => updateAgent(i, { is_synthesizer: v, is_router: v ? false : a.is_router })} />
-                      <Label className="text-xs">Consolidador final</Label>
+                      <Label className="text-xs text-white/90">Consolidador final</Label>
                     </div>
                   </div>
                   {a.is_router && (
                     <div>
-                      <Label className="text-xs">Esteiras criadas (uma por linha, ex: rp, inexigibilidade, pregao)</Label>
+                      <Label className="text-xs text-white/90">Esteiras criadas (uma por linha, ex: rp, inexigibilidade, pregao)</Label>
                       <Textarea
                         value={a.branches.join("\n")}
                         onChange={(e) => updateAgent(i, { branches: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
                         placeholder={"rp\ninexigibilidade\npregao"}
-                        className="min-h-[70px] bg-white/5 border-white/10 font-mono text-xs"
+                        className="min-h-[70px] bg-white/5 border-white/20 text-white placeholder:text-white/40 font-mono text-xs"
                       />
                     </div>
                   )}
                 </Card>
               );
             })}
-            <Button variant="outline" onClick={addAgent} disabled={agents.length >= 12} className="gap-2 w-full border-white/10">
+            <Button variant="outline" onClick={addAgent} disabled={agents.length >= 12} className="gap-2 w-full border-white/20 text-white hover:bg-white/10">
               <Plus className="h-4 w-4" /> Adicionar agente ({agents.length}/12)
             </Button>
             <div className="flex justify-between">
@@ -289,11 +289,11 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
         {step === "review" && (
           <div className="space-y-4">
             <Card className="bg-white/5 border-white/10 p-3">
-              <p className="text-sm font-medium">{flowName}</p>
-              <p className="text-xs text-white/60 mt-1">{flowObjective}</p>
-              <p className="text-xs text-white/40 mt-2">Input: {inputType} • Agentes: {agents.length} • Esteiras: {Array.from(new Set(agents.flatMap((a) => [a.branch, ...(a.is_router ? a.branches : [])]))).join(", ")}</p>
+              <p className="text-sm font-medium text-white">{flowName}</p>
+              <p className="text-xs text-white/80 mt-1">{flowObjective}</p>
+              <p className="text-xs text-white/70 mt-2">Input: {inputType} • Agentes: {agents.length} • Esteiras: {Array.from(new Set(agents.flatMap((a) => [a.branch, ...(a.is_router ? a.branches : [])]))).join(", ")}</p>
             </Card>
-            <pre className="text-xs bg-black/30 border border-white/10 rounded p-3 whitespace-pre-wrap">{diagram}</pre>
+            <pre className="text-xs text-white/90 bg-black/40 border border-white/15 rounded p-3 whitespace-pre-wrap">{diagram}</pre>
             <div className="flex justify-between">
               <Button variant="ghost" onClick={() => setStep("agents")} className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button>
               <Button onClick={() => { setStep("creating"); submit(); }} disabled={loading} className="gap-2">
