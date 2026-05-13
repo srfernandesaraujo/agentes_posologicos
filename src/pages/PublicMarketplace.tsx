@@ -100,8 +100,8 @@ export default function PublicMarketplace() {
         </div>
       </header>
 
-      <div className="container max-w-6xl py-12">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-white/40 hover:text-white/70 transition-colors mb-8">
+      <main className="container max-w-6xl py-12">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-white/70 hover:text-white/70 transition-colors mb-8">
           <ArrowLeft className="h-4 w-4" />
           Voltar ao início
         </Link>
@@ -138,7 +138,7 @@ export default function PublicMarketplace() {
               <h3 className="font-display text-xl font-bold text-white mb-3">{product.name}</h3>
               <p className="text-sm text-white/60 leading-relaxed mb-4">{product.description}</p>
               <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-3">
-                <p className="text-xs text-white/40 font-medium mb-1">💡 Caso de uso</p>
+                <p className="text-xs text-white/70 font-medium mb-1">💡 Caso de uso</p>
                 <p className="text-sm text-white/70">{product.useCase}</p>
               </div>
             </div>
@@ -161,7 +161,7 @@ export default function PublicMarketplace() {
               <h3 className="font-display text-base font-bold text-white mb-2">{product.name}</h3>
               <p className="text-sm text-white/50 leading-relaxed mb-3">{product.description}</p>
               <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-2.5">
-                <p className="text-xs text-white/40 font-medium mb-0.5">💡 Caso de uso</p>
+                <p className="text-xs text-white/70 font-medium mb-0.5">💡 Caso de uso</p>
                 <p className="text-xs text-white/60">{product.useCase}</p>
               </div>
             </div>
@@ -175,7 +175,7 @@ export default function PublicMarketplace() {
             <h2 className="font-display text-2xl md:text-3xl font-bold text-white mb-4">
               Pronto para experimentar?
             </h2>
-            <p className="text-white/40 max-w-lg mx-auto mb-8">
+            <p className="text-white/70 max-w-lg mx-auto mb-8">
               Crie sua conta gratuita e receba 15 créditos de boas-vindas para testar os agentes.
             </p>
             <div className="flex items-center justify-center gap-4">
@@ -193,7 +193,7 @@ export default function PublicMarketplace() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
