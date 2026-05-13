@@ -58,18 +58,21 @@ export type Database = {
       }
       agent_flow_edges: {
         Row: {
+          branch_key: string | null
           flow_id: string
           id: string
           source_node_id: string
           target_node_id: string
         }
         Insert: {
+          branch_key?: string | null
           flow_id: string
           id?: string
           source_node_id: string
           target_node_id: string
         }
         Update: {
+          branch_key?: string | null
           flow_id?: string
           id?: string
           source_node_id?: string
@@ -192,37 +195,46 @@ export type Database = {
         Row: {
           agent_id: string
           agent_type: string
+          branch_key: string
           created_at: string
           flow_id: string
           id: string
           input_prompt: string
+          is_router: boolean
           is_synthesizer: boolean
           position_x: number
           position_y: number
+          router_branches: Json
           sort_order: number
         }
         Insert: {
           agent_id: string
           agent_type?: string
+          branch_key?: string
           created_at?: string
           flow_id: string
           id?: string
           input_prompt?: string
+          is_router?: boolean
           is_synthesizer?: boolean
           position_x?: number
           position_y?: number
+          router_branches?: Json
           sort_order?: number
         }
         Update: {
           agent_id?: string
           agent_type?: string
+          branch_key?: string
           created_at?: string
           flow_id?: string
           id?: string
           input_prompt?: string
+          is_router?: boolean
           is_synthesizer?: boolean
           position_x?: number
           position_y?: number
+          router_branches?: Json
           sort_order?: number
         }
         Relationships: [
@@ -241,6 +253,7 @@ export type Database = {
           description: string
           execution_mode: string
           id: string
+          input_type: string | null
           name: string
           status: string
           updated_at: string
@@ -251,6 +264,7 @@ export type Database = {
           description?: string
           execution_mode?: string
           id?: string
+          input_type?: string | null
           name: string
           status?: string
           updated_at?: string
@@ -261,6 +275,7 @@ export type Database = {
           description?: string
           execution_mode?: string
           id?: string
+          input_type?: string | null
           name?: string
           status?: string
           updated_at?: string
