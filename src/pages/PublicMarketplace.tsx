@@ -100,7 +100,7 @@ export default function PublicMarketplace() {
         </div>
       </header>
 
-      <div className="container max-w-6xl py-12">
+      <main className="container max-w-6xl py-12">
         <Link to="/" className="inline-flex items-center gap-1 text-sm text-white/40 hover:text-white/70 transition-colors mb-8">
           <ArrowLeft className="h-4 w-4" />
           Voltar ao início
@@ -193,7 +193,7 @@ export default function PublicMarketplace() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
