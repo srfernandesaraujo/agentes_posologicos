@@ -1,0 +1,20 @@
+# Agentes Posológicos
+
+> Plataforma de agentes de IA especializados em prática clínica, farmácia, educação em saúde, pesquisa acadêmica e produção de conteúdo. Profissionais usam créditos para conversar com agentes que apoiam decisões clínicas, criam materiais didáticos e estruturam pesquisas.
+
+## Pages
+
+- [Início](/): Visão geral da plataforma e categorias de agentes.
+- [Vitrine de agentes](/vitrine): Catálogo público de agentes disponíveis.
+- [Preços e créditos](/precos): Planos, pacotes de créditos e assinaturas.
+- [Documentação](/docs): Guias de uso, fluxos e boas práticas.
+- [Fale conosco](/fale-conosco): Canais de contato e suporte.
+- [Verificar certificado](/verificar): Conferência de autenticidade de respostas geradas.
+
+## Optional
+
+- [Cadastro](/signup): Criação de conta gratuita.
+- [Login](/login): Acesso de usuários existentes.
+- [Termos de uso](/termos)
+- [Política de privacidade](/privacidade)
+- [Política de cookies](/cookies)
