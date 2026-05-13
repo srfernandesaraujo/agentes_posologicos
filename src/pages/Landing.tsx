@@ -77,6 +77,7 @@ export default function Landing() {
         </div>
       </header>
 
+      <main>
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0">
@@ -218,6 +219,7 @@ export default function Landing() {
         </div>
       </section>
 
+      </main>
       {/* Footer */}
       <footer className="border-t border-white/10 py-12">
         <div className="container">
