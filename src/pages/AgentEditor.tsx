@@ -870,6 +870,10 @@ export default function AgentEditor() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="tuning">
+          {agentId && <AutoFineTuningPanel agentId={agentId} agentType="custom" />}
+        </TabsContent>
       </Tabs>
     </div>
   );
