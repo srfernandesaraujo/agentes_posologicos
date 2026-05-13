@@ -172,17 +172,17 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
               Crie pipelines com roteamento condicional: enriquecimento → roteador → esteiras paralelas → consolidador.
             </p>
             <div>
-              <Label>Nome do fluxo</Label>
-              <Input value={flowName} onChange={(e) => setFlowName(e.target.value)} placeholder="Ex: Compras hospitalares — RP/Inex/Pregão" className="bg-white/5 border-white/10" />
+              <Label className="text-white/90">Nome do fluxo</Label>
+              <Input value={flowName} onChange={(e) => setFlowName(e.target.value)} placeholder="Ex: Compras hospitalares — RP/Inex/Pregão" className="bg-white/5 border-white/20 text-white placeholder:text-white/40" />
             </div>
             <div>
-              <Label>Objetivo final</Label>
-              <Textarea value={flowObjective} onChange={(e) => setFlowObjective(e.target.value)} placeholder="Ex: A partir da planilha de estoque, produzir os documentos de aquisição (RP, Inexigibilidade ou Pregão) prontos para o gestor." className="min-h-[100px] bg-white/5 border-white/10" />
+              <Label className="text-white/90">Objetivo final</Label>
+              <Textarea value={flowObjective} onChange={(e) => setFlowObjective(e.target.value)} placeholder="Ex: A partir da planilha de estoque, produzir os documentos de aquisição (RP, Inexigibilidade ou Pregão) prontos para o gestor." className="min-h-[100px] bg-white/5 border-white/20 text-white placeholder:text-white/40" />
             </div>
             <div>
-              <Label>Tipo de input inicial</Label>
+              <Label className="text-white/90">Tipo de input inicial</Label>
               <Select value={inputType} onValueChange={setInputType}>
-                <SelectTrigger className="bg-white/5 border-white/10"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="bg-white/5 border-white/20 text-white"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="text">Texto livre</SelectItem>
                   <SelectItem value="spreadsheet">Planilha (Excel/CSV)</SelectItem>
