@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
         .select().single();
       if (execErr) throw execErr;
 
-      if (executionMode === "parallel") {
+      if (executionMode === "parallel" || executionMode === "complex") {
         // BFS layering for parallel execution
         const layers = bfsLayers(nodes, edges || []);
         const levels = layers.map((layer, levelIdx) =>
@@ -173,13 +173,16 @@ Deno.serve(async (req) => {
               agent_name: agent?.name || "Agente",
               input_prompt: node.input_prompt || "",
               is_synthesizer: node.is_synthesizer || false,
+              is_router: node.is_router || false,
+              branch_key: node.branch_key || "main",
+              router_branches: node.router_branches || [],
             };
           })
         );
 
         return new Response(JSON.stringify({
           execution_id: execution.id,
-          execution_mode: "parallel",
+          execution_mode: executionMode,
           levels,
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },

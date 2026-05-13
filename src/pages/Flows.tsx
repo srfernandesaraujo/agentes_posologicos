@@ -7,10 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Workflow, Trash2, Sparkles, Loader2, ArrowLeft, ArrowRight, MessageSquare } from "lucide-react";
+import { Plus, Workflow, Trash2, Sparkles, Loader2, ArrowLeft, ArrowRight, MessageSquare, Network } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { ComplexFlowWizard } from "@/components/flows/ComplexFlowWizard";
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   draft: { label: "Rascunho", variant: "secondary" },
@@ -45,6 +46,7 @@ export default function Flows() {
   const [newDesc, setNewDesc] = useState("");
 
   const [aiOpen, setAiOpen] = useState(false);
+  const [complexOpen, setComplexOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiStep, setAiStep] = useState<AiStep>("prompt");
@@ -142,6 +144,14 @@ export default function Flows() {
           <p className="text-white/60 mt-1">Monte pipelines conectando agentes em sequência ou paralelo</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setComplexOpen(true)}
+            className="gap-2 border-[hsl(var(--accent))]/40 text-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/10"
+          >
+            <Network className="h-4 w-4" />
+            Criar fluxo complexo com IA
+          </Button>
           <Dialog open={aiOpen} onOpenChange={(open) => { setAiOpen(open); if (!open) resetAiDialog(); }}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2 border-[hsl(var(--accent))]/40 text-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/10">
@@ -325,6 +335,7 @@ export default function Flows() {
           })}
         </div>
       )}
+      <ComplexFlowWizard open={complexOpen} onOpenChange={setComplexOpen} />
     </div>
   );
 }
