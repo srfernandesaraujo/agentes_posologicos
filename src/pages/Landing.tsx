@@ -121,7 +121,7 @@ export default function Landing() {
             {STATS.map((s) => (
               <div key={s.label} className="text-center">
                 <p className="font-display text-3xl font-bold gradient-text">{s.value}</p>
-                <p className="mt-1 text-sm text-white/40">{s.label}</p>
+                <p className="mt-1 text-sm text-white/70">{s.label}</p>
               </div>
             ))}
           </div>
@@ -136,13 +136,13 @@ export default function Landing() {
               <DoorOpen className="h-6 w-6 text-[hsl(174,62%,47%)]" />
               <h2 className="font-display text-xl font-bold text-white">{t("landing.pin.title")}</h2>
             </div>
-            <p className="text-sm text-white/40 mb-4">{t("landing.pin.desc")}</p>
+            <p className="text-sm text-white/70 mb-4">{t("landing.pin.desc")}</p>
             <div className="flex gap-2">
               <Input
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
                 placeholder={t("landing.pin.placeholder")}
-                className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 text-center font-mono text-lg tracking-widest"
+                className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/60 text-center font-mono text-lg tracking-widest"
                 onKeyDown={(e) => { if (e.key === "Enter") handlePinAccess(); }}
               />
               <Button onClick={handlePinAccess} disabled={pin.trim().length < 4} className="bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,40%)] text-white shrink-0">
@@ -157,7 +157,7 @@ export default function Landing() {
       <section className="container py-24">
         <div className="text-center mb-16">
           <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">{t("landing.features.title")}</h2>
-          <p className="text-white/40 max-w-xl mx-auto">{t("landing.features.desc")}</p>
+          <p className="text-white/70 max-w-xl mx-auto">{t("landing.features.desc")}</p>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
@@ -166,7 +166,7 @@ export default function Landing() {
                 <f.icon className="h-6 w-6 text-white" />
               </div>
               <h3 className="font-display text-lg font-semibold text-white mb-2">{f.title}</h3>
-              <p className="text-sm text-white/40 leading-relaxed">{f.description}</p>
+              <p className="text-sm text-white/70 leading-relaxed">{f.description}</p>
             </div>
           ))}
         </div>
@@ -176,7 +176,7 @@ export default function Landing() {
       <section className="container py-24">
         <div className="text-center mb-16">
           <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">{t("landing.categories.title")}</h2>
-          <p className="text-white/40 max-w-xl mx-auto">{t("landing.categories.desc")}</p>
+          <p className="text-white/70 max-w-xl mx-auto">{t("landing.categories.desc")}</p>
         </div>
         <div className="grid gap-6 sm:grid-cols-2">
           {CATEGORIES.map((cat) => (
@@ -188,7 +188,7 @@ export default function Landing() {
               <div className="space-y-2">
                 {cat.agents.map((a) => (
                   <div key={a} className="flex items-center gap-2 text-sm text-white/50">
-                    <CheckCircle2 className="h-4 w-4 text-white/20" />
+                    <CheckCircle2 className="h-4 w-4 text-white/50" />
                     {a}
                   </div>
                 ))}
@@ -206,7 +206,7 @@ export default function Landing() {
             <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">
               {t("landing.cta2.title")}
             </h2>
-            <p className="text-white/40 max-w-lg mx-auto mb-8">
+            <p className="text-white/70 max-w-lg mx-auto mb-8">
               {t("landing.cta2.desc")}
             </p>
             <Link to="/signup">
@@ -232,7 +232,7 @@ export default function Landing() {
                 </div>
                 <span className="font-display font-semibold text-white text-base">Agentes Posológicos</span>
               </div>
-              <p className="text-sm text-white/40 leading-relaxed">
+              <p className="text-sm text-white/70 leading-relaxed">
                 Agentes de IA especializados para profissionais de saúde, educadores e pesquisadores.
               </p>
             </div>
@@ -240,7 +240,7 @@ export default function Landing() {
             {/* Produto */}
             <div className="flex flex-col gap-3">
               <h4 className="font-semibold text-white/80 text-sm">Produto</h4>
-              <div className="flex flex-col gap-2 text-sm text-white/40">
+              <div className="flex flex-col gap-2 text-sm text-white/70">
                 <Link to="/signup" className="hover:text-white/70 transition-colors">Criar Conta</Link>
                 <Link to="/login" className="hover:text-white/70 transition-colors">Entrar</Link>
                 <Link to="/precos" className="hover:text-white/70 transition-colors">Créditos</Link>
@@ -251,7 +251,7 @@ export default function Landing() {
             {/* Recursos */}
             <div className="flex flex-col gap-3">
               <h4 className="font-semibold text-white/80 text-sm">Recursos</h4>
-              <div className="flex flex-col gap-2 text-sm text-white/40">
+              <div className="flex flex-col gap-2 text-sm text-white/70">
                 <Link to="/docs" className="hover:text-white/70 transition-colors">Documentação</Link>
                 <Link to="/fale-conosco" className="hover:text-white/70 transition-colors">Contato</Link>
                 <button onClick={() => document.getElementById('pin-section')?.scrollIntoView({ behavior: 'smooth' })} className="text-left hover:text-white/70 transition-colors">Salas Virtuais</button>
@@ -261,7 +261,7 @@ export default function Landing() {
             {/* Legal */}
             <div className="flex flex-col gap-3">
               <h4 className="font-semibold text-white/80 text-sm">Legal</h4>
-              <div className="flex flex-col gap-2 text-sm text-white/40">
+              <div className="flex flex-col gap-2 text-sm text-white/70">
                 <Link to="/termos" className="hover:text-white/70 transition-colors">Termos de Serviço</Link>
                 <Link to="/privacidade" className="hover:text-white/70 transition-colors">Política de Privacidade</Link>
                 <Link to="/cookies" className="hover:text-white/70 transition-colors">Política de Cookies</Link>
@@ -270,7 +270,7 @@ export default function Landing() {
           </div>
 
           {/* Bottom bar */}
-          <div className="border-t border-white/10 pt-6 text-center text-sm text-white/30">
+          <div className="border-t border-white/10 pt-6 text-center text-sm text-white/60">
             <span>© {new Date().getFullYear()} Agentes Posológicos. {t("landing.footer.rights")}</span>
             <span className="mx-1">—</span>
             <span>Desenvolvido por Sérgio Araújo. Posologia Produções</span>

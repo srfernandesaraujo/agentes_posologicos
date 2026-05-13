@@ -69,7 +69,7 @@ export default function PublicCredits() {
       </header>
 
       <main className="container max-w-5xl py-12">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-white/40 hover:text-white/70 transition-colors mb-8">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-white/70 hover:text-white/70 transition-colors mb-8">
           <ArrowLeft className="h-4 w-4" />
           Voltar ao início
         </Link>
@@ -89,7 +89,7 @@ export default function PublicCredits() {
             <Coins className="h-5 w-5 text-[hsl(174,62%,47%)]" />
             <h2 className="font-display text-xl font-bold text-white">Planos Mensais</h2>
           </div>
-          <p className="mb-6 text-sm text-white/40">Receba créditos automaticamente todo mês e economize com assinatura recorrente.</p>
+          <p className="mb-6 text-sm text-white/70">Receba créditos automaticamente todo mês e economize com assinatura recorrente.</p>
 
           <div className="grid gap-6 sm:grid-cols-3">
             {PLANS.map((plan) => (
@@ -111,9 +111,9 @@ export default function PublicCredits() {
                   <plan.icon className="h-7 w-7 text-[hsl(174,62%,47%)]" />
                 </div>
                 <p className="mb-1 text-center font-display text-xl font-bold text-white">{plan.name}</p>
-                <p className="mb-1 text-center text-sm text-white/40">{plan.credits} créditos/mês</p>
+                <p className="mb-1 text-center text-sm text-white/70">{plan.credits} créditos/mês</p>
                 <p className="mb-4 text-center text-2xl font-semibold text-white">
-                  {plan.price}<span className="text-sm text-white/40">/mês</span>
+                  {plan.price}<span className="text-sm text-white/70">/mês</span>
                 </p>
 
                 <ul className="mb-6 space-y-2">
@@ -149,7 +149,7 @@ export default function PublicCredits() {
             <Coins className="h-5 w-5 text-[hsl(174,62%,47%)]" />
             <h2 className="font-display text-xl font-bold text-white">Pacotes Avulsos</h2>
           </div>
-          <p className="mb-6 text-sm text-white/40">Compre créditos extras a qualquer momento, mesmo com uma assinatura ativa.</p>
+          <p className="mb-6 text-sm text-white/70">Compre créditos extras a qualquer momento, mesmo com uma assinatura ativa.</p>
 
           <div className="grid gap-6 sm:grid-cols-3">
             {CREDIT_PACKS.map((pack) => (
@@ -169,7 +169,7 @@ export default function PublicCredits() {
                 </div>
                 <p className="mb-1 font-display text-lg font-bold text-[hsl(174,62%,47%)]">{pack.name}</p>
                 <p className="mb-1 font-display text-3xl font-bold text-white">{pack.amount}</p>
-                <p className="mb-1 text-sm text-white/40">créditos</p>
+                <p className="mb-1 text-sm text-white/70">créditos</p>
                 <p className="mb-6 text-xl font-semibold text-white">{pack.price}</p>
                 <Link to="/signup">
                   <Button
