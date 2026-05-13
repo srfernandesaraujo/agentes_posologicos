@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Bot, Wand2, FileText, MessageSquare, Settings2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { DocumentManager } from "@/components/agents/DocumentManager";
+import { AutoFineTuningPanel } from "@/components/agents/AutoFineTuningPanel";
 
 export default function NativeAgentEditor() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -172,6 +173,7 @@ export default function NativeAgentEditor() {
         <TabsList className="mb-6 bg-white/5 border border-white/10">
           <TabsTrigger value="conversations" className="text-white/60 data-[state=active]:text-white data-[state=active]:bg-white/10">Conversas</TabsTrigger>
           <TabsTrigger value="config" className="text-white/60 data-[state=active]:text-white data-[state=active]:bg-white/10">Configurações</TabsTrigger>
+          <TabsTrigger value="tuning" className="text-white/60 data-[state=active]:text-white data-[state=active]:bg-white/10">Otimização</TabsTrigger>
         </TabsList>
 
         {/* CONVERSATIONS TAB */}
@@ -339,6 +341,10 @@ export default function NativeAgentEditor() {
               )}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="tuning">
+          {agentId && <AutoFineTuningPanel agentId={agentId} agentType="native" />}
         </TabsContent>
       </Tabs>
     </div>

@@ -6570,8 +6570,26 @@ Deno.serve(async (req) => {
       .single();
 
     if (builtInAgent) {
+      // Auto fine-tuning: try to load active prompt version
+      let overridePrompt: string | null = null;
+      try {
+        const { data: activeVer } = await supabase
+          .from("agent_prompt_versions")
+          .select("system_prompt")
+          .eq("agent_id", agentId)
+          .eq("agent_type", "native")
+          .eq("status", "active")
+          .order("version", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (activeVer && (activeVer as any).system_prompt) {
+          overridePrompt = (activeVer as any).system_prompt as string;
+        }
+      } catch (_) { /* ignore */ }
       // Use DB-stored prompt if available (admin override), otherwise use hardcoded
-      const basePrompt = (builtInAgent as any).system_prompt && (builtInAgent as any).system_prompt.trim().length > 0
+      const basePrompt = overridePrompt && overridePrompt.trim().length > 0
+        ? overridePrompt
+        : (builtInAgent as any).system_prompt && (builtInAgent as any).system_prompt.trim().length > 0
         ? (builtInAgent as any).system_prompt
         : (builtInAgent.slug === "super-agente" ? SUPER_AGENT_BASE_PROMPT : (AGENT_PROMPTS[builtInAgent.slug] || DEFAULT_PROMPT));
       let systemPrompt = basePrompt + GLOBAL_TABLE_INSTRUCTION;
@@ -7196,8 +7214,25 @@ ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhe
       }
     }
 
+    // Auto fine-tuning: prefer active prompt version if any
+    let basePromptCustom = customAgent.system_prompt || DEFAULT_PROMPT;
+    try {
+      const { data: activeVer } = await serviceClient
+        .from("agent_prompt_versions")
+        .select("system_prompt")
+        .eq("agent_id", customAgent.id)
+        .eq("agent_type", "custom")
+        .eq("status", "active")
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (activeVer && (activeVer as any).system_prompt) {
+        basePromptCustom = (activeVer as any).system_prompt as string;
+      }
+    } catch (_) { /* ignore */ }
+
     // Build system prompt with extras
-    let finalSystemPrompt = (customAgent.system_prompt || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
+    let finalSystemPrompt = basePromptCustom + GLOBAL_TABLE_INSTRUCTION;
 
     // Inject active skills into system prompt
     try {

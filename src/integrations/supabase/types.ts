@@ -307,6 +307,170 @@ export type Database = {
           },
         ]
       }
+      agent_optimization_runs: {
+        Row: {
+          agent_id: string
+          agent_type: string
+          comments_used: number | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          feedback_count: number | null
+          feedback_window_end: string | null
+          feedback_window_start: string | null
+          generated_version_id: string | null
+          id: string
+          model_used: string | null
+          negative_count: number | null
+          positive_count: number | null
+          provider_used: string | null
+          status: string
+          triggered_by: string
+        }
+        Insert: {
+          agent_id: string
+          agent_type: string
+          comments_used?: number | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          feedback_count?: number | null
+          feedback_window_end?: string | null
+          feedback_window_start?: string | null
+          generated_version_id?: string | null
+          id?: string
+          model_used?: string | null
+          negative_count?: number | null
+          positive_count?: number | null
+          provider_used?: string | null
+          status?: string
+          triggered_by?: string
+        }
+        Update: {
+          agent_id?: string
+          agent_type?: string
+          comments_used?: number | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          feedback_count?: number | null
+          feedback_window_end?: string | null
+          feedback_window_start?: string | null
+          generated_version_id?: string | null
+          id?: string
+          model_used?: string | null
+          negative_count?: number | null
+          positive_count?: number | null
+          provider_used?: string | null
+          status?: string
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_optimization_runs_generated_version_id_fkey"
+            columns: ["generated_version_id"]
+            isOneToOne: false
+            referencedRelation: "agent_prompt_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_optimization_settings: {
+        Row: {
+          agent_id: string
+          agent_type: string
+          auto_apply: boolean
+          auto_optimize_enabled: boolean
+          created_at: string
+          id: string
+          last_run_at: string | null
+          min_feedbacks: number
+          negative_threshold: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          agent_id: string
+          agent_type: string
+          auto_apply?: boolean
+          auto_optimize_enabled?: boolean
+          created_at?: string
+          id?: string
+          last_run_at?: string | null
+          min_feedbacks?: number
+          negative_threshold?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          agent_id?: string
+          agent_type?: string
+          auto_apply?: boolean
+          auto_optimize_enabled?: boolean
+          created_at?: string
+          id?: string
+          last_run_at?: string | null
+          min_feedbacks?: number
+          negative_threshold?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      agent_prompt_versions: {
+        Row: {
+          activated_at: string | null
+          agent_id: string
+          agent_type: string
+          change_summary: string | null
+          created_at: string
+          created_by: string | null
+          feedback_negative: number | null
+          feedback_positive: number | null
+          feedback_window_end: string | null
+          feedback_window_start: string | null
+          id: string
+          origin: string
+          status: string
+          system_prompt: string
+          version: number
+        }
+        Insert: {
+          activated_at?: string | null
+          agent_id: string
+          agent_type: string
+          change_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          feedback_negative?: number | null
+          feedback_positive?: number | null
+          feedback_window_end?: string | null
+          feedback_window_start?: string | null
+          id?: string
+          origin?: string
+          status?: string
+          system_prompt: string
+          version: number
+        }
+        Update: {
+          activated_at?: string | null
+          agent_id?: string
+          agent_type?: string
+          change_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          feedback_negative?: number | null
+          feedback_positive?: number | null
+          feedback_window_end?: string | null
+          feedback_window_start?: string | null
+          id?: string
+          origin?: string
+          status?: string
+          system_prompt?: string
+          version?: number
+        }
+        Relationships: []
+      }
       agent_reviews: {
         Row: {
           agent_id: string
