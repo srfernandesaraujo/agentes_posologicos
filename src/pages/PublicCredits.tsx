@@ -68,7 +68,7 @@ export default function PublicCredits() {
         </div>
       </header>
 
-      <div className="container max-w-5xl py-12">
+      <main className="container max-w-5xl py-12">
         <Link to="/" className="inline-flex items-center gap-1 text-sm text-white/40 hover:text-white/70 transition-colors mb-8">
           <ArrowLeft className="h-4 w-4" />
           Voltar ao início
@@ -185,10 +185,10 @@ export default function PublicCredits() {
         </div>
 
         <div className="text-center">
-          <p className="text-xs text-white/30">Os créditos são consumidos a cada interação com um agente. O custo varia de acordo com a complexidade do agente.</p>
-          <p className="mt-2 text-xs text-white/20">Pagamento seguro via Stripe • Cartão de crédito/débito</p>
+          <p className="text-xs text-white/70">Os créditos são consumidos a cada interação com um agente. O custo varia de acordo com a complexidade do agente.</p>
+          <p className="mt-2 text-xs text-white/60">Pagamento seguro via Stripe • Cartão de crédito/débito</p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
