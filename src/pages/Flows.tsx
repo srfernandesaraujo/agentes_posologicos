@@ -335,6 +335,7 @@ export default function Flows() {
           })}
         </div>
       )}
+      <ComplexFlowWizard open={complexOpen} onOpenChange={setComplexOpen} />
     </div>
   );
 }
