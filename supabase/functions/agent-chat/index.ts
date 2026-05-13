@@ -7214,8 +7214,25 @@ ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhe
       }
     }
 
+    // Auto fine-tuning: prefer active prompt version if any
+    let basePromptCustom = customAgent.system_prompt || DEFAULT_PROMPT;
+    try {
+      const { data: activeVer } = await serviceClient
+        .from("agent_prompt_versions")
+        .select("system_prompt")
+        .eq("agent_id", customAgent.id)
+        .eq("agent_type", "custom")
+        .eq("status", "active")
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (activeVer && (activeVer as any).system_prompt) {
+        basePromptCustom = (activeVer as any).system_prompt as string;
+      }
+    } catch (_) { /* ignore */ }
+
     // Build system prompt with extras
-    let finalSystemPrompt = (customAgent.system_prompt || DEFAULT_PROMPT) + GLOBAL_TABLE_INSTRUCTION;
+    let finalSystemPrompt = basePromptCustom + GLOBAL_TABLE_INSTRUCTION;
 
     // Inject active skills into system prompt
     try {
