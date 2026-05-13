@@ -1,62 +1,102 @@
+## Auto-Fine-Tuning de Agentes por Feedback
 
+Sistema que evolui automaticamente os `system_prompt` dos agentes (nativos e customizados) com base nos feedbacks (👍/👎 + comentários) já coletados em `response_feedback`, criando versões melhoradas, validadas e revertíveis.
 
-# Fix: Meeting Bot Stuck in "Transcribing" -- Split Processing Pipeline
+---
 
-## Root Cause
+### 1. Conceito
 
-The logs show the `meeting-webhook` function is being **killed by Supabase before it finishes**. Every 8-10 seconds:
-1. Function boots (~30ms)
-2. Starts fetching transcript from Recall.ai
-3. Gets shut down before the response arrives
+Quando um agente acumula **massa crítica de feedback** (ex.: ≥ 10 avaliações novas desde a última otimização **e** taxa de 👎 ≥ 20% **OU** ≥ 5 comentários textuais novos), um pipeline automático:
 
-The function tries to do too much in one invocation: fetch bot data + fetch transcript + call AI for summary. This exceeds the edge function wall time limit.
+1. Coleta feedbacks recentes + trecho da conversa associada (pergunta do usuário + resposta do agente).
+2. Envia para um "Agente Otimizador de Prompts" (Gemini 2.5 Pro, seguindo a ordem de provedores Google → ... → Lovable).
+3. Gera uma **proposta de novo `system_prompt`** com diff explicado.
+4. Salva como **versão pendente** (não aplica direto).
+5. Notifica o **dono do agente** (ou admin, p/ agentes nativos) para **aprovar / rejeitar / editar**.
+6. Após aprovação, vira a versão ativa; versões antigas ficam no histórico para rollback 1-clique.
 
-Meanwhile, `meeting-sync` keeps calling the webhook every 15s from the frontend poll, creating an infinite retry loop that never succeeds.
+Modo opcional **"auto-aplicar"** (toggle por agente) para usuários que confiam no fluxo — ainda assim mantém histórico e rollback.
 
-## Fix: Move Transcript Fetch Into meeting-sync
+---
 
-Instead of `meeting-sync` calling `meeting-webhook` (which then tries to do everything), `meeting-sync` will handle the transcript fetch and summary generation directly, in smaller steps:
+### 2. Novas tabelas
 
-**Step 1**: When `meeting-sync` detects a "done" bot, it fetches the transcript directly and saves it to the DB (status: "transcribing" -> save transcript -> status: "summarizing"). This is one sync cycle.
+- **`agent_prompt_versions`** — histórico de prompts
+  - agente (nativo ou custom), versão (int), prompt, status (`active` | `pending` | `archived` | `rejected`), origem (`manual` | `auto_feedback`), resumo das mudanças, métricas-base (👍/👎 no momento da geração), criado por.
 
-**Step 2**: On the next sync cycle, for meetings in "summarizing" status that have a transcript but no summary, `meeting-sync` calls `meeting-summary` (which already exists as a separate function).
+- **`agent_optimization_runs`** — execuções do pipeline
+  - agente alvo, janela de feedback analisada (de/até), nº feedbacks positivos/negativos, comentários usados, modelo/provedor utilizado, status (`running`|`success`|`failed`|`skipped`), versão gerada, erro.
 
-This ensures no single function call needs more than one external API call.
+- **`agent_optimization_settings`** — configuração por agente
+  - auto_optimize_enabled (bool), auto_apply (bool), min_feedbacks (default 10), negative_threshold (default 0.2), última execução.
 
-### Architecture Change
+RLS: dono do agente vê/edita o seu; admin vê todos os agentes nativos.
+
+---
+
+### 3. Edge Functions
+
+- **`agent-prompt-optimizer`** (invocável manual + via cron)
+  - Input: `agentId`, `agentType` (`native|custom`), `force?: boolean`.
+  - Lê settings → checa thresholds → coleta últimos N feedbacks (com mensagens via `messages`/`session_id`) → monta prompt do otimizador → chama AI Gateway respeitando ordem (Google primeiro) → salva nova versão `pending` (ou `active` se auto_apply) → cria notificação para o dono → registra run.
+
+- **Cron (pg_cron + pg_net)**: roda diariamente às 04:00 e dispara `agent-prompt-optimizer` para cada agente elegível (query de candidatos).
+
+- **`agent-prompt-rollback`** — alterna a versão ativa de volta para uma anterior (apenas dono/admin).
+
+A função **`agent-chat`** passa a ler o `system_prompt` da **versão `active` em `agent_prompt_versions`** quando existir; caso contrário usa o campo legado em `agents`/`custom_agents` (compatibilidade).
+
+---
+
+### 4. UI
+
+- **Editor do agente** (`AgentEditor` e `NativeAgentEditor`) ganha aba **"Otimização Automática"**:
+  - Toggle "Habilitar auto-fine-tuning" e "Auto-aplicar sem revisão".
+  - Sliders: nº mínimo de feedbacks, % máximo de 👎 tolerado.
+  - Lista de **versões** com diff visual (linha-a-linha), métricas, botão **Aprovar / Rejeitar / Reverter**.
+  - Botão **"Otimizar agora"** (executa manualmente).
+
+- **`NotificationBell`**: nova notificação tipo `prompt_optimization_pending` linkando para a aba.
+
+- **Admin**: nova aba em `/admin` listando todos os runs e versões pendentes globais.
+
+---
+
+### 5. Fluxo de aprovação
 
 ```text
-BEFORE (broken):
-  meeting-sync -> meeting-webhook (fetch transcript + AI summary = TIMEOUT)
-
-AFTER (fixed):
-  meeting-sync cycle 1: detect done -> fetch transcript -> save to DB
-  meeting-sync cycle 2: detect summarizing -> call meeting-summary -> done
+Feedback acumula
+   │
+   ▼
+Cron diário OR botão manual
+   │
+   ▼
+Edge function coleta dados → chama LLM → gera proposta
+   │
+   ├── auto_apply=false → versão "pending" + notificação → dono aprova → "active"
+   │
+   └── auto_apply=true  → versão "active" direto (anterior vira "archived")
 ```
 
-## Files Changed
+Rollback sempre disponível pela aba de versões.
 
-| File | Change |
-|------|--------|
-| `supabase/functions/meeting-sync/index.ts` | Add transcript fetching logic directly; handle "summarizing" meetings by calling meeting-summary; stop delegating to webhook |
-| `supabase/functions/meeting-webhook/index.ts` | Simplify to only handle status updates (done/error) -- set status to "transcribing" without trying to fetch transcript |
+---
 
-## Implementation Details
+### 6. Detalhes técnicos
 
-### meeting-webhook (simplified)
-- On "done" status: just update meeting to `status: "transcribing"`, return immediately
-- On "error" status: update with error message (keep existing logic)
-- Remove all transcript fetching and AI summary code from this function
+- Reaproveita `ai_usage_log` para medir custo do otimizador.
+- Otimizador roda com `gemini-2.5-pro` por padrão (memory: model-priority-prompt-generation).
+- Limita comentários a 50 por run para caber no contexto.
+- Sanitiza PII básico antes de enviar amostras de mensagens.
+- Toda escrita usa `SUPABASE_SERVICE_ROLE_KEY` na edge function (bypass RLS controlado).
+- Eficácia medida comparando taxa de 👍 nos N feedbacks pós-aplicação vs N pré-aplicação — exibida na UI ("Versão v3 melhorou +12% de aprovação").
 
-### meeting-sync (enhanced)
-- Query meetings in `["pending", "recording", "transcribing", "summarizing"]`
-- For `pending`/`recording`: fetch bot status from Recall, update if done/error
-- For `transcribing`: fetch transcript from Recall directly (reuse fetchTranscript logic), save to DB, set status to "summarizing"
-- For `summarizing`: call `meeting-summary` function via internal service-role call
-- Keep existing timeout protections (15min max wait)
+---
 
-### Key technical points
-- Move `fetchRecallJson`, `extractTranscriptShortcut`, `fetchTranscriptPayload`, `fetchTranscript` helper functions into `meeting-sync`
-- `meeting-summary` already exists and works -- just need to call it with service role auth pattern
-- Each sync cycle does at most ONE external API call per meeting, staying within edge function limits
+### 7. Entregáveis
 
+1. Migração: 3 tabelas + RLS + índices + cron job.
+2. Edge functions: `agent-prompt-optimizer`, `agent-prompt-rollback`.
+3. Ajuste em `agent-chat` para ler versão ativa.
+4. UI: aba "Otimização Automática" nos dois editores + admin view.
+5. Notificações + tradução pt/en/es.
