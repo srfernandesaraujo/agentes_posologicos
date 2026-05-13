@@ -1570,6 +1570,22 @@ export type Database = {
             Returns: string
           }
       get_current_user_email: { Args: never; Returns: string }
+      get_marketplace_agents: {
+        Args: never
+        Returns: {
+          created_at: string
+          description: string
+          id: string
+          markdown_response: boolean
+          model: string
+          name: string
+          provider: string
+          restrict_content: boolean
+          temperature: number
+          updated_at: string
+          user_id: string
+        }[]
+      }
       get_room_by_pin: {
         Args: { p_pin: string }
         Returns: {
