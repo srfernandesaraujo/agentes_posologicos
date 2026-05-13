@@ -621,6 +621,11 @@ export default function Chat() {
 
   return (
     <>
+    <SEO
+      title={`${agent.name} — Agentes Posológicos`}
+      description={agent.description?.slice(0, 155) || `Converse com o agente ${agent.name} na plataforma Agentes Posológicos.`}
+      path={`/chat/${actualAgentId}`}
+    />
     {/* No credits dialog */}
     <Dialog open={showNoCreditsDialog} onOpenChange={setShowNoCreditsDialog}>
       <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-sm">
