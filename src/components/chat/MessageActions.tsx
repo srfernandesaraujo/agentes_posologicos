@@ -180,6 +180,7 @@ export function MessageActions({ content, agentName, messageRef, sessionId, mess
       <div className="absolute -top-8 right-2 flex items-center gap-1 rounded-lg border border-white/10 bg-[hsl(220,25%,12%)] px-1 py-0.5 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
         <button
           onClick={handleCopy}
+          aria-label="Copiar texto"
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-white/60 hover:text-white hover:bg-white/10 transition-colors"
           title="Copiar texto"
         >
@@ -188,6 +189,7 @@ export function MessageActions({ content, agentName, messageRef, sessionId, mess
         <button
           onClick={handleExportPDF}
           disabled={exporting}
+          aria-label="Exportar como PDF"
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-white/60 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-40"
           title="Exportar como PDF"
         >
@@ -200,6 +202,7 @@ export function MessageActions({ content, agentName, messageRef, sessionId, mess
         <button
           onClick={handleCertify}
           disabled={generating}
+          aria-label="Certificar autenticidade"
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-white/60 hover:text-emerald-400 hover:bg-white/10 transition-colors disabled:opacity-40"
           title="Certificar autenticidade"
         >

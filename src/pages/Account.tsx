@@ -123,7 +123,7 @@ export default function Account() {
           <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
             <Avatar className="h-14 w-14 border-2 border-white/20">
               {profile?.avatar_url ? (
-                <AvatarImage src={profile.avatar_url} alt="Avatar" />
+                <AvatarImage src={profile.avatar_url} alt={`Foto de perfil de ${profile?.full_name || user?.email || "usuário"}`} />
               ) : null}
               <AvatarFallback className="gradient-primary text-white text-lg font-bold">
                 {user?.email?.charAt(0).toUpperCase()}
