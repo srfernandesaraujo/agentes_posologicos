@@ -15,6 +15,7 @@ import { getIcon } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, ArrowLeft, Coins, Bot, User, Paperclip, X, FileText, AlertTriangle, MessageSquare, File, Settings2, MoreVertical, Trash2, Download, Pencil, Users } from "lucide-react";
+import { SEO } from "@/components/seo/SEO";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -620,6 +621,11 @@ export default function Chat() {
 
   return (
     <>
+    <SEO
+      title={`${agent.name} — Agentes Posológicos`}
+      description={agent.description?.slice(0, 155) || `Converse com o agente ${agent.name} na plataforma Agentes Posológicos.`}
+      path={`/chat/${actualAgentId}`}
+    />
     {/* No credits dialog */}
     <Dialog open={showNoCreditsDialog} onOpenChange={setShowNoCreditsDialog}>
       <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white max-w-sm">
@@ -710,14 +716,14 @@ export default function Chat() {
         {/* Chat header */}
         <div className="border-b border-white/10 bg-[hsl(220,25%,8%)]/80 backdrop-blur-xl px-4 py-3">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/agentes")} className="text-white/60 hover:bg-white/10 hover:text-white">
+            <Button variant="ghost" size="icon" aria-label="Voltar para agentes" onClick={() => navigate("/agentes")} className="text-white/60 hover:bg-white/10 hover:text-white">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
               <AgentIcon className={`h-5 w-5 ${isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="font-display font-semibold truncate text-white">{agent.name}</h2>
+              <h1 className="font-display font-semibold truncate text-white text-base">{agent.name}</h1>
               <p className="text-xs text-white/40 truncate">{agent.category}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -746,7 +752,7 @@ export default function Chat() {
               {sessionId && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-white/60 hover:bg-white/10 hover:text-white">
+                    <Button variant="ghost" size="icon" aria-label="Mais opções da conversa" className="text-white/60 hover:bg-white/10 hover:text-white">
                       <MoreVertical className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>

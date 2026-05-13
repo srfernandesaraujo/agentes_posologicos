@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Pill, Zap, Star, Crown, Check, Coins, ArrowRight, ArrowLeft } from "lucide-react";
+import { SEO } from "@/components/seo/SEO";
 
 const PLANS = [
   {
@@ -38,6 +39,11 @@ const CREDIT_PACKS = [
 export default function PublicCredits() {
   return (
     <div className="min-h-screen bg-[hsl(220,25%,5%)] text-white">
+      <SEO
+        title="Planos e Créditos — Agentes Posológicos"
+        description="Escolha o plano ideal: pacotes Básico, Pro e Premium com créditos mensais para usar agentes de IA em saúde, ensino e pesquisa."
+        path="/precos"
+      />
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[hsl(220,25%,5%)]/80 backdrop-blur-xl">
         <div className="container flex h-16 items-center justify-between">

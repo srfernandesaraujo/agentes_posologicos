@@ -7,6 +7,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
 import { SalesAgentWidget } from "@/components/sales/SalesAgentWidget";
+import { SEO } from "@/components/seo/SEO";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -47,6 +48,19 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-[hsl(220,25%,5%)] text-white">
+      <SEO
+        title="Agentes Posológicos — IA para Saúde, Educação e Pesquisa"
+        description="Plataforma de agentes de IA especializados em prática clínica, farmácia, ensino em saúde, pesquisa acadêmica e produção de conteúdo. Crie sua conta gratuita."
+        path="/"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "Agentes Posológicos",
+          applicationCategory: "HealthApplication",
+          operatingSystem: "Web",
+          offers: { "@type": "Offer", price: "0", priceCurrency: "BRL" },
+        }}
+      />
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[hsl(220,25%,5%)]/80 backdrop-blur-xl">
         <div className="container flex h-16 items-center justify-between">

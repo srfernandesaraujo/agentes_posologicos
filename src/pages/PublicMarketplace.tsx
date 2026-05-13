@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Pill, Bot, ArrowLeft, ArrowRight, Sparkles, Star, Calculator, Gamepad2, Stethoscope, Brain, FlaskConical, BarChart3, BookOpen, Shield } from "lucide-react";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
+import { SEO } from "@/components/seo/SEO";
 
 const PRODUCTS = [
   {
@@ -81,6 +82,11 @@ const PRODUCTS = [
 export default function PublicMarketplace() {
   return (
     <div className="min-h-screen bg-[hsl(220,25%,5%)] text-white">
+      <SEO
+        title="Vitrine de Agentes de IA — Agentes Posológicos"
+        description="Catálogo de agentes de IA para saúde, farmácia, ensino e pesquisa. Simuladores clínicos, planejamento de aulas, antibioticoterapia e muito mais."
+        path="/vitrine"
+      />
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[hsl(220,25%,5%)]/80 backdrop-blur-xl">
         <div className="container flex h-16 items-center justify-between">
