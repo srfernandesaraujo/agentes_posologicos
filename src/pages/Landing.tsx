@@ -7,6 +7,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
 import { SalesAgentWidget } from "@/components/sales/SalesAgentWidget";
+import { SEO } from "@/components/seo/SEO";
 
 export default function Landing() {
   const navigate = useNavigate();
