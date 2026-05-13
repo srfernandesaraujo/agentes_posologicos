@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, Loader2, Network, Plus, Trash2, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Network, Plus, Trash2, ArrowUp, ArrowDown, Sparkles, AlertTriangle, CheckCircle2, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -47,6 +47,8 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
   const [flowObjective, setFlowObjective] = useState("");
   const [inputType, setInputType] = useState<string>("text");
   const [agents, setAgents] = useState<AgentSpec[]>([emptyAgent(), emptyAgent()]);
+  const [manyAgents, setManyAgents] = useState(false);
+  const [agentCount, setAgentCount] = useState<number>(2);
   const [loading, setLoading] = useState(false);
   const [preflightQs, setPreflightQs] = useState<string[]>([]);
   const [preflightAns, setPreflightAns] = useState<Record<string, string>>({});
@@ -57,6 +59,8 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
     setFlowObjective("");
     setInputType("text");
     setAgents([emptyAgent(), emptyAgent()]);
+    setManyAgents(false);
+    setAgentCount(2);
     setLoading(false);
     setPreflightQs([]);
     setPreflightAns({});
@@ -84,6 +88,80 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
   };
   const addAgent = () => setAgents((p) => (p.length >= 12 ? p : [...p, emptyAgent()]));
   const removeAgent = (i: number) => setAgents((p) => (p.length <= 2 ? p : p.filter((_, idx) => idx !== i)));
+
+  const resizeAgentsTo = (n: number) => {
+    const target = Math.max(2, Math.min(12, Math.floor(n) || 2));
+    setAgents((prev) => {
+      if (prev.length === target) return prev;
+      if (prev.length < target) {
+        return [...prev, ...Array.from({ length: target - prev.length }, () => emptyAgent())];
+      }
+      return prev.slice(0, target);
+    });
+  };
+
+  const goToAgentsStep = () => {
+    const desired = manyAgents ? Math.max(2, Math.min(12, agentCount || 2)) : Math.max(2, agents.length);
+    resizeAgentsTo(desired);
+    setStep("agents");
+  };
+
+  // Heuristic inconsistency detection — returns { issues, suggestions }
+  const analysis = useMemo(() => {
+    const issues: string[] = [];
+    const suggestions: string[] = [];
+    const names = agents.map((a) => a.name.trim()).filter(Boolean);
+    const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+    if (dupes.length) issues.push(`Nomes duplicados: ${Array.from(new Set(dupes)).join(", ")}.`);
+
+    const declaredBranches = new Set<string>(["main"]);
+    agents.forEach((a) => { if (a.is_router) a.branches.forEach((b) => b.trim() && declaredBranches.add(b.trim())); });
+
+    agents.forEach((a, i) => {
+      if (!a.name.trim()) issues.push(`Agente ${i + 1}: sem nome.`);
+      if (!a.role.trim()) issues.push(`Agente ${i + 1}: sem descrição do que faz.`);
+      if (a.is_router && a.branches.filter((b) => b.trim()).length < 2) {
+        issues.push(`Agente ${i + 1} é roteador mas declara menos de 2 esteiras.`);
+      }
+      if (!declaredBranches.has(a.branch)) {
+        issues.push(`Agente ${i + 1} está na esteira "${a.branch}", que não foi declarada por nenhum roteador anterior.`);
+      }
+      if (a.is_router && a.is_synthesizer) issues.push(`Agente ${i + 1}: não pode ser roteador e consolidador ao mesmo tempo.`);
+    });
+
+    const routers = agents.filter((a) => a.is_router);
+    const synthesizers = agents.filter((a) => a.is_synthesizer);
+    const hasBranches = Array.from(declaredBranches).filter((b) => b !== "main").length > 0;
+
+    if (routers.length > 1) suggestions.push("Você tem mais de um roteador — considere consolidar a decisão em um único roteador para simplificar o fluxo.");
+    if (hasBranches && synthesizers.length === 0) suggestions.push("Há esteiras paralelas mas nenhum Consolidador final — adicione um agente consolidador no fim para unificar os resultados.");
+    if (synthesizers.length > 1) suggestions.push("Mais de um Consolidador final detectado — normalmente deve haver apenas um.");
+    if (synthesizers.length === 1 && agents[agents.length - 1] && !agents[agents.length - 1].is_synthesizer) {
+      suggestions.push("O Consolidador final não é o último agente — mova-o para o fim do pipeline.");
+    }
+    if (agents.length >= 3 && routers.length === 0 && !hasBranches) {
+      suggestions.push("Pipeline linear com 3+ agentes: avalie se faz sentido paralelizar etapas independentes com um Roteador.");
+    }
+    // Branches declared but unused
+    const usedBranches = new Set(agents.map((a) => a.branch));
+    Array.from(declaredBranches).forEach((b) => {
+      if (b !== "main" && !usedBranches.has(b)) {
+        issues.push(`A esteira "${b}" foi declarada mas nenhum agente a utiliza.`);
+      }
+    });
+    // Router not followed by any agent in any of its branches
+    agents.forEach((a, i) => {
+      if (!a.is_router) return;
+      a.branches.forEach((b) => {
+        const label = b.trim();
+        if (!label) return;
+        const downstream = agents.slice(i + 1).some((x) => x.branch === label);
+        if (!downstream) issues.push(`Roteador "${a.name || `Agente ${i + 1}`}" declara a esteira "${label}", mas nenhum agente posterior a executa.`);
+      });
+    });
+
+    return { issues: Array.from(new Set(issues)), suggestions: Array.from(new Set(suggestions)) };
+  }, [agents]);
 
   const validateAgents = (): string | null => {
     for (let i = 0; i < agents.length; i++) {
@@ -191,8 +269,31 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
                 </SelectContent>
               </Select>
             </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <Label className="text-white/90">Mais de 2 agentes?</Label>
+                  <p className="text-xs text-white/70">Ative para definir agora quantos agentes o fluxo terá (2 a 12).</p>
+                </div>
+                <Switch checked={manyAgents} onCheckedChange={(v) => { setManyAgents(v); if (!v) setAgentCount(2); else if (agentCount < 3) setAgentCount(3); }} />
+              </div>
+              {manyAgents && (
+                <div>
+                  <Label className="text-white/90">Quantidade de agentes</Label>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={12}
+                    value={agentCount}
+                    onChange={(e) => setAgentCount(Math.max(2, Math.min(12, parseInt(e.target.value || "2", 10) || 2)))}
+                    className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                  />
+                  <p className="text-xs text-white/60 mt-1">Você ainda poderá adicionar/remover agentes na próxima etapa.</p>
+                </div>
+              )}
+            </div>
             <div className="flex justify-end">
-              <Button onClick={() => setStep("agents")} disabled={!flowName.trim() || !flowObjective.trim()} className="gap-2">
+              <Button onClick={goToAgentsStep} disabled={!flowName.trim() || !flowObjective.trim()} className="gap-2">
                 Próximo <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
@@ -294,9 +395,37 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
               <p className="text-xs text-white/70 mt-2">Input: {inputType} • Agentes: {agents.length} • Esteiras: {Array.from(new Set(agents.flatMap((a) => [a.branch, ...(a.is_router ? a.branches : [])]))).join(", ")}</p>
             </Card>
             <pre className="text-xs text-white/90 bg-black/40 border border-white/15 rounded p-3 whitespace-pre-wrap">{diagram}</pre>
+            <div className="space-y-2">
+              {analysis.issues.length === 0 && analysis.suggestions.length === 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>Nenhuma inconsistência detectada. Fluxo pronto para gerar.</span>
+                </div>
+              )}
+              {analysis.issues.length > 0 && (
+                <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3">
+                  <div className="flex items-center gap-2 text-red-200 text-sm font-medium">
+                    <AlertTriangle className="h-4 w-4" /> Inconsistências detectadas
+                  </div>
+                  <ul className="mt-2 list-disc list-inside text-xs text-red-100/90 space-y-1">
+                    {analysis.issues.map((it, i) => <li key={i}>{it}</li>)}
+                  </ul>
+                </div>
+              )}
+              {analysis.suggestions.length > 0 && (
+                <div className="rounded-md border border-amber-400/30 bg-amber-400/10 p-3">
+                  <div className="flex items-center gap-2 text-amber-200 text-sm font-medium">
+                    <Lightbulb className="h-4 w-4" /> Sugestões de melhoria
+                  </div>
+                  <ul className="mt-2 list-disc list-inside text-xs text-amber-100/90 space-y-1">
+                    {analysis.suggestions.map((it, i) => <li key={i}>{it}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
             <div className="flex justify-between">
               <Button variant="ghost" onClick={() => setStep("agents")} className="gap-2"><ArrowLeft className="h-4 w-4" /> Voltar</Button>
-              <Button onClick={() => { setStep("creating"); submit(); }} disabled={loading} className="gap-2">
+              <Button onClick={() => { setStep("creating"); submit(); }} disabled={loading || analysis.issues.length > 0} className="gap-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 Gerar fluxo complexo
               </Button>
