@@ -92,7 +92,13 @@ export default function KnowledgeDetail() {
 
     for (const file of files) {
       try {
-        const filePath = `${user.id}/${kbId}/${Date.now()}-${file.name}`;
+        const safeName = file.name
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-zA-Z0-9._-]+/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_|_$/g, "");
+        const filePath = `${user.id}/${kbId}/${Date.now()}-${safeName || "arquivo"}`;
         const { error: uploadError } = await supabase.storage
           .from("knowledge-files")
           .upload(filePath, file);
