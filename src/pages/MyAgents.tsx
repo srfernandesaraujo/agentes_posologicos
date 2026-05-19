@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
-import { useApiKeys } from "@/hooks/useApiKeys";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
-import { Bot, Plus, AlertCircle, Settings, Coins, Wand2, Sparkles } from "lucide-react";
+import { Bot, Plus, Coins, Wand2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,7 +23,6 @@ const AGENT_CREATION_COST = 5;
 export default function MyAgents() {
   const navigate = useNavigate();
   const { data: agents = [], createAgent } = useCustomAgents();
-  const { hasAnyKey } = useApiKeys();
   const { balance, refetch: refetchCredits } = useCredits();
   const { isAdmin } = useIsAdmin();
   const { user } = useAuth();
@@ -143,15 +141,7 @@ export default function MyAgents() {
 
       {/* New agent button */}
       <button
-        onClick={() => {
-          if (!hasAnyKey) {
-            toast.error("Configure pelo menos uma chave API antes de criar agentes.", {
-              action: { label: "Configurar", onClick: () => navigate("/configuracoes") },
-            });
-            return;
-          }
-          setShowCreate(true);
-        }}
+        onClick={() => setShowCreate(true)}
         className="mb-6 flex w-full max-w-sm items-center gap-3 rounded-xl border border-dashed border-white/20 bg-white/[0.03] p-4 transition-colors hover:border-[hsl(14,90%,58%)]/50 hover:bg-white/[0.05]"
       >
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[hsl(14,90%,58%)]/20">
@@ -165,25 +155,6 @@ export default function MyAgents() {
         </div>
         <Plus className="ml-auto h-4 w-4 text-white/40" />
       </button>
-
-      {/* Warning if no API keys */}
-      {!hasAnyKey && (
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
-          <div>
-            <p className="text-sm font-medium text-red-300">Nenhuma LLM configurada</p>
-            <p className="text-xs text-red-300/70">
-              Você ainda não configurou nenhuma chave API. A criação de agentes só é liberada após inserir alguma chave.
-            </p>
-            <Link to="/configuracoes">
-              <Button size="sm" variant="ghost" className="mt-2 gap-1 text-red-300 hover:text-red-200 hover:bg-red-500/10">
-                <Settings className="h-3.5 w-3.5" />
-                Configurar
-              </Button>
-            </Link>
-          </div>
-        </div>
-      )}
 
       {/* Agents list */}
       {agents.length === 0 ? (
