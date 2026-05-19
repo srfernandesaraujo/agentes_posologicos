@@ -526,14 +526,11 @@ export default function AgentEditor() {
                         <SelectValue placeholder="Selecione o provedor" />
                       </SelectTrigger>
                       <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
-                        {apiKeys.map((k) => {
-                          const p = LLM_PROVIDERS.find((pp) => pp.id === k.provider);
-                          return (
-                            <SelectItem key={k.provider} value={k.provider}>
-                              {p?.name || k.provider}
-                            </SelectItem>
-                          );
-                        })}
+                        {LLM_PROVIDERS.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
