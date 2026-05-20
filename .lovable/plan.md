@@ -1,153 +1,107 @@
+# Plano: Funcionalidades de Alto Valor para os Usuários
 
-# Fluxo Complexo com IA — novo modo de criação
+## Contexto
 
-## Objetivo
+O sistema já é robusto: agentes nativos e custom, fluxos complexos, salas colaborativas, base de conhecimento (RAG), marketplace, créditos, atas de reunião, WhatsApp, PubMed, certificação de conteúdo, etc.
 
-Adicionar, em `/fluxos`, um segundo botão ao lado de **"Criar com IA"** chamado **"Criar fluxo complexo com IA"** (ícone `Network`), que abre um wizard onde o usuário descreve **agente por agente** (papel, entrada, saída, ferramentas, regras de roteamento) e a IA monta um pipeline com:
+A pergunta agora não é "o que falta tecnicamente?", mas **"qual dor real ainda não está resolvida?"** para os perfis-alvo (farmacêuticos clínicos, professores de saúde, pesquisadores e criadores de conteúdo).
 
-- ingestão de arquivo (planilha, PDF, etc.) como input inicial
-- agentes de **enriquecimento** que escrevem novas colunas/derivam dados
-- **agente roteador** que classifica cada item (linha da planilha) em uma de N **esteiras**
-- esteiras paralelas, cada uma com sua própria sequência de agentes produzindo documentos
-- agregação/handoff final para revisão humana ("gestor")
+A dor comum e transversal que identifiquei observando o produto:
 
-O fluxo "Criar com IA" atual continua existindo, intocado.
+> **"Eu gero MUITO conteúdo com a IA, mas perco esse conhecimento. Cada conversa morre isolada, eu não consigo reaproveitar, não consigo provar autoria, não consigo transformar em entregável final sem retrabalho enorme — e quando preciso colaborar ou prestar contas (aluno, paciente, banca, cliente), o material da IA parece 'solto demais'."**
 
-## Escopo desta entrega
+A partir disso, proponho 5 frentes priorizadas por **impacto × diferenciação × esforço**.
 
-Apenas o **planejamento e criação** do fluxo complexo (geração de nós + edges + prompts premium + metadados de roteamento). A execução real das esteiras condicionais entra como ajuste mínimo no `agent-flow-execute` para respeitar o `branch_key` dos nós; processamento item-a-item de planilhas e geração de .docx/.pdf finais ficam fora desta entrega (são mencionados como follow-up).
+---
 
-## UX
+## Frente 1 — Workspaces / Projetos (alta prioridade)
 
-### 1. Botão e diálogo
+**Dor resolvida:** hoje conversas, fluxos, bases de conhecimento, atas e arquivos vivem soltos. O usuário não consegue agrupar "tudo do meu TCC", "tudo da disciplina de Farmacologia 2026.1", "tudo do paciente X" num só lugar.
 
-Em `src/pages/Flows.tsx`, ao lado de "Criar com IA":
+**Proposta:**
+- Entidade `projects` (workspace) agrupando: conversas, fluxos executados, KBs, atas, certificados, anexos.
+- Painel do projeto com timeline, busca unificada e tags.
+- Compartilhamento granular do projeto (read/write) com colegas convidados — reaproveita a lógica de unlimited invited users.
+- Exportação do projeto inteiro (zip com PDFs + JSON).
 
-```
-[ Sparkles ] Criar com IA      [ Network ] Criar fluxo complexo com IA
-```
+**Por que é diferenciador:** transforma o app de "ferramenta de IA" em "ambiente de trabalho do profissional", aumentando retenção e LTV.
 
-O novo diálogo é um wizard em 4 passos:
+---
 
-1. **Visão geral** — nome do fluxo, objetivo final, tipo de input (texto, planilha, PDF, imagem).
-2. **Agentes** — lista dinâmica (add/remove/reorder) onde para cada agente o usuário preenche:
-   - Nome curto
-   - O que faz (descrição livre)
-   - O que recebe (de qual agente anterior, ou "input do usuário")
-   - O que produz
-   - É roteador? (toggle) — se sim, o usuário lista os **rótulos das esteiras** (ex.: "Registro de Preço", "Inexigibilidade", "Pregão")
-   - Pertence a qual esteira? (select com os rótulos definidos pelos roteadores anteriores, ou "principal")
-3. **Revisão** — preview compacto: lista de agentes, esteiras detectadas, diagrama ASCII simples.
-4. **Gerando…** — chama a edge function, mostra progresso, navega para `/fluxos/:id` ao concluir.
+## Frente 2 — Entregáveis Estruturados ("Artefatos")
 
-Se faltar info crítica, a edge function retorna `needs_preflight` (mesma mecânica do fluxo simples) e o wizard insere o passo de perguntas.
+**Dor resolvida:** o output do chat é texto. O usuário ainda precisa formatar manualmente em plano de aula, prescrição comentada, material para paciente, roteiro de vídeo, projeto de pesquisa, etc.
 
-## Backend
+**Proposta:**
+- Tipo de saída "Artefato" por agente: além do chat livre, o agente pode produzir um documento estruturado editável (campos previsíveis: objetivo, conteúdo, cronograma, referências…).
+- Editor lateral com preview e versionamento (v1, v2, v3) — já existe o padrão `_v2` em /mnt/documents, replicar no app.
+- Templates de saída por categoria: Plano de Aula, Material para Paciente (PT-BR didático), Caso Clínico, Roteiro YouTube, Resumo Executivo de Projeto.
+- Exportação consistente: PDF estilizado, DOCX, e link público com certificado SHA-256 (já existe a infra de content_certificates).
 
-### Nova edge function: `agent-flow-plan-complex`
+**Por que é diferenciador:** entrega "trabalho pronto", não rascunho. Encurta a distância entre chat e produto final.
 
-Recebe:
+---
 
-```json
-{
-  "user_id": "...",
-  "flow_name": "...",
-  "flow_objective": "...",
-  "input_type": "spreadsheet|pdf|text|image",
-  "agents": [
-    {
-      "name": "Analista de Estoque",
-      "role": "Lê planilha de estoque e adiciona coluna GAP de aquisição",
-      "receives_from": "user_input",
-      "produces": "planilha enriquecida com coluna GAP",
-      "is_router": false,
-      "branch": "main"
-    },
-    {
-      "name": "Roteador de Compras",
-      "role": "Classifica cada medicamento em RP, Inexigibilidade ou Pregão",
-      "receives_from": "Analista de Estoque",
-      "produces": "rota de cada item",
-      "is_router": true,
-      "branches": ["rp", "inexigibilidade", "pregao"],
-      "branch": "main"
-    },
-    { "name": "Redator RP", "branch": "rp", ... },
-    { "name": "Redator Inexigibilidade", "branch": "inexigibilidade", ... },
-    { "name": "Redator Pregão", "branch": "pregao", ... },
-    { "name": "Consolidador para Gestor", "branch": "main", "receives_from": "all_branches", ... }
-  ]
-}
-```
+## Frente 3 — Memória do Usuário ("O agente que me conhece")
 
-A função:
+**Dor resolvida:** o usuário repete contexto toda hora ("sou professor de farmácia, dou aula para o 5º período, uso metodologia ativa…"). A IA esquece tudo entre sessões.
 
-1. Carrega catálogo de agentes nativos + custom do usuário (igual `agent-flow-plan`).
-2. Manda tudo para `google/gemini-2.5-pro` via tool calling com schema `create_complex_flow_plan` que devolve, para cada agente, `agent_type` (`native|custom|new`), `agent_id` ou `new_agent_*` (com `system_prompt` premium nas seções OBJETIVO/INSTRUCOES/FORMATO_SAIDA/REGRAS/LIMITACOES — reutiliza o template do plan atual), `branch_key`, `is_router`, `router_branches[]`, `is_synthesizer`.
-3. Cria o `agent_flows` com `execution_mode = "complex"` (novo valor permitido).
-4. Cria os `agent_flow_nodes` salvando os campos novos `branch_key`, `is_router`, `router_branches` (jsonb).
-5. Cria os `agent_flow_edges` ligando:
-   - cada agente "main" em sequência até o roteador
-   - roteador → primeiro agente de cada esteira (edge com `branch_key` = rótulo)
-   - sequência interna de cada esteira
-   - último de cada esteira → consolidador final
+**Proposta:**
+- Perfil profissional estruturado (área, público-alvo, tom de voz preferido, instituições, linhas de pesquisa, restrições éticas).
+- Memória vetorial leve de "fatos sobre o usuário" extraídos automaticamente das conversas (com opt-in e painel de revisão/remoção — LGPD).
+- Injeção automática como `<USER_CONTEXT>` em todos os agentes, com toggle por conversa.
 
-### Migração necessária
+**Por que é diferenciador:** percepção de "IA personalizada" sem precisar criar agente custom para cada coisa. Vira competitive moat e melhora qualidade percebida com custo marginal mínimo.
 
-```sql
-ALTER TABLE public.agent_flows
-  -- garantir que execution_mode aceita 'complex' (é text livre, sem CHECK; ok)
-  ADD COLUMN IF NOT EXISTS input_type text;
+---
 
-ALTER TABLE public.agent_flow_nodes
-  ADD COLUMN IF NOT EXISTS branch_key text DEFAULT 'main',
-  ADD COLUMN IF NOT EXISTS is_router boolean DEFAULT false,
-  ADD COLUMN IF NOT EXISTS router_branches jsonb DEFAULT '[]'::jsonb;
+## Frente 4 — Biblioteca de Evidências Citáveis
 
-ALTER TABLE public.agent_flow_edges
-  ADD COLUMN IF NOT EXISTS branch_key text;
-```
+**Dor resolvida:** farmacêuticos, pesquisadores e professores precisam **provar a fonte** do que a IA disse. Hoje o PubMed Specialist existe, mas as citações não viram um acervo organizado.
 
-RLS já existente nas tabelas (escopo por `user_id` via `flow_id`) cobre os campos novos — não precisa de novas policies.
+**Proposta:**
+- "Minha Estante": toda referência (PubMed, OpenFDA, VigiAccess, KB própria) usada nas conversas é salva, deduplicada e taggeada.
+- Botão "Citar nesta resposta" injeta a referência formatada (Vancouver/ABNT/APA — escolha do usuário).
+- Exportação BibTeX / RIS para Mendeley / Zotero.
+- Alerta semanal de novas evidências em tópicos salvos (reusa pubmed-weekly-monitor + cron).
 
-### Ajuste mínimo em `agent-flow-execute`
+**Por que é diferenciador:** resolve o ceticismo "IA inventa referência" — virou exigência regulatória/acadêmica.
 
-Quando `flow.execution_mode === "complex"`:
+---
 
-- BFS continua, mas ao processar um nó com `is_router=true`, parsear a saída JSON do roteador (a IA é instruída no prompt a devolver `{ "branch": "<rótulo>" }` ou lista por item) e seguir apenas pelas edges cujo `branch_key` casa.
-- Sintetizador final (`is_synthesizer=true`) recebe o output de todas as esteiras concluídas (mesmo padrão do modo `parallel`).
+## Frente 5 — Modo "Apresentação ao Vivo" para professores
 
-Processamento por linha de planilha (split-map-reduce real) **não** entra agora; o roteador por enquanto recebe o output agregado e escolhe um caminho. Documentar como follow-up.
+**Dor resolvida:** professor monta o material com IA mas, em sala, precisa de outra ferramenta (slides) e perde a interatividade.
 
-## Detalhes técnicos
+**Proposta:**
+- A partir de um artefato "Plano de Aula", gerar deck navegável (HTML fullscreen) com cronômetro de etapas.
+- Modo aluno: link público com QR code, alunos enviam dúvidas que aparecem como overlay.
+- Geração automática de quiz pós-aula a partir do conteúdo (reusa agentes existentes).
 
-- **Arquivos novos**:
-  - `supabase/functions/agent-flow-plan-complex/index.ts`
-  - `src/components/flows/ComplexFlowWizard.tsx` (wizard com os 4 passos, usa `Dialog`, `Tabs`/stepper, `Sortable` simples por botões ↑↓)
-- **Arquivos editados**:
-  - `src/pages/Flows.tsx` — novo botão + estado do wizard
-  - `src/hooks/useAgentFlows.ts` — sem mudanças (CRUD já genérico)
-  - `supabase/functions/agent-flow-execute/index.ts` — branch routing
-  - `src/integrations/supabase/types.ts` — regenerado pela migração
-- **Diagrama no FlowEditor**: o editor visual já consome `agent_flow_nodes/edges`; nós com `is_router=true` ganham um badge "Roteador" e edges com `branch_key` mostram o rótulo. Isso é tweak visual pequeno em `FlowEditor.tsx` (badge + label na aresta).
-- **Validações**:
-  - pelo menos 2 agentes
-  - se houver agente em `branch != main`, deve existir um roteador anterior que declare aquela `branch`
-  - todo `branch != main` deve eventualmente convergir num agente `main` posterior (consolidador)
-- **Limites**: máx. 12 agentes, máx. 5 esteiras (evita estourar contexto do planejador e custo).
+**Por que é diferenciador:** fecha o loop "preparar → apresentar → avaliar" dentro do mesmo produto. Difícil de copiar.
 
-## Diagrama do exemplo do usuário
+---
 
-```text
-[Planilha estoque] -> [Analista GAP] -> [Roteador RP/Inex/Pregão]
-                                          |-- rp -----> [Redator RP] -----+
-                                          |-- inex --> [Redator Inex] ----+--> [Consolidador Gestor]
-                                          \-- pregao -> [Redator Pregão] -+
-```
+## Detalhes Técnicos
 
-## Fora de escopo (follow-up)
+- **Frente 1:** nova tabela `projects` + `project_items` (polimórfico: conversation_id | flow_run_id | knowledge_base_id | meeting_id | artifact_id), RLS por owner + membros, função `has_project_access(_user, _project)` no padrão SECURITY DEFINER já usado.
+- **Frente 2:** tabela `artifacts` (project_id, type, content jsonb, version), edge function `artifact-render` para PDF/DOCX (reusa jsPDF + fflate). Integrar com `content_certificates`.
+- **Frente 3:** tabela `user_memory_facts` (user_id, fact, source_conversation_id, confidence, active), edge function `extract-user-facts` chamada async pós-conversa via gemini-2.5-flash. Painel em /conta.
+- **Frente 4:** tabela `user_references` (user_id, source, identifier, payload jsonb, tags[]), botão no MessageActions.
+- **Frente 5:** rota `/aula/:artifactId/apresentar`, canal Realtime para perguntas, edge function `generate-quiz`.
 
-- Iterar planilha linha-a-linha (split por item) com fan-out real
-- Geração de .docx/.pdf nos nós finais
-- Aprovação humana embutida ("Humano-in-the-loop") com fila de revisão
+Tudo segue padrões já estabelecidos: pt-BR, Markdown tables, dark theme teal/orange, RLS rigoroso, AI Gateway com fallback Google → OpenAI → Anthropic.
 
+---
+
+## Sugestão de Ordem
+
+1. **Memória do Usuário** (Frente 3) — menor esforço, ganho de qualidade percebida imediato.
+2. **Workspaces** (Frente 1) — base estrutural para o resto.
+3. **Artefatos** (Frente 2) — depende de Workspaces.
+4. **Biblioteca de Evidências** (Frente 4).
+5. **Apresentação ao Vivo** (Frente 5) — depende de Artefatos.
+
+---
+
+Quer que eu detalhe alguma frente específica em um plano de implementação executável, ou prefere que comece direto pela Frente 3 (Memória do Usuário)?
