@@ -29,6 +29,58 @@ Isso se aplica a TODAS as tabelas, sem exceção.
 </REGRA_GLOBAL_FORMATACAO_TABELAS>
 `;
 
+// ---------------------------------------------------------------------------
+// USER MEMORY: builds <USER_CONTEXT> block from user_profile_context + facts
+// ---------------------------------------------------------------------------
+async function buildUserContextBlock(client: any, userId: string | null | undefined): Promise<string> {
+  if (!userId) return "";
+  try {
+    const { data: ctx } = await client
+      .from("user_profile_context")
+      .select("area_atuacao, public_target, tone_preference, institution, research_lines, restrictions, memory_enabled")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    // If user explicitly disabled memory, skip
+    if (ctx && ctx.memory_enabled === false) return "";
+
+    const lines: string[] = [];
+    if (ctx) {
+      if (ctx.area_atuacao?.trim()) lines.push(`- Área de atuação: ${ctx.area_atuacao.trim()}`);
+      if (ctx.public_target?.trim()) lines.push(`- Público-alvo: ${ctx.public_target.trim()}`);
+      if (ctx.tone_preference?.trim()) lines.push(`- Tom preferido: ${ctx.tone_preference.trim()}`);
+      if (ctx.institution?.trim()) lines.push(`- Instituição: ${ctx.institution.trim()}`);
+      if (ctx.research_lines?.trim()) lines.push(`- Linhas de pesquisa/interesse: ${ctx.research_lines.trim()}`);
+      if (ctx.restrictions?.trim()) lines.push(`- Restrições éticas/contextuais: ${ctx.restrictions.trim()}`);
+    }
+
+    const { data: facts } = await client
+      .from("user_memory_facts")
+      .select("fact")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    const factList = (facts || []).map((f: any) => `- ${f.fact}`).filter((s: string) => s.length > 2);
+
+    if (lines.length === 0 && factList.length === 0) return "";
+
+    let block = "\n\n<USER_CONTEXT>\nVocê está conversando com um usuário recorrente. Use as informações abaixo APENAS como contexto silencioso para personalizar suas respostas (tom, exemplos, nível de profundidade). NÃO repita esses dados de volta para o usuário a menos que ele pergunte explicitamente.\n";
+    if (lines.length > 0) {
+      block += "\n## Perfil profissional\n" + lines.join("\n") + "\n";
+    }
+    if (factList.length > 0) {
+      block += "\n## Fatos relevantes já mencionados em conversas anteriores\n" + factList.join("\n") + "\n";
+    }
+    block += "</USER_CONTEXT>";
+    return block;
+  } catch (e) {
+    console.warn("buildUserContextBlock error:", (e as any)?.message);
+    return "";
+  }
+}
+
 const PUBMED_PT_TO_EN: Record<string, string> = {
   "efeitos adversos": "adverse effects",
   "efeitos colaterais": "side effects",
