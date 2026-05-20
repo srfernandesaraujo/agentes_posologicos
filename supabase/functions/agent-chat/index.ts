@@ -7292,6 +7292,12 @@ ragContext = "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhe
     // Build system prompt with extras
     let finalSystemPrompt = basePromptCustom + GLOBAL_TABLE_INSTRUCTION;
 
+    // Inject user memory context (silent personalization)
+    try {
+      const userCtxBlock = await buildUserContextBlock(serviceClient, userId);
+      if (userCtxBlock) finalSystemPrompt += userCtxBlock;
+    } catch (_) { /* ignore */ }
+
     // Inject active skills into system prompt
     try {
       const { data: activeSkills } = await serviceClient
