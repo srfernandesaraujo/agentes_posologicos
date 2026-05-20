@@ -535,6 +535,13 @@ export default function Chat() {
       await supabase
         .from("messages")
         .insert({ session_id: sid, role: "assistant", content: assistantContent });
+
+      // Fire-and-forget: extract durable user facts (silent personalization)
+      try {
+        supabase.functions
+          .invoke("extract-user-facts", { body: { userMessage: text, sessionId: sid } })
+          .catch(() => { /* silent */ });
+      } catch { /* silent */ }
     },
     onSuccess: () => {
       setInput("");
