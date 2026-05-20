@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
+import { UserMemoryPanel } from "@/components/account/UserMemoryPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -256,6 +257,7 @@ export default function Account() {
       </div>
 
       <ResearchInterestsManager />
+      <UserMemoryPanel />
     </div>
   );
 }

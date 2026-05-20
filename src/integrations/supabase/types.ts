@@ -1347,6 +1347,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_memory_facts: {
+        Row: {
+          active: boolean
+          confidence: number
+          created_at: string
+          fact: string
+          id: string
+          source_session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          confidence?: number
+          created_at?: string
+          fact: string
+          id?: string
+          source_session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          confidence?: number
+          created_at?: string
+          fact?: string
+          id?: string
+          source_session_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           created_at: string
@@ -1366,6 +1396,51 @@ export type Database = {
           created_at?: string
           id?: string
           onboarding_completed?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_profile_context: {
+        Row: {
+          area_atuacao: string
+          auto_extract_enabled: boolean
+          created_at: string
+          id: string
+          institution: string
+          memory_enabled: boolean
+          public_target: string
+          research_lines: string
+          restrictions: string
+          tone_preference: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          area_atuacao?: string
+          auto_extract_enabled?: boolean
+          created_at?: string
+          id?: string
+          institution?: string
+          memory_enabled?: boolean
+          public_target?: string
+          research_lines?: string
+          restrictions?: string
+          tone_preference?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          area_atuacao?: string
+          auto_extract_enabled?: boolean
+          created_at?: string
+          id?: string
+          institution?: string
+          memory_enabled?: boolean
+          public_target?: string
+          research_lines?: string
+          restrictions?: string
+          tone_preference?: string
           updated_at?: string
           user_id?: string
         }
