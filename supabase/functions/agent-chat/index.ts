@@ -6647,6 +6647,12 @@ Deno.serve(async (req) => {
       let systemPrompt = basePrompt + GLOBAL_TABLE_INSTRUCTION;
       let enrichedInput = input;
 
+      // Inject user memory context (silent personalization)
+      try {
+        const userCtxBlock = await buildUserContextBlock(supabase, userId);
+        if (userCtxBlock) systemPrompt += userCtxBlock;
+      } catch (_) { /* ignore */ }
+
       // Super Agente: inject dynamic agent catalog + marketplace
       if (builtInAgent.slug === "super-agente") {
         try {
