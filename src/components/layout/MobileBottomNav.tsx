@@ -1,12 +1,12 @@
 import { NavLink } from "react-router-dom";
-import { LayoutGrid, Bot, MessageSquare, Store, CreditCard } from "lucide-react";
+import { LayoutGrid, Bot, MessageSquare, FolderKanban, CreditCard } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const navItems = [
   { to: "/agentes", icon: LayoutGrid, label: "Agentes" },
   { to: "/meus-agentes", icon: Bot, label: "Meus" },
   { to: "/conversas", icon: MessageSquare, label: "Conversas" },
-  { to: "/marketplace", icon: Store, label: "Market" },
+  { to: "/projetos", icon: FolderKanban, label: "Projetos" },
   { to: "/creditos", icon: CreditCard, label: "Créditos" },
 ];
 
