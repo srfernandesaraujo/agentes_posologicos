@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { exportConversationPdf } from "@/lib/exportConversationPdf";
 import { toast } from "sonner";
+import { AddToProjectMenu } from "@/components/projects/AddToProjectMenu";
 
 export default function Conversations() {
   const { user } = useAuth();
@@ -256,6 +257,9 @@ export default function Conversations() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  <div className="mr-2">
+                    <AddToProjectMenu itemType="conversation" itemId={session.id} size="icon" />
+                  </div>
                 </>
               )}
             </div>

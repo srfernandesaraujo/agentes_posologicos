@@ -4,7 +4,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Coins, User, LogOut, Pill, Shield, BarChart3 } from "lucide-react";
+import { Coins, User, LogOut, Pill, Shield, BarChart3, FolderKanban } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/LanguageSelector";
@@ -89,6 +89,10 @@ export function AppHeader() {
               <DropdownMenuItem onClick={() => navigate("/dashboard")} className="text-white/80 focus:bg-white/10 focus:text-white">
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Meu Dashboard
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/projetos")} className="text-white/80 focus:bg-white/10 focus:text-white">
+                <FolderKanban className="mr-2 h-4 w-4" />
+                Projetos
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/creditos")} className="text-white/80 focus:bg-white/10 focus:text-white">
                 <Coins className="mr-2 h-4 w-4" />
