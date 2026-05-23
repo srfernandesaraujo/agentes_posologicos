@@ -12,6 +12,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // SECURITY: if an Evolution API webhook secret is configured, require it
+    const webhookSecret = Deno.env.get("EVOLUTION_WEBHOOK_SECRET");
+    if (webhookSecret) {
+      const provided =
+        req.headers.get("x-evolution-signature") ||
+        req.headers.get("x-webhook-secret") ||
+        req.headers.get("apikey") ||
+        (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      if (provided !== webhookSecret) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      console.warn("[whatsapp-webhook] EVOLUTION_WEBHOOK_SECRET not configured — accepting unsigned requests");
+    }
+
     const body = await req.json();
     console.log("[whatsapp-webhook] Received event:", body?.event, "instance:", body?.instance);
 

@@ -62,6 +62,23 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // SECURITY: if a Recall.ai webhook secret is configured, require it
+    const webhookSecret = Deno.env.get("RECALL_WEBHOOK_SECRET");
+    if (webhookSecret) {
+      const provided =
+        req.headers.get("x-recall-signature") ||
+        req.headers.get("x-webhook-secret") ||
+        (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+      if (provided !== webhookSecret) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else {
+      console.warn("[meeting-webhook] RECALL_WEBHOOK_SECRET not configured — accepting unsigned requests");
+    }
+
     const payload = await req.json();
     console.log("[meeting-webhook] Payload:", JSON.stringify(payload).slice(0, 500));
 
