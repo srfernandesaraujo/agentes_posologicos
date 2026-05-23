@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
             content: "⚠️ Não foi possível encontrar legendas para este vídeo. O vídeo pode não ter legendas automáticas disponíveis.",
             status: "error",
           })
-          .eq("id", source_id);
+          .eq("id", source_id).eq("user_id", callerId);
 
         return new Response(
           JSON.stringify({ success: false, message: "No captions found" }),
@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
           content: "⚠️ Este vídeo não possui legendas (automáticas ou manuais) disponíveis.",
           status: "error",
         })
-        .eq("id", source_id);
+        .eq("id", source_id).eq("user_id", callerId);
 
       return new Response(
         JSON.stringify({ success: false, message: "No caption tracks available" }),
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
           content: "⚠️ A transcrição extraída estava vazia ou muito curta.",
           status: "error",
         })
-        .eq("id", source_id);
+        .eq("id", source_id).eq("user_id", callerId);
 
       return new Response(
         JSON.stringify({ success: false, message: "Empty transcript" }),
@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
         content: header + transcript,
         status: "ready",
       })
-      .eq("id", source_id);
+      .eq("id", source_id).eq("user_id", callerId);
 
     console.log(`Transcript saved: ${transcript.length} chars`);
 
