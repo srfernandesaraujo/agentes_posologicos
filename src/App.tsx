@@ -29,6 +29,8 @@ import NotFound from "./pages/NotFound";
 import Flows from "./pages/Flows";
 import Meetings from "./pages/Meetings";
 import FlowEditor from "./pages/FlowEditor";
+import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
 import UserDashboard from "./pages/UserDashboard";
 import Contact from "./pages/Contact";
 import ResetPassword from "./pages/ResetPassword";
@@ -92,6 +94,8 @@ const App = () => (
               <Route path="/fluxos" element={<Flows />} />
               <Route path="/fluxos/:flowId" element={<FlowEditor />} />
               <Route path="/reunioes" element={<Meetings />} />
+              <Route path="/projetos" element={<Projects />} />
+              <Route path="/projetos/:projectId" element={<ProjectDetail />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
