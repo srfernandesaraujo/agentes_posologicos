@@ -12,6 +12,18 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // SECURITY: require shared cron secret to prevent public abuse
+    const expectedSecret = Deno.env.get("CRON_SECRET");
+    const provided =
+      req.headers.get("x-cron-secret") ||
+      (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!expectedSecret || provided !== expectedSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);

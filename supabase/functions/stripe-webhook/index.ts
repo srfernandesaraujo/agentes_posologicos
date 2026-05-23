@@ -26,15 +26,18 @@ serve(async (req) => {
   const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
   try {
+    if (!webhookSecret) {
+      console.error("[STRIPE-WEBHOOK] STRIPE_WEBHOOK_SECRET not configured — refusing to process unsigned events");
+      return new Response(JSON.stringify({ error: "Webhook secret not configured" }), { status: 500 });
+    }
     const body = await req.text();
     let event: Stripe.Event;
 
-    if (webhookSecret) {
-      const signature = req.headers.get("stripe-signature")!;
-      event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
-    } else {
-      event = JSON.parse(body);
+    const signature = req.headers.get("stripe-signature");
+    if (!signature) {
+      return new Response(JSON.stringify({ error: "Missing stripe-signature header" }), { status: 401 });
     }
+    event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
 
     console.log(`[STRIPE-WEBHOOK] Event: ${event.type}`);
 
@@ -102,6 +105,17 @@ serve(async (req) => {
 
       if (!subscriptionId) {
         console.log("[STRIPE-WEBHOOK] invoice.paid without subscription, skipping");
+        return new Response(JSON.stringify({ received: true }), { status: 200 });
+      }
+
+      // Duplicate-reference guard (idempotency)
+      const { data: existingInvoice } = await supabase
+        .from("credits_ledger")
+        .select("id")
+        .eq("reference_id", invoice.id)
+        .limit(1);
+      if (existingInvoice && existingInvoice.length > 0) {
+        console.log(`[STRIPE-WEBHOOK] invoice.paid ${invoice.id} already processed, skipping`);
         return new Response(JSON.stringify({ received: true }), { status: 200 });
       }
 

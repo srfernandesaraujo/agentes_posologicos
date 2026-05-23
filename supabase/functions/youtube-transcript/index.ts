@@ -72,11 +72,38 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // SECURITY: require authenticated user and verify ownership of source_id
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const callerId = userData.user.id;
+    const { data: sourceRow } = await supabaseAdmin
+      .from("knowledge_sources")
+      .select("user_id")
+      .eq("id", source_id)
+      .maybeSingle();
+    if (!sourceRow || sourceRow.user_id !== callerId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Update status to processing
     await supabaseAdmin
       .from("knowledge_sources")
       .update({ status: "processing" })
-      .eq("id", source_id);
+      .eq("id", source_id)
+      .eq("user_id", callerId);
 
     console.log(`Extracting transcript for video: ${videoId}`);
 
@@ -106,7 +133,7 @@ Deno.serve(async (req) => {
             content: "⚠️ Não foi possível encontrar legendas para este vídeo. O vídeo pode não ter legendas automáticas disponíveis.",
             status: "error",
           })
-          .eq("id", source_id);
+          .eq("id", source_id).eq("user_id", callerId);
 
         return new Response(
           JSON.stringify({ success: false, message: "No captions found" }),
@@ -132,7 +159,7 @@ Deno.serve(async (req) => {
           content: "⚠️ Este vídeo não possui legendas (automáticas ou manuais) disponíveis.",
           status: "error",
         })
-        .eq("id", source_id);
+        .eq("id", source_id).eq("user_id", callerId);
 
       return new Response(
         JSON.stringify({ success: false, message: "No caption tracks available" }),
@@ -168,7 +195,7 @@ Deno.serve(async (req) => {
           content: "⚠️ A transcrição extraída estava vazia ou muito curta.",
           status: "error",
         })
-        .eq("id", source_id);
+        .eq("id", source_id).eq("user_id", callerId);
 
       return new Response(
         JSON.stringify({ success: false, message: "Empty transcript" }),
@@ -190,7 +217,7 @@ Deno.serve(async (req) => {
         content: header + transcript,
         status: "ready",
       })
-      .eq("id", source_id);
+      .eq("id", source_id).eq("user_id", callerId);
 
     console.log(`Transcript saved: ${transcript.length} chars`);
 

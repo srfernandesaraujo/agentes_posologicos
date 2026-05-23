@@ -6346,9 +6346,26 @@ Deno.serve(async (req) => {
     // Server-side credit deduction helper
     const deductCredits = async (output: string) => {
       if (!userId || isVirtualRoom) return; // No deduction for virtual rooms or unauthenticated
-      if (typeof creditCost !== "number" || creditCost <= 0) return; // No cost specified
-
       const svc = createClient(supabaseUrl, serviceRoleKey);
+
+      // SECURITY: compute cost server-side; never trust client-supplied creditCost
+      let serverCost = 1; // default fallback for custom agents
+      if (isCustomAgent) {
+        serverCost = 1;
+      } else {
+        const { data: agentRow } = await svc
+          .from("agents")
+          .select("credit_cost")
+          .eq("id", agentId)
+          .maybeSingle();
+        if (agentRow && typeof (agentRow as any).credit_cost === "number") {
+          serverCost = (agentRow as any).credit_cost;
+        } else {
+          // Unknown agent — do not deduct
+          return;
+        }
+      }
+      if (serverCost <= 0) return;
       
       // Check if user has admin role or unlimited access
       const { data: roleData } = await svc
@@ -6378,8 +6395,8 @@ Deno.serve(async (req) => {
         .select("amount")
         .eq("user_id", userId);
       const balance = (balanceData || []).reduce((sum: number, r: any) => sum + Number(r.amount), 0);
-      if (balance < creditCost) {
-        console.warn(`User ${userId} has insufficient credits: ${balance} < ${creditCost}`);
+      if (balance < serverCost) {
+        console.warn(`User ${userId} has insufficient credits: ${balance} < ${serverCost}`);
         // Still allow response since AI already ran, but log it
         return;
       }
@@ -6387,11 +6404,11 @@ Deno.serve(async (req) => {
       // Deduct
       await svc.from("credits_ledger").insert({
         user_id: userId,
-        amount: -creditCost,
+        amount: -serverCost,
         type: "usage",
         description: `Uso de agente via servidor`,
       });
-      console.log(`Credits deducted: ${creditCost} for user ${userId}`);
+      console.log(`Credits deducted: ${serverCost} for user ${userId}`);
     };
 
     // Cost estimation per 1M tokens (input/output) in USD
