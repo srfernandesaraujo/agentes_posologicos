@@ -1064,6 +1064,115 @@ export type Database = {
         }
         Relationships: []
       }
+      project_collaborators: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by: string
+          project_id: string
+          role: string
+          user_email: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by: string
+          project_id: string
+          role?: string
+          user_email: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by?: string
+          project_id?: string
+          role?: string
+          user_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_collaborators_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_items: {
+        Row: {
+          added_at: string
+          added_by: string
+          id: string
+          item_id: string
+          item_type: string
+          project_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by: string
+          id?: string
+          item_id: string
+          item_type: string
+          project_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          id?: string
+          item_id?: string
+          item_type?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          archived: boolean
+          color: string
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          tags: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean
+          color?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name: string
+          tags?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived?: boolean
+          color?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pubmed_notifications_log: {
         Row: {
           id: string
@@ -1676,6 +1785,10 @@ export type Database = {
           updated_at: string
           user_id: string
         }[]
+      }
+      has_project_access: {
+        Args: { _min_role?: string; _project_id: string; _user_id: string }
+        Returns: boolean
       }
       has_role: {
         Args: {
