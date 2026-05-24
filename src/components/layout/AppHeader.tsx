@@ -50,6 +50,13 @@ export function AppHeader() {
         <div className="flex items-center gap-3">
           <LanguageSelector />
 
+          <Link to="/projetos" className="hidden md:inline-flex">
+            <Button variant="outline" size="sm" className="gap-2 font-medium border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
+              <FolderKanban className="h-4 w-4 text-[hsl(174,62%,47%)]" />
+              Projetos
+            </Button>
+          </Link>
+
           {isAdmin && (
             <Link to="/admin">
               <Button variant="outline" size="sm" className="gap-2 font-medium border-[hsl(14,90%,58%)]/40 bg-[hsl(14,90%,58%)]/10 text-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,58%)]/20 hover:text-[hsl(14,90%,58%)]">

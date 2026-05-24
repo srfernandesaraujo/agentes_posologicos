@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AddToProjectMenu } from "@/components/projects/AddToProjectMenu";
 
 type Meeting = {
   id: string;
@@ -218,6 +219,7 @@ export default function Meetings() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">{selectedMeeting.title || "Reunião"}</CardTitle>
                   <div className="flex items-center gap-2">
+                    <AddToProjectMenu itemType="meeting" itemId={selectedMeeting.id} size="icon" />
                     {selectedMeeting.status === "done" && selectedMeeting.transcript && (
                       <Button
                         size="sm"
