@@ -397,6 +397,10 @@ export default function Landing() {
 
         {/* Marquee strip */}
         <section className="border-y border-white/[0.06] overflow-hidden py-5">
+          {/* Cinematic scroll act injected above marquee */}
+        </section>
+        <CinematicAvatar />
+        <section className="border-y border-white/[0.06] overflow-hidden py-5">
           <div className="flex whitespace-nowrap animate-sw-marquee font-display italic text-3xl md:text-5xl text-white/70">
             {Array.from({ length: 2 }).map((_, i) => (
               <div key={i} className="flex items-center shrink-0 pr-12 gap-12">
