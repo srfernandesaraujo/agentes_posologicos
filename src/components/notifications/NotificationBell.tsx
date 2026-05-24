@@ -99,6 +99,14 @@ export function NotificationBell() {
 
   const handleClick = (notif: Notification) => {
     if (!notif.read) markRead.mutate(notif.id);
+    // PubMed notifications: open the first article link in a new tab instead of navigating in-app
+    if (notif.type === "pubmed") {
+      const match = (notif.message || "").match(/\((https?:\/\/[^\)]+)\)/);
+      if (match) {
+        window.open(match[1], "_blank", "noopener,noreferrer");
+      }
+      return;
+    }
     // If the message contains markdown links, don't auto-navigate — user can click the link directly
     const hasMarkdownLink = /\[[^\]]+\]\([^)]+\)/.test(notif.message || "");
     if (notif.link && !hasMarkdownLink) {

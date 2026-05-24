@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
           title: `🔬 ${allNewArticles.length} novos artigos PubMed`,
           message,
           type: "pubmed",
-          link: "/agentes",
+          link: null,
         });
 
         totalNotifications++;
