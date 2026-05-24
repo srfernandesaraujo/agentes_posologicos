@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.content-certificate]
 verify_jwt = false
+
+[functions.export-project]
+verify_jwt = false

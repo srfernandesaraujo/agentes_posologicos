@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Share2, Archive, Trash2, Download, Pencil, Check, X, MessageSquare, GitBranch, BookOpen, Video, ShieldCheck, ExternalLink, Tag } from "lucide-react";
+import { ArrowLeft, Share2, Archive, Trash2, Download, Pencil, Check, X, MessageSquare, GitBranch, BookOpen, Video, ShieldCheck, ExternalLink, Tag, FileArchive, Loader2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ShareProjectDialog } from "@/components/projects/ShareProjectDialog";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ export default function ProjectDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const [exportingZip, setExportingZip] = useState(false);
 
   // Fetch titles for items
   const { data: titlesMap = {} } = useQuery({
@@ -122,6 +123,26 @@ export default function ProjectDetail() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Projeto exportado");
+  };
+
+  const exportZip = async () => {
+    if (!project) return;
+    setExportingZip(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("export-project", {
+        body: { project_id: project.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.url) {
+        window.open(data.url, "_blank");
+        toast.success(`ZIP gerado (${data.items} itens)`);
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao gerar ZIP");
+    } finally {
+      setExportingZip(false);
+    }
   };
 
   const ItemList = ({ list }: { list: ProjectItemRow[] }) => (
@@ -218,6 +239,9 @@ export default function ProjectDetail() {
           </Button>
           <Button onClick={exportJson} variant="outline" className="gap-2 border-white/20 bg-white/5 text-white hover:bg-white/10">
             <Download className="h-4 w-4" /> Exportar
+          </Button>
+          <Button onClick={exportZip} disabled={exportingZip} variant="outline" className="gap-2 border-white/20 bg-white/5 text-white hover:bg-white/10">
+            {exportingZip ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />} ZIP completo
           </Button>
           <Button onClick={toggleArchive} variant="outline" className="gap-2 border-white/20 bg-white/5 text-white hover:bg-white/10">
             <Archive className="h-4 w-4" /> {project.archived ? "Desarquivar" : "Arquivar"}

@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Database, Plus, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { AddToProjectMenu } from "@/components/projects/AddToProjectMenu";
 
 export default function Knowledge() {
   const navigate = useNavigate();
@@ -87,18 +88,22 @@ export default function Knowledge() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {bases.map((kb) => (
-            <button
+            <div
               key={kb.id}
-              onClick={() => navigate(`/conteudos/${kb.id}`)}
-              className="text-left rounded-xl border border-white/10 bg-white/[0.03] p-5 hover:bg-white/[0.06] transition-colors"
+              className="relative group rounded-xl border border-white/10 bg-white/[0.03] p-5 hover:bg-white/[0.06] transition-colors"
             >
-              <div className="flex items-center gap-3 mb-2">
-                <Database className="h-5 w-5 text-[hsl(14,90%,58%)]" />
-                <h3 className="text-sm font-semibold text-white truncate">{kb.name}</h3>
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <AddToProjectMenu itemType="knowledge_base" itemId={kb.id} size="icon" />
               </div>
-              <p className="text-xs text-white/40 line-clamp-2">{kb.description || "Sem descrição"}</p>
-              <p className="mt-2 text-xs text-white/20">{new Date(kb.created_at).toLocaleDateString("pt-BR")}</p>
-            </button>
+              <button onClick={() => navigate(`/conteudos/${kb.id}`)} className="text-left w-full">
+                <div className="flex items-center gap-3 mb-2">
+                  <Database className="h-5 w-5 text-[hsl(14,90%,58%)]" />
+                  <h3 className="text-sm font-semibold text-white truncate">{kb.name}</h3>
+                </div>
+                <p className="text-xs text-white/40 line-clamp-2">{kb.description || "Sem descrição"}</p>
+                <p className="mt-2 text-xs text-white/20">{new Date(kb.created_at).toLocaleDateString("pt-BR")}</p>
+              </button>
+            </div>
           ))}
         </div>
       )}

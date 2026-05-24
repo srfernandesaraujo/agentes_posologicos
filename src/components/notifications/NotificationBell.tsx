@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Notification {
   id: string;
@@ -29,6 +31,7 @@ const typeIcons: Record<string, typeof Info> = {
   warning: AlertTriangle,
   credit: Gift,
   feature: Megaphone,
+  pubmed: Info,
 };
 
 const typeColors: Record<string, string> = {
@@ -36,6 +39,7 @@ const typeColors: Record<string, string> = {
   warning: "text-[hsl(38,92%,50%)]",
   credit: "text-[hsl(14,90%,58%)]",
   feature: "text-[hsl(262,80%,65%)]",
+  pubmed: "text-[hsl(174,62%,47%)]",
 };
 
 export function NotificationBell() {
@@ -95,7 +99,9 @@ export function NotificationBell() {
 
   const handleClick = (notif: Notification) => {
     if (!notif.read) markRead.mutate(notif.id);
-    if (notif.link) {
+    // If the message contains markdown links, don't auto-navigate — user can click the link directly
+    const hasMarkdownLink = /\[[^\]]+\]\([^)]+\)/.test(notif.message || "");
+    if (notif.link && !hasMarkdownLink) {
       setOpen(false);
       navigate(notif.link);
     }
@@ -166,7 +172,25 @@ export function NotificationBell() {
                           <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[hsl(14,90%,58%)]" />
                         )}
                       </div>
-                      <p className="text-[11px] text-white/40 line-clamp-2 mt-0.5">{notif.message}</p>
+                      <div className="text-[11px] text-white/50 mt-0.5 break-words space-y-1 max-h-40 overflow-y-auto pr-1 [&_a]:text-[hsl(174,62%,55%)] [&_a]:underline [&_a:hover]:text-[hsl(174,62%,65%)] [&_ul]:list-none [&_p]:my-0.5">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            a: ({ href, children }) => (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {children}
+                              </a>
+                            ),
+                          }}
+                        >
+                          {notif.message}
+                        </ReactMarkdown>
+                      </div>
                       <p className="text-[10px] text-white/25 mt-1">
                         {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: ptBR })}
                       </p>

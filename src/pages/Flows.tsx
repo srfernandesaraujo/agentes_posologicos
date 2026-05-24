@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { ComplexFlowWizard } from "@/components/flows/ComplexFlowWizard";
+import { AddToProjectMenu } from "@/components/projects/AddToProjectMenu";
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   draft: { label: "Rascunho", variant: "secondary" },
@@ -320,14 +321,17 @@ export default function Flows() {
                     <span className="text-xs text-white/30">
                       {new Date(flow.updated_at).toLocaleDateString("pt-BR")}
                     </span>
-                    <Button
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <AddToProjectMenu itemType="flow" itemId={flow.id} size="icon" />
+                      <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-white/30 hover:text-red-400"
                       onClick={(e) => handleDelete(flow.id, e)}
                     >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
