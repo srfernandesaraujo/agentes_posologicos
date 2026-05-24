@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useEffect, useRef } from "react";
-import { ArrowRight, ArrowUpRight, Pill, Shield, Zap, Brain, BarChart3, DoorOpen, Wrench, Stethoscope, Smartphone, Workflow } from "lucide-react";
+import { ArrowUpRight, Pill, Shield, Zap, Brain, BarChart3, DoorOpen, Wrench, Stethoscope, Smartphone, Workflow } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
