@@ -8,6 +8,216 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
 import { SalesAgentWidget } from "@/components/sales/SalesAgentWidget";
 import { SEO } from "@/components/seo/SEO";
+import landingAvatar from "@/assets/landing-avatar.png";
+
+/* ---------- Cinematic avatar layer ----------
+ * Fixed full-viewport canvas with:
+ *  - scroll-driven scale + vertical drift (avatar approaches as you scroll)
+ *  - mouse parallax (drag/lag effect on pointer move)
+ *  - cross-fading text overlays per scroll act
+ */
+const ACTS: { id: string; eyebrow: string; title: React.ReactNode; body?: string; align?: "left" | "right" | "center" }[] = [
+  {
+    id: "act-1",
+    eyebrow: "[ ORIGEM ]",
+    title: <>SINTA<br />ANTES DE VER</>,
+    body: "Agentes de IA que traduzem dados clínicos densos em decisões claras — para você, para o paciente, para a sala de aula.",
+    align: "right",
+  },
+  {
+    id: "act-2",
+    eyebrow: "[ PRESENÇA ]",
+    title: <>FÉ AGNÓSTICA<br />NA EVIDÊNCIA</>,
+    body: "Cada resposta é ancorada em literatura, diretrizes e contexto. Nenhum palpite. Nenhum ruído.",
+    align: "right",
+  },
+  {
+    id: "act-3",
+    eyebrow: "[ ABSORÇÃO ]",
+    title: <>ABSORVENDO<br />A REALIDADE</>,
+    body: "Sua prescrição, seu protocolo, seu plano de aula, seus dados de pesquisa — entram, viram sinal.",
+    align: "center",
+  },
+  {
+    id: "act-4",
+    eyebrow: "[ SINAL ]",
+    title: <>ISOLANDO SINAIS<br />DO RUÍDO</>,
+    body: "Dois lados da mesma entidade: a especialidade do profissional e a precisão do agente.",
+    align: "center",
+  },
+  {
+    id: "act-5",
+    eyebrow: "[ ENGENHARIA ]",
+    title: <>ENGENHARIA<br />DO INVISÍVEL</>,
+    body: "Pixels brutos viram nuances. Fragmentos viram contexto. Contexto vira ação de alto valor clínico, didático e científico.",
+    align: "right",
+  },
+];
+
+function CinematicAvatar() {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLDivElement>(null);
+  const overlaysRef = useRef<HTMLDivElement>(null);
+  const mouse = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+  const raf = useRef<number | null>(null);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const img = imgRef.current;
+    const overlays = overlaysRef.current;
+    if (!wrap || !img || !overlays) return;
+
+    const compute = () => {
+      const rect = wrap.getBoundingClientRect();
+      const vh = window.innerHeight;
+      // progress 0..1 across the cinematic section
+      const total = rect.height - vh;
+      const p = Math.min(1, Math.max(0, -rect.top / total));
+      // Avatar approaches: scale 0.55 -> 1.55, drifts slightly down
+      const scale = 0.55 + p * 1.0;
+      const ty = -40 + p * 60;
+      // Lerp mouse for drag feel
+      mouse.current.tx += (mouse.current.x - mouse.current.tx) * 0.08;
+      mouse.current.ty += (mouse.current.y - mouse.current.ty) * 0.08;
+      const mx = mouse.current.tx * 40 * (1 - p * 0.4);
+      const my = mouse.current.ty * 30 * (1 - p * 0.4);
+      img.style.transform = `translate3d(${mx}px, ${ty + my}px, 0) scale(${scale})`;
+
+      // Cross-fade overlays based on per-act windows
+      const acts = overlays.querySelectorAll<HTMLElement>("[data-act]");
+      const n = acts.length;
+      acts.forEach((el, i) => {
+        const center = (i + 0.5) / n;
+        const dist = Math.abs(p - center);
+        const window_ = 0.5 / n;
+        const opacity = Math.max(0, 1 - dist / window_);
+        const lift = (1 - opacity) * 30;
+        el.style.opacity = String(opacity);
+        el.style.transform = `translateY(${lift}px)`;
+        el.style.pointerEvents = opacity > 0.6 ? "auto" : "none";
+      });
+
+      raf.current = null;
+    };
+
+    const schedule = () => {
+      if (raf.current == null) raf.current = requestAnimationFrame(compute);
+    };
+
+    const onMouse = (e: MouseEvent) => {
+      mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.current.y = (e.clientY / window.innerHeight) * 2 - 1;
+      schedule();
+    };
+
+    compute();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    window.addEventListener("mousemove", onMouse, { passive: true });
+    // continuous loop for smooth mouse lerp
+    let loop = 0;
+    const tick = () => {
+      schedule();
+      loop = requestAnimationFrame(tick);
+    };
+    loop = requestAnimationFrame(tick);
+
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("mousemove", onMouse);
+      cancelAnimationFrame(loop);
+      if (raf.current) cancelAnimationFrame(raf.current);
+    };
+  }, []);
+
+  return (
+    <section ref={wrapRef} className="relative" style={{ height: "500vh" }}>
+      {/* Sticky stage */}
+      <div className="sticky top-0 h-screen w-full overflow-hidden">
+        {/* Aurora light streaks */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(120% 70% at 50% 110%, rgba(20,184,166,0.18) 0%, transparent 55%), radial-gradient(80% 50% at 80% 20%, rgba(56,189,248,0.18) 0%, transparent 60%), radial-gradient(60% 40% at 10% 30%, rgba(168,85,247,0.14) 0%, transparent 60%)",
+          }}
+        />
+        {/* Light streaks */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-60 mix-blend-screen"
+          style={{
+            background:
+              "linear-gradient(110deg, transparent 30%, rgba(125,211,252,0.25) 45%, rgba(125,211,252,0.05) 48%, transparent 60%), linear-gradient(100deg, transparent 40%, rgba(192,132,252,0.18) 52%, transparent 65%)",
+            filter: "blur(6px)",
+          }}
+        />
+
+        {/* Avatar (LCP-style) */}
+        <div
+          ref={imgRef}
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
+          style={{ width: "min(82vh, 90vw)", height: "min(82vh, 90vw)", transition: "transform 0.08s linear" }}
+        >
+          <img
+            src={landingAvatar}
+            alt="Agente de IA — avatar simbólico"
+            width={1024}
+            height={1024}
+            className="h-full w-full object-contain drop-shadow-[0_30px_80px_rgba(56,189,248,0.25)]"
+            draggable={false}
+          />
+        </div>
+
+        {/* Side rail */}
+        <div className="pointer-events-none absolute left-4 md:left-8 top-1/2 -translate-y-1/2 flex flex-col gap-12 font-mono text-[10px] uppercase tracking-[0.24em] text-white/40">
+          <div>
+            <p className="text-white/70">[ ORIGEM ]</p>
+            <p className="mt-2 max-w-[140px] leading-relaxed">A fundação da nossa realidade, propósito e capacidades.</p>
+          </div>
+          <div className="flex flex-col gap-3 border-l border-white/10 pl-4">
+            <span className="text-white">INTRO</span>
+            <span>PRESENÇA</span>
+            <span>SINAL</span>
+          </div>
+        </div>
+        <div className="pointer-events-none absolute right-4 md:right-8 top-1/2 -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/40 [writing-mode:vertical-rl] rotate-180">
+          PORTFÓLIO · AGENTES POSOLÓGICOS
+        </div>
+
+        {/* Text overlays */}
+        <div ref={overlaysRef} className="absolute inset-0">
+          {ACTS.map((a) => (
+            <div
+              key={a.id}
+              data-act
+              className="absolute inset-0 flex items-center px-6 md:px-20"
+              style={{ opacity: 0, transition: "opacity 0.3s ease, transform 0.5s ease" }}
+            >
+              <div
+                className={`max-w-2xl ${
+                  a.align === "right" ? "ml-auto text-left" : a.align === "center" ? "mx-auto text-center" : "text-left"
+                }`}
+              >
+                <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/60 mb-6">{a.eyebrow}</p>
+                <h2 className="font-display font-black uppercase leading-[0.92] tracking-[-0.02em] text-[clamp(2.5rem,7vw,6rem)] text-white drop-shadow-[0_4px_30px_rgba(0,0,0,0.6)]">
+                  {a.title}
+                </h2>
+                {a.body && (
+                  <p className="mt-6 font-mono text-[11px] md:text-[12px] uppercase tracking-[0.16em] leading-[1.8] text-white/70 max-w-md">
+                    {a.body}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function Reveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
