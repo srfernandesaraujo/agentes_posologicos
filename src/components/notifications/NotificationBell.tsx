@@ -15,6 +15,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ExternalLink } from "lucide-react";
 
 interface Notification {
   id: string;
@@ -99,20 +100,29 @@ export function NotificationBell() {
 
   const handleClick = (notif: Notification) => {
     if (!notif.read) markRead.mutate(notif.id);
-    // PubMed notifications: open the first article link in a new tab instead of navigating in-app
-    if (notif.type === "pubmed") {
-      const match = (notif.message || "").match(/\((https?:\/\/[^\)]+)\)/);
-      if (match) {
-        window.open(match[1], "_blank", "noopener,noreferrer");
-      }
-      return;
-    }
+    // PubMed notifications: don't auto-navigate — user clicks individual article links below
+    if (notif.type === "pubmed") return;
     // If the message contains markdown links, don't auto-navigate — user can click the link directly
     const hasMarkdownLink = /\[[^\]]+\]\([^)]+\)/.test(notif.message || "");
     if (notif.link && !hasMarkdownLink) {
       setOpen(false);
       navigate(notif.link);
     }
+  };
+
+  // Extract all [title](url) pairs from a pubmed message
+  const parsePubmedArticles = (message: string) => {
+    const articles: { title: string; url: string; meta: string }[] = [];
+    const regex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)([^\n•]*)/g;
+    let m;
+    while ((m = regex.exec(message)) !== null) {
+      articles.push({
+        title: m[1].replace(/\.\.\.$/, "…"),
+        url: m[2],
+        meta: (m[3] || "").replace(/^\s*[—-]\s*/, "").replace(/_/g, "").trim(),
+      });
+    }
+    return articles;
   };
 
   return (
@@ -180,25 +190,60 @@ export function NotificationBell() {
                           <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[hsl(14,90%,58%)]" />
                         )}
                       </div>
-                      <div className="text-[11px] text-white/50 mt-0.5 break-words space-y-1 max-h-40 overflow-y-auto pr-1 [&_a]:text-[hsl(174,62%,55%)] [&_a]:underline [&_a:hover]:text-[hsl(174,62%,65%)] [&_ul]:list-none [&_p]:my-0.5">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            a: ({ href, children }) => (
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {children}
-                              </a>
-                            ),
-                          }}
-                        >
-                          {notif.message}
-                        </ReactMarkdown>
-                      </div>
+                      {notif.type === "pubmed" ? (
+                        (() => {
+                          const articles = parsePubmedArticles(notif.message || "");
+                          const intro = (notif.message || "").split("\n")[0];
+                          return (
+                            <div className="mt-1 space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                              <p className="text-[11px] text-white/60">{intro}</p>
+                              <ul className="space-y-1">
+                                {articles.map((a, i) => (
+                                  <li key={i}>
+                                    <a
+                                      href={a.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="group/link flex items-start gap-1.5 rounded-md px-2 py-1.5 -mx-1 hover:bg-white/5 transition-colors"
+                                    >
+                                      <ExternalLink className="h-3 w-3 mt-0.5 shrink-0 text-[hsl(174,62%,55%)]" />
+                                      <span className="min-w-0 flex-1">
+                                        <span className="block text-[11px] leading-snug text-[hsl(174,62%,65%)] underline-offset-2 group-hover/link:underline">
+                                          {a.title}
+                                        </span>
+                                        {a.meta && (
+                                          <span className="block text-[10px] text-white/40 mt-0.5">{a.meta}</span>
+                                        )}
+                                      </span>
+                                    </a>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="text-[11px] text-white/50 mt-0.5 break-words space-y-1 max-h-40 overflow-y-auto pr-1 [&_a]:text-[hsl(174,62%,55%)] [&_a]:underline [&_a:hover]:text-[hsl(174,62%,65%)] [&_ul]:list-none [&_p]:my-0.5">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              a: ({ href, children }) => (
+                                <a
+                                  href={href}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {children}
+                                </a>
+                              ),
+                            }}
+                          >
+                            {notif.message}
+                          </ReactMarkdown>
+                        </div>
+                      )}
                       <p className="text-[10px] text-white/25 mt-1">
                         {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: ptBR })}
                       </p>
