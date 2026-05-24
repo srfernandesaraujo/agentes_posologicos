@@ -1,13 +1,45 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Bot, ArrowRight, Pill, BookOpen, FlaskConical, Video, MessageSquare, Settings, Sparkles, Shield, Zap, Users, Brain, BarChart3, FileText, CheckCircle2, DoorOpen, Wrench, Stethoscope, Smartphone, Workflow } from "lucide-react";
+import { ArrowUpRight, Pill, Shield, Zap, Brain, BarChart3, DoorOpen, Wrench, Stethoscope, Smartphone, Workflow } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
 import { SalesAgentWidget } from "@/components/sales/SalesAgentWidget";
 import { SEO } from "@/components/seo/SEO";
+
+function Reveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            el.style.animationPlayState = "running";
+            el.classList.add("opacity-100");
+            el.classList.remove("opacity-0");
+            io.unobserve(el);
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div
+      ref={ref}
+      className={`opacity-0 animate-sw-rise ${className}`}
+      style={{ animationDelay: `${delay}ms`, animationPlayState: "paused" }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -47,7 +79,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(220,25%,5%)] text-white">
+    <div className="min-h-screen bg-black text-white selection:bg-white selection:text-black antialiased">
       <SEO
         title="Agentes Posológicos — IA para Saúde, Educação e Pesquisa"
         description="Plataforma de agentes de IA especializados em prática clínica, farmácia, ensino em saúde, pesquisa acadêmica e produção de conteúdo. Crie sua conta gratuita."
@@ -61,219 +93,332 @@ export default function Landing() {
           offers: { "@type": "Offer", price: "0", priceCurrency: "BRL" },
         }}
       />
+      {/* Subtle grain overlay */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-[1] opacity-[0.035] mix-blend-overlay"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.7'/></svg>\")",
+        }}
+      />
+
       {/* Nav */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[hsl(220,25%,5%)]/80 backdrop-blur-xl">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
-              <Pill className="h-4 w-4 text-white" />
+      <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-black/40 border-b border-white/[0.06]">
+        <div className="mx-auto max-w-[1440px] flex h-14 items-center justify-between px-6 md:px-10 font-mono text-[11px] uppercase tracking-[0.18em]">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="h-5 w-5 rounded-[5px] bg-white grid place-items-center">
+              <Pill className="h-3 w-3 text-black" />
             </div>
-            <span className="font-display text-lg font-bold">Agentes Posológicos</span>
-          </div>
-          <div className="flex items-center gap-3">
+            <span className="text-white">Agentes Posológicos<span className="text-white/40">®</span></span>
+          </Link>
+          <nav className="hidden md:flex items-center gap-8 text-white/50">
+            <a href="#index" className="hover:text-white transition-colors">Índice</a>
+            <a href="#capabilities" className="hover:text-white transition-colors">Capacidades</a>
+            <a href="#agents" className="hover:text-white transition-colors">Agentes</a>
+            <a href="#access" className="hover:text-white transition-colors">Acesso</a>
+          </nav>
+          <div className="flex items-center gap-4">
             <LanguageSelector />
             <FloatingAuth />
           </div>
         </div>
       </header>
 
-      <main>
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: `radial-gradient(circle, hsl(199 89% 48% / 0.5) 1px, transparent 1px)`, backgroundSize: '32px 32px' }} />
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[600px] rounded-full bg-[hsl(199,89%,48%)]/[0.06] blur-[120px]" />
-        </div>
+      <main className="relative z-[2] pt-14">
+        {/* Hero */}
+        <section className="relative min-h-[100svh] flex flex-col justify-between overflow-hidden">
+          {/* breathing orb */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-[58%] -translate-x-1/2 -translate-y-1/2 h-[680px] w-[680px] rounded-full animate-sw-orb"
+            style={{
+              background:
+                "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.18) 0%, rgba(56,189,248,0.12) 28%, rgba(20,184,166,0.08) 48%, transparent 70%)",
+              filter: "blur(40px)",
+            }}
+          />
 
-        <div className="container relative py-24 md:py-36 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-xs font-medium text-white/60 mb-8 animate-fade-in">
-            <Sparkles className="h-3.5 w-3.5 text-[hsl(14,90%,58%)]" />
-            {t("landing.subtitle")}
+          {/* Top meta line */}
+          <div className="relative mx-auto w-full max-w-[1440px] px-6 md:px-10 pt-10 grid grid-cols-2 md:grid-cols-3 gap-6 font-mono text-[10px] uppercase tracking-[0.22em] text-white/40 animate-sw-fade">
+            <span>[ V.2026 / PT-BR ]</span>
+            <span className="hidden md:block text-center">Plataforma de Agentes de IA</span>
+            <span className="text-right">Saúde · Educação · Pesquisa</span>
           </div>
-          <h1 className="font-display text-5xl md:text-7xl lg:text-8xl font-bold leading-[1.05] mb-6 animate-slide-up">
-            {t("landing.hero.title1")}
-            <br />
-            <span className="gradient-text">{t("landing.hero.title2")}</span>
-          </h1>
-          <p className="mx-auto max-w-2xl text-lg md:text-xl text-white/50 mb-10 animate-fade-in leading-relaxed">
-            {t("landing.hero.desc")}
-          </p>
-          <div className="flex items-center justify-center gap-4 animate-fade-in">
-            <Link to="/signup">
-              <Button size="lg" className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white border-0 gap-2 text-base px-8 h-12">
-                {t("landing.cta")}
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </Link>
-            <Link to="/login">
-              <Button size="lg" variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white h-12 px-8 text-base">
-                {t("landing.login")}
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
 
-      {/* Stats */}
-      <section className="border-y border-white/10 bg-white/[0.02]">
-        <div className="container py-12">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
-            {STATS.map((s) => (
-              <div key={s.label} className="text-center">
-                <p className="font-display text-3xl font-bold gradient-text">{s.value}</p>
-                <p className="mt-1 text-sm text-white/70">{s.label}</p>
+          {/* Headline */}
+          <div className="relative mx-auto w-full max-w-[1440px] px-6 md:px-10 py-24 md:py-32 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/40 mb-10 animate-sw-fade">
+              ✦ &nbsp; {t("landing.subtitle")} &nbsp; ✦
+            </p>
+            <h1 className="font-display font-light leading-[0.92] tracking-[-0.04em] text-[clamp(3rem,11vw,11rem)] animate-sw-rise">
+              <span className="block italic font-serif text-white/95">{t("landing.hero.title1")}.</span>
+              <span className="block font-bold uppercase">{t("landing.hero.title2")}</span>
+            </h1>
+
+            <p className="mx-auto max-w-xl text-base md:text-lg text-white/55 mt-12 leading-relaxed animate-sw-fade" style={{ animationDelay: "300ms" }}>
+              {t("landing.hero.desc")}
+            </p>
+
+            <div className="mt-14 flex items-center justify-center gap-3 animate-sw-fade" style={{ animationDelay: "500ms" }}>
+              <Link to="/signup">
+                <Button className="group h-12 rounded-full bg-white text-black hover:bg-white/90 px-7 text-[12px] font-mono uppercase tracking-[0.2em] gap-3">
+                  {t("landing.cta")}
+                  <span className="grid place-items-center h-7 w-7 rounded-full bg-black text-white transition-transform group-hover:rotate-45">
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </span>
+                </Button>
+              </Link>
+              <Link to="/login">
+                <Button variant="ghost" className="h-12 rounded-full border border-white/15 bg-transparent text-white hover:bg-white/5 hover:text-white px-7 text-[12px] font-mono uppercase tracking-[0.2em]">
+                  {t("landing.login")}
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Bottom scroll cue */}
+          <div className="relative mx-auto w-full max-w-[1440px] px-6 md:px-10 pb-8 flex items-end justify-between font-mono text-[10px] uppercase tracking-[0.24em] text-white/35 animate-sw-fade" style={{ animationDelay: "700ms" }}>
+            <span>Role para descobrir</span>
+            <div className="h-px w-24 md:w-64 bg-white/15" />
+            <span>↓ 001</span>
+          </div>
+        </section>
+
+        {/* Marquee strip */}
+        <section className="border-y border-white/[0.06] overflow-hidden py-5">
+          <div className="flex whitespace-nowrap animate-sw-marquee font-display italic text-3xl md:text-5xl text-white/70">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="flex items-center shrink-0 pr-12 gap-12">
+                <span>Clínica</span><span className="text-white/20">✦</span>
+                <span className="font-bold not-italic uppercase">Farmácia</span><span className="text-white/20">✦</span>
+                <span>Ensino</span><span className="text-white/20">✦</span>
+                <span className="font-bold not-italic uppercase">Pesquisa</span><span className="text-white/20">✦</span>
+                <span>Conteúdo</span><span className="text-white/20">✦</span>
+                <span className="font-bold not-italic uppercase">Fluxos</span><span className="text-white/20">✦</span>
+                <span>RAG</span><span className="text-white/20">✦</span>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* PIN Access */}
-      <section id="pin-section" className="border-b border-white/10 bg-white/[0.02]">
-        <div className="container py-12">
-          <div className="mx-auto max-w-md text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <DoorOpen className="h-6 w-6 text-[hsl(174,62%,47%)]" />
-              <h2 className="font-display text-xl font-bold text-white">{t("landing.pin.title")}</h2>
-            </div>
-            <p className="text-sm text-white/70 mb-4">{t("landing.pin.desc")}</p>
-            <div className="flex gap-2">
-              <Input
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder={t("landing.pin.placeholder")}
-                className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/60 text-center font-mono text-lg tracking-widest"
-                onKeyDown={(e) => { if (e.key === "Enter") handlePinAccess(); }}
-              />
-              <Button onClick={handlePinAccess} disabled={pin.trim().length < 4} className="bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,40%)] text-white shrink-0">
-                {t("landing.pin.access")}
-              </Button>
+        {/* Stats / Index */}
+        <section id="index" className="border-b border-white/[0.06]">
+          <div className="mx-auto max-w-[1440px] px-6 md:px-10 py-24 grid lg:grid-cols-12 gap-10">
+            <Reveal className="lg:col-span-4">
+              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 001 ] Índice</p>
+              <h2 className="font-display text-4xl md:text-5xl leading-[1.05] tracking-tight">
+                <span className="italic font-serif font-light">A escala</span><br />
+                <span className="font-bold uppercase">em números.</span>
+              </h2>
+            </Reveal>
+            <div className="lg:col-span-8 grid grid-cols-2 md:grid-cols-5 gap-y-10 gap-x-6 self-end">
+              {STATS.map((s, i) => (
+                <Reveal key={s.label} delay={i * 80}>
+                  <p className="font-display text-4xl md:text-5xl font-light text-white">{s.value}</p>
+                  <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40 leading-relaxed">{s.label}</p>
+                </Reveal>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Features */}
-      <section className="container py-24">
-        <div className="text-center mb-16">
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">{t("landing.features.title")}</h2>
-          <p className="text-white/70 max-w-xl mx-auto">{t("landing.features.desc")}</p>
-        </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="group rounded-2xl border border-white/10 bg-white/[0.02] p-6 hover:border-white/20 hover:bg-white/[0.04] transition-all duration-300">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl gradient-primary mb-4 group-hover:scale-110 transition-transform">
-                <f.icon className="h-6 w-6 text-white" />
-              </div>
-              <h3 className="font-display text-lg font-semibold text-white mb-2">{f.title}</h3>
-              <p className="text-sm text-white/70 leading-relaxed">{f.description}</p>
+        {/* Features / Capabilities */}
+        <section id="capabilities" className="border-b border-white/[0.06]">
+          <div className="mx-auto max-w-[1440px] px-6 md:px-10 py-28">
+            <div className="grid lg:grid-cols-12 gap-10 mb-20">
+              <Reveal className="lg:col-span-5">
+                <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 002 ] Capacidades</p>
+                <h2 className="font-display text-5xl md:text-7xl leading-[0.95] tracking-tight">
+                  <span className="italic font-serif font-light">Tudo o que</span><br />
+                  <span className="font-bold uppercase">você precisa.</span>
+                </h2>
+              </Reveal>
+              <Reveal delay={120} className="lg:col-span-5 lg:col-start-8 self-end">
+                <p className="text-white/55 text-base md:text-lg leading-relaxed">{t("landing.features.desc")}</p>
+              </Reveal>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* Categories */}
-      <section className="container py-24">
-        <div className="text-center mb-16">
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">{t("landing.categories.title")}</h2>
-          <p className="text-white/70 max-w-xl mx-auto">{t("landing.categories.desc")}</p>
-        </div>
-        <div className="grid gap-6 sm:grid-cols-2">
-          {CATEGORIES.map((cat) => (
-            <div key={cat.name} className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                <h3 className="font-display text-lg font-semibold text-white">{cat.name}</h3>
-              </div>
-              <div className="space-y-2">
-                {cat.agents.map((a) => (
-                  <div key={a} className="flex items-center gap-2 text-sm text-white/50">
-                    <CheckCircle2 className="h-4 w-4 text-white/50" />
-                    {a}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 border-t border-white/[0.08]">
+              {FEATURES.map((f, i) => (
+                <Reveal
+                  key={f.title}
+                  delay={(i % 4) * 100}
+                  className="group relative border-b border-white/[0.08] md:border-r md:[&:nth-child(2n)]:border-r-0 lg:[&:nth-child(2n)]:border-r lg:[&:nth-child(4n)]:border-r-0 p-8 lg:p-10 hover:bg-white/[0.02] transition-colors min-h-[280px] flex flex-col"
+                >
+                  <div className="flex items-start justify-between mb-12">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/35">
+                      {String(i + 1).padStart(3, "0")}
+                    </span>
+                    <f.icon className="h-5 w-5 text-white/40 group-hover:text-white transition-colors" strokeWidth={1.2} />
                   </div>
-                ))}
-              </div>
+                  <h3 className="font-display text-2xl leading-tight tracking-tight mb-4 text-white">{f.title}</h3>
+                  <p className="text-sm text-white/50 leading-relaxed mt-auto">{f.description}</p>
+                </Reveal>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="container py-24">
-        <div className="relative rounded-3xl border border-white/10 bg-white/[0.02] px-8 py-16 text-center overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-[hsl(199,89%,48%)]/5 to-[hsl(174,62%,47%)]/5" />
-          <div className="relative">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-white mb-4">
-              {t("landing.cta2.title")}
-            </h2>
-            <p className="text-white/70 max-w-lg mx-auto mb-8">
-              {t("landing.cta2.desc")}
-            </p>
-            <Link to="/signup">
-              <Button size="lg" className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white border-0 gap-2 text-base px-10 h-12">
-                {t("landing.signup")}
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </Link>
           </div>
-        </div>
-      </section>
+        </section>
 
-      </main>
-      {/* Footer */}
-      <footer className="border-t border-white/10 py-12">
-        <div className="container">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-10">
-            {/* Brand */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg gradient-primary">
-                  <Pill className="h-3.5 w-3.5 text-white" />
+        {/* Categories / Agents */}
+        <section id="agents" className="border-b border-white/[0.06]">
+          <div className="mx-auto max-w-[1440px] px-6 md:px-10 py-28">
+            <Reveal className="max-w-3xl mb-20">
+              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 003 ] Agentes</p>
+              <h2 className="font-display text-5xl md:text-7xl leading-[0.95] tracking-tight">
+                <span className="italic font-serif font-light">Especialistas</span>{" "}
+                <span className="font-bold uppercase">por domínio.</span>
+              </h2>
+              <p className="mt-8 text-white/55 text-base md:text-lg max-w-xl leading-relaxed">{t("landing.categories.desc")}</p>
+            </Reveal>
+
+            <div className="space-y-px bg-white/[0.06]">
+              {CATEGORIES.map((cat, i) => (
+                <Reveal key={cat.name} delay={i * 90}>
+                  <div className="group grid grid-cols-12 items-center gap-6 bg-black hover:bg-white/[0.025] transition-colors px-2 md:px-6 py-8 md:py-10">
+                    <div className="col-span-1 font-mono text-[11px] text-white/35">
+                      {String(i + 1).padStart(2, "0")}
+                    </div>
+                    <div className="col-span-11 md:col-span-4 flex items-center gap-4">
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color, boxShadow: `0 0 24px ${cat.color}` }} />
+                      <h3 className="font-display text-2xl md:text-3xl tracking-tight text-white">{cat.name}</h3>
+                    </div>
+                    <div className="col-span-12 md:col-span-6 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/50">
+                      {cat.agents.map((a) => (
+                        <span key={a} className="before:content-['—_'] before:text-white/25">{a}</span>
+                      ))}
+                    </div>
+                    <div className="hidden md:flex col-span-1 justify-end">
+                      <ArrowUpRight className="h-5 w-5 text-white/30 group-hover:text-white group-hover:-translate-y-1 group-hover:translate-x-1 transition-all" strokeWidth={1.2} />
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Access / PIN */}
+        <section id="access" className="border-b border-white/[0.06] relative overflow-hidden">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute right-[-15%] top-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full opacity-50"
+            style={{
+              background: "radial-gradient(circle, rgba(20,184,166,0.18) 0%, transparent 60%)",
+              filter: "blur(60px)",
+            }}
+          />
+          <div className="relative mx-auto max-w-[1440px] px-6 md:px-10 py-28 grid lg:grid-cols-12 gap-10 items-center">
+            <Reveal className="lg:col-span-6">
+              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 004 ] Salas Virtuais</p>
+              <h2 className="font-display text-5xl md:text-7xl leading-[0.95] tracking-tight">
+                <span className="italic font-serif font-light">Entre com</span><br />
+                <span className="font-bold uppercase inline-flex items-center gap-4">
+                  um PIN
+                  <DoorOpen className="h-12 w-12 text-white/60" strokeWidth={1.2} />
+                </span>
+              </h2>
+              <p className="mt-8 text-white/55 max-w-lg leading-relaxed">{t("landing.pin.desc")}</p>
+            </Reveal>
+            <Reveal delay={150} className="lg:col-span-5 lg:col-start-8">
+              <div className="border border-white/10 bg-white/[0.02] p-6 md:p-8">
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/40 mb-4">{t("landing.pin.title")}</p>
+                <div className="flex flex-col gap-3">
+                  <Input
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value)}
+                    placeholder={t("landing.pin.placeholder")}
+                    className="h-14 border-0 border-b border-white/20 rounded-none bg-transparent text-white placeholder:text-white/30 font-mono text-2xl tracking-[0.4em] text-center px-0 focus-visible:ring-0 focus-visible:border-white"
+                    onKeyDown={(e) => { if (e.key === "Enter") handlePinAccess(); }}
+                  />
+                  <Button
+                    onClick={handlePinAccess}
+                    disabled={pin.trim().length < 4}
+                    className="h-12 rounded-full bg-white text-black hover:bg-white/90 font-mono text-[12px] uppercase tracking-[0.2em] gap-3 group"
+                  >
+                    {t("landing.pin.access")}
+                    <span className="grid place-items-center h-7 w-7 rounded-full bg-black text-white transition-transform group-hover:rotate-45">
+                      <ArrowUpRight className="h-3.5 w-3.5" />
+                    </span>
+                  </Button>
                 </div>
-                <span className="font-display font-semibold text-white text-base">Agentes Posológicos</span>
               </div>
-              <p className="text-sm text-white/70 leading-relaxed">
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Final CTA */}
+        <section className="relative overflow-hidden">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[800px] w-[800px] rounded-full animate-sw-orb"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(255,255,255,0.14) 0%, rgba(56,189,248,0.10) 30%, transparent 65%)",
+              filter: "blur(50px)",
+            }}
+          />
+          <div className="relative mx-auto max-w-[1440px] px-6 md:px-10 py-32 md:py-44 text-center">
+            <Reveal>
+              <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/40 mb-10">[ 005 ] Comece agora</p>
+              <h2 className="font-display leading-[0.92] tracking-[-0.04em] text-[clamp(2.75rem,9vw,8rem)]">
+                <span className="block italic font-serif font-light text-white/95">{t("landing.cta2.title")}</span>
+              </h2>
+              <p className="mt-10 mx-auto max-w-xl text-white/55 text-base md:text-lg leading-relaxed">{t("landing.cta2.desc")}</p>
+              <div className="mt-14">
+                <Link to="/signup">
+                  <Button className="group h-14 rounded-full bg-white text-black hover:bg-white/90 px-10 text-[12px] font-mono uppercase tracking-[0.22em] gap-4">
+                    {t("landing.signup")}
+                    <span className="grid place-items-center h-8 w-8 rounded-full bg-black text-white transition-transform group-hover:rotate-45">
+                      <ArrowUpRight className="h-4 w-4" />
+                    </span>
+                  </Button>
+                </Link>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-[2] border-t border-white/[0.08]">
+        <div className="container">
+          <div className="py-16 grid grid-cols-2 md:grid-cols-4 gap-10 font-mono text-[11px] uppercase tracking-[0.18em]">
+            <div className="col-span-2 md:col-span-1 flex flex-col gap-4">
+              <div className="flex items-center gap-2.5">
+                <div className="h-5 w-5 rounded-[5px] bg-white grid place-items-center">
+                  <Pill className="h-3 w-3 text-black" />
+                </div>
+                <span className="text-white">Agentes Posológicos</span>
+              </div>
+              <p className="text-white/40 text-[11px] leading-relaxed normal-case tracking-normal font-sans">
                 Agentes de IA especializados para profissionais de saúde, educadores e pesquisadores.
               </p>
             </div>
-
-            {/* Produto */}
             <div className="flex flex-col gap-3">
-              <h4 className="font-semibold text-white/80 text-sm">Produto</h4>
-              <div className="flex flex-col gap-2 text-sm text-white/70">
-                <Link to="/signup" className="hover:text-white/70 transition-colors">Criar Conta</Link>
-                <Link to="/login" className="hover:text-white/70 transition-colors">Entrar</Link>
-                <Link to="/precos" className="hover:text-white/70 transition-colors">Créditos</Link>
-                <Link to="/vitrine" className="hover:text-white/70 transition-colors">Marketplace</Link>
-              </div>
+              <h4 className="text-white/40">Produto</h4>
+              <Link to="/signup" className="text-white/70 hover:text-white transition-colors">Criar Conta</Link>
+              <Link to="/login" className="text-white/70 hover:text-white transition-colors">Entrar</Link>
+              <Link to="/precos" className="text-white/70 hover:text-white transition-colors">Créditos</Link>
+              <Link to="/vitrine" className="text-white/70 hover:text-white transition-colors">Marketplace</Link>
             </div>
-
-            {/* Recursos */}
             <div className="flex flex-col gap-3">
-              <h4 className="font-semibold text-white/80 text-sm">Recursos</h4>
-              <div className="flex flex-col gap-2 text-sm text-white/70">
-                <Link to="/docs" className="hover:text-white/70 transition-colors">Documentação</Link>
-                <Link to="/fale-conosco" className="hover:text-white/70 transition-colors">Contato</Link>
-                <button onClick={() => document.getElementById('pin-section')?.scrollIntoView({ behavior: 'smooth' })} className="text-left hover:text-white/70 transition-colors">Salas Virtuais</button>
-              </div>
+              <h4 className="text-white/40">Recursos</h4>
+              <Link to="/docs" className="text-white/70 hover:text-white transition-colors">Documentação</Link>
+              <Link to="/fale-conosco" className="text-white/70 hover:text-white transition-colors">Contato</Link>
+              <a href="#access" className="text-white/70 hover:text-white transition-colors">Salas Virtuais</a>
             </div>
-
-            {/* Legal */}
             <div className="flex flex-col gap-3">
-              <h4 className="font-semibold text-white/80 text-sm">Legal</h4>
-              <div className="flex flex-col gap-2 text-sm text-white/70">
-                <Link to="/termos" className="hover:text-white/70 transition-colors">Termos de Serviço</Link>
-                <Link to="/privacidade" className="hover:text-white/70 transition-colors">Política de Privacidade</Link>
-                <Link to="/cookies" className="hover:text-white/70 transition-colors">Política de Cookies</Link>
-              </div>
+              <h4 className="text-white/40">Legal</h4>
+              <Link to="/termos" className="text-white/70 hover:text-white transition-colors">Termos</Link>
+              <Link to="/privacidade" className="text-white/70 hover:text-white transition-colors">Privacidade</Link>
+              <Link to="/cookies" className="text-white/70 hover:text-white transition-colors">Cookies</Link>
             </div>
           </div>
 
-          {/* Bottom bar */}
-          <div className="border-t border-white/10 pt-6 text-center text-sm text-white/60">
-            <span>© {new Date().getFullYear()} Agentes Posológicos. {t("landing.footer.rights")}</span>
-            <span className="mx-1">—</span>
-            <span>Desenvolvido por Sérgio Araújo. Posologia Produções</span>
+          <div className="border-t border-white/[0.06] py-6 flex flex-col md:flex-row items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-white/40">
+            <span>© {new Date().getFullYear()} Agentes Posológicos — {t("landing.footer.rights")}</span>
+            <span>Sérgio Araújo · Posologia Produções</span>
           </div>
         </div>
       </footer>
