@@ -123,10 +123,10 @@ Deno.serve(async (req) => {
       if (allNewArticles.length > 0) {
         const articleList = allNewArticles
           .slice(0, 10) // Max 10 articles per notification
-          .map((a) => `• ${a.title.substring(0, 80)}... (${a.authors}) — Interesse: "${a.interest}"`)
+          .map((a) => `• [${a.title.substring(0, 100)}](https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/) — ${a.authors} _(Interesse: "${a.interest}")_`)
           .join("\n");
 
-        const message = `📚 ${allNewArticles.length} novo(s) artigo(s) encontrado(s) no PubMed esta semana:\n\n${articleList}\n\nAcesse o agente Especialista PubMed para ler mais.`;
+        const message = `📚 ${allNewArticles.length} novo(s) artigo(s) encontrado(s) no PubMed esta semana:\n\n${articleList}\n\n_Clique no título para abrir o artigo no PubMed._`;
 
         await supabase.from("notifications").insert({
           user_id: userId,
