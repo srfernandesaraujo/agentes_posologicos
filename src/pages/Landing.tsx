@@ -9,93 +9,145 @@ import { FloatingAuth } from "@/components/auth/FloatingAuth";
 import { SalesAgentWidget } from "@/components/sales/SalesAgentWidget";
 import { SEO } from "@/components/seo/SEO";
 import landingAvatar from "@/assets/landing-avatar.png";
+import sceneHorizon from "@/assets/scene-horizon.jpg";
+import sceneTunnel from "@/assets/scene-tunnel.jpg";
+import sceneDesert from "@/assets/scene-desert.jpg";
+import sceneAnatomy from "@/assets/scene-anatomy.jpg";
 
-/* ---------- Cinematic avatar layer ----------
- * Fixed full-viewport canvas with:
- *  - scroll-driven scale + vertical drift (avatar approaches as you scroll)
- *  - mouse parallax (drag/lag effect on pointer move)
- *  - cross-fading text overlays per scroll act
+/* ---------- Cinematic scene stack (sidewave-style) ----------
+ * A sticky stage that cross-fades between full-screen scene images while scrolling.
+ * Each scene gets a big word/headline overlay with its own eyebrow + body.
+ * Mouse parallax adds a subtle drag-lag to the active scene + headline.
  */
-const ACTS: { id: string; eyebrow: string; title: React.ReactNode; body?: string; align?: "left" | "right" | "center" }[] = [
+type Scene = {
+  id: string;
+  bg: string;
+  alt: string;
+  eyebrow: string;
+  word: string;
+  body: string;
+  align: "left" | "right" | "center";
+  tone: "dark" | "warm";
+};
+
+const SCENES: Scene[] = [
   {
-    id: "act-1",
-    eyebrow: "[ ORIGEM ]",
-    title: <>SINTA<br />ANTES DE VER</>,
-    body: "Agentes de IA que traduzem dados clínicos densos em decisões claras — para você, para o paciente, para a sala de aula.",
+    id: "sc-1",
+    bg: sceneHorizon,
+    alt: "Horizonte com figura solitária e orbe cintilante",
+    eyebrow: "[ 001 / SINTA ]",
+    word: "SINTA",
+    body: "Antes de ver. Antes de prescrever. Agentes de IA que traduzem dados clínicos densos em decisões claras.",
     align: "right",
+    tone: "dark",
   },
   {
-    id: "act-2",
-    eyebrow: "[ PRESENÇA ]",
-    title: <>FÉ AGNÓSTICA<br />NA EVIDÊNCIA</>,
-    body: "Cada resposta é ancorada em literatura, diretrizes e contexto. Nenhum palpite. Nenhum ruído.",
-    align: "right",
-  },
-  {
-    id: "act-3",
-    eyebrow: "[ ABSORÇÃO ]",
-    title: <>ABSORVENDO<br />A REALIDADE</>,
-    body: "Sua prescrição, seu protocolo, seu plano de aula, seus dados de pesquisa — entram, viram sinal.",
+    id: "sc-2",
+    bg: sceneTunnel,
+    alt: "Vórtice de anéis revelando deserto ao pôr do sol",
+    eyebrow: "[ 002 / FOCO ]",
+    word: "FOCO",
+    body: "Atravesse o ruído. Cada agente é um túnel direto para a resposta — ancorado em literatura, diretrizes e contexto.",
     align: "center",
+    tone: "warm",
   },
   {
-    id: "act-4",
-    eyebrow: "[ SINAL ]",
-    title: <>ISOLANDO SINAIS<br />DO RUÍDO</>,
-    body: "Dois lados da mesma entidade: a especialidade do profissional e a precisão do agente.",
-    align: "center",
+    id: "sc-3",
+    bg: landingAvatar,
+    alt: "Avatar simbólico do agente de IA",
+    eyebrow: "[ 003 / PRESENÇA ]",
+    word: "PRESENÇA",
+    body: "Um copiloto que não pisca. Antibioticoterapia, interações, planos de aula, editais — sempre presente, sempre afiado.",
+    align: "left",
+    tone: "dark",
   },
   {
-    id: "act-5",
-    eyebrow: "[ ENGENHARIA ]",
-    title: <>ENGENHARIA<br />DO INVISÍVEL</>,
-    body: "Pixels brutos viram nuances. Fragmentos viram contexto. Contexto vira ação de alto valor clínico, didático e científico.",
+    id: "sc-4",
+    bg: sceneAnatomy,
+    alt: "Figura anatômica com constelações de pontos",
+    eyebrow: "[ 004 / SINAL ]",
+    word: "SINAL",
+    body: "Pixels brutos viram nuances. Fragmentos viram contexto. Contexto vira ação clínica, didática e científica.",
     align: "right",
+    tone: "warm",
+  },
+  {
+    id: "sc-5",
+    bg: sceneDesert,
+    alt: "Figura mascarada em deserto com ruínas e planeta",
+    eyebrow: "[ 005 / VOCÊ ]",
+    word: "VOCÊ",
+    body: "Médicos, farmacêuticos, professores, pesquisadores e criadores. Esta plataforma é um espelho da sua expertise.",
+    align: "left",
+    tone: "warm",
   },
 ];
 
 function CinematicAvatar() {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLDivElement>(null);
-  const overlaysRef = useRef<HTMLDivElement>(null);
+  const scenesRef = useRef<HTMLDivElement>(null);
+  const counterRef = useRef<HTMLSpanElement>(null);
   const mouse = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
   const raf = useRef<number | null>(null);
 
   useEffect(() => {
     const wrap = wrapRef.current;
-    const img = imgRef.current;
-    const overlays = overlaysRef.current;
-    if (!wrap || !img || !overlays) return;
+    const scenes = scenesRef.current;
+    if (!wrap || !scenes) return;
 
     const compute = () => {
       const rect = wrap.getBoundingClientRect();
       const vh = window.innerHeight;
-      // progress 0..1 across the cinematic section
       const total = rect.height - vh;
       const p = Math.min(1, Math.max(0, -rect.top / total));
-      // Avatar approaches: scale 0.55 -> 1.55, drifts slightly down
-      const scale = 0.55 + p * 1.0;
-      const ty = -40 + p * 60;
-      // Lerp mouse for drag feel
+
+      // Lerp mouse
       mouse.current.tx += (mouse.current.x - mouse.current.tx) * 0.08;
       mouse.current.ty += (mouse.current.y - mouse.current.ty) * 0.08;
-      const mx = mouse.current.tx * 40 * (1 - p * 0.4);
-      const my = mouse.current.ty * 30 * (1 - p * 0.4);
-      img.style.transform = `translate3d(${mx}px, ${ty + my}px, 0) scale(${scale})`;
+      const mx = mouse.current.tx;
+      const my = mouse.current.ty;
 
-      // Cross-fade overlays based on per-act windows
-      const acts = overlays.querySelectorAll<HTMLElement>("[data-act]");
-      const n = acts.length;
-      acts.forEach((el, i) => {
+      const nodes = scenes.querySelectorAll<HTMLElement>("[data-scene]");
+      const n = nodes.length;
+      let activeIndex = 0;
+      let bestOpacity = 0;
+      nodes.forEach((el, i) => {
         const center = (i + 0.5) / n;
         const dist = Math.abs(p - center);
-        const window_ = 0.5 / n;
-        const opacity = Math.max(0, 1 - dist / window_);
-        const lift = (1 - opacity) * 30;
-        el.style.opacity = String(opacity);
-        el.style.transform = `translateY(${lift}px)`;
-        el.style.pointerEvents = opacity > 0.6 ? "auto" : "none";
+        // Each scene is fully visible at its center, fades into neighbors.
+        const half = 0.6 / n;
+        const o = Math.max(0, 1 - dist / half);
+        const local = o; // 0..1 active strength
+        if (local > bestOpacity) { bestOpacity = local; activeIndex = i; }
+
+        const bg = el.querySelector<HTMLElement>("[data-bg]");
+        const text = el.querySelector<HTMLElement>("[data-text]");
+        const big = el.querySelector<HTMLElement>("[data-big]");
+
+        // Scene zoom: grows from 1.04 to 1.18 as we cross it
+        const localProgress = Math.min(1, Math.max(0, (p - (i / n)) / (1 / n)));
+        const zoom = 1.04 + localProgress * 0.14;
+        if (bg) {
+          bg.style.opacity = String(Math.min(1, local * 1.2));
+          bg.style.transform = `scale(${zoom}) translate3d(${mx * 18}px, ${my * 14}px, 0)`;
+        }
+        if (text) {
+          const lift = (1 - local) * 40;
+          text.style.opacity = String(Math.max(0, local * 1.1 - 0.05));
+          text.style.transform = `translate3d(${mx * -22}px, ${lift + my * -12}px, 0)`;
+          text.style.pointerEvents = local > 0.6 ? "auto" : "none";
+        }
+        if (big) {
+          // Big watermark word slides horizontally based on local progress
+          const slide = (localProgress - 0.5) * 220;
+          big.style.transform = `translate3d(${slide + mx * 40}px, ${my * 20}px, 0)`;
+          big.style.opacity = String(Math.max(0, local * 0.9));
+        }
       });
+
+      if (counterRef.current) {
+        counterRef.current.textContent = String(activeIndex + 1).padStart(3, "0");
+      }
 
       raf.current = null;
     };
@@ -103,25 +155,19 @@ function CinematicAvatar() {
     const schedule = () => {
       if (raf.current == null) raf.current = requestAnimationFrame(compute);
     };
-
     const onMouse = (e: MouseEvent) => {
       mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.current.y = (e.clientY / window.innerHeight) * 2 - 1;
       schedule();
     };
-
     compute();
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     window.addEventListener("mousemove", onMouse, { passive: true });
-    // continuous loop for smooth mouse lerp
-    let loop = 0;
-    const tick = () => {
+    let loop = requestAnimationFrame(function tick() {
       schedule();
       loop = requestAnimationFrame(tick);
-    };
-    loop = requestAnimationFrame(tick);
-
+    });
     return () => {
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
@@ -132,87 +178,87 @@ function CinematicAvatar() {
   }, []);
 
   return (
-    <section ref={wrapRef} className="relative" style={{ height: "500vh" }}>
-      {/* Sticky stage */}
+    <section ref={wrapRef} className="relative bg-black" style={{ height: `${SCENES.length * 120}vh` }}>
       <div className="sticky top-0 h-screen w-full overflow-hidden">
-        {/* Aurora light streaks */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(120% 70% at 50% 110%, rgba(20,184,166,0.18) 0%, transparent 55%), radial-gradient(80% 50% at 80% 20%, rgba(56,189,248,0.18) 0%, transparent 60%), radial-gradient(60% 40% at 10% 30%, rgba(168,85,247,0.14) 0%, transparent 60%)",
-          }}
-        />
-        {/* Light streaks */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-60 mix-blend-screen"
-          style={{
-            background:
-              "linear-gradient(110deg, transparent 30%, rgba(125,211,252,0.25) 45%, rgba(125,211,252,0.05) 48%, transparent 60%), linear-gradient(100deg, transparent 40%, rgba(192,132,252,0.18) 52%, transparent 65%)",
-            filter: "blur(6px)",
-          }}
-        />
-
-        {/* Avatar (LCP-style) */}
-        <div
-          ref={imgRef}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
-          style={{ width: "min(82vh, 90vw)", height: "min(82vh, 90vw)", transition: "transform 0.08s linear" }}
-        >
-          <img
-            src={landingAvatar}
-            alt="Agente de IA — avatar simbólico"
-            width={1024}
-            height={1024}
-            className="h-full w-full object-contain drop-shadow-[0_30px_80px_rgba(56,189,248,0.25)]"
-            draggable={false}
-          />
-        </div>
-
-        {/* Side rail */}
-        <div className="pointer-events-none absolute left-4 md:left-8 top-1/2 -translate-y-1/2 flex flex-col gap-12 font-mono text-[10px] uppercase tracking-[0.24em] text-white/40">
-          <div>
-            <p className="text-white/70">[ ORIGEM ]</p>
-            <p className="mt-2 max-w-[140px] leading-relaxed">A fundação da nossa realidade, propósito e capacidades.</p>
-          </div>
-          <div className="flex flex-col gap-3 border-l border-white/10 pl-4">
-            <span className="text-white">INTRO</span>
-            <span>PRESENÇA</span>
-            <span>SINAL</span>
-          </div>
-        </div>
-        <div className="pointer-events-none absolute right-4 md:right-8 top-1/2 -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/40 [writing-mode:vertical-rl] rotate-180">
-          PORTFÓLIO · AGENTES POSOLÓGICOS
-        </div>
-
-        {/* Text overlays */}
-        <div ref={overlaysRef} className="absolute inset-0">
-          {ACTS.map((a) => (
-            <div
-              key={a.id}
-              data-act
-              className="absolute inset-0 flex items-center px-6 md:px-20"
-              style={{ opacity: 0, transition: "opacity 0.3s ease, transform 0.5s ease" }}
-            >
+        {/* Scene layers */}
+        <div ref={scenesRef} className="absolute inset-0">
+          {SCENES.map((s, i) => (
+            <div key={s.id} data-scene className="absolute inset-0">
+              {/* Background image */}
               <div
-                className={`max-w-2xl ${
-                  a.align === "right" ? "ml-auto text-left" : a.align === "center" ? "mx-auto text-center" : "text-left"
-                }`}
+                data-bg
+                className="absolute inset-0 will-change-transform"
+                style={{ opacity: i === 0 ? 1 : 0, transition: "opacity 0.5s ease" }}
               >
-                <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/60 mb-6">{a.eyebrow}</p>
-                <h2 className="font-display font-black uppercase leading-[0.92] tracking-[-0.02em] text-[clamp(2.5rem,7vw,6rem)] text-white drop-shadow-[0_4px_30px_rgba(0,0,0,0.6)]">
-                  {a.title}
-                </h2>
-                {a.body && (
-                  <p className="mt-6 font-mono text-[11px] md:text-[12px] uppercase tracking-[0.16em] leading-[1.8] text-white/70 max-w-md">
-                    {a.body}
+                <img
+                  src={s.bg}
+                  alt={s.alt}
+                  loading={i === 0 ? "eager" : "lazy"}
+                  width={1920}
+                  height={1080}
+                  className="h-full w-full object-cover"
+                  draggable={false}
+                />
+                {/* Tone vignette over each scene */}
+                <div
+                  aria-hidden
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      s.tone === "warm"
+                        ? "radial-gradient(120% 80% at 50% 60%, transparent 30%, rgba(0,0,0,0.55) 100%)"
+                        : "radial-gradient(120% 80% at 50% 60%, transparent 25%, rgba(0,0,0,0.7) 100%)",
+                  }}
+                />
+              </div>
+
+              {/* Giant watermark word that slides across */}
+              <div
+                data-big
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 will-change-transform"
+                style={{ opacity: 0 }}
+              >
+                <div className="font-display font-black uppercase tracking-[-0.04em] text-white/[0.07] text-center leading-none whitespace-nowrap" style={{ fontSize: "clamp(8rem, 22vw, 22rem)" }}>
+                  {s.word}
+                </div>
+              </div>
+
+              {/* Headline + body block */}
+              <div
+                data-text
+                className="absolute inset-0 flex items-center px-6 md:px-20 will-change-transform"
+                style={{ opacity: 0, transition: "opacity 0.3s ease" }}
+              >
+                <div
+                  className={`max-w-2xl ${
+                    s.align === "right" ? "ml-auto text-left" : s.align === "center" ? "mx-auto text-center" : "text-left"
+                  }`}
+                >
+                  <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/70 mb-6">{s.eyebrow}</p>
+                  <h2 className="font-display font-black uppercase leading-[0.9] tracking-[-0.02em] text-white drop-shadow-[0_6px_40px_rgba(0,0,0,0.8)]" style={{ fontSize: "clamp(3rem, 9vw, 8rem)" }}>
+                    {s.word}
+                  </h2>
+                  <p className="mt-6 font-mono text-[11px] md:text-[12px] uppercase tracking-[0.16em] leading-[1.8] text-white/80 max-w-md">
+                    {s.body}
                   </p>
-                )}
+                </div>
               </div>
             </div>
           ))}
+        </div>
+
+        {/* HUD: counter + vertical label */}
+        <div className="pointer-events-none absolute left-4 md:left-8 top-1/2 -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/60 flex flex-col gap-4">
+          <span className="text-white">
+            <span ref={counterRef}>001</span>
+            <span className="text-white/40"> / {String(SCENES.length).padStart(3, "0")}</span>
+          </span>
+          <span className="h-24 w-px bg-white/20" />
+          <span className="text-white/40 [writing-mode:vertical-rl] rotate-180">Cinema · Posológico</span>
+        </div>
+        <div className="pointer-events-none absolute right-4 md:right-8 top-1/2 -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/50 [writing-mode:vertical-rl] rotate-180">
+          PORTFÓLIO · AGENTES POSOLÓGICOS
         </div>
       </div>
     </section>
