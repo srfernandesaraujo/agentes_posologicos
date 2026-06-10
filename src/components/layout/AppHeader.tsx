@@ -52,7 +52,7 @@ export function AppHeader() {
 
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+            onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
             className="hidden md:inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/60 hover:bg-white/10 hover:text-white transition-colors"
             title="Buscar e ações rápidas (Ctrl/Cmd+K)"
           >
