@@ -25,6 +25,7 @@ import { InputTemplates } from "@/components/chat/InputTemplates";
 import { ConversationPicker } from "@/components/chat/ConversationPicker";
 import { AgentConversationsPicker } from "@/components/chat/AgentConversationsPicker";
 import { MessageActions } from "@/components/chat/MessageActions";
+import { OutputActions } from "@/components/chat/OutputActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
@@ -830,6 +831,7 @@ export default function Chat() {
                       {msg.role === "assistant" ? (
                         <>
                           <ChatMessageContent content={msg.content} />
+                          <OutputActions content={msg.content} />
                           <ResponseFeedback
                             messageId={msg.id}
                             agentId={rawAgentId || ""}
