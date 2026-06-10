@@ -52,9 +52,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("chat_sessions")
-        .select("id, title, agent_id, updated_at")
+        .select("id, title, agent_id, created_at")
         .eq("user_id", user!.id)
-        .order("updated_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(15);
       if (error) return [];
       return data || [];
