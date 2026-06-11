@@ -1571,6 +1571,43 @@ export default function FlowEditor() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Store className="h-5 w-5" /> Publicar no Marketplace de Fluxos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Ao publicar, outros usuários poderão instalar este fluxo por <b>5 créditos</b>, e você ganha <b>2 créditos</b> de royalty a cada instalação.
+            </p>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+              <select
+                value={publishCategory}
+                onChange={(e) => setPublishCategory(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="alta-hospitalar">Protocolo de Alta Hospitalar</option>
+                <option value="osce">Avaliação OSCE</option>
+                <option value="revisao">Revisão Sistemática</option>
+                <option value="clinica">Prática Clínica</option>
+                <option value="edtech">EdTech</option>
+                <option value="pesquisa">Pesquisa</option>
+                <option value="conteudo">Conteúdo</option>
+                <option value="outros">Outros</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handlePublishToggle} disabled={publishing} className="flex-1 gap-2">
+                {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : isPublished ? <Trash2 className="h-4 w-4" /> : <Store className="h-4 w-4" />}
+                {isPublished ? "Despublicar" : "Publicar"}
+              </Button>
+              <Button variant="outline" onClick={() => setPublishOpen(false)}>Cancelar</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
