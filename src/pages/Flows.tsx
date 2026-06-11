@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Workflow, Trash2, Sparkles, Loader2, ArrowLeft, ArrowRight, MessageSquare, Network } from "lucide-react";
+import { Plus, Workflow, Trash2, Sparkles, Loader2, ArrowLeft, ArrowRight, MessageSquare, Network, Store } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -145,6 +145,14 @@ export default function Flows() {
           <p className="text-white/60 mt-1">Monte pipelines conectando agentes em sequência ou paralelo</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/marketplace/fluxos")}
+            className="gap-2"
+          >
+            <Store className="h-4 w-4" />
+            Marketplace de Fluxos
+          </Button>
           <Button
             variant="outline"
             onClick={() => setComplexOpen(true)}
