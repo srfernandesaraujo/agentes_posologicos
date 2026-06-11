@@ -94,7 +94,7 @@ export default function LiveClass() {
     if (!room) return;
     const updates: any = { live_mode: next };
     if (!next) updates.current_broadcast_prompt = null;
-    const { error } = await supabase.from("virtual_rooms").update(updates).eq("id", room.id);
+    const { error } = await (supabase as any).from("virtual_rooms").update(updates).eq("id", room.id);
     if (error) return toast.error("Erro ao alterar modo");
     qc.invalidateQueries({ queryKey: ["live-class-room", pin] });
     toast.success(next ? "Modo Aula ao Vivo ativado" : "Modo Aula ao Vivo desativado");
@@ -107,7 +107,7 @@ export default function LiveClass() {
     setSending(true);
     try {
       // 1. Insert professor's broadcast prompt
-      const { error: uErr } = await supabase.from("room_messages").insert({
+      const { error: uErr } = await (supabase as any).from("room_messages").insert({
         room_id: room.id,
         sender_name: "Professor",
         sender_email: user?.email || "",
@@ -136,7 +136,7 @@ export default function LiveClass() {
       if (!resp.ok) throw new Error(data?.error || "Erro do agente");
 
       // 3. Insert assistant broadcast
-      await supabase.from("room_messages").insert({
+      await (supabase as any).from("room_messages").insert({
         room_id: room.id,
         sender_name: "Assistente",
         sender_email: user?.email || "",
