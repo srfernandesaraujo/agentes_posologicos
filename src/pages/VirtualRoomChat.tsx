@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Send, Bot, User, Loader2, Pill, Users, Radio } from "lucide-react";
+import { ArrowLeft, Send, Bot, User, Loader2, Pill, Users, Radio, HelpCircle, Megaphone } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -43,6 +43,9 @@ interface RoomMessage {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  is_broadcast?: boolean;
+  is_question?: boolean;
+  is_anonymous?: boolean;
 }
 
 export default function VirtualRoomChat() {
@@ -77,21 +80,25 @@ export default function VirtualRoomChat() {
 
   const roomExpired = room?.room_expires_at && new Date(room.room_expires_at) < new Date();
   const agentExpired = room?.agent_expires_at && new Date(room.agent_expires_at) < new Date();
+  const liveMode = !!room?.live_mode;
 
   // Load existing messages for this participant only
   useEffect(() => {
     if (!room?.id || !nameConfirmed || !participantEmail) return;
     const loadMessages = async () => {
-      const { data, error } = await roomMessagesRest("GET", {
-        room_id: `eq.${room.id}`,
-        sender_email: `eq.${participantEmail}`,
-      });
+      const params: Record<string, string> = { room_id: `eq.${room.id}` };
+      if (liveMode) {
+        params.is_broadcast = "eq.true";
+      } else {
+        params.sender_email = `eq.${participantEmail}`;
+      }
+      const { data, error } = await roomMessagesRest("GET", params);
       if (!error && data) {
         setMessages(data);
       }
     };
     loadMessages();
-  }, [room?.id, nameConfirmed, participantEmail]);
+  }, [room?.id, nameConfirmed, participantEmail, liveMode]);
 
   // Subscribe to Realtime for new messages (only this participant's)
   useEffect(() => {
@@ -109,8 +116,13 @@ export default function VirtualRoomChat() {
         },
         (payload: any) => {
           const newMsg = payload.new as RoomMessage;
-          // Only show messages belonging to this participant
-          if (newMsg.sender_email !== participantEmail) return;
+          // In live mode, students only see broadcast messages
+          if (liveMode) {
+            if (!newMsg.is_broadcast) return;
+          } else {
+            // Normal mode: only show this participant's messages
+            if (newMsg.sender_email !== participantEmail) return;
+          }
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
@@ -124,7 +136,7 @@ export default function VirtualRoomChat() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [room?.id, nameConfirmed, participantEmail]);
+  }, [room?.id, nameConfirmed, participantEmail, liveMode]);
 
   // Presence tracking for participant count
   useEffect(() => {
@@ -159,13 +171,33 @@ export default function VirtualRoomChat() {
   }, [messages]);
 
   const handleSend = async () => {
-    console.log("[VirtualRoom] handleSend called", { input: input.trim(), agentId: room?.agent_id, loading, agentExpired });
-    if (!input.trim() || !room?.agent_id || loading) return;
+    if (!input.trim() || loading) return;
+    if (!liveMode && !room?.agent_id) return;
     if (agentExpired) return;
 
     const text = input.trim();
     setInput("");
     setLoading(true);
+
+    // LIVE MODE: students submit anonymous questions only (no AI call)
+    if (liveMode) {
+      try {
+        await roomMessagesRest("POST", undefined, {
+          room_id: room!.id,
+          sender_name: "Anônimo",
+          sender_email: participantEmail || "",
+          role: "user",
+          content: text,
+          is_question: true,
+          is_anonymous: true,
+        });
+      } catch (e) {
+        console.error("[VirtualRoom] anon question error", e);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       // Insert user message to DB (will be broadcast via Realtime)
