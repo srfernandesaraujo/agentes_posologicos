@@ -437,6 +437,38 @@ export default function FlowEditor() {
     }
   }, [stepResults, currentStepIndex, flowCompleted]);
 
+  // Load publish state from current flow row
+  useEffect(() => {
+    if (!flow?.id) return;
+    (async () => {
+      const { data } = await supabase.from("agent_flows").select("published, category").eq("id", flow.id).maybeSingle();
+      if (data) {
+        setIsPublished(!!(data as any).published);
+        if ((data as any).category) setPublishCategory((data as any).category);
+      }
+    })();
+  }, [flow?.id]);
+
+  const handlePublishToggle = async () => {
+    if (!flow) return;
+    setPublishing(true);
+    try {
+      const next = !isPublished;
+      const { error } = await supabase.from("agent_flows").update({
+        published: next,
+        category: next ? publishCategory : null,
+      }).eq("id", flow.id);
+      if (error) throw error;
+      setIsPublished(next);
+      toast.success(next ? "Fluxo publicado no marketplace!" : "Fluxo despublicado.");
+      setPublishOpen(false);
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao publicar fluxo");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const allAgents = [
     ...nativeAgents.map((a) => ({ ...a, agent_type: "native" as const })),
     ...customAgents.map((a) => ({
