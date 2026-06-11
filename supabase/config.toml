@@ -71,3 +71,12 @@ verify_jwt = false
 
 [functions.export-project]
 verify_jwt = false
+
+[functions.install-flow]
+verify_jwt = false
+
+[functions.aggregate-questions]
+verify_jwt = false
+
+[functions.agent-transform]
+verify_jwt = false
