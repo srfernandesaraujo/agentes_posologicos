@@ -1108,6 +1108,18 @@ export default function FlowEditor() {
             <Play className="h-4 w-4" />
             Executar
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPublishOpen(true)}
+            disabled={nodes.length < 2 || edges.length === 0}
+            className={isPublished
+              ? "gap-1 border-emerald-400/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+              : "gap-1 border-white/30 bg-white/10 text-white hover:bg-white/20"}
+          >
+            {isPublished ? <Check className="h-4 w-4" /> : <Store className="h-4 w-4" />}
+            {isPublished ? "Publicado" : "Publicar"}
+          </Button>
           </div>
         </div>
       </div>
