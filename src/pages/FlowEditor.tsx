@@ -441,7 +441,7 @@ export default function FlowEditor() {
   useEffect(() => {
     if (!flow?.id) return;
     (async () => {
-      const { data } = await supabase.from("agent_flows").select("published, category").eq("id", flow.id).maybeSingle();
+      const { data } = await (supabase as any).from("agent_flows").select("published, category").eq("id", flow.id).maybeSingle();
       if (data) {
         setIsPublished(!!(data as any).published);
         if ((data as any).category) setPublishCategory((data as any).category);
@@ -454,7 +454,7 @@ export default function FlowEditor() {
     setPublishing(true);
     try {
       const next = !isPublished;
-      const { error } = await supabase.from("agent_flows").update({
+      const { error } = await (supabase as any).from("agent_flows").update({
         published: next,
         category: next ? publishCategory : null,
       }).eq("id", flow.id);
