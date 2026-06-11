@@ -168,6 +168,7 @@ function AgentPicker({ value, onChange }: { value: string; onChange: (v: string)
 export default function VirtualRooms() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { data: customAgents = [] } = useCustomAgents();
   const { data: nativeAgents = [] } = useAgents();
   const { data: purchasedSet = new Set<string>() } = usePurchasedAgents();
