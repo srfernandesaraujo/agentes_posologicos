@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, Download, GitBranch, Sparkles } from "lucide-react";
+import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, Download, GitBranch, Sparkles, Store, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
@@ -405,6 +405,10 @@ export default function FlowEditor() {
 
   // Execution - phased mode
   const [execOpen, setExecOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishCategory, setPublishCategory] = useState<string>("outros");
+  const [publishing, setPublishing] = useState(false);
+  const [isPublished, setIsPublished] = useState<boolean>(false);
   const [execInput, setExecInput] = useState("");
   const [executing, setExecuting] = useState(false);
   const [executionId, setExecutionId] = useState<string | null>(null);
@@ -432,6 +436,38 @@ export default function FlowEditor() {
       scrollEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [stepResults, currentStepIndex, flowCompleted]);
+
+  // Load publish state from current flow row
+  useEffect(() => {
+    if (!flow?.id) return;
+    (async () => {
+      const { data } = await (supabase as any).from("agent_flows").select("published, category").eq("id", flow.id).maybeSingle();
+      if (data) {
+        setIsPublished(!!(data as any).published);
+        if ((data as any).category) setPublishCategory((data as any).category);
+      }
+    })();
+  }, [flow?.id]);
+
+  const handlePublishToggle = async () => {
+    if (!flow) return;
+    setPublishing(true);
+    try {
+      const next = !isPublished;
+      const { error } = await (supabase as any).from("agent_flows").update({
+        published: next,
+        category: next ? publishCategory : null,
+      }).eq("id", flow.id);
+      if (error) throw error;
+      setIsPublished(next);
+      toast.success(next ? "Fluxo publicado no marketplace!" : "Fluxo despublicado.");
+      setPublishOpen(false);
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao publicar fluxo");
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const allAgents = [
     ...nativeAgents.map((a) => ({ ...a, agent_type: "native" as const })),
@@ -1072,6 +1108,18 @@ export default function FlowEditor() {
             <Play className="h-4 w-4" />
             Executar
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPublishOpen(true)}
+            disabled={nodes.length < 2 || edges.length === 0}
+            className={isPublished
+              ? "gap-1 border-emerald-400/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+              : "gap-1 border-white/30 bg-white/10 text-white hover:bg-white/20"}
+          >
+            {isPublished ? <Check className="h-4 w-4" /> : <Store className="h-4 w-4" />}
+            {isPublished ? "Publicado" : "Publicar"}
+          </Button>
           </div>
         </div>
       </div>
@@ -1519,6 +1567,43 @@ export default function FlowEditor() {
                 </div>
               )}
               <div ref={scrollEndRef} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Store className="h-5 w-5" /> Publicar no Marketplace de Fluxos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Ao publicar, outros usuários poderão instalar este fluxo por <b>5 créditos</b>, e você ganha <b>2 créditos</b> de royalty a cada instalação.
+            </p>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+              <select
+                value={publishCategory}
+                onChange={(e) => setPublishCategory(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="alta-hospitalar">Protocolo de Alta Hospitalar</option>
+                <option value="osce">Avaliação OSCE</option>
+                <option value="revisao">Revisão Sistemática</option>
+                <option value="clinica">Prática Clínica</option>
+                <option value="edtech">EdTech</option>
+                <option value="pesquisa">Pesquisa</option>
+                <option value="conteudo">Conteúdo</option>
+                <option value="outros">Outros</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handlePublishToggle} disabled={publishing} className="flex-1 gap-2">
+                {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : isPublished ? <Trash2 className="h-4 w-4" /> : <Store className="h-4 w-4" />}
+                {isPublished ? "Despublicar" : "Publicar"}
+              </Button>
+              <Button variant="outline" onClick={() => setPublishOpen(false)}>Cancelar</Button>
             </div>
           </div>
         </DialogContent>

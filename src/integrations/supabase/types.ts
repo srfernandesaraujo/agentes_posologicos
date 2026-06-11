@@ -249,39 +249,62 @@ export type Database = {
       }
       agent_flows: {
         Row: {
+          category: string | null
           created_at: string
+          creator_earnings: number
           description: string
           execution_mode: string
+          forked_from: string | null
           id: string
           input_type: string | null
+          installs_count: number
           name: string
+          published: boolean
           status: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
+          creator_earnings?: number
           description?: string
           execution_mode?: string
+          forked_from?: string | null
           id?: string
           input_type?: string | null
+          installs_count?: number
           name: string
+          published?: boolean
           status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string
+          creator_earnings?: number
           description?: string
           execution_mode?: string
+          forked_from?: string | null
           id?: string
           input_type?: string | null
+          installs_count?: number
           name?: string
+          published?: boolean
           status?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "agent_flows_forked_from_fkey"
+            columns: ["forked_from"]
+            isOneToOne: false
+            referencedRelation: "agent_flows"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       agent_knowledge_bases: {
         Row: {
@@ -844,6 +867,89 @@ export type Database = {
           },
         ]
       }
+      flow_installs: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          credits_spent: number
+          id: string
+          installed_flow_id: string
+          seller_id: string
+          source_flow_id: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          credits_spent?: number
+          id?: string
+          installed_flow_id: string
+          seller_id: string
+          source_flow_id: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          credits_spent?: number
+          id?: string
+          installed_flow_id?: string
+          seller_id?: string
+          source_flow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_installs_installed_flow_id_fkey"
+            columns: ["installed_flow_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_installs_source_flow_id_fkey"
+            columns: ["source_flow_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          flow_id: string
+          id: string
+          rating: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          flow_id: string
+          id?: string
+          rating: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          flow_id?: string
+          id?: string
+          rating?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_reviews_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_bases: {
         Row: {
           created_at: string
@@ -1300,6 +1406,9 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          is_anonymous: boolean
+          is_broadcast: boolean
+          is_question: boolean
           role: string
           room_id: string
           sender_email: string
@@ -1309,6 +1418,9 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          is_anonymous?: boolean
+          is_broadcast?: boolean
+          is_question?: boolean
           role?: string
           room_id: string
           sender_email?: string
@@ -1318,6 +1430,9 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          is_anonymous?: boolean
+          is_broadcast?: boolean
+          is_question?: boolean
           role?: string
           room_id?: string
           sender_email?: string
@@ -1608,9 +1723,11 @@ export type Database = {
           agent_expires_at: string | null
           agent_id: string | null
           created_at: string
+          current_broadcast_prompt: string | null
           description: string
           id: string
           is_active: boolean
+          live_mode: boolean
           name: string
           pin: string
           room_expires_at: string | null
@@ -1621,9 +1738,11 @@ export type Database = {
           agent_expires_at?: string | null
           agent_id?: string | null
           created_at?: string
+          current_broadcast_prompt?: string | null
           description?: string
           id?: string
           is_active?: boolean
+          live_mode?: boolean
           name: string
           pin: string
           room_expires_at?: string | null
@@ -1634,9 +1753,11 @@ export type Database = {
           agent_expires_at?: string | null
           agent_id?: string | null
           created_at?: string
+          current_broadcast_prompt?: string | null
           description?: string
           id?: string
           is_active?: boolean
+          live_mode?: boolean
           name?: string
           pin?: string
           room_expires_at?: string | null
@@ -1767,6 +1888,19 @@ export type Database = {
           restrict_content: boolean
           temperature: number
           updated_at: string
+          user_id: string
+        }[]
+      }
+      get_marketplace_flows: {
+        Args: never
+        Returns: {
+          category: string
+          created_at: string
+          description: string
+          execution_mode: string
+          id: string
+          installs_count: number
+          name: string
           user_id: string
         }[]
       }

@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Trash2, Edit2, Copy, DoorOpen, Coins, Clock, Search, Bot, ChevronDown, Check, MessageSquare, CalendarClock } from "lucide-react";
+import { Plus, Trash2, Edit2, Copy, DoorOpen, Coins, Clock, Search, Bot, ChevronDown, Check, MessageSquare, CalendarClock, Megaphone } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { RoomConversations } from "@/components/rooms/RoomConversations";
@@ -167,6 +168,7 @@ function AgentPicker({ value, onChange }: { value: string; onChange: (v: string)
 export default function VirtualRooms() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { data: customAgents = [] } = useCustomAgents();
   const { data: nativeAgents = [] } = useAgents();
   const { data: purchasedSet = new Set<string>() } = usePurchasedAgents();
@@ -428,6 +430,9 @@ export default function VirtualRooms() {
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" title="Painel Aula ao Vivo" onClick={() => navigate(`/salas-virtuais/aula/${room.pin}`)} className="text-red-400/70 hover:text-red-400 hover:bg-red-500/10">
+                    <Megaphone className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => setViewingRoom(room)} className="text-white/40 hover:text-white hover:bg-white/10">
                     <MessageSquare className="h-4 w-4" />
                   </Button>
