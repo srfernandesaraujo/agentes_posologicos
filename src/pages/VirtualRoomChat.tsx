@@ -377,10 +377,17 @@ export default function VirtualRoomChat() {
             <p className="text-xs text-white/40">Sala Colaborativa • {participantName}</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
-              <Radio className="h-3 w-3 text-green-400 animate-pulse" />
-              <span className="text-xs text-white/60">Ao vivo</span>
-            </div>
+            {liveMode ? (
+              <div className="flex items-center gap-1.5 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1">
+                <Megaphone className="h-3 w-3 text-red-400 animate-pulse" />
+                <span className="text-xs font-medium text-red-200">Aula ao Vivo</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
+                <Radio className="h-3 w-3 text-green-400 animate-pulse" />
+                <span className="text-xs text-white/60">Ao vivo</span>
+              </div>
+            )}
             <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1">
               <Users className="h-3 w-3 text-[hsl(174,62%,47%)]" />
               <span className="text-xs text-white/60">{participantCount}</span>
@@ -458,6 +465,12 @@ export default function VirtualRoomChat() {
       {/* Input */}
       {!agentExpired && (
         <div className="border-t border-white/10 p-4">
+          {liveMode && (
+            <p className="mb-2 flex items-center gap-1.5 text-xs text-white/50">
+              <HelpCircle className="h-3 w-3" />
+              Modo Aula ao Vivo — sua dúvida será enviada de forma anônima ao professor.
+            </p>
+          )}
           <div className="flex gap-2">
             <Textarea
               value={input}
@@ -468,7 +481,7 @@ export default function VirtualRoomChat() {
                   handleSend();
                 }
               }}
-              placeholder="Digite sua mensagem..."
+              placeholder={liveMode ? "Escreva sua dúvida anônima..." : "Digite sua mensagem..."}
               rows={1}
               className="border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 resize-none min-h-[44px]"
             />
@@ -477,7 +490,7 @@ export default function VirtualRoomChat() {
               disabled={loading || !input.trim()}
               className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white shrink-0"
             >
-              <Send className="h-4 w-4" />
+              {liveMode ? <HelpCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
         </div>
