@@ -24,7 +24,9 @@ import Knowledge from "./pages/Knowledge";
 import KnowledgeDetail from "./pages/KnowledgeDetail";
 import VirtualRooms from "./pages/VirtualRooms";
 import VirtualRoomChat from "./pages/VirtualRoomChat";
+import LiveClass from "./pages/LiveClass";
 import Marketplace from "./pages/Marketplace";
+import MarketplaceFlows from "./pages/MarketplaceFlows";
 import NotFound from "./pages/NotFound";
 import Flows from "./pages/Flows";
 import Meetings from "./pages/Meetings";
@@ -88,7 +90,9 @@ const App = () => (
               <Route path="/conteudos" element={<Knowledge />} />
               <Route path="/conteudos/:kbId" element={<KnowledgeDetail />} />
               <Route path="/salas-virtuais" element={<VirtualRooms />} />
+              <Route path="/salas-virtuais/aula/:pin" element={<LiveClass />} />
               <Route path="/marketplace" element={<Marketplace />} />
+              <Route path="/marketplace/fluxos" element={<MarketplaceFlows />} />
               <Route path="/contato" element={<Contact />} />
               <Route path="/documentacao" element={<Documentation />} />
               <Route path="/fluxos" element={<Flows />} />
