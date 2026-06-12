@@ -1409,9 +1409,10 @@ export type Database = {
           is_anonymous: boolean
           is_broadcast: boolean
           is_question: boolean
+          participant_token: string | null
           role: string
           room_id: string
-          sender_email: string
+          sender_email: string | null
           sender_name: string
         }
         Insert: {
@@ -1421,9 +1422,10 @@ export type Database = {
           is_anonymous?: boolean
           is_broadcast?: boolean
           is_question?: boolean
+          participant_token?: string | null
           role?: string
           room_id: string
-          sender_email?: string
+          sender_email?: string | null
           sender_name?: string
         }
         Update: {
@@ -1433,9 +1435,10 @@ export type Database = {
           is_anonymous?: boolean
           is_broadcast?: boolean
           is_question?: boolean
+          participant_token?: string | null
           role?: string
           room_id?: string
-          sender_email?: string
+          sender_email?: string | null
           sender_name?: string
         }
         Relationships: [
@@ -1902,6 +1905,21 @@ export type Database = {
           installs_count: number
           name: string
           user_id: string
+        }[]
+      }
+      get_my_room_messages: {
+        Args: { _room_id: string; _token: string }
+        Returns: {
+          content: string
+          created_at: string
+          id: string
+          is_anonymous: boolean
+          is_broadcast: boolean
+          is_question: boolean
+          participant_token: string
+          role: string
+          room_id: string
+          sender_name: string
         }[]
       }
       get_room_by_pin: {

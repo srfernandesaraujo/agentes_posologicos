@@ -40,7 +40,8 @@ interface RoomMessage {
   id: string;
   room_id: string;
   sender_name: string;
-  sender_email: string;
+  sender_email?: string | null;
+  participant_token?: string | null;
   role: "user" | "assistant";
   content: string;
   created_at: string;
@@ -63,6 +64,19 @@ export default function VirtualRoomChat() {
   const channelRef = useRef<any>(null);
   const presenceChannelRef = useRef<any>(null);
 
+  // Per-session anonymous identity. Kept locally so the server never sees the email
+  // of anonymous participants. Persisted per-pin so a reload keeps the same history.
+  const participantToken = (() => {
+    if (!pin) return "";
+    const key = `vroom-token-${pin}`;
+    let t = typeof window !== "undefined" ? localStorage.getItem(key) : null;
+    if (!t) {
+      t = (typeof crypto !== "undefined" && "randomUUID" in crypto) ? crypto.randomUUID() : `t-${Date.now()}-${Math.random()}`;
+      if (typeof window !== "undefined") localStorage.setItem(key, t);
+    }
+    return t;
+  })();
+
   // Load room by PIN
   const { data: room, isLoading: roomLoading, error: roomError } = useQuery({
     queryKey: ["virtual-room-pin", pin],
@@ -83,30 +97,32 @@ export default function VirtualRoomChat() {
   const agentExpired = room?.agent_expires_at && new Date(room.agent_expires_at) < new Date();
   const liveMode = !!room?.live_mode;
 
-  // Load existing messages for this participant only
+  // Load existing messages for this participant only via SECURITY DEFINER RPC.
+  // The RPC returns only this participant's messages plus broadcast messages —
+  // it never exposes other participants' emails.
   useEffect(() => {
-    if (!room?.id || !nameConfirmed || !participantEmail) return;
+    if (!room?.id || !nameConfirmed || !participantToken) return;
     const loadMessages = async () => {
-      const params: Record<string, string> = { room_id: `eq.${room.id}` };
-      if (liveMode) {
-        params.is_broadcast = "eq.true";
-      } else {
-        params.sender_email = `eq.${participantEmail}`;
+      const { data, error } = await supabase.rpc("get_my_room_messages", {
+        _room_id: room.id,
+        _token: participantToken,
+      });
+      if (error) {
+        console.error("[VirtualRoom] load messages error", error);
+        return;
       }
-      const { data, error } = await roomMessagesRest("GET", params);
-      if (!error && data) {
-        setMessages(data);
-      }
+      const rows = (data || []) as RoomMessage[];
+      setMessages(liveMode ? rows.filter((m) => m.is_broadcast) : rows);
     };
     loadMessages();
-  }, [room?.id, nameConfirmed, participantEmail, liveMode]);
+  }, [room?.id, nameConfirmed, participantToken, liveMode]);
 
   // Subscribe to Realtime for new messages (only this participant's)
   useEffect(() => {
     if (!room?.id || !nameConfirmed || !participantEmail) return;
 
     const channel = supabase
-      .channel(`room-messages-${room.id}-${participantEmail}`)
+      .channel(`room-messages-${room.id}-${participantToken}`)
       .on(
         "postgres_changes" as any,
         {
@@ -121,8 +137,8 @@ export default function VirtualRoomChat() {
           if (liveMode) {
             if (!newMsg.is_broadcast) return;
           } else {
-            // Normal mode: only show this participant's messages
-            if (newMsg.sender_email !== participantEmail) return;
+            // Normal mode: only show this participant's messages (matched by token)
+            if (newMsg.participant_token !== participantToken) return;
           }
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev;
@@ -137,7 +153,7 @@ export default function VirtualRoomChat() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [room?.id, nameConfirmed, participantEmail, liveMode]);
+  }, [room?.id, nameConfirmed, participantToken, liveMode]);
 
   // Presence tracking for participant count
   useEffect(() => {
@@ -186,11 +202,11 @@ export default function VirtualRoomChat() {
         const { error: qErr } = await roomMessagesRest("POST", undefined, {
           room_id: room!.id,
           sender_name: "Anônimo",
-          sender_email: participantEmail || "",
           role: "user",
           content: text,
           is_question: true,
           is_anonymous: true,
+          participant_token: participantToken,
         });
         if (qErr) {
           toast.error("Não foi possível enviar sua dúvida. Tente novamente.");
@@ -213,9 +229,9 @@ export default function VirtualRoomChat() {
       const { error: insertError } = await roomMessagesRest("POST", undefined, {
         room_id: room.id,
         sender_name: participantName || "Anônimo",
-        sender_email: participantEmail || "",
         role: "user",
         content: text,
+        participant_token: participantToken,
       });
       console.log("[VirtualRoom] User message insert result:", { insertError });
 
@@ -244,6 +260,7 @@ export default function VirtualRoomChat() {
           isCustomAgent: true,
           isVirtualRoom: true,
           roomId: room.id,
+          participantToken,
           conversationHistory: recentMessages,
         }),
       });
@@ -254,13 +271,13 @@ export default function VirtualRoomChat() {
 
       if (!response.ok) throw new Error(data?.error || "Agent error");
 
-      // Insert assistant response to DB (tagged with same email)
+      // Insert assistant response to DB (tagged with same participant token)
       const { error: assistantInsertError } = await roomMessagesRest("POST", undefined, {
         room_id: room.id,
         sender_name: "Assistente",
-        sender_email: participantEmail,
         role: "assistant",
         content: data?.output || "Sem resposta.",
+        participant_token: participantToken,
       });
       console.log("[VirtualRoom] Assistant message insert result:", { assistantInsertError });
     } catch (err: any) {
@@ -269,7 +286,6 @@ export default function VirtualRoomChat() {
         id: crypto.randomUUID(),
         room_id: room.id,
         sender_name: "Sistema",
-        sender_email: participantEmail,
         role: "assistant",
         content: "Erro ao processar a mensagem. Tente novamente.",
         created_at: new Date().toISOString(),
@@ -279,9 +295,9 @@ export default function VirtualRoomChat() {
       await roomMessagesRest("POST", undefined, {
         room_id: room.id,
         sender_name: "Sistema",
-        sender_email: participantEmail,
         role: "assistant",
         content: "Erro ao processar a mensagem. Tente novamente.",
+        participant_token: participantToken,
       });
     } finally {
       setLoading(false);
