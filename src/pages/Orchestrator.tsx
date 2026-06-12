@@ -47,6 +47,10 @@ export default function Orchestrator() {
       toast.error("Descreva o objetivo com mais detalhes.");
       return;
     }
+    if (balance < COST) {
+      toast.error(`Você precisa de ${COST} créditos para executar o Orquestrador (saldo: ${balance}).`);
+      return;
+    }
     setLoading(true);
     setResult(null);
     try {

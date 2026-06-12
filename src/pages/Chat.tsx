@@ -995,7 +995,7 @@ function ClinicalValidatorMount({ input, category }: { input: string; category?:
   const { subscribed } = useSubscription();
   const { hasUnlimitedAccess } = useUnlimitedAccess();
   const enabled =
-    (subscribed || hasUnlimitedAccess) &&
-    category === "Prática Clínica e Farmácia";
+    category === "Prática Clínica e Farmácia" &&
+    (subscribed || hasUnlimitedAccess || true); // habilitado para todos enquanto em beta
   return <ClinicalValidator text={input} enabled={enabled} />;
 }

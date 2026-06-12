@@ -249,22 +249,22 @@ export default function MarketplaceFlows() {
   });
 
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-8">
+    <div className="container mx-auto max-w-6xl px-4 py-8 text-white">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold flex items-center gap-2"><Store className="h-6 w-6" /> Marketplace de Fluxos</h1>
-          <p className="text-sm text-muted-foreground">Instale fluxos completos criados pela comunidade. {INSTALL_COST} créditos por instalação.</p>
+          <h1 className="font-display text-2xl font-bold flex items-center gap-2 text-white"><Store className="h-6 w-6" /> Marketplace de Fluxos</h1>
+          <p className="text-sm text-white/60">Instale fluxos completos criados pela comunidade. {INSTALL_COST} créditos por instalação.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="gap-1"><Coins className="h-3 w-3" /> {balance} créditos</Badge>
-          <Button variant="outline" onClick={() => navigate("/marketplace")}>Marketplace de Agentes</Button>
+          <Badge variant="outline" className="gap-1 border-white/20 text-white/80"><Coins className="h-3 w-3" /> {balance} créditos</Badge>
+          <Button onClick={() => navigate("/marketplace")} className="bg-white/[0.06] text-white hover:bg-white/[0.12] border border-white/15">Marketplace de Agentes</Button>
         </div>
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar fluxos..." className="pl-9" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar fluxos..." className="pl-9 border-white/10 bg-white/[0.04] text-white placeholder:text-white/40" />
         </div>
       </div>
       <div className="mb-6 flex flex-wrap gap-2">
@@ -272,7 +272,7 @@ export default function MarketplaceFlows() {
           <button
             key={c.key}
             onClick={() => setCategory(c.key)}
-            className={`rounded-full border px-3 py-1 text-xs transition-colors ${category === c.key ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:bg-muted"}`}
+            className={`rounded-full border px-3 py-1 text-xs transition-colors ${category === c.key ? "border-[hsl(199,89%,48%)] bg-[hsl(199,89%,48%)] text-white" : "border-white/15 text-white/70 hover:bg-white/10 hover:text-white"}`}
           >
             {c.label}
           </button>
@@ -280,9 +280,9 @@ export default function MarketplaceFlows() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-white/40" /></div>
       ) : filtered.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">Nenhum fluxo publicado ainda.</p>
+        <p className="py-16 text-center text-sm text-white/50">Nenhum fluxo publicado ainda.</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((f) => {
@@ -291,17 +291,17 @@ export default function MarketplaceFlows() {
               <button
                 key={f.id}
                 onClick={() => setSelected(f)}
-                className="rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
+                className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left transition-colors hover:border-[hsl(174,62%,47%)]/40 hover:bg-white/[0.08]"
               >
                 <div className="mb-3 flex items-start justify-between">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary">
                     <Workflow className="h-5 w-5 text-white" />
                   </div>
-                  {installedId && <Badge variant="secondary" className="gap-1"><Check className="h-3 w-3" /> Instalado</Badge>}
+                  {installedId && <Badge variant="secondary" className="gap-1 bg-[hsl(174,62%,47%)]/20 text-[hsl(174,62%,75%)] border-0"><Check className="h-3 w-3" /> Instalado</Badge>}
                 </div>
-                <h3 className="font-semibold mb-1 line-clamp-1">{f.name}</h3>
-                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{f.description || "Sem descrição."}</p>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <h3 className="font-semibold mb-1 line-clamp-1 text-white">{f.name}</h3>
+                <p className="text-xs text-white/60 line-clamp-2 mb-2">{f.description || "Sem descrição."}</p>
+                <div className="flex items-center justify-between text-xs text-white/50">
                   <span>{f.creator_name}</span>
                   <span className="flex items-center gap-1"><GitFork className="h-3 w-3" /> {f.installs_count}</span>
                 </div>
