@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Send, Bot, User, Loader2, Pill, Users, Radio, HelpCircle, Megaphone } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { toast } from "sonner";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -182,7 +183,7 @@ export default function VirtualRoomChat() {
     // LIVE MODE: students submit anonymous questions only (no AI call)
     if (liveMode) {
       try {
-        await roomMessagesRest("POST", undefined, {
+        const { error: qErr } = await roomMessagesRest("POST", undefined, {
           room_id: room!.id,
           sender_name: "Anônimo",
           sender_email: participantEmail || "",
@@ -191,8 +192,16 @@ export default function VirtualRoomChat() {
           is_question: true,
           is_anonymous: true,
         });
+        if (qErr) {
+          toast.error("Não foi possível enviar sua dúvida. Tente novamente.");
+          setInput(text);
+        } else {
+          toast.success("Dúvida enviada anonimamente ao professor.");
+        }
       } catch (e) {
         console.error("[VirtualRoom] anon question error", e);
+        toast.error("Erro ao enviar dúvida.");
+        setInput(text);
       } finally {
         setLoading(false);
       }
@@ -211,9 +220,10 @@ export default function VirtualRoomChat() {
       console.log("[VirtualRoom] User message insert result:", { insertError });
 
       // Build conversation history from last 20 messages
-      const recentMessages = messages.slice(-20).map((m) => ({
+      const recentMessages = messages.slice(-10).map((m) => ({
         role: m.role,
-        content: m.role === "user" ? `[${m.sender_name}]: ${m.content}` : m.content,
+        // agent-chat rejects history items >10k chars
+        content: ((m.role === "user" ? `[${m.sender_name}]: ${m.content}` : m.content) || "").slice(0, 8000),
       }));
 
       // Call agent via direct fetch (bypass SDK auth header for anonymous users)
