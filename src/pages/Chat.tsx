@@ -984,6 +984,18 @@ export default function Chat() {
       onSelect={(agents) => setAttachedConversations(prev => [...prev, ...agents])}
       excludeAgentId={actualAgentId}
     />
+
+    {/* Clinical Validator — Pro+ only, only for clinical agents */}
+    <ClinicalValidatorMount input={input} category={agent?.category} />
     </>
   );
+}
+
+function ClinicalValidatorMount({ input, category }: { input: string; category?: string }) {
+  const { subscribed } = useSubscription();
+  const { hasUnlimitedAccess } = useUnlimitedAccess();
+  const enabled =
+    (subscribed || hasUnlimitedAccess) &&
+    category === "Prática Clínica e Farmácia";
+  return <ClinicalValidator text={input} enabled={enabled} />;
 }
