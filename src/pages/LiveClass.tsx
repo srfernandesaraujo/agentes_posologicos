@@ -129,7 +129,11 @@ export default function LiveClass() {
           isCustomAgent: true,
           isVirtualRoom: true,
           roomId: room.id,
-          conversationHistory: broadcasts.slice(-10).map((m) => ({ role: m.role, content: m.content })),
+          conversationHistory: broadcasts.slice(-6).map((m) => ({
+            role: m.role,
+            // Edge function rejects history items >10k chars; truncate aggressively
+            content: (m.content || "").slice(0, 8000),
+          })),
         }),
       });
       const data = await resp.json();
