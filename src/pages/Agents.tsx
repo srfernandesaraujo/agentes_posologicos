@@ -93,6 +93,26 @@ export default function Agents() {
         </p>
       </div>
 
+      {/* Orchestrator highlight */}
+      <button
+        onClick={() => navigate("/orquestrador")}
+        className="mb-6 w-full text-left group relative overflow-hidden rounded-xl border border-[hsl(174,62%,47%)]/30 bg-gradient-to-r from-[hsl(174,62%,47%)]/10 via-[hsl(220,80%,55%)]/10 to-[hsl(14,90%,58%)]/10 p-4 hover:border-[hsl(174,62%,47%)]/60 transition-all"
+      >
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[hsl(174,62%,47%)] to-[hsl(220,80%,55%)]">
+            <Sparkles className="h-6 w-6 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h2 className="font-semibold text-white">Agente Orquestrador</h2>
+              <span className="text-[10px] uppercase tracking-wide rounded-full bg-[hsl(14,90%,58%)]/20 text-[hsl(14,90%,68%)] px-2 py-0.5">Novo</span>
+            </div>
+            <p className="text-xs text-white/60">Diga um objetivo. Vários especialistas trabalham juntos e entregam um dossiê consolidado. 12 créditos.</p>
+          </div>
+          <ArrowRight className="h-5 w-5 text-white/40 group-hover:translate-x-1 group-hover:text-white transition-all" />
+        </div>
+      </button>
+
       <div className="flex gap-6">
         {/* Sidebar */}
         <aside className="hidden md:block w-56 shrink-0 space-y-1">
