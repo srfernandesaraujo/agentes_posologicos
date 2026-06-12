@@ -68,13 +68,10 @@ export default function Orchestrator() {
     const fullMd = `# Dossiê: ${goal}\n\n## Roteamento\n${result.rationale}\n\n${result.results.map((r, i) =>
       `## Etapa ${i + 1}: ${r.title}\n*Agente: ${r.agent_name}*\n\n${r.output || `Erro: ${r.error}`}`
     ).join("\n\n")}\n\n---\n\n## Dossiê Consolidado\n${result.dossier}`;
-    exportConversationPdf({
-      agentName: "Agente Orquestrador",
-      messages: [
-        { role: "user", content: goal, created_at: new Date().toISOString() },
-        { role: "assistant", content: fullMd, created_at: new Date().toISOString() },
-      ],
-    });
+    exportConversationPdf("Agente Orquestrador", [
+      { role: "user", content: goal, created_at: new Date().toISOString() },
+      { role: "assistant", content: fullMd, created_at: new Date().toISOString() },
+    ]);
   };
 
   return (
