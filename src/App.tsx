@@ -27,6 +27,7 @@ import VirtualRoomChat from "./pages/VirtualRoomChat";
 import LiveClass from "./pages/LiveClass";
 import Marketplace from "./pages/Marketplace";
 import MarketplaceFlows from "./pages/MarketplaceFlows";
+import Orchestrator from "./pages/Orchestrator";
 import NotFound from "./pages/NotFound";
 import Flows from "./pages/Flows";
 import Meetings from "./pages/Meetings";
@@ -93,6 +94,7 @@ const App = () => (
               <Route path="/salas-virtuais/aula/:pin" element={<LiveClass />} />
               <Route path="/marketplace" element={<Marketplace />} />
               <Route path="/marketplace/fluxos" element={<MarketplaceFlows />} />
+              <Route path="/orquestrador" element={<Orchestrator />} />
               <Route path="/contato" element={<Contact />} />
               <Route path="/documentacao" element={<Documentation />} />
               <Route path="/fluxos" element={<Flows />} />

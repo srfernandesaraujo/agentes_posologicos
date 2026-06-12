@@ -27,6 +27,8 @@ import { AgentConversationsPicker } from "@/components/chat/AgentConversationsPi
 import { MessageActions } from "@/components/chat/MessageActions";
 import { OutputActions } from "@/components/chat/OutputActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
+import { ClinicalValidator } from "@/components/chat/ClinicalValidator";
+import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -982,6 +984,18 @@ export default function Chat() {
       onSelect={(agents) => setAttachedConversations(prev => [...prev, ...agents])}
       excludeAgentId={actualAgentId}
     />
+
+    {/* Clinical Validator — Pro+ only, only for clinical agents */}
+    <ClinicalValidatorMount input={input} category={agent?.category} />
     </>
   );
+}
+
+function ClinicalValidatorMount({ input, category }: { input: string; category?: string }) {
+  const { subscribed } = useSubscription();
+  const { hasUnlimitedAccess } = useUnlimitedAccess();
+  const enabled =
+    (subscribed || hasUnlimitedAccess) &&
+    category === "Prática Clínica e Farmácia";
+  return <ClinicalValidator text={input} enabled={enabled} />;
 }
