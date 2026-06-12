@@ -27,6 +27,8 @@ import { AgentConversationsPicker } from "@/components/chat/AgentConversationsPi
 import { MessageActions } from "@/components/chat/MessageActions";
 import { OutputActions } from "@/components/chat/OutputActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
+import { ClinicalValidator } from "@/components/chat/ClinicalValidator";
+import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
