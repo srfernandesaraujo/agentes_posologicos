@@ -151,7 +151,7 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
     // Render parts
     parts.forEach((part) => {
       if (part.type === "text") {
-        renderTextBlock(doc, cleanMarkdown(part.content), margin, contentWidth, () => y, (v) => { y = v; }, bottomLimit, newPage);
+        renderTextBlock(doc, part.content, margin, contentWidth, () => y, (v) => { y = v; }, bottomLimit, newPage);
       } else {
         renderTable(doc, part.table, margin, contentWidth, () => y, (v) => { y = v; }, bottomLimit, newPage);
       }
@@ -176,17 +176,70 @@ function renderTextBlock(
   doc: jsPDF, text: string, margin: number, contentWidth: number,
   getY: () => number, setY: (v: number) => void, bottomLimit: number, newPage: () => void
 ) {
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(17, 24, 39);
-  const allLines = doc.splitTextToSize(text, contentWidth);
-  const lineHeight = 5.2;
   let y = getY();
-  for (const line of allLines) {
-    if (y + lineHeight > bottomLimit) { newPage(); y = margin; }
-    doc.text(line, margin, y);
-    y += lineHeight;
+
+  const addWrappedText = (value: string, x: number, width: number, lineHeight: number) => {
+    const allLines = doc.splitTextToSize(value, width);
+    for (const line of allLines) {
+      if (y + lineHeight > bottomLimit) { newPage(); y = margin; }
+      doc.text(line, x, y);
+      y += lineHeight;
+    }
+  };
+
+  const renderParagraph = (value: string) => {
+    const cleaned = cleanMarkdown(value).replace(/\s+/g, " ").trim();
+    if (!cleaned) return;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(17, 24, 39);
+    addWrappedText(cleaned, margin, contentWidth, 5.2);
+    y += 2;
+  };
+
+  let paragraph: string[] = [];
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    renderParagraph(paragraph.join(" "));
+    paragraph = [];
+  };
+
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      y += 1.5;
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      const level = heading[1].length;
+      doc.setFontSize(level === 1 ? 14 : level === 2 ? 12 : 11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      y += 1.5;
+      addWrappedText(cleanMarkdown(heading[2]), margin, contentWidth, level === 1 ? 6.3 : 5.8);
+      y += 2.5;
+      continue;
+    }
+
+    const listItem = line.match(/^([-*]|\d+\.)\s+(.+)$/);
+    if (listItem) {
+      flushParagraph();
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(17, 24, 39);
+      addWrappedText(`- ${cleanMarkdown(listItem[2]).replace(/\s+/g, " ").trim()}`, margin + 3, contentWidth - 3, 5.1);
+      y += 1;
+      continue;
+    }
+
+    paragraph.push(line);
   }
+
+  flushParagraph();
   setY(y + 2);
 }
 
