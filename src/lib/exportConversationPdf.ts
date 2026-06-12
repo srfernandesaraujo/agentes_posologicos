@@ -50,9 +50,24 @@ function parseMarkdownTables(text: string): Array<{ type: "text"; content: strin
 
 function cleanMarkdown(text: string): string {
   return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/[\u00A0\u200B-\u200D\uFEFF]/g, " ")
+    .replace(/[\u2264]/g, "<=")
+    .replace(/[\u2265]/g, ">=")
+    .replace(/[\u00B2]/g, "2")
+    .replace(/[\u00B3]/g, "3")
+    .replace(/[\u2080-\u2089]/g, (m) => String("₀₁₂₃₄₅₆₇₈₉".indexOf(m)))
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\*(.*?)\*/g, "$1")
-    .replace(/#{1,6}\s/g, "")
+    .replace(/^#{1,6}\s/gm, "")
     .replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*\n?/g, "").trim())
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/^\s*[-*]\s/gm, "• ")
@@ -63,18 +78,18 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
+  const margin = 18;
   const contentWidth = pageWidth - margin * 2;
   let y = margin;
   let pageNum = 1;
-  const bottomLimit = pageHeight - 18;
+  const bottomLimit = pageHeight - 20;
 
   const addFooter = () => {
-    doc.setFontSize(7);
-    doc.setTextColor(160, 160, 160);
+    doc.setFontSize(8);
+    doc.setTextColor(90, 99, 110);
     doc.text(`Página ${pageNum}`, pageWidth / 2, pageHeight - 8, { align: "center" });
     doc.text("Gerado por Agentes Posológicos", margin, pageHeight - 8);
-    doc.setDrawColor(220, 220, 220);
+    doc.setDrawColor(205, 213, 224);
     doc.line(margin, pageHeight - 13, pageWidth - margin, pageHeight - 13);
   };
 
@@ -91,12 +106,12 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
 
   // Header
   doc.setFillColor(15, 23, 42);
-  doc.rect(0, 0, pageWidth, 28, "F");
-  doc.setFontSize(14);
+  doc.rect(0, 0, pageWidth, 31, "F");
+  doc.setFontSize(16);
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.text(agentName, margin, 14);
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(200, 200, 200);
   const dateStr = new Date().toLocaleDateString("pt-BR", {
@@ -105,7 +120,7 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
   doc.text(`Exportado em ${dateStr}`, margin, 22);
   doc.text(`${messages.length} mensagens`, pageWidth - margin, 22, { align: "right" });
 
-  y = 34;
+  y = 38;
   doc.setDrawColor(45, 212, 191);
   doc.setLineWidth(0.6);
   doc.line(margin, y, pageWidth - margin, y);
