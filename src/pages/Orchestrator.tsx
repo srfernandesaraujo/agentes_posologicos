@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCredits } from "@/hooks/useCredits";
+import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -38,6 +40,9 @@ const EXAMPLES = [
 
 export default function Orchestrator() {
   const { balance, refetch } = useCredits();
+  const { hasUnlimitedAccess } = useUnlimitedAccess();
+  const { isAdmin } = useIsAdmin();
+  const unlimited = hasUnlimitedAccess || isAdmin;
   const [goal, setGoal] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<OrchestratorResult | null>(null);
@@ -47,7 +52,7 @@ export default function Orchestrator() {
       toast.error("Descreva o objetivo com mais detalhes.");
       return;
     }
-    if (balance < COST) {
+    if (!unlimited && balance < COST) {
       toast.error(`Você precisa de ${COST} créditos para executar o Orquestrador (saldo: ${balance}).`);
       return;
     }
@@ -92,7 +97,7 @@ export default function Orchestrator() {
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-white/50">
-            <Coins className="h-3 w-3" /> Custo: {COST} créditos · Saldo: {balance}
+            <Coins className="h-3 w-3" /> Custo: {COST} créditos · Saldo: {unlimited ? "∞" : balance}
           </div>
         </header>
 
@@ -127,7 +132,7 @@ export default function Orchestrator() {
               ) : (
                 <Sparkles className="h-4 w-4" />
               )}
-              {loading ? "Orquestrando..." : `Executar (${COST} créditos)`}
+              {loading ? "Orquestrando..." : unlimited ? "Executar" : `Executar (${COST} créditos)`}
             </Button>
           </div>
         </Card>
