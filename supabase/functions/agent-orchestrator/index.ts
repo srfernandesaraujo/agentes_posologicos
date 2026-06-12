@@ -76,7 +76,8 @@ Deno.serve(async (req) => {
     const { data: unlimited } = await admin
       .from("unlimited_users")
       .select("id").eq("email", (user.email || "").toLowerCase()).eq("is_active", true).maybeSingle();
-    const hasUnlimited = !!unlimited;
+    const { data: isAdminFlag } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" });
+    const hasUnlimited = !!unlimited || isAdminFlag === true;
 
     if (!hasUnlimited) {
       const { data: ledger } = await admin
