@@ -138,15 +138,15 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
 
     // Label + time
     ensureSpace(8);
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(isUser ? 20 : 51, isUser ? 184 : 65, isUser ? 166 : 85);
-    doc.text(label, margin + 2, y + 3.5);
+    doc.text(label, margin, y + 3.5);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(160, 160, 160);
-    doc.setFontSize(7);
-    doc.text(time, pageWidth - margin - 2, y + 3.5, { align: "right" });
-    y += 6;
+    doc.setTextColor(90, 99, 110);
+    doc.setFontSize(8);
+    doc.text(time, pageWidth - margin, y + 3.5, { align: "right" });
+    y += 7;
 
     // Render parts
     parts.forEach((part) => {
@@ -161,10 +161,10 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
 
     if (idx < messages.length - 1) {
       ensureSpace(4);
-      doc.setDrawColor(230, 230, 230);
-      doc.setLineWidth(0.2);
-      doc.line(margin + 8, y, pageWidth - margin - 8, y);
-      y += 4;
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.25);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 5;
     }
   });
 
@@ -176,18 +176,18 @@ function renderTextBlock(
   doc: jsPDF, text: string, margin: number, contentWidth: number,
   getY: () => number, setY: (v: number) => void, bottomLimit: number, newPage: () => void
 ) {
-  doc.setFontSize(8);
+  doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(30, 41, 59);
-  const allLines = doc.splitTextToSize(text, contentWidth - 6);
-  const lineHeight = 3.8;
+  doc.setTextColor(17, 24, 39);
+  const allLines = doc.splitTextToSize(text, contentWidth);
+  const lineHeight = 5.2;
   let y = getY();
   for (const line of allLines) {
     if (y + lineHeight > bottomLimit) { newPage(); y = margin; }
-    doc.text(line, margin + 3, y);
+    doc.text(line, margin, y);
     y += lineHeight;
   }
-  setY(y + 1);
+  setY(y + 2);
 }
 
 function renderTable(
