@@ -1910,9 +1910,11 @@ export type Database = {
           agent_expires_at: string
           agent_id: string
           created_at: string
+          current_broadcast_prompt: string
           description: string
           id: string
           is_active: boolean
+          live_mode: boolean
           name: string
           pin: string
           room_expires_at: string
