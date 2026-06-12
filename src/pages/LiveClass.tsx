@@ -199,7 +199,7 @@ export default function LiveClass() {
             <span className="text-xs text-white/70">Aula ao Vivo</span>
             <Switch checked={!!room.live_mode} onCheckedChange={toggleLive} />
           </div>
-          <Button onClick={exportPdf} variant="outline" size="sm" className="gap-2 border-white/20 text-white hover:bg-white/10">
+          <Button onClick={exportPdf} variant="outline" size="sm" className="gap-2 border-white/20 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white">
             <FileDown className="h-4 w-4" /> Apostila PDF
           </Button>
         </div>
