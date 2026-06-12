@@ -148,7 +148,7 @@ export default function Flows() {
           <Button
             variant="outline"
             onClick={() => navigate("/marketplace/fluxos")}
-            className="gap-2"
+            className="gap-2 border-white/20 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white"
           >
             <Store className="h-4 w-4" />
             Marketplace de Fluxos
