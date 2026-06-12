@@ -199,11 +199,11 @@ function renderTable(
   const colCount = headers.length;
   if (colCount === 0) return;
 
-  const tableMargin = margin + 2;
-  const tableWidth = contentWidth - 4;
-  const cellPadding = 1.5;
-  const fontSize = 7;
-  const lineHeight = 3.4;
+  const tableMargin = margin;
+  const tableWidth = contentWidth;
+  const cellPadding = 2.2;
+  const fontSize = 8.5;
+  const lineHeight = 4.6;
 
   doc.setFontSize(fontSize);
   const colWidths = calculateColumnWidths(doc, headers, rows, tableWidth, fontSize);
@@ -212,14 +212,14 @@ function renderTable(
 
   const drawHeader = () => {
     const hh = calcRowH(doc, headers, colWidths, cellPadding, lineHeight);
-    doc.setFillColor(30, 41, 59);
+    doc.setFillColor(15, 23, 42);
     doc.rect(tableMargin, y, tableWidth, hh, "F");
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     let x = tableMargin;
     for (let c = 0; c < colCount; c++) {
       const cl = doc.splitTextToSize(headers[c] || "", colWidths[c] - cellPadding * 2);
-      doc.text(cl, x + cellPadding, y + cellPadding + 2.5);
+      doc.text(cl, x + cellPadding, y + cellPadding + 3.2);
       x += colWidths[c];
     }
     y += hh;
@@ -234,18 +234,18 @@ function renderTable(
     const rh = calcRowH(doc, row, colWidths, cellPadding, lineHeight);
     if (y + rh > bottomLimit) { newPage(); y = margin; drawHeader(); }
 
-    doc.setFillColor(ri % 2 === 0 ? 248 : 255, ri % 2 === 0 ? 250 : 255, ri % 2 === 0 ? 252 : 255);
+    doc.setFillColor(ri % 2 === 0 ? 241 : 255, ri % 2 === 0 ? 245 : 255, ri % 2 === 0 ? 249 : 255);
     doc.rect(tableMargin, y, tableWidth, rh, "F");
-    doc.setDrawColor(220, 225, 230);
-    doc.setLineWidth(0.15);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.2);
     doc.line(tableMargin, y + rh, tableMargin + tableWidth, y + rh);
 
-    doc.setTextColor(30, 41, 59);
+    doc.setTextColor(17, 24, 39);
     let rx = tableMargin;
     for (let c = 0; c < colCount; c++) {
       const ct = (c < row.length ? row[c] : "") || "";
       const cl = doc.splitTextToSize(ct, colWidths[c] - cellPadding * 2);
-      doc.text(cl, rx + cellPadding, y + cellPadding + 2.5);
+      doc.text(cl, rx + cellPadding, y + cellPadding + 3.2);
       if (c > 0) doc.line(rx, y, rx, y + rh);
       rx += colWidths[c];
     }
