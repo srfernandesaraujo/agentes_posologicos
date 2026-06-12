@@ -50,9 +50,24 @@ function parseMarkdownTables(text: string): Array<{ type: "text"; content: strin
 
 function cleanMarkdown(text: string): string {
   return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/[\u00A0\u200B-\u200D\uFEFF]/g, " ")
+    .replace(/[\u2264]/g, "<=")
+    .replace(/[\u2265]/g, ">=")
+    .replace(/[\u00B2]/g, "2")
+    .replace(/[\u00B3]/g, "3")
+    .replace(/[\u2080-\u2089]/g, (m) => String("₀₁₂₃₄₅₆₇₈₉".indexOf(m)))
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\*(.*?)\*/g, "$1")
-    .replace(/#{1,6}\s/g, "")
+    .replace(/^#{1,6}\s/gm, "")
     .replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*\n?/g, "").trim())
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/^\s*[-*]\s/gm, "• ")
@@ -63,18 +78,18 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
+  const margin = 18;
   const contentWidth = pageWidth - margin * 2;
   let y = margin;
   let pageNum = 1;
-  const bottomLimit = pageHeight - 18;
+  const bottomLimit = pageHeight - 20;
 
   const addFooter = () => {
-    doc.setFontSize(7);
-    doc.setTextColor(160, 160, 160);
+    doc.setFontSize(8);
+    doc.setTextColor(90, 99, 110);
     doc.text(`Página ${pageNum}`, pageWidth / 2, pageHeight - 8, { align: "center" });
     doc.text("Gerado por Agentes Posológicos", margin, pageHeight - 8);
-    doc.setDrawColor(220, 220, 220);
+    doc.setDrawColor(205, 213, 224);
     doc.line(margin, pageHeight - 13, pageWidth - margin, pageHeight - 13);
   };
 
@@ -91,12 +106,12 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
 
   // Header
   doc.setFillColor(15, 23, 42);
-  doc.rect(0, 0, pageWidth, 28, "F");
-  doc.setFontSize(14);
+  doc.rect(0, 0, pageWidth, 31, "F");
+  doc.setFontSize(16);
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.text(agentName, margin, 14);
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(200, 200, 200);
   const dateStr = new Date().toLocaleDateString("pt-BR", {
@@ -105,7 +120,7 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
   doc.text(`Exportado em ${dateStr}`, margin, 22);
   doc.text(`${messages.length} mensagens`, pageWidth - margin, 22, { align: "right" });
 
-  y = 34;
+  y = 38;
   doc.setDrawColor(45, 212, 191);
   doc.setLineWidth(0.6);
   doc.line(margin, y, pageWidth - margin, y);
@@ -123,20 +138,20 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
 
     // Label + time
     ensureSpace(8);
-    doc.setFontSize(8);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(isUser ? 20 : 51, isUser ? 184 : 65, isUser ? 166 : 85);
-    doc.text(label, margin + 2, y + 3.5);
+    doc.text(label, margin, y + 3.5);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(160, 160, 160);
-    doc.setFontSize(7);
-    doc.text(time, pageWidth - margin - 2, y + 3.5, { align: "right" });
-    y += 6;
+    doc.setTextColor(90, 99, 110);
+    doc.setFontSize(8);
+    doc.text(time, pageWidth - margin, y + 3.5, { align: "right" });
+    y += 7;
 
     // Render parts
     parts.forEach((part) => {
       if (part.type === "text") {
-        renderTextBlock(doc, cleanMarkdown(part.content), margin, contentWidth, () => y, (v) => { y = v; }, bottomLimit, newPage);
+        renderTextBlock(doc, part.content, margin, contentWidth, () => y, (v) => { y = v; }, bottomLimit, newPage);
       } else {
         renderTable(doc, part.table, margin, contentWidth, () => y, (v) => { y = v; }, bottomLimit, newPage);
       }
@@ -146,10 +161,10 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
 
     if (idx < messages.length - 1) {
       ensureSpace(4);
-      doc.setDrawColor(230, 230, 230);
-      doc.setLineWidth(0.2);
-      doc.line(margin + 8, y, pageWidth - margin - 8, y);
-      y += 4;
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.25);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 5;
     }
   });
 
@@ -161,18 +176,71 @@ function renderTextBlock(
   doc: jsPDF, text: string, margin: number, contentWidth: number,
   getY: () => number, setY: (v: number) => void, bottomLimit: number, newPage: () => void
 ) {
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(30, 41, 59);
-  const allLines = doc.splitTextToSize(text, contentWidth - 6);
-  const lineHeight = 3.8;
   let y = getY();
-  for (const line of allLines) {
-    if (y + lineHeight > bottomLimit) { newPage(); y = margin; }
-    doc.text(line, margin + 3, y);
-    y += lineHeight;
+
+  const addWrappedText = (value: string, x: number, width: number, lineHeight: number) => {
+    const allLines = doc.splitTextToSize(value, width);
+    for (const line of allLines) {
+      if (y + lineHeight > bottomLimit) { newPage(); y = margin; }
+      doc.text(line, x, y);
+      y += lineHeight;
+    }
+  };
+
+  const renderParagraph = (value: string) => {
+    const cleaned = cleanMarkdown(value).replace(/\s+/g, " ").trim();
+    if (!cleaned) return;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(17, 24, 39);
+    addWrappedText(cleaned, margin, contentWidth, 5.2);
+    y += 2;
+  };
+
+  let paragraph: string[] = [];
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    renderParagraph(paragraph.join(" "));
+    paragraph = [];
+  };
+
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      y += 1.5;
+      continue;
+    }
+
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      const level = heading[1].length;
+      doc.setFontSize(level === 1 ? 14 : level === 2 ? 12 : 11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      y += 1.5;
+      addWrappedText(cleanMarkdown(heading[2]), margin, contentWidth, level === 1 ? 6.3 : 5.8);
+      y += 2.5;
+      continue;
+    }
+
+    const listItem = line.match(/^([-*]|\d+\.)\s+(.+)$/);
+    if (listItem) {
+      flushParagraph();
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(17, 24, 39);
+      addWrappedText(`- ${cleanMarkdown(listItem[2]).replace(/\s+/g, " ").trim()}`, margin + 3, contentWidth - 3, 5.1);
+      y += 1;
+      continue;
+    }
+
+    paragraph.push(line);
   }
-  setY(y + 1);
+
+  flushParagraph();
+  setY(y + 2);
 }
 
 function renderTable(
@@ -184,11 +252,11 @@ function renderTable(
   const colCount = headers.length;
   if (colCount === 0) return;
 
-  const tableMargin = margin + 2;
-  const tableWidth = contentWidth - 4;
-  const cellPadding = 1.5;
-  const fontSize = 7;
-  const lineHeight = 3.4;
+  const tableMargin = margin;
+  const tableWidth = contentWidth;
+  const cellPadding = 2.2;
+  const fontSize = 8.5;
+  const lineHeight = 4.6;
 
   doc.setFontSize(fontSize);
   const colWidths = calculateColumnWidths(doc, headers, rows, tableWidth, fontSize);
@@ -197,14 +265,14 @@ function renderTable(
 
   const drawHeader = () => {
     const hh = calcRowH(doc, headers, colWidths, cellPadding, lineHeight);
-    doc.setFillColor(30, 41, 59);
+    doc.setFillColor(15, 23, 42);
     doc.rect(tableMargin, y, tableWidth, hh, "F");
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     let x = tableMargin;
     for (let c = 0; c < colCount; c++) {
       const cl = doc.splitTextToSize(headers[c] || "", colWidths[c] - cellPadding * 2);
-      doc.text(cl, x + cellPadding, y + cellPadding + 2.5);
+      doc.text(cl, x + cellPadding, y + cellPadding + 3.2);
       x += colWidths[c];
     }
     y += hh;
@@ -219,18 +287,18 @@ function renderTable(
     const rh = calcRowH(doc, row, colWidths, cellPadding, lineHeight);
     if (y + rh > bottomLimit) { newPage(); y = margin; drawHeader(); }
 
-    doc.setFillColor(ri % 2 === 0 ? 248 : 255, ri % 2 === 0 ? 250 : 255, ri % 2 === 0 ? 252 : 255);
+    doc.setFillColor(ri % 2 === 0 ? 241 : 255, ri % 2 === 0 ? 245 : 255, ri % 2 === 0 ? 249 : 255);
     doc.rect(tableMargin, y, tableWidth, rh, "F");
-    doc.setDrawColor(220, 225, 230);
-    doc.setLineWidth(0.15);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.2);
     doc.line(tableMargin, y + rh, tableMargin + tableWidth, y + rh);
 
-    doc.setTextColor(30, 41, 59);
+    doc.setTextColor(17, 24, 39);
     let rx = tableMargin;
     for (let c = 0; c < colCount; c++) {
       const ct = (c < row.length ? row[c] : "") || "";
       const cl = doc.splitTextToSize(ct, colWidths[c] - cellPadding * 2);
-      doc.text(cl, rx + cellPadding, y + cellPadding + 2.5);
+      doc.text(cl, rx + cellPadding, y + cellPadding + 3.2);
       if (c > 0) doc.line(rx, y, rx, y + rh);
       rx += colWidths[c];
     }
