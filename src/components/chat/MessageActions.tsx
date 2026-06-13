@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useContentCertificate } from "@/hooks/useContentCertificate";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MessageTTS } from "./MessageTTS";
 
 interface MessageActionsProps {
   content: string;
@@ -178,6 +179,7 @@ export function MessageActions({ content, agentName, messageRef, sessionId, mess
   return (
     <>
       <div className="absolute -top-8 right-2 flex items-center gap-1 rounded-lg border border-white/10 bg-[hsl(220,25%,12%)] px-1 py-0.5 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+        <MessageTTS text={content} />
         <button
           onClick={handleCopy}
           aria-label="Copiar texto"
