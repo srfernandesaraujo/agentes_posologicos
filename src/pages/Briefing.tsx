@@ -42,7 +42,7 @@ export default function Briefing() {
 
   return (
     <div className="min-h-screen bg-[hsl(220,25%,5%)] text-white">
-      <SEO title={briefing.title} description={briefing.summary || "Briefing por voz"} />
+        <SEO title={briefing.title} description={briefing.summary || "Briefing por voz"} path={`/briefing/${briefing.id}`} />
       <div className="mx-auto max-w-2xl px-6 py-12">
         <div className="flex items-center gap-3 mb-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(174,62%,47%)]/20">
