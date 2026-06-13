@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Volume2, Pause, Play, Square } from "lucide-react";
+import { Volume2, Pause, Play, Square, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface MessageTTSProps { text: string }
 
@@ -17,58 +19,95 @@ function stripMarkdown(text: string) {
 }
 
 export function MessageTTS({ text }: MessageTTSProps) {
+  const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [paused, setPaused] = useState(false);
   const [rate, setRate] = useState(1);
-  const uttRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const urlRef = useRef<string | null>(null);
 
   useEffect(() => () => {
-    try { window.speechSynthesis?.cancel(); } catch {}
+    try {
+      audioRef.current?.pause();
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+    } catch {}
   }, []);
 
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+  const ensureAudio = async (): Promise<HTMLAudioElement | null> => {
+    if (audioRef.current && urlRef.current) return audioRef.current;
+    setLoading(true);
+    try {
+      const clean = stripMarkdown(text).slice(0, 5000);
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token;
+      if (!token) {
+        toast.error("Faça login para ouvir a narração");
+        return null;
+      }
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tts-elevenlabs`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean }),
+      });
+      if (!res.ok) {
+        toast.error("Falha ao gerar áudio");
+        return null;
+      }
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      urlRef.current = objUrl;
+      const audio = new Audio(objUrl);
+      audio.playbackRate = rate;
+      audio.onended = () => { setPlaying(false); setPaused(false); };
+      audio.onerror = () => { setPlaying(false); setPaused(false); };
+      audioRef.current = audio;
+      return audio;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const start = () => {
-    const synth = window.speechSynthesis;
-    synth.cancel();
-    const utt = new SpeechSynthesisUtterance(stripMarkdown(text).slice(0, 5000));
-    utt.lang = "pt-BR";
-    utt.rate = rate;
-    const voices = synth.getVoices();
-    const pt = voices.find((v) => v.lang?.toLowerCase().startsWith("pt"));
-    if (pt) utt.voice = pt;
-    utt.onend = () => { setPlaying(false); setPaused(false); };
-    utt.onerror = () => { setPlaying(false); setPaused(false); };
-    uttRef.current = utt;
-    synth.speak(utt);
+  const start = async () => {
+    const audio = await ensureAudio();
+    if (!audio) return;
+    audio.currentTime = 0;
+    audio.playbackRate = rate;
+    await audio.play();
     setPlaying(true);
     setPaused(false);
   };
 
   const togglePause = () => {
-    const synth = window.speechSynthesis;
-    if (paused) { synth.resume(); setPaused(false); }
-    else { synth.pause(); setPaused(true); }
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (paused) { audio.play(); setPaused(false); }
+    else { audio.pause(); setPaused(true); }
   };
 
   const stop = () => {
-    window.speechSynthesis.cancel();
+    const audio = audioRef.current;
+    if (audio) { audio.pause(); audio.currentTime = 0; }
     setPlaying(false);
     setPaused(false);
   };
 
   const changeRate = (next: number) => {
     setRate(next);
-    if (playing) { stop(); setTimeout(start, 60); }
+    if (audioRef.current) audioRef.current.playbackRate = next;
   };
 
   return (
     <div className="flex items-center gap-1">
-      {!playing ? (
+      {loading ? (
+        <span className="flex items-center gap-1 px-2 py-1 text-xs text-white/60">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Gerando...
+        </span>
+      ) : !playing ? (
         <button
           onClick={start}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-          title="Ouvir resposta"
+          title="Ouvir com voz natural (ElevenLabs)"
         >
           <Volume2 className="h-3.5 w-3.5" />
         </button>
