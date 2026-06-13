@@ -46,6 +46,7 @@ import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CookiePolicy from "./pages/CookiePolicy";
 import VerifyCertificate from "./pages/VerifyCertificate";
+import Briefing from "./pages/Briefing";
 import { CookieConsent } from "./components/cookies/CookieConsent";
 
 const queryClient = new QueryClient();
@@ -72,6 +73,7 @@ const App = () => (
             <Route path="/privacidade" element={<PrivacyPolicy />} />
             <Route path="/cookies" element={<CookiePolicy />} />
             <Route path="/verificar" element={<VerifyCertificate />} />
+            <Route path="/briefing/:id" element={<Briefing />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
