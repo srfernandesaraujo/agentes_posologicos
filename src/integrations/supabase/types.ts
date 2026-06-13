@@ -703,6 +703,72 @@ export type Database = {
         }
         Relationships: []
       }
+      briefing_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          frequency: string
+          id: string
+          last_sent_at: string | null
+          send_hour: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          last_sent_at?: string | null
+          send_hour?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          last_sent_at?: string | null
+          send_hour?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      briefings: {
+        Row: {
+          created_at: string
+          delivered_email: boolean
+          id: string
+          sections: Json
+          summary: string | null
+          title: string
+          transcript: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_email?: boolean
+          id?: string
+          sections?: Json
+          summary?: string | null
+          title: string
+          transcript: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delivered_email?: boolean
+          id?: string
+          sections?: Json
+          summary?: string | null
+          title?: string
+          transcript?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       chat_sessions: {
         Row: {
           agent_id: string

@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
+import { BriefingSettings } from "@/components/briefing/BriefingSettings";
 import { UserMemoryPanel } from "@/components/account/UserMemoryPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -257,6 +258,7 @@ export default function Account() {
       </div>
 
       <ResearchInterestsManager />
+      <BriefingSettings />
       <UserMemoryPanel />
     </div>
   );

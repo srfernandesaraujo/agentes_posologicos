@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
+import { VoiceInput } from "@/components/chat/VoiceInput";
 
 
 const CUSTOM_AGENT_INTERACTION_COST = 0.5;
@@ -939,6 +940,10 @@ export default function Chat() {
               agentId={rawAgentId || ""}
               currentInput={input}
               onSelectTemplate={(content) => setInput(content)}
+            />
+            <VoiceInput
+              onTranscript={(t) => setInput((prev) => (prev ? prev + " " + t : t))}
+              disabled={sendMutation.isPending}
             />
             <Textarea
               value={input}
