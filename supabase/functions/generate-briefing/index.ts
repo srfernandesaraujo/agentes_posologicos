@@ -14,8 +14,14 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const isCron = req.headers.get("x-cron-secret") === Deno.env.get("CRON_SECRET");
     const forceUserId: string | undefined = body?.userId;
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const authVal = req.headers.get("Authorization") || "";
+    const isCron = body?.cron === true && (
+      (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret) ||
+      (!!anonKey && authVal === `Bearer ${anonKey}`)
+    );
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
