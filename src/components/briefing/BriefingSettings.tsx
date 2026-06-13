@@ -28,7 +28,7 @@ export function BriefingSettings() {
         .select("enabled, frequency, send_hour, last_sent_at")
         .eq("user_id", user!.id)
         .maybeSingle();
-      return (data as Settings) || { enabled: false, frequency: "daily", send_hour: 7, last_sent_at: null };
+      return ((data as unknown) as Settings) || { enabled: false, frequency: "daily", send_hour: 7, last_sent_at: null };
     },
   });
 
