@@ -136,20 +136,29 @@ Deno.serve(async (req) => {
         let emailed = false;
         if (u?.email) {
           try {
+            // Render the FULL transcript as HTML paragraphs (no truncation)
+            const escaped = transcript.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const paragraphsHtml = escaped
+              .split(/\n{2,}|\r\n{2,}/)
+              .map((p) => p.trim())
+              .filter(Boolean)
+              .map((p) => `<p style="color:#333; font-size:14px; line-height:1.75; margin:0 0 14px 0;">${p.replace(/\n/g, "<br/>")}</p>`)
+              .join("");
+
             await resend.emails.send({
               from: FROM_EMAIL,
               to: [u.email],
               subject: `${title} — Agentes Posológicos`,
               html: `
-                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto; background:#ffffff; padding: 40px 32px;">
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 640px; margin: 0 auto; background:#ffffff; padding: 40px 32px;">
                   <h1 style="color:#1a1a2e; font-size: 22px; margin-bottom: 6px;">${title}</h1>
-                  <p style="color:#555; font-size: 14px; line-height: 1.6;">Seu briefing está pronto. Ouça em qualquer dispositivo no player web ou leia a transcrição completa.</p>
-                  <div style="text-align:center; margin: 28px 0;">
+                  <p style="color:#555; font-size: 14px; line-height: 1.6;">Seu briefing está pronto. Ouça em qualquer dispositivo com voz natural ou leia a transcrição completa abaixo.</p>
+                  <div style="text-align:center; margin: 24px 0;">
                     <a href="${playerUrl}" style="display:inline-block; background: linear-gradient(135deg, #14b8a6, #0ea5e9); color:#ffffff; text-decoration:none; padding:14px 28px; border-radius:10px; font-size:15px; font-weight:600;">Ouvir o briefing</a>
                   </div>
-                  <h3 style="color:#1a1a2e; font-size: 15px; margin-bottom: 8px;">Resumo</h3>
-                  <p style="color:#444; font-size:13px; line-height: 1.7; white-space: pre-wrap;">${transcript.replace(/</g, "&lt;").slice(0, 1200)}${transcript.length > 1200 ? "…" : ""}</p>
-                  <p style="color:#999; font-size:11px; margin-top: 32px;">Você está recebendo este e-mail porque ativou o briefing diário em Minha Conta.</p>
+                  <h3 style="color:#1a1a2e; font-size: 15px; margin: 24px 0 12px;">Transcrição completa</h3>
+                  ${paragraphsHtml}
+                  <p style="color:#999; font-size:11px; margin-top: 32px; border-top:1px solid #eee; padding-top:16px;">Você está recebendo este e-mail porque ativou o briefing em Minha Conta.</p>
                 </div>
               `,
             });
