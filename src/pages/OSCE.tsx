@@ -68,7 +68,7 @@ export default function OSCE() {
           <p className="text-sm text-muted-foreground">Estações cronometradas com paciente IA e rubrica automatizada.</p>
         </div>
         <div className="flex gap-2">
-          <Link to="/osce/entrar"><Button variant="outline" className="gap-2"><LogIn className="h-4 w-4" /> Entrar com PIN</Button></Link>
+          <Link to="/osce/entrar"><Button variant="outline" className="gap-2 border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"><LogIn className="h-4 w-4" /> Entrar com PIN</Button></Link>
           <Button variant="default" className="gap-2 bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white" onClick={() => setLiveOpen(true)}>
             <Radio className="h-4 w-4" /> Aplicar prova ao vivo
           </Button>
