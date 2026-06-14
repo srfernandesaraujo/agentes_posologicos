@@ -58,11 +58,14 @@ export default function OSCESessionTeacher() {
   }, [sessionId]);
 
   useEffect(() => {
-    if (!session?.current_station_started_at) { setElapsed(0); return; }
+    if (!session?.current_station_started_at || session.status !== "running") {
+      setElapsed(0);
+      return;
+    }
     const start = new Date(session.current_station_started_at).getTime();
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
     return () => clearInterval(t);
-  }, [session?.current_station_started_at]);
+  }, [session?.current_station_started_at, session?.status]);
 
   async function act(action: string, confirmMsg?: string) {
     if (confirmMsg && !confirm(confirmMsg)) return;
@@ -131,7 +134,7 @@ export default function OSCESessionTeacher() {
             </Badge>
             {currentStation && <span className="text-base">Estação {currentIdx + 1}/{stations.length}: {currentStation.title}</span>}
           </CardTitle>
-          {currentStation && (
+          {currentStation && session.status === "running" && (
             <Badge variant={overtime ? "destructive" : "outline"} className="gap-1 text-base px-3 py-1">
               <Clock className="h-4 w-4" /> {mm}:{ss} / {currentStation.duration_minutes}:00
             </Badge>
