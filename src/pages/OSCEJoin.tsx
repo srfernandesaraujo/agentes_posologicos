@@ -33,7 +33,22 @@ export default function OSCEJoin() {
           guestEmail: user ? undefined : email.trim().toLowerCase(),
         },
       });
-      if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message);
+      let errMsg = (data as any)?.error as string | undefined;
+      if (error) {
+        // supabase-js v2: read the real error body on non-2xx
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === "function") {
+            const body = await ctx.json();
+            errMsg = body?.error || errMsg;
+          } else if (ctx && typeof ctx.text === "function") {
+            const txt = await ctx.text();
+            try { errMsg = JSON.parse(txt)?.error || errMsg || txt; } catch { errMsg = errMsg || txt; }
+          }
+        } catch { /* ignore */ }
+        if (!errMsg) errMsg = error.message;
+      }
+      if (errMsg) throw new Error(errMsg);
       const sessionId = (data as any).sessionId;
       const guestToken = (data as any).guestToken;
       if (guestToken) {
