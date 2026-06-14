@@ -318,7 +318,7 @@ export default function VirtualRoomChat() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[hsl(220,25%,5%)] text-white gap-4">
         <p className="text-white/50">{roomExpired ? "Esta sala virtual foi encerrada." : "Sala não encontrada ou inativa."}</p>
-        <Button onClick={() => navigate("/")} variant="outline" className="border-white/20 text-white hover:bg-white/10">
+        <Button onClick={() => navigate("/")} variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
           Voltar ao início
         </Button>
       </div>
