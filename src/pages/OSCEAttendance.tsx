@@ -162,7 +162,7 @@ export default function OSCEAttendance() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-xl font-bold">{station.title}</h1>
-            <p className="text-xs text-muted-foreground line-clamp-2">{station.scenario_brief}</p>
+            <p className="text-xs text-muted-foreground whitespace-pre-wrap">{station.scenario_brief}</p>
           </div>
           <div className="text-right">
             <Badge variant={overtime ? "destructive" : "outline"} className="gap-1">

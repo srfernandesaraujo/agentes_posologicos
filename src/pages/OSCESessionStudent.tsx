@@ -103,6 +103,9 @@ export default function OSCESessionStudent() {
 
   const currentIdx = session.current_station_index ?? -1;
   const currentStation = currentIdx >= 0 && currentIdx < stations.length ? stations[currentIdx] : null;
+  const allCompleted =
+    attempts.length > 0 &&
+    attempts.every((a: any) => a.status === "completed");
   const totalSec = (currentStation?.duration_minutes || 8) * 60;
   const pct = Math.min(100, (elapsed / totalSec) * 100);
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
@@ -117,6 +120,8 @@ export default function OSCESessionStudent() {
               <><Loader2 className="h-5 w-5 animate-spin" /> Aguardando o professor iniciar</>
             ) : session.status === "paused" ? (
               <><Clock className="h-5 w-5" /> Prova pausada</>
+            ) : allCompleted ? (
+              <><CheckCircle2 className="h-5 w-5 text-primary" /> Você concluiu suas estações</>
             ) : (
               <><Loader2 className="h-5 w-5 animate-spin" /> Preparando próxima estação...</>
             )}
@@ -135,7 +140,10 @@ export default function OSCESessionStudent() {
           {session.status === "paused" && (
             <p className="text-sm text-muted-foreground">Aguarde — o professor retomará a sessão.</p>
           )}
-          {currentStation && (
+          {allCompleted && session.status === "running" && (
+            <p className="text-sm text-muted-foreground">Aguarde — o professor irá avançar para a próxima estação ou encerrar a prova. Sua pontuação parcial aparece abaixo.</p>
+          )}
+          {currentStation && !allCompleted && (
             <div className="space-y-2 pt-2 border-t">
               <div className="flex justify-between text-sm">
                 <span>Estação atual: <strong>{currentStation.title}</strong></span>
