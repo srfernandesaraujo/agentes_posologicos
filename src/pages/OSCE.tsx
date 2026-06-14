@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Stethoscope, Plus, Play, BarChart3, Clock, Trophy } from "lucide-react";
+import { Stethoscope, Plus, Play, BarChart3, Clock, Trophy, Radio, LogIn } from "lucide-react";
 import { toast } from "sonner";
 
 const sb: any = supabase;
@@ -41,6 +41,15 @@ export default function OSCE() {
     navigate(`/osce/atendimento/${data.id}`);
   }
 
+  async function startLive(examId: string) {
+    if (!confirm("Criar uma sessão ao vivo desta prova? Você receberá um PIN para os alunos entrarem.")) return;
+    try {
+      const { data, error } = await sb.functions.invoke("osce-session-control", { body: { action: "create", examId } });
+      if (error || (data as any)?.error) throw new Error((data as any)?.error || error?.message);
+      navigate(`/osce/sessao/${(data as any).session.id}`);
+    } catch (e: any) { toast.error(e.message || "Falha ao criar sessão"); }
+  }
+
   return (
     <div className="container py-8">
       <div className="flex items-center justify-between mb-6">
@@ -51,6 +60,7 @@ export default function OSCE() {
           <p className="text-sm text-muted-foreground">Estações cronometradas com paciente IA e rubrica automatizada.</p>
         </div>
         <div className="flex gap-2">
+          <Link to="/osce/entrar"><Button variant="outline" className="gap-2"><LogIn className="h-4 w-4" /> Entrar com PIN</Button></Link>
           <Link to="/osce/estacao/nova"><Button className="gap-2"><Plus className="h-4 w-4" /> Nova estação</Button></Link>
           <Link to="/osce/prova/nova"><Button variant="secondary" className="gap-2"><Plus className="h-4 w-4" /> Nova prova</Button></Link>
         </div>
@@ -112,7 +122,12 @@ export default function OSCE() {
                     <CardDescription>{ex.description || "Sem descrição"}</CardDescription>
                   </CardHeader>
                   <CardContent className="flex gap-2">
-                    <Link to={`/osce/prova/${ex.id}`} className="flex-1"><Button size="sm" variant="outline" className="w-full gap-1"><BarChart3 className="h-3.5 w-3.5" /> Detalhes & turma</Button></Link>
+                    {ex.user_id === user?.id && (
+                      <Button size="sm" className="flex-1 gap-1" onClick={() => startLive(ex.id)}>
+                        <Radio className="h-3.5 w-3.5" /> Aplicar ao vivo
+                      </Button>
+                    )}
+                    <Link to={`/osce/prova/${ex.id}`} className="flex-1"><Button size="sm" variant="outline" className="w-full gap-1"><BarChart3 className="h-3.5 w-3.5" /> Detalhes</Button></Link>
                   </CardContent>
                 </Card>
               ))}
