@@ -194,15 +194,24 @@ Deno.serve(async (req) => {
         }, { onConflict: "session_id,user_id" });
       } else {
         if (!guestName || !guestEmail) return json({ error: "Nome e e-mail obrigatórios" }, 400);
-        // Reuse existing guest_token if same email already joined
+        // Reuse existing guest_token if same email already joined (no upsert: partial unique index breaks PostgREST ON CONFLICT)
         const { data: existing } = await admin.from("osce_session_participants")
-          .select("guest_token").eq("session_id", session.id).eq("guest_email", guestEmail).maybeSingle();
-        guestToken = existing?.guest_token || crypto.randomUUID();
-        await admin.from("osce_session_participants").upsert({
-          session_id: session.id, user_id: null,
-          guest_token: guestToken, guest_email: guestEmail, guest_name: guestName,
-          display_name: guestName,
-        }, { onConflict: "session_id,guest_token" });
+          .select("id, guest_token").eq("session_id", session.id).eq("guest_email", guestEmail).maybeSingle();
+        if (existing) {
+          guestToken = existing.guest_token;
+          const { error: updErr } = await admin.from("osce_session_participants")
+            .update({ guest_name: guestName, display_name: guestName })
+            .eq("id", existing.id);
+          if (updErr) return json({ error: `Falha ao atualizar participante: ${updErr.message}` }, 500);
+        } else {
+          guestToken = crypto.randomUUID();
+          const { error: insErr } = await admin.from("osce_session_participants").insert({
+            session_id: session.id, user_id: null,
+            guest_token: guestToken, guest_email: guestEmail, guest_name: guestName,
+            display_name: guestName,
+          });
+          if (insErr) return json({ error: `Falha ao registrar participante: ${insErr.message}` }, 500);
+        }
       }
 
       // If session running, ensure attempt for current station
