@@ -148,11 +148,13 @@ export default function OSCESessionTeacher() {
             {session.status === "running" && (
               <>
                 <Button onClick={() => act("pause")} variant="outline" disabled={busy} className="gap-2"><Pause className="h-4 w-4" /> Pausar</Button>
-                <Button onClick={() => act("next", "Avaliar a estação atual e avançar para a próxima?")} disabled={busy} className="gap-2">
-                  <SkipForward className="h-4 w-4" /> {currentIdx + 1 >= stations.length ? "Encerrar" : "Próxima estação"}
-                </Button>
-                <Button onClick={() => act("finish", "Encerrar a sessão agora?")} variant="destructive" disabled={busy} className="gap-2">
-                  <Square className="h-4 w-4" /> Encerrar
+                {currentIdx + 1 < stations.length && (
+                  <Button onClick={() => act("next", "Avaliar a estação atual e avançar para a próxima?")} disabled={busy} className="gap-2">
+                    <SkipForward className="h-4 w-4" /> Próxima estação
+                  </Button>
+                )}
+                <Button onClick={() => act("finish", "Avaliar a estação atual e encerrar a sessão?")} variant="destructive" disabled={busy} className="gap-2">
+                  <Square className="h-4 w-4" /> Encerrar prova
                 </Button>
               </>
             )}
