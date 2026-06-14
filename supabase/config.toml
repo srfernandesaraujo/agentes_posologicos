@@ -92,3 +92,6 @@ verify_jwt = false
 
 [functions.osce-evaluate]
 verify_jwt = false
+
+[functions.osce-session-control]
+verify_jwt = false

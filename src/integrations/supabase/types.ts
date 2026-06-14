@@ -1221,6 +1221,7 @@ export type Database = {
           max_score: number | null
           rubric_result: Json | null
           score: number | null
+          session_id: string | null
           started_at: string
           station_id: string
           status: string
@@ -1239,6 +1240,7 @@ export type Database = {
           max_score?: number | null
           rubric_result?: Json | null
           score?: number | null
+          session_id?: string | null
           started_at?: string
           station_id: string
           status?: string
@@ -1257,6 +1259,7 @@ export type Database = {
           max_score?: number | null
           rubric_result?: Json | null
           score?: number | null
+          session_id?: string | null
           started_at?: string
           station_id?: string
           status?: string
@@ -1273,10 +1276,70 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "osce_attempts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "osce_exam_sessions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "osce_attempts_station_id_fkey"
             columns: ["station_id"]
             isOneToOne: false
             referencedRelation: "osce_stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      osce_exam_sessions: {
+        Row: {
+          auto_advance: boolean
+          created_at: string
+          current_station_index: number
+          current_station_started_at: string | null
+          exam_id: string
+          finished_at: string | null
+          id: string
+          owner_id: string
+          pin: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          auto_advance?: boolean
+          created_at?: string
+          current_station_index?: number
+          current_station_started_at?: string | null
+          exam_id: string
+          finished_at?: string | null
+          id?: string
+          owner_id: string
+          pin: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          auto_advance?: boolean
+          created_at?: string
+          current_station_index?: number
+          current_station_started_at?: string | null
+          exam_id?: string
+          finished_at?: string | null
+          id?: string
+          owner_id?: string
+          pin?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "osce_exam_sessions_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "osce_exams"
             referencedColumns: ["id"]
           },
         ]
@@ -1352,6 +1415,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      osce_session_participants: {
+        Row: {
+          current_attempt_id: string | null
+          display_name: string | null
+          id: string
+          joined_at: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          current_attempt_id?: string | null
+          display_name?: string | null
+          id?: string
+          joined_at?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          current_attempt_id?: string | null
+          display_name?: string | null
+          id?: string
+          joined_at?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "osce_session_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "osce_exam_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       osce_stations: {
         Row: {
@@ -2189,6 +2287,16 @@ export type Database = {
           sender_name: string
         }[]
       }
+      get_osce_session_by_pin: {
+        Args: { _pin: string }
+        Returns: {
+          current_station_index: number
+          exam_id: string
+          id: string
+          owner_id: string
+          status: string
+        }[]
+      }
       get_room_by_pin: {
         Args: { p_pin: string }
         Returns: {
@@ -2219,6 +2327,14 @@ export type Database = {
         Returns: boolean
       }
       is_active_virtual_room: { Args: { _room_id: string }; Returns: boolean }
+      is_osce_session_owner: {
+        Args: { _session_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_osce_session_participant: {
+        Args: { _session_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_project_owner: {
         Args: { _project_id: string; _user_id: string }
         Returns: boolean

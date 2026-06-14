@@ -36,9 +36,28 @@ export default function OSCEAttendance() {
       setHistory(Array.isArray(a.transcript) ? a.transcript : []);
       const { data: st } = await sb.from("osce_stations").select("*").eq("id", a.station_id).maybeSingle();
       setStation(st);
-      if (a.status === "completed") navigate(`/osce/resultado/${a.id}`);
+      if (a.status === "completed") {
+        navigate(a.session_id ? `/osce/sala/${a.session_id}` : `/osce/resultado/${a.id}`);
+      }
     })();
   }, [attemptId]);
+
+  // If in a live session, listen for session changes (auto-advance / finish) and bounce back
+  useEffect(() => {
+    if (!attempt?.session_id) return;
+    const sessionId = attempt.session_id;
+    const ch = supabase
+      .channel(`osce-att-session-${sessionId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "osce_attempts", filter: `id=eq.${attemptId}` }, (payload: any) => {
+        if (payload.new?.status === "completed") navigate(`/osce/sala/${sessionId}`);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "osce_exam_sessions", filter: `id=eq.${sessionId}` }, (payload: any) => {
+        const ns = payload.new;
+        if (ns?.status === "paused" || ns?.status === "finished") navigate(`/osce/sala/${sessionId}`);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [attempt?.session_id, attemptId, navigate]);
 
   useEffect(() => {
     if (!attempt) return;
@@ -86,7 +105,7 @@ export default function OSCEAttendance() {
       const { data, error } = await supabase.functions.invoke("osce-evaluate", { body: { attemptId } });
       if (error) throw error;
       if ((data as any)?.error) { toast.error((data as any).error); setEvaluating(false); return; }
-      navigate(`/osce/resultado/${attemptId}`);
+      navigate(attempt?.session_id ? `/osce/sala/${attempt.session_id}` : `/osce/resultado/${attemptId}`);
     } catch (e: any) {
       toast.error(e.message || "Falha ao avaliar"); setEvaluating(false);
     }
