@@ -8,6 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Stethoscope, Plus, Play, BarChart3, Clock, Trophy, Radio, LogIn } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const sb: any = supabase;
 
@@ -18,6 +22,8 @@ export default function OSCE() {
   const [exams, setExams] = useState<any[]>([]);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [liveOpen, setLiveOpen] = useState(false);
+  const [liveExamId, setLiveExamId] = useState<string>("");
 
   async function load() {
     setLoading(true);
@@ -50,6 +56,8 @@ export default function OSCE() {
     } catch (e: any) { toast.error(e.message || "Falha ao criar sessão"); }
   }
 
+  const myExams = exams.filter((e) => e.user_id === user?.id);
+
   return (
     <div className="container py-8">
       <div className="flex items-center justify-between mb-6">
@@ -61,10 +69,44 @@ export default function OSCE() {
         </div>
         <div className="flex gap-2">
           <Link to="/osce/entrar"><Button variant="outline" className="gap-2"><LogIn className="h-4 w-4" /> Entrar com PIN</Button></Link>
+          <Button variant="default" className="gap-2 bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white" onClick={() => setLiveOpen(true)}>
+            <Radio className="h-4 w-4" /> Aplicar prova ao vivo
+          </Button>
           <Link to="/osce/estacao/nova"><Button className="gap-2"><Plus className="h-4 w-4" /> Nova estação</Button></Link>
           <Link to="/osce/prova/nova"><Button variant="secondary" className="gap-2"><Plus className="h-4 w-4" /> Nova prova</Button></Link>
         </div>
       </div>
+
+      <Dialog open={liveOpen} onOpenChange={setLiveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Aplicar prova ao vivo</DialogTitle>
+            <DialogDescription>
+              Escolha uma das suas provas. Será gerado um PIN para os alunos entrarem em /osce/entrar.
+            </DialogDescription>
+          </DialogHeader>
+          {myExams.length === 0 ? (
+            <div className="text-sm text-muted-foreground">
+              Você ainda não tem provas. Crie uma em <Link to="/osce/prova/nova" className="underline">Nova prova</Link>.
+            </div>
+          ) : (
+            <Select value={liveExamId} onValueChange={setLiveExamId}>
+              <SelectTrigger><SelectValue placeholder="Selecione uma prova" /></SelectTrigger>
+              <SelectContent>
+                {myExams.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLiveOpen(false)}>Cancelar</Button>
+            <Button disabled={!liveExamId} onClick={() => { setLiveOpen(false); startLive(liveExamId); }} className="gap-2">
+              <Radio className="h-4 w-4" /> Iniciar sessão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="stations">
         <TabsList>
