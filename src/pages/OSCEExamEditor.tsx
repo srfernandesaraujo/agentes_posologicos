@@ -31,7 +31,18 @@ export default function OSCEExamEditor() {
     sb.from("osce_exam_stations").select("station_id").eq("exam_id", id).then(({ data }: any) => {
       setSelected(new Set((data || []).map((r: any) => r.station_id)));
     });
-    sb.from("osce_attempts").select("*, osce_stations(title), profiles:user_id(display_name)").eq("exam_id", id).order("created_at", { ascending: false }).then(({ data }: any) => setAttempts(data || []));
+    (async () => {
+      const { data } = await sb.from("osce_attempts").select("*, osce_stations(title)").eq("exam_id", id).order("created_at", { ascending: false });
+      const list = data || [];
+      const userIds = Array.from(new Set(list.map((a: any) => a.user_id)));
+      if (userIds.length) {
+        const { data: profs } = await sb.from("profiles").select("user_id,display_name").in("user_id", userIds);
+        const map: Record<string, string> = {};
+        (profs || []).forEach((p: any) => { map[p.user_id] = p.display_name; });
+        list.forEach((a: any) => { a._student = map[a.user_id] || "Aluno"; });
+      }
+      setAttempts(list);
+    })();
   }, [id]);
 
   async function save() {
@@ -54,7 +65,7 @@ export default function OSCEExamEditor() {
   attempts.forEach((a) => {
     if (a.status !== "completed") return;
     const k = a.user_id;
-    if (!byStudent[k]) byStudent[k] = { name: a.profiles?.display_name || "Aluno", total: 0, max: 0, n: 0 };
+      if (!byStudent[k]) byStudent[k] = { name: a._student || "Aluno", total: 0, max: 0, n: 0 };
     byStudent[k].total += Number(a.score || 0);
     byStudent[k].max += Number(a.max_score || 0);
     byStudent[k].n += 1;
@@ -116,7 +127,7 @@ export default function OSCEExamEditor() {
             <CardContent className="space-y-1">
               {attempts.map((a) => (
                 <div key={a.id} className="flex justify-between text-sm py-1 border-b">
-                  <span>{a.profiles?.display_name || "Aluno"} - {a.osce_stations?.title}</span>
+                  <span>{a._student || "Aluno"} - {a.osce_stations?.title}</span>
                   <span className="flex gap-2">
                     {a.status === "completed" ? <Badge>{Number(a.score).toFixed(1)}/{Number(a.max_score).toFixed(1)}</Badge> : <Badge variant="secondary">em andamento</Badge>}
                     <Link to={`/osce/resultado/${a.id}`}><Button size="sm" variant="ghost"><Play className="h-3.5 w-3.5" /></Button></Link>
