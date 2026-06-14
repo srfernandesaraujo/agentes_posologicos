@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ type Msg = { role: "patient" | "student"; content: string; ts: string };
 
 export default function OSCEAttendance() {
   const { attemptId } = useParams();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [attempt, setAttempt] = useState<any>(null);
@@ -27,15 +28,40 @@ export default function OSCEAttendance() {
   const [evaluating, setEvaluating] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Guest token: prefer URL param, fallback to localStorage by session
+  const guestTokenFromUrl = searchParams.get("guest");
+  const [guestToken, setGuestToken] = useState<string | null>(guestTokenFromUrl);
+  const isGuest = !user && !!guestToken;
+
   useEffect(() => {
     if (!attemptId) return;
     (async () => {
-      const { data: a } = await sb.from("osce_attempts").select("*").eq("id", attemptId).maybeSingle();
-      if (!a) { toast.error("Tentativa não encontrada"); navigate("/osce"); return; }
+      // Resolve guest token from localStorage if not in URL
+      let token = guestTokenFromUrl;
+      if (!user && !token) {
+        // try every osce_guest_* key
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k?.startsWith("osce_guest_")) {
+            try { const v = JSON.parse(localStorage.getItem(k) || ""); if (v?.token) { token = v.token; break; } } catch { /* */ }
+          }
+        }
+      }
+      setGuestToken(token || null);
+
+      // Fetch via edge function so guests work
+      const { data, error } = await supabase.functions.invoke("osce-session-control", {
+        body: { action: "attempt", attemptId, guestToken: token || null },
+      });
+      if (error || (data as any)?.error) {
+        toast.error((data as any)?.error || error?.message || "Tentativa não encontrada");
+        navigate(user ? "/osce" : "/osce/entrar"); return;
+      }
+      const a = (data as any).attempt;
+      const st = (data as any).station;
       setAttempt(a);
-      setHistory(Array.isArray(a.transcript) ? a.transcript : []);
-      const { data: st } = await sb.from("osce_stations").select("*").eq("id", a.station_id).maybeSingle();
       setStation(st);
+      setHistory(Array.isArray(a.transcript) ? a.transcript : []);
       if (a.status === "completed") {
         navigate(a.session_id ? `/osce/sala/${a.session_id}` : `/osce/resultado/${a.id}`);
       }
@@ -89,7 +115,13 @@ export default function OSCEAttendance() {
       const patientMsg: Msg = { role: "patient", content: reply, ts: new Date().toISOString() };
       const newHistory = [...next, patientMsg];
       setHistory(newHistory);
-      await sb.from("osce_attempts").update({ transcript: newHistory }).eq("id", attemptId);
+      if (isGuest) {
+        await supabase.functions.invoke("osce-session-control", {
+          body: { action: "save-transcript", attemptId, guestToken, transcript: newHistory },
+        });
+      } else {
+        await sb.from("osce_attempts").update({ transcript: newHistory }).eq("id", attemptId);
+      }
     } catch (e: any) {
       toast.error(e.message || "Erro ao gerar resposta");
     } finally {
@@ -101,8 +133,16 @@ export default function OSCEAttendance() {
     if (!confirm("Encerrar atendimento e avaliar?")) return;
     setEvaluating(true);
     try {
-      await sb.from("osce_attempts").update({ transcript: history }).eq("id", attemptId);
-      const { data, error } = await supabase.functions.invoke("osce-evaluate", { body: { attemptId } });
+      if (isGuest) {
+        await supabase.functions.invoke("osce-session-control", {
+          body: { action: "save-transcript", attemptId, guestToken, transcript: history },
+        });
+      } else {
+        await sb.from("osce_attempts").update({ transcript: history }).eq("id", attemptId);
+      }
+      const { data, error } = await supabase.functions.invoke("osce-evaluate", {
+        body: { attemptId, guestToken: isGuest ? guestToken : undefined },
+      });
       if (error) throw error;
       if ((data as any)?.error) { toast.error((data as any).error); setEvaluating(false); return; }
       navigate(attempt?.session_id ? `/osce/sala/${attempt.session_id}` : `/osce/resultado/${attemptId}`);
