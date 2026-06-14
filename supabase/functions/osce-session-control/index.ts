@@ -259,6 +259,34 @@ Deno.serve(async (req) => {
       return json({ session, attempts: attempts || [], stations });
     }
 
+    if (action === "attempt") {
+      const attemptId = String(body.attemptId || "");
+      const guestToken = body.guestToken ? String(body.guestToken) : null;
+      const { data: attempt } = await admin.from("osce_attempts")
+        .select("*").eq("id", attemptId).maybeSingle();
+      if (!attempt) return json({ error: "Tentativa não encontrada" }, 404);
+      const okUser = user && attempt.user_id === user.id;
+      const okGuest = guestToken && attempt.guest_token === guestToken;
+      if (!okUser && !okGuest) return json({ error: "Sem permissão" }, 403);
+      const { data: station } = await admin.from("osce_stations")
+        .select("*").eq("id", attempt.station_id).maybeSingle();
+      return json({ attempt, station });
+    }
+
+    if (action === "save-transcript") {
+      const attemptId = String(body.attemptId || "");
+      const guestToken = body.guestToken ? String(body.guestToken) : null;
+      const transcript = Array.isArray(body.transcript) ? body.transcript : [];
+      const { data: attempt } = await admin.from("osce_attempts")
+        .select("id, user_id, guest_token").eq("id", attemptId).maybeSingle();
+      if (!attempt) return json({ error: "Tentativa não encontrada" }, 404);
+      const okUser = user && attempt.user_id === user.id;
+      const okGuest = guestToken && attempt.guest_token === guestToken;
+      if (!okUser && !okGuest) return json({ error: "Sem permissão" }, 403);
+      await admin.from("osce_attempts").update({ transcript }).eq("id", attemptId);
+      return json({ ok: true });
+    }
+
     // ========= Authenticated actions below =========
     if (!user) return json({ error: "Não autenticado" }, 401);
 
