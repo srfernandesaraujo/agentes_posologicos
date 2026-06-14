@@ -35,7 +35,7 @@ export default function OSCESessionTeacher() {
     setParticipants(ps || []);
     const { data: ats } = await sb.from("osce_attempts").select("*").eq("session_id", sessionId);
     setAttempts(ats || []);
-    const ids = Array.from(new Set([...(ps || []).map((p: any) => p.user_id)]));
+    const ids = Array.from(new Set((ps || []).map((p: any) => p.user_id).filter(Boolean)));
     if (ids.length) {
       const { data: profs } = await sb.from("profiles").select("user_id, display_name").in("user_id", ids);
       const m: Record<string, string> = {};
@@ -85,13 +85,24 @@ export default function OSCESessionTeacher() {
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
   const ss = String(elapsed % 60).padStart(2, "0");
 
-  // Ranking
+  // Ranking — supports guests (user_id null) via guest_token
+  const participantKey = (p: any) => p.user_id || `g:${p.guest_token}`;
+  const participantName = (p: any) =>
+    p.user_id ? (profiles[p.user_id] || p.display_name || "Aluno") : (p.display_name || p.guest_name || p.guest_email || "Convidado");
   const ranking = participants.map((p) => {
-    const myAttempts = attempts.filter((a) => a.user_id === p.user_id);
+    const myAttempts = attempts.filter((a) =>
+      p.user_id ? a.user_id === p.user_id : (a.guest_token && a.guest_token === p.guest_token)
+    );
     const total = myAttempts.reduce((s, a) => s + Number(a.score || 0), 0);
     const max = myAttempts.reduce((s, a) => s + Number(a.max_score || 0), 0);
     const inProgress = myAttempts.find((a) => a.status === "in_progress");
-    return { user_id: p.user_id, name: profiles[p.user_id] || "Aluno", total, max, completed: myAttempts.filter(a => a.status === "completed").length, inProgress: !!inProgress };
+    return {
+      key: participantKey(p),
+      name: participantName(p),
+      total, max,
+      completed: myAttempts.filter((a) => a.status === "completed").length,
+      inProgress: !!inProgress,
+    };
   }).sort((a, b) => b.total - a.total);
 
   return (
@@ -159,8 +170,11 @@ export default function OSCESessionTeacher() {
             {participants.length === 0 ? (
               <p className="text-sm text-muted-foreground">Compartilhe o PIN para os alunos entrarem.</p>
             ) : participants.map((p) => (
-              <div key={p.user_id} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
-                <span>{profiles[p.user_id] || "Aluno"}</span>
+              <div key={participantKey(p)} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
+                <span>
+                  {participantName(p)}
+                  {!p.user_id && <Badge variant="outline" className="ml-2 text-[10px]">convidado</Badge>}
+                </span>
                 <span className="text-xs text-muted-foreground">{new Date(p.joined_at).toLocaleTimeString("pt-BR")}</span>
               </div>
             ))}
@@ -173,7 +187,7 @@ export default function OSCESessionTeacher() {
             {ranking.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sem dados ainda.</p>
             ) : ranking.map((r, i) => (
-              <div key={r.user_id} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
+              <div key={r.key} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
                 <span><strong>{i + 1}.</strong> {r.name} {r.inProgress && <Badge variant="outline" className="ml-1 text-[10px]">atendendo</Badge>}</span>
                 <span className="font-mono">{r.total.toFixed(1)}/{r.max.toFixed(1)} · {r.completed} est.</span>
               </div>
