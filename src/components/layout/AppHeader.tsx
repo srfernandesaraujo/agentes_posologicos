@@ -4,7 +4,7 @@ import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Coins, User, LogOut, Pill, Shield, BarChart3, FolderKanban, Search } from "lucide-react";
+import { Coins, User, LogOut, Pill, Shield, BarChart3, FolderKanban, Search, Stethoscope } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { LanguageSelector } from "@/components/LanguageSelector";
@@ -65,6 +65,13 @@ export function AppHeader() {
             <Button variant="outline" size="sm" className="gap-2 font-medium border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
               <FolderKanban className="h-4 w-4 text-[hsl(174,62%,47%)]" />
               Projetos
+            </Button>
+          </Link>
+
+          <Link to="/osce" className="hidden md:inline-flex">
+            <Button variant="outline" size="sm" className="gap-2 font-medium border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
+              <Stethoscope className="h-4 w-4 text-[hsl(174,62%,47%)]" />
+              OSCE
             </Button>
           </Link>
 

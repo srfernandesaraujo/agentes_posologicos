@@ -47,6 +47,11 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CookiePolicy from "./pages/CookiePolicy";
 import VerifyCertificate from "./pages/VerifyCertificate";
 import Briefing from "./pages/Briefing";
+import OSCE from "./pages/OSCE";
+import OSCEStationEditor from "./pages/OSCEStationEditor";
+import OSCEAttendance from "./pages/OSCEAttendance";
+import OSCEResult from "./pages/OSCEResult";
+import OSCEExamEditor from "./pages/OSCEExamEditor";
 import { CookieConsent } from "./components/cookies/CookieConsent";
 
 const queryClient = new QueryClient();
@@ -104,6 +109,11 @@ const App = () => (
               <Route path="/reunioes" element={<Meetings />} />
               <Route path="/projetos" element={<Projects />} />
               <Route path="/projetos/:projectId" element={<ProjectDetail />} />
+              <Route path="/osce" element={<OSCE />} />
+              <Route path="/osce/estacao/:id" element={<OSCEStationEditor />} />
+              <Route path="/osce/atendimento/:attemptId" element={<OSCEAttendance />} />
+              <Route path="/osce/resultado/:attemptId" element={<OSCEResult />} />
+              <Route path="/osce/prova/:id" element={<OSCEExamEditor />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
