@@ -52,7 +52,7 @@ export default function OSCE() {
         </div>
         <div className="flex gap-2">
           <Link to="/osce/estacao/nova"><Button className="gap-2"><Plus className="h-4 w-4" /> Nova estação</Button></Link>
-          <Link to="/osce/prova/nova"><Button variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Nova prova</Button></Link>
+          <Link to="/osce/prova/nova"><Button variant="secondary" className="gap-2"><Plus className="h-4 w-4" /> Nova prova</Button></Link>
         </div>
       </div>
 
