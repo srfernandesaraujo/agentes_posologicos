@@ -52,6 +52,9 @@ import OSCEStationEditor from "./pages/OSCEStationEditor";
 import OSCEAttendance from "./pages/OSCEAttendance";
 import OSCEResult from "./pages/OSCEResult";
 import OSCEExamEditor from "./pages/OSCEExamEditor";
+import OSCEJoin from "./pages/OSCEJoin";
+import OSCESessionTeacher from "./pages/OSCESessionTeacher";
+import OSCESessionStudent from "./pages/OSCESessionStudent";
 import { CookieConsent } from "./components/cookies/CookieConsent";
 
 const queryClient = new QueryClient();
@@ -114,6 +117,9 @@ const App = () => (
               <Route path="/osce/atendimento/:attemptId" element={<OSCEAttendance />} />
               <Route path="/osce/resultado/:attemptId" element={<OSCEResult />} />
               <Route path="/osce/prova/:id" element={<OSCEExamEditor />} />
+              <Route path="/osce/entrar" element={<OSCEJoin />} />
+              <Route path="/osce/sessao/:sessionId" element={<OSCESessionTeacher />} />
+              <Route path="/osce/sala/:sessionId" element={<OSCESessionStudent />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
