@@ -73,6 +73,10 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/redefinir-senha" element={<ResetPassword />} />
             <Route path="/sala/:pin" element={<VirtualRoomChat />} />
+            {/* Acesso público de alunos por PIN ao OSCE */}
+            <Route path="/osce/entrar" element={<OSCEJoin />} />
+            <Route path="/osce/sala/:sessionId" element={<OSCESessionStudent />} />
+            <Route path="/osce/atendimento/:attemptId" element={<OSCEAttendance />} />
             <Route path="/precos" element={<PublicCredits />} />
             <Route path="/vitrine" element={<PublicMarketplace />} />
             <Route path="/docs" element={<PublicDocumentation />} />
@@ -114,12 +118,9 @@ const App = () => (
               <Route path="/projetos/:projectId" element={<ProjectDetail />} />
               <Route path="/osce" element={<OSCE />} />
               <Route path="/osce/estacao/:id" element={<OSCEStationEditor />} />
-              <Route path="/osce/atendimento/:attemptId" element={<OSCEAttendance />} />
               <Route path="/osce/resultado/:attemptId" element={<OSCEResult />} />
               <Route path="/osce/prova/:id" element={<OSCEExamEditor />} />
-              <Route path="/osce/entrar" element={<OSCEJoin />} />
               <Route path="/osce/sessao/:sessionId" element={<OSCESessionTeacher />} />
-              <Route path="/osce/sala/:sessionId" element={<OSCESessionStudent />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

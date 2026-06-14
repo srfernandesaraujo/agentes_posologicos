@@ -1217,6 +1217,9 @@ export type Database = {
           ended_at: string | null
           exam_id: string | null
           feedback: string | null
+          guest_email: string | null
+          guest_name: string | null
+          guest_token: string | null
           id: string
           max_score: number | null
           rubric_result: Json | null
@@ -1227,7 +1230,7 @@ export type Database = {
           status: string
           transcript: Json
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1236,6 +1239,9 @@ export type Database = {
           ended_at?: string | null
           exam_id?: string | null
           feedback?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_token?: string | null
           id?: string
           max_score?: number | null
           rubric_result?: Json | null
@@ -1246,7 +1252,7 @@ export type Database = {
           status?: string
           transcript?: Json
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1255,6 +1261,9 @@ export type Database = {
           ended_at?: string | null
           exam_id?: string | null
           feedback?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_token?: string | null
           id?: string
           max_score?: number | null
           rubric_result?: Json | null
@@ -1265,7 +1274,7 @@ export type Database = {
           status?: string
           transcript?: Json
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1420,26 +1429,35 @@ export type Database = {
         Row: {
           current_attempt_id: string | null
           display_name: string | null
+          guest_email: string | null
+          guest_name: string | null
+          guest_token: string | null
           id: string
           joined_at: string
           session_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           current_attempt_id?: string | null
           display_name?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_token?: string | null
           id?: string
           joined_at?: string
           session_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           current_attempt_id?: string | null
           display_name?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_token?: string | null
           id?: string
           joined_at?: string
           session_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {

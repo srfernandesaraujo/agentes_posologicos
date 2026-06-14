@@ -16,7 +16,7 @@ function difficultyCost(d: string | null | undefined): number {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { attemptId } = await req.json();
+    const { attemptId, guestToken } = await req.json();
     if (!attemptId) {
       return new Response(JSON.stringify({ error: "attemptId obrigatório" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -27,24 +27,30 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Não autenticado" }), {
+    let user: any = null;
+    if (authHeader && authHeader !== `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`) {
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: u } = await userClient.auth.getUser();
+      user = u?.user || null;
+    }
+    if (!user && !guestToken) {
+      return new Response(JSON.stringify({ error: "Sem autenticação nem token de convidado" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { data: attempt } = await admin
       .from("osce_attempts")
-      .select("id,user_id,station_id,transcript,started_at,credits_charged,status")
+      .select("id,user_id,guest_token,station_id,transcript,started_at,credits_charged,status")
       .eq("id", attemptId)
       .maybeSingle();
-    if (!attempt || attempt.user_id !== user.id) {
+    const okUser = user && attempt?.user_id === user.id;
+    const okGuest = guestToken && attempt?.guest_token === guestToken;
+    if (!attempt || (!okUser && !okGuest)) {
       return new Response(JSON.stringify({ error: "Tentativa inválida" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -68,15 +74,18 @@ Deno.serve(async (req) => {
     }
 
     // Verifica créditos
-    const { data: { user: u2 } } = await admin.auth.admin.getUserById(user.id);
-    const email = u2?.email || "";
-    const isAdmin = ADMIN_EMAILS.includes(email);
-    const { data: roleRow } = await admin
-      .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
-    const isFree = isAdmin || !!roleRow;
+    let isFree = true;
+    if (user) {
+      const { data: { user: u2 } } = await admin.auth.admin.getUserById(user.id);
+      const email = u2?.email || "";
+      const isAdmin = ADMIN_EMAILS.includes(email);
+      const { data: roleRow } = await admin
+        .from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
+      isFree = isAdmin || !!roleRow;
+    }
     const cost = difficultyCost(station.difficulty);
 
-    if (!isFree) {
+    if (!isFree && user) {
       const { data: ledger } = await admin
         .from("credits_ledger").select("amount").eq("user_id", user.id);
       const balance = (ledger || []).reduce((s: number, r: any) => s + r.amount, 0);
@@ -165,7 +174,7 @@ ${transcriptText}`;
       credits_charged: isFree ? 0 : cost,
     }).eq("id", attemptId);
 
-    if (!isFree) {
+    if (!isFree && user) {
       await admin.from("credits_ledger").insert({
         user_id: user.id,
         amount: -cost,

@@ -7,56 +7,59 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, CheckCircle2, Clock, Trophy } from "lucide-react";
 
-const sb: any = supabase;
+function readGuest(sessionId: string): { token: string; name?: string; email?: string } | null {
+  try {
+    const raw = localStorage.getItem(`osce_guest_${sessionId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.token ? parsed : null;
+  } catch { return null; }
+}
 
 export default function OSCESessionStudent() {
   const { sessionId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [session, setSession] = useState<any>(null);
-  const [participant, setParticipant] = useState<any>(null);
   const [attempts, setAttempts] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
   const [elapsed, setElapsed] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  async function loadAll() {
-    if (!sessionId || !user) return;
-    const { data: s } = await sb.from("osce_exam_sessions").select("*").eq("id", sessionId).maybeSingle();
-    setSession(s);
-    if (!s) return;
-    const { data: p } = await sb.from("osce_session_participants").select("*")
-      .eq("session_id", sessionId).eq("user_id", user.id).maybeSingle();
-    setParticipant(p);
-    const { data: ats } = await sb.from("osce_attempts").select("*, osce_stations(title, duration_minutes)")
-      .eq("session_id", sessionId).eq("user_id", user.id).order("created_at", { ascending: true });
-    setAttempts(ats || []);
-    const { data: exSt } = await sb.from("osce_exam_stations")
-      .select("order_index, osce_stations(title, duration_minutes)").eq("exam_id", s.exam_id)
-      .order("order_index", { ascending: true });
-    setStations((exSt || []).map((r: any) => r.osce_stations).filter(Boolean));
+  const guest = sessionId ? readGuest(sessionId) : null;
+
+  async function loadState() {
+    if (!sessionId) return;
+    const { data, error } = await supabase.functions.invoke("osce-session-control", {
+      body: { action: "state", sessionId, guestToken: guest?.token || null },
+    });
+    if (error || (data as any)?.error) {
+      setError((data as any)?.error || error?.message || "Falha ao carregar sessão");
+      return;
+    }
+    setError(null);
+    setSession((data as any).session);
+    setAttempts((data as any).attempts || []);
+    setStations((data as any).stations || []);
   }
 
-  useEffect(() => { loadAll(); }, [sessionId, user?.id]);
-
   useEffect(() => {
-    if (!sessionId) return;
-    const ch = supabase
-      .channel(`osce-student-${sessionId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "osce_exam_sessions", filter: `id=eq.${sessionId}` }, () => loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "osce_session_participants", filter: `session_id=eq.${sessionId}` }, () => loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "osce_attempts", filter: `session_id=eq.${sessionId}` }, () => loadAll())
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [sessionId]);
+    loadState();
+    const t = setInterval(loadState, 2500);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, user?.id]);
 
   // Auto-redirect to in-progress attempt
   useEffect(() => {
     if (session?.status !== "running") return;
-    const cur = attempts.find((a) => a.status === "in_progress");
-    if (cur) navigate(`/osce/atendimento/${cur.id}`);
-  }, [session?.status, attempts, navigate]);
+    const cur = attempts.find((a: any) => a.status === "in_progress");
+    if (cur) {
+      const qs = guest?.token ? `?guest=${encodeURIComponent(guest.token)}` : "";
+      navigate(`/osce/atendimento/${cur.id}${qs}`);
+    }
+  }, [session?.status, attempts, navigate, guest?.token]);
 
-  // Elapsed timer for current station
   useEffect(() => {
     if (!session?.current_station_started_at) { setElapsed(0); return; }
     const start = new Date(session.current_station_started_at).getTime();
@@ -64,12 +67,12 @@ export default function OSCESessionStudent() {
     return () => clearInterval(t);
   }, [session?.current_station_started_at]);
 
+  if (error) return <div className="container py-8"><Card><CardContent className="p-8 text-center text-destructive">{error}</CardContent></Card></div>;
   if (!session) return <div className="container py-8">Carregando sessão...</div>;
 
-  // Finished view
   if (session.status === "finished") {
-    const total = attempts.reduce((s, a) => s + Number(a.score || 0), 0);
-    const max = attempts.reduce((s, a) => s + Number(a.max_score || 0), 0);
+    const total = attempts.reduce((s: number, a: any) => s + Number(a.score || 0), 0);
+    const max = attempts.reduce((s: number, a: any) => s + Number(a.max_score || 0), 0);
     return (
       <div className="container max-w-3xl py-8 space-y-4">
         <Card>
@@ -82,16 +85,13 @@ export default function OSCESessionStudent() {
               <p className="text-sm text-muted-foreground mt-1">Pontuação total · {attempts.length} estações</p>
             </div>
             <div className="space-y-2">
-              {attempts.map((a) => (
-                <div key={a.id} className="flex items-center justify-between border rounded-lg p-3">
-                  <div>
+              {attempts.map((a: any) => (
+                <div key={a.id} className="border rounded-lg p-3">
+                  <div className="flex items-center justify-between">
                     <div className="font-medium text-sm">{a.osce_stations?.title}</div>
-                    <div className="text-xs text-muted-foreground line-clamp-1">{a.feedback}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
                     <Badge>{Number(a.score || 0).toFixed(1)}/{Number(a.max_score || 0).toFixed(1)}</Badge>
-                    <a href={`/osce/resultado/${a.id}`} className="text-xs underline">Ver</a>
                   </div>
+                  {a.feedback && <p className="text-xs text-muted-foreground mt-1">{a.feedback}</p>}
                 </div>
               ))}
             </div>
@@ -151,7 +151,7 @@ export default function OSCESessionStudent() {
         <Card>
           <CardHeader><CardTitle className="text-base">Suas estações</CardTitle></CardHeader>
           <CardContent className="space-y-1">
-            {attempts.map((a, i) => (
+            {attempts.map((a: any, i: number) => (
               <div key={a.id} className="flex items-center justify-between text-sm py-1">
                 <span>{i + 1}. {a.osce_stations?.title}</span>
                 {a.status === "completed" ? (
