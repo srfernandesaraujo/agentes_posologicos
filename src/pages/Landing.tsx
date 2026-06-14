@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowUpRight, Pill, Shield, Zap, Brain, BarChart3, DoorOpen, Wrench, Stethoscope, Smartphone, Workflow } from "lucide-react";
+import { ArrowUpRight, Pill, Shield, Zap, Brain, BarChart3, DoorOpen, Wrench, Stethoscope, Smartphone, Workflow, Users } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
@@ -570,7 +570,7 @@ export default function Landing() {
           />
           <div className="relative mx-auto max-w-[1440px] px-6 md:px-10 py-28 grid lg:grid-cols-12 gap-10 items-center">
             <Reveal className="lg:col-span-6">
-              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 004 ] Salas Virtuais</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 004 ] Acesso por PIN</p>
               <h2 className="font-display text-5xl md:text-7xl leading-[0.95] tracking-tight">
                 <span className="italic font-serif font-light">Entre com</span><br />
                 <span className="font-bold uppercase inline-flex items-center gap-4">
@@ -578,31 +578,49 @@ export default function Landing() {
                   <DoorOpen className="h-12 w-12 text-white/60" strokeWidth={1.2} />
                 </span>
               </h2>
-              <p className="mt-8 text-white/55 max-w-lg leading-relaxed">{t("landing.pin.desc")}</p>
+              <p className="mt-8 text-white/55 max-w-lg leading-relaxed">
+                Recebeu um PIN do seu professor? Escolha o tipo de atividade para entrar — você não precisa criar conta.
+              </p>
             </Reveal>
-            <Reveal delay={150} className="lg:col-span-5 lg:col-start-8">
-              <div className="border border-white/10 bg-white/[0.02] p-6 md:p-8">
-                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/40 mb-4">{t("landing.pin.title")}</p>
-                <div className="flex flex-col gap-3">
-                  <Input
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder={t("landing.pin.placeholder")}
-                    className="h-14 border-0 border-b border-white/20 rounded-none bg-transparent text-white placeholder:text-white/30 font-mono text-2xl tracking-[0.4em] text-center px-0 focus-visible:ring-0 focus-visible:border-white"
-                    onKeyDown={(e) => { if (e.key === "Enter") handlePinAccess(); }}
-                  />
-                  <Button
-                    onClick={handlePinAccess}
-                    disabled={pin.trim().length < 4}
-                    className="h-12 rounded-full bg-white text-black hover:bg-white/90 font-mono text-[12px] uppercase tracking-[0.2em] gap-3 group"
-                  >
-                    {t("landing.pin.access")}
-                    <span className="grid place-items-center h-7 w-7 rounded-full bg-black text-white transition-transform group-hover:rotate-45">
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </span>
-                  </Button>
+            <Reveal delay={150} className="lg:col-span-5 lg:col-start-8 grid sm:grid-cols-2 gap-4">
+              <Link
+                to="/sala/"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const p = window.prompt("Digite o PIN da sala virtual:");
+                  if (p && p.trim()) navigate(`/sala/${p.trim()}`);
+                }}
+                className="group border border-white/10 bg-white/[0.02] p-6 hover:bg-white/[0.05] hover:border-white/20 transition-colors flex flex-col gap-4"
+              >
+                <div className="flex items-center justify-between">
+                  <Users className="h-7 w-7 text-[hsl(174,62%,55%)]" strokeWidth={1.5} />
+                  <ArrowUpRight className="h-4 w-4 text-white/40 group-hover:text-white transition-colors" />
                 </div>
-              </div>
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/40 mb-2">Aula colaborativa</p>
+                  <h3 className="text-xl font-bold text-white">Sala Virtual</h3>
+                  <p className="mt-2 text-sm text-white/55 leading-snug">
+                    Entre numa aula ao vivo com o agente do professor.
+                  </p>
+                </div>
+              </Link>
+
+              <Link
+                to="/osce/entrar"
+                className="group border border-[hsl(174,62%,47%)]/30 bg-[hsl(174,62%,47%)]/[0.06] p-6 hover:bg-[hsl(174,62%,47%)]/[0.12] hover:border-[hsl(174,62%,47%)]/50 transition-colors flex flex-col gap-4"
+              >
+                <div className="flex items-center justify-between">
+                  <Stethoscope className="h-7 w-7 text-[hsl(174,62%,55%)]" strokeWidth={1.5} />
+                  <ArrowUpRight className="h-4 w-4 text-white/40 group-hover:text-white transition-colors" />
+                </div>
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/40 mb-2">Prova clínica</p>
+                  <h3 className="text-xl font-bold text-white">OSCE Virtual</h3>
+                  <p className="mt-2 text-sm text-white/55 leading-snug">
+                    Entre na prova OSCE aplicada pelo seu professor.
+                  </p>
+                </div>
+              </Link>
             </Reveal>
           </div>
         </section>
