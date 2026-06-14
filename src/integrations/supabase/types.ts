@@ -1209,6 +1209,207 @@ export type Database = {
         }
         Relationships: []
       }
+      osce_attempts: {
+        Row: {
+          created_at: string
+          credits_charged: number
+          duration_seconds: number | null
+          ended_at: string | null
+          exam_id: string | null
+          feedback: string | null
+          id: string
+          max_score: number | null
+          rubric_result: Json | null
+          score: number | null
+          started_at: string
+          station_id: string
+          status: string
+          transcript: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_charged?: number
+          duration_seconds?: number | null
+          ended_at?: string | null
+          exam_id?: string | null
+          feedback?: string | null
+          id?: string
+          max_score?: number | null
+          rubric_result?: Json | null
+          score?: number | null
+          started_at?: string
+          station_id: string
+          status?: string
+          transcript?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_charged?: number
+          duration_seconds?: number | null
+          ended_at?: string | null
+          exam_id?: string | null
+          feedback?: string | null
+          id?: string
+          max_score?: number | null
+          rubric_result?: Json | null
+          score?: number | null
+          started_at?: string
+          station_id?: string
+          status?: string
+          transcript?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "osce_attempts_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "osce_exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "osce_attempts_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "osce_stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      osce_exam_stations: {
+        Row: {
+          created_at: string
+          exam_id: string
+          id: string
+          order_index: number
+          station_id: string
+        }
+        Insert: {
+          created_at?: string
+          exam_id: string
+          id?: string
+          order_index?: number
+          station_id: string
+        }
+        Update: {
+          created_at?: string
+          exam_id?: string
+          id?: string
+          order_index?: number
+          station_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "osce_exam_stations_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "osce_exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "osce_exam_stations_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "osce_stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      osce_exams: {
+        Row: {
+          access_code: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_open: boolean
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_open?: boolean
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_code?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_open?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      osce_stations: {
+        Row: {
+          created_at: string
+          difficulty: string
+          duration_minutes: number
+          expected_conducts: Json
+          expected_questions: Json
+          id: string
+          is_public: boolean
+          patient_omissions: string | null
+          patient_persona: string
+          patient_symptoms: string
+          rubric: Json
+          scenario_brief: string
+          specialty: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          difficulty?: string
+          duration_minutes?: number
+          expected_conducts?: Json
+          expected_questions?: Json
+          id?: string
+          is_public?: boolean
+          patient_omissions?: string | null
+          patient_persona: string
+          patient_symptoms: string
+          rubric?: Json
+          scenario_brief: string
+          specialty?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string
+          duration_minutes?: number
+          expected_conducts?: Json
+          expected_questions?: Json
+          id?: string
+          is_public?: boolean
+          patient_omissions?: string | null
+          patient_persona?: string
+          patient_symptoms?: string
+          rubric?: Json
+          scenario_brief?: string
+          specialty?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

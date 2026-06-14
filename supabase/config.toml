@@ -86,3 +86,9 @@ verify_jwt = false
 
 [functions.clinical-validator]
 verify_jwt = false
+
+[functions.osce-patient]
+verify_jwt = false
+
+[functions.osce-evaluate]
+verify_jwt = false
