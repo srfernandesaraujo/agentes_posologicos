@@ -57,10 +57,12 @@ export default function OSCEResult() {
             {r.items.map((it: any, i: number) => {
               const p = it.max_score ? (Number(it.score) / Number(it.max_score)) * 100 : 0;
               return (
-                <div key={i} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>{it.criterion}</span>
-                    <span className="font-mono">{Number(it.score).toFixed(1)}/{it.max_score}</span>
+                <div key={i} className="space-y-2 pb-3 border-b border-border/40 last:border-0 last:pb-0">
+                  <div className="flex justify-between items-start gap-4 text-sm">
+                    <span className="flex-1">{it.criterion}</span>
+                    <span className="shrink-0 font-mono font-bold text-base px-2.5 py-1 rounded-md bg-primary/10 text-primary border border-primary/20">
+                      {Number(it.score).toFixed(1)}<span className="opacity-60">/{it.max_score}</span>
+                    </span>
                   </div>
                   <Progress value={p} />
                   {it.evidence && <p className="text-xs text-muted-foreground italic">"{it.evidence}"</p>}
