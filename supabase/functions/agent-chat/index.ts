@@ -6041,6 +6041,143 @@ Ao final, pergunte: "Posso te ajudar com mais alguma coisa? 😊"
 
 const DEFAULT_PROMPT = "Você é um assistente especializado. Responda de forma clara, estruturada e objetiva. Mantenha-se dentro do escopo do tema solicitado.";
 
+const ORACLE_MODULE_GUIDES: Array<{ key: string; patterns: RegExp[]; response: string }> = [
+  {
+    key: "osce",
+    patterns: [/\bosce\b/i, /paciente\s+virtual/i, /esta[cç][aã]o\s+cl[ií]nica/i, /prova\s+ao\s+vivo/i, /simula(?:r|[cç][aã]o).*cl[ií]nic/i],
+    response: `🧭 **OSCE Virtual** — use este módulo para criar estações clínicas interativas, aplicar provas com paciente virtual e avaliar alunos automaticamente.
+📍 Rota: \`/osce\`
+
+**Passo a passo:**
+1. Acesse **OSCE** no menu lateral.
+2. Na aba **Estações**, crie uma estação com briefing, persona do paciente, sintomas, omissões, perguntas esperadas, condutas e rubrica.
+3. Na aba **Provas**, crie uma prova e adicione as estações na ordem desejada.
+4. Para uso individual/assíncrono, abra a estação ou prova e inicie o atendimento: o aluno conversa com o paciente virtual por chat e, ao encerrar, recebe avaliação pela rubrica.
+5. Para aplicar ao vivo, abra a prova e clique em **Aplicar ao vivo**; o sistema gera um PIN.
+6. Os alunos entram por \`/osce/entrar\`, digitam o PIN e acessam com conta ou como convidados.
+7. No painel do professor, use **Iniciar**, **Pausar**, **Próxima estação** e **Encerrar prova** para controlar a turma em tempo real.
+
+💡 **Dica:** isto não é um agente de EdTech. A ferramenta correta é o **módulo OSCE**, porque ele tem paciente virtual, PIN, cronômetro, rubrica e avaliação automática.`
+  },
+  {
+    key: "salas",
+    patterns: [/salas?\s+virtuais/i, /\bsala\b.*\bpin\b/i, /participantes?.*pin/i],
+    response: `🧭 **Salas Virtuais** — use este módulo para liberar um agente para alunos ou convidados via PIN.
+📍 Rota: \`/salas-virtuais\`
+
+**Passo a passo:**
+1. Acesse **Salas Virtuais** no menu lateral.
+2. Crie uma sala, dê nome/descrição e escolha o agente que responderá aos participantes.
+3. Compartilhe o PIN gerado com os participantes.
+4. Cada participante entra pelo PIN, informa nome/e-mail e conversa em uma sessão isolada.
+5. Como criador, acompanhe as conversas na área de participantes.
+
+💡 **Dica:** use Salas Virtuais quando várias pessoas precisam conversar com o mesmo agente sem acessar sua conta.`
+  },
+  {
+    key: "reunioes",
+    patterns: [/reuni[oõ]es?/i, /google\s+meet/i, /atas?\s+de\s+reuni/i, /transcri[cç][aã]o.*reuni/i],
+    response: `🧭 **Reuniões com IA** — use este módulo para gravar, transcrever e resumir encontros do Google Meet.
+📍 Rota: \`/reunioes\`
+
+**Passo a passo:**
+1. Acesse **Reuniões** no menu lateral.
+2. Cole o link do Google Meet.
+3. Inicie o bot para entrar na reunião.
+4. Ao final, aguarde gravação, transcrição e resumo automático.
+5. Se necessário, regenere a ata com um prompt customizado.
+
+💡 **Dica:** é ideal para atas formais, resumos executivos, aulas e reuniões de projeto.`
+  },
+  {
+    key: "fluxos",
+    patterns: [/fluxos?/i, /rede\s+de\s+agentes/i, /pipeline/i, /multi[-\s]?agente/i, /orquestra[cç][aã]o/i],
+    response: `🧭 **Fluxos / Rede de Agentes** — use este módulo para encadear vários agentes em uma tarefa complexa.
+📍 Rota: \`/fluxos\`
+
+**Passo a passo:**
+1. Acesse **Fluxos** no menu lateral.
+2. Crie um fluxo manualmente ou use **Gerar com IA**.
+3. Configure cada etapa com um agente e uma instrução específica.
+4. Execute o fluxo; a saída de uma etapa alimenta a próxima.
+5. Exporte o resultado em PDF quando necessário.
+
+💡 **Dica:** use Fluxos quando uma tarefa exige revisão, síntese ou etapas complementares.`
+  },
+  {
+    key: "conteudos",
+    patterns: [/conte[uú]dos?/i, /base\s+de\s+conhecimento/i, /\brag\b/i, /documentos?.*agente/i, /youtube.*transcri/i],
+    response: `🧭 **Conteúdos / Base de Conhecimento** — use este módulo para dar documentos e fontes próprias aos agentes.
+📍 Rota: \`/conteudos\`
+
+**Passo a passo:**
+1. Acesse **Conteúdos** no menu lateral.
+2. Crie uma base de conhecimento com nome e descrição.
+3. Adicione textos, arquivos, URLs ou vídeos do YouTube.
+4. Vá em **Meus Agentes**, edite o agente e vincule a base na configuração de conhecimento.
+5. Depois disso, o agente usa esses materiais como contexto nas respostas.
+
+💡 **Dica:** use bases de conhecimento para aulas, protocolos, materiais institucionais e documentos próprios.`
+  },
+  {
+    key: "projetos",
+    patterns: [/projetos?/i, /colaboradores?/i, /compartilhar.*projeto/i],
+    response: `🧭 **Projetos** — use este módulo para organizar conversas, agentes e bases de conhecimento em um espaço colaborativo.
+📍 Rota: \`/projetos\`
+
+**Passo a passo:**
+1. Acesse **Projetos** no menu lateral.
+2. Crie um projeto e defina nome/descrição.
+3. Adicione conversas, agentes ou bases ao projeto.
+4. Convide colaboradores e escolha permissão de leitura ou edição.
+5. Exporte o projeto em PDF quando precisar consolidar o material.
+
+💡 **Dica:** use Projetos para organizar disciplinas, turmas, pesquisas ou entregas para clientes.`
+  },
+  {
+    key: "briefings",
+    patterns: [/briefings?/i, /planejar.*projeto/i, /escopo.*projeto/i],
+    response: `🧭 **Briefings** — use este módulo para estruturar objetivos, público, escopo e requisitos antes de produzir conteúdo ou projeto.
+📍 Rota: \`/briefings\`
+
+**Passo a passo:**
+1. Acesse **Briefings** no menu lateral.
+2. Preencha o objetivo, público, contexto e restrições.
+3. Gere o briefing com IA.
+4. Revise e use o resultado como base para agentes, fluxos ou projetos.
+
+💡 **Dica:** é útil para alinhar expectativas antes de criar aulas, materiais clínicos ou campanhas.`
+  },
+  {
+    key: "creditos",
+    patterns: [/cr[eé]ditos?/i, /assinatura/i, /planos?/i, /comprar.*cr[eé]dito/i],
+    response: `🧭 **Créditos e Planos** — use esta área para consultar saldo, comprar pacotes ou assinar um plano.
+📍 Rota: \`/creditos\`
+
+**Passo a passo:**
+1. Acesse **Créditos** no menu lateral.
+2. Veja seu saldo atual e as opções disponíveis.
+3. Escolha pacote avulso ou plano mensal.
+4. Finalize o pagamento pelo checkout.
+5. Consulte o histórico em **Conta**.
+
+💡 **Dica:** o cadastro gratuito recebe bônus inicial, e administradores/usuários convidados podem ter acesso ilimitado.`
+  },
+];
+
+function getOracleOperationalHelp(input: string): string | null {
+  const text = input.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/\b(qual|quais)\s+agente\b/.test(text) || /recomenda(?:r|cao|ção).*agente/.test(text)) return null;
+
+  const hasOperationalIntent = /\b(como|onde|passo\s+a\s+passo|funciona|usar|uso|criar|aplicar|entrar|configurar|habilitar|explicar|explique|tutorial|rota|menu|ferramenta|modulo|módulo)\b/.test(text);
+  for (const guide of ORACLE_MODULE_GUIDES) {
+    if (guide.patterns.some((pattern) => pattern.test(input)) && (hasOperationalIntent || guide.key === "osce")) {
+      return `${guide.response}\n\nPosso te ajudar com mais alguma coisa? 😊`;
+    }
+  }
+  return null;
+}
+
 const PROMPT_GENERATOR_PROMPT = `Você é um META-ENGENHEIRO DE PROMPTS de nível elite. Sua missão é analisar a descrição do usuário e criar um agente de IA com qualidade PREMIUM — tão bem feito que surpreende pela naturalidade e profundidade.
 
 ## PROCESSO DE ANÁLISE
