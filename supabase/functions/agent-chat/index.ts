@@ -5736,6 +5736,34 @@ Você tem duas missões principais:
 
 <CONHECIMENTO_DO_SISTEMA>
 
+## 🗺️ Mapa de Rotas (todas as páginas)
+- \`/\` — Landing/início
+- \`/login\` e \`/signup\` — autenticação (bônus de 15 créditos no cadastro)
+- \`/redefinir-senha\` — recuperação e primeiro acesso de senha
+- \`/agentes\` — biblioteca de agentes nativos
+- \`/vitrine\` — vitrine pública de agentes
+- \`/chat/:agentId\` — conversar com um agente (suporta \`?session=ID\` para retomar)
+- \`/meus-agentes\` — agentes personalizados do usuário
+- \`/meus-agentes/:id\` — editor de agente personalizado
+- \`/conteudos\` e \`/conteudos/:id\` — bases de conhecimento (RAG)
+- \`/fluxos\` e \`/fluxos/:id\` — Rede de Agentes (pipelines)
+- \`/marketplace\` e \`/marketplace-fluxos\` — agentes e fluxos publicados pela comunidade
+- \`/salas-virtuais\` e \`/sala/:pin\` — Salas Virtuais
+- \`/reunioes\` — Reuniões com IA (Google Meet)
+- \`/osce\`, \`/osce/estacao/:id\`, \`/osce/prova/:id\`, \`/osce/entrar\`, \`/osce/sala/:sessionId\`, \`/osce/sessao/:sessionId\`, \`/osce/atendimento/:attemptId\`, \`/osce/resultado/:attemptId\` — módulo OSCE
+- \`/briefings\` — geração assistida de briefings
+- \`/projetos\` e \`/projetos/:id\` — projetos colaborativos
+- \`/aula-ao-vivo\` — aula ao vivo com agente
+- \`/orquestrador\` — orquestrador multi-agente
+- \`/conversas\` — histórico central de conversas
+- \`/creditos\` — comprar créditos / assinaturas
+- \`/conta\` — perfil, créditos, chaves de API, monitor PubMed, interesses, memória
+- \`/dashboard\` — visão geral do usuário
+- \`/docs\` — documentação completa
+- \`/precos\`, \`/fale-conosco\` — páginas públicas
+- \`/verificar\` — verificar certificado de conteúdo (autenticidade SHA-256)
+- \`/admin\` — painel administrativo (apenas admins)
+
 ## 📚 Bases de Conhecimento (Conteúdos)
 - Acesse pelo menu lateral "Conteúdos"
 - Crie uma base de conhecimento com nome e descrição
@@ -5743,6 +5771,8 @@ Você tem duas missões principais:
 - **Para vincular a um agente**: vá em "Meus Agentes" → edite o agente → aba "Configurações" → seção "Base de Conhecimento" → selecione a base desejada
 - Também é possível vincular múltiplas bases via o Gerenciador de Documentos no editor do agente
 - As bases podem ser públicas (compartilhadas) ou privadas
+- Tipos de fonte suportados: **texto colado**, **arquivos** (PDF, DOCX, TXT, CSV, XLS/XLSX), **URLs** (páginas web) e **transcrição automática de vídeos do YouTube**
+- O sistema ignora textos com menos de 20 caracteres ou placeholders ao montar o contexto RAG
 
 ## 🚪 Salas Virtuais
 - Acesse pelo menu lateral "Salas Virtuais"
@@ -5754,6 +5784,7 @@ Você tem duas missões principais:
 - Ideal para professores em sala de aula ou demonstrações ao vivo
 - Salas expiram automaticamente após 7 dias ou na data definida
 - É possível definir uma data de expiração personalizada
+- Suporta **modo ao vivo** com broadcast de prompt e modo perguntas anônimas
 
 ## 🔄 Fluxos (Rede de Agentes)
 - Acesse pelo menu lateral "Fluxos"
@@ -5763,6 +5794,10 @@ Você tem duas missões principais:
 - Existe a opção "Gerar com IA" que monta o fluxo automaticamente a partir de uma descrição
 - Os fluxos podem ser exportados em PDF
 - Ideal para tarefas complexas que precisam de múltiplas perspectivas
+- Suporta **execução paralela** com Agente Sintetizador ao final
+- Detecção automática de perguntas: se um agente faz perguntas no final, o fluxo pausa e exibe chat inline para o usuário responder
+- Mapas mentais em formato ┣/┗ são renderizados como SVG interativo (zoom/pan)
+- Marketplace de Fluxos em \`/marketplace-fluxos\` para publicar/instalar pipelines prontos
 
 ## 🎥 Reuniões com IA
 - Acesse pelo menu lateral "Reuniões"
@@ -5770,36 +5805,81 @@ Você tem duas missões principais:
 - Um bot entra na reunião, grava e transcreve automaticamente
 - Após a reunião, o sistema gera um resumo automático
 - Útil para atas de reunião, resumos de aula, etc.
+- Status: pending → recording → transcribing → summarizing → done
+- É possível **regenerar a ata** com prompt customizado (ata formal, resumo executivo, plano de aula etc.)
 
 ## 🏥 OSCE — Estações Clínicas com Paciente Virtual
-- Acesse pelo menu lateral "OSCE"
-- **Estações**: crie cenários clínicos com paciente virtual (rubrica, perguntas-chave, condutas esperadas, dificuldade fácil/médio/difícil)
-- **Provas**: agrupe várias estações em uma prova
-- **Modo assíncrono**: o aluno entra na estação, conversa com o paciente virtual (IA) e recebe boletim com nota, rubrica detalhada e feedback
-- **Modo ao vivo (sessão)**: o professor clica "Aplicar ao vivo" → gera um PIN de 6 dígitos. Alunos entram em \`/osce/entrar\` com o PIN (com ou sem conta). O professor vê os participantes em tempo real e controla Iniciar / Próxima estação / Encerrar. Todos avançam juntos
-- **Custo por estação avaliada**: 10 créditos (fácil), 15 (média), 20 (difícil). Admins e convidados não pagam
-- O professor vê ranking parcial e boletins consolidados de todos os alunos
+- Módulo completo de **simulação clínica estruturada** com paciente virtual. É a versão digital do OSCE (Objective Structured Clinical Examination) usado em provas de Medicina, Farmácia, Enfermagem, Odontologia etc.
+- Acesse pelo menu lateral "OSCE" (rota \`/osce\`). O módulo tem 3 abas: **Estações**, **Provas** e **Resultados**.
+
+### 1. Estações (\`/osce/estacao/:id\`)
+Crie cenários clínicos individuais. Cada estação tem:
+- **Título** e **briefing** (cenário que o aluno lê antes de iniciar)
+- **Persona do paciente virtual** (idade, queixa, história, comportamento)
+- **Perguntas-chave esperadas** (o que o aluno deve perguntar)
+- **Condutas esperadas** (o que ele deve propor)
+- **Rubrica** com critérios e pontuação máxima
+- **Dificuldade**: fácil, média ou difícil
+- **Duração** em minutos
+
+### 2. Provas (\`/osce/prova/:id\`)
+Agrupam várias estações em ordem para compor um exame completo.
+
+### 3. Modo Assíncrono
+- O aluno acessa a estação, lê o briefing e clica em "Iniciar"
+- Conversa por chat com o paciente virtual (IA roleplay 100% imersivo)
+- Ao encerrar, o sistema avalia a transcrição usando a rubrica e gera boletim com **nota**, **rubrica detalhada com evidências**, **pontos fortes**, **pontos a melhorar** e **feedback em pt-BR**
+- Pode visualizar/exportar resultado em \`/osce/resultado/:attemptId\`
+
+### 4. Modo ao Vivo (Sessão sincronizada)
+Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no comando:
+1. Na página da prova, clicar em **"Aplicar ao vivo"** → o sistema gera um **PIN de 6 dígitos**
+2. Alunos acessam \`/osce/entrar\`, digitam o PIN e entram **com conta** (usuário logado) **ou como convidados** (nome + e-mail)
+3. O professor abre o painel da sessão (\`/osce/sessao/:sessionId\`) e vê:
+   - PIN grande para projetar/compartilhar
+   - Lista de participantes em tempo real (entram via Supabase Realtime, sem F5)
+   - Cronômetro da estação atual
+   - Ranking parcial e status (em andamento / concluído) de cada aluno
+4. Controles do professor: **Iniciar**, **Pausar**, **Próxima estação**, **Encerrar prova**
+5. Quando o professor clica "Iniciar", todos os alunos começam a primeira estação juntos. Ao avançar, o sistema fecha as tentativas em andamento, avalia automaticamente e cria as próximas
+6. Alunos veem a tela em \`/osce/sala/:sessionId\` ("Aguardando professor iniciar...") e são redirecionados automaticamente para \`/osce/atendimento/:attemptId\` quando a estação inicia
+7. Após o fim, cada aluno recebe boletim consolidado de todas as estações e o professor vê ranking final
+
+### 5. Custo em créditos
+- 10 créditos (estação **fácil**), 15 (**média**), 20 (**difícil**) por estação avaliada
+- Admins e convidados (alunos sem conta) **não pagam créditos**
+- Em sessões ao vivo, o débito acontece no aluno autenticado (ou é zero para convidados)
+
+### 6. Observações importantes
+- Cada sessão ao vivo é descartada após "Encerrar prova" — para reutilizar a mesma prova com outra turma, gere uma nova sessão (novo PIN)
+- Se o PIN estiver vencido, o aluno recebe "Sessão não encontrada ou finalizada"
+- Realtime habilitado: timer para imediatamente quando o status muda para finished/paused; lista de participantes atualiza sozinha
 
 ## 📱 Integração WhatsApp
 - No editor do agente personalizado, ative "Publicar no WhatsApp"
 - Suporta Evolution API e Z-API
 - O agente passa a responder mensagens recebidas no número conectado automaticamente
 - Mantém histórico das últimas 10 mensagens por contato
+- Configuração: webhook URL, token e phone number ID por agente
 
 ## 🔬 Especialista PubMed
 - Agente nativo que busca artigos científicos em tempo real na base PubMed (NCBI)
 - Em "Conta" → "Monitor PubMed", cadastre seus interesses de pesquisa
 - Toda segunda-feira o sistema busca novos artigos dos últimos 7 dias e envia notificações na plataforma
+- Limite de 15 artigos por consulta. Traduz pt→en automaticamente para a busca e devolve em pt-BR com links diretos para PubMed
 
 ## 📋 Briefings
 - Acesse pelo menu lateral "Briefings"
 - Estruture briefings de projetos clínicos, educacionais ou de conteúdo com ajuda de IA
 - Útil para alinhar escopo antes de iniciar um trabalho com os agentes
+- Configurações em "Conta" controlam tom, idioma e estilo padrão dos briefings
 
 ## 📁 Projetos e Colaboradores
 - Organize conversas, agentes e bases de conhecimento em projetos
 - Convide colaboradores para um projeto compartilhado
 - Cada item (conversa, agente, base) pode ser adicionado a um ou mais projetos
+- Permissões por colaborador: **viewer** (apenas lê) ou **editor** (lê e edita)
+- Exportação consolidada do projeto em PDF
 
 ## ✅ Certificado e Verificação de Conteúdo
 - Toda resposta gerada pode receber um certificado com hash SHA-256
@@ -5811,6 +5891,33 @@ Você tem duas missões principais:
 - No chat, clique no ícone de templates para reutilizar entradas salvas
 - Acelera o trabalho repetitivo
 
+## 🎙️ Voz (entrada e saída)
+- **Entrada por voz**: ícone de microfone no chat usa transcrição (voice-transcribe) para converter fala em texto
+- **Saída por voz (TTS)**: cada mensagem do agente tem botão de "ouvir" via ElevenLabs
+
+## 🧠 Memória do Usuário e Contexto
+- O sistema extrai automaticamente fatos relevantes do usuário durante as conversas (\`user_memory_facts\`)
+- Acesse e edite manualmente em \`/conta\` → "Memória"
+- Esses fatos são injetados como contexto extra nos agentes para personalizar respostas
+
+## 🔔 Notificações
+- Sino no topo da aplicação mostra notificações (PubMed semanal, convites, eventos da plataforma)
+
+## 🧪 Outras funcionalidades
+- **Orquestrador** (\`/orquestrador\`): roteia automaticamente a pergunta para o melhor agente disponível
+- **Aula ao Vivo** (\`/aula-ao-vivo\`): formato dedicado para apresentações em sala
+- **Aba de mapa mental**: agentes com saída ┣/┗ renderizam SVG interativo
+- **Validador Clínico**: blocos \`[PACIENTE]\` e \`[ALERTAS]\` viram cards visuais
+- **Simulador de Prescrição**: validação gamificada com hotspots
+- **Auto Fine-Tuning** de agentes personalizados (otimização automática do prompt)
+
+## 🏷️ Categorias dos Agentes Nativos
+1. **Prática Clínica e Farmácia** — Analisador de Interações + Risco CV, Consultor de Antibioticoterapia, Educador Clínico
+2. **EdTech e Professores 4.0** — Arquiteto de Metodologias Ativas, Simulador de Casos Clínicos, Analisador de Dados de Turma
+3. **Pesquisa Acadêmica e Dados** — Assistente de Editais, Consultor de Análise Estatística, Especialista PubMed
+4. **Produção de Conteúdo** — Estrategista SEO YouTube, Desmistificador/Fact-Checker
+5. **Especiais** — Super Agente (Oráculo / você), Paciente Virtual, Gerador de OSCE
+
 ## 🤖 Criar Agentes Personalizados
 - Acesse "Meus Agentes" → botão "Criar Agente"
 - Defina: nome, descrição, modelo de IA, temperatura, provedor
@@ -5819,15 +5926,32 @@ Você tem duas missões principais:
 - Ative skills modulares para adicionar capacidades extras
 - Agentes podem ser publicados no Marketplace para outros usuários
 
+## 🔌 Provedores de IA Suportados (chaves próprias)
+- **OpenAI**: GPT-4o, GPT-4o Mini, GPT-4.1, GPT-4.1 Mini, o3 Mini
+- **Google**: Gemini 2.0 Flash, Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 3 Flash Preview
+- **Anthropic**: Claude Sonnet 4, Claude 3.5 Haiku
+- **Groq**: LLaMA 3.3 70B, Qwen QWQ 32B
+- **DeepSeek**: DeepSeek Chat, DeepSeek Reasoner
+- **NVIDIA** e **OpenRouter** também suportados
+- Ordem de fallback: Google → OpenAI → Anthropic → Groq → NVIDIA → GitHub → OpenRouter
+- Chaves armazenadas criptografadas (pgcrypto/AES) e expiram em 30 dias (renovação automática ao usar)
+
 ## 🛒 Marketplace
 - Encontre agentes criados por outros usuários
 - Adquira agentes com créditos
 - Agentes adquiridos ficam disponíveis na sua biblioteca
+- Custo padrão: 5 créditos (3 vão para o autor)
+- Reviews/avaliações disponíveis antes da compra
+- Também existe **Marketplace de Fluxos** em \`/marketplace-fluxos\`
 
 ## 💳 Créditos
-- Cada agente tem um custo em créditos por interação
-- Compre créditos na seção "Créditos"
-- Administradores e usuários ilimitados não gastam créditos
+- Cada interação debita créditos (geralmente 1-5; OSCE custa 10/15/20 por estação)
+- Agentes personalizados: 0,5 crédito por interação
+- **Planos** (mensais via Stripe): Gratuito (15 créditos de bônus no cadastro), Básico (30/mês — R$ 29,90), Pro (100/mês — R$ 59,90), Institucional (300/mês — R$ 149,90)
+- **Pacotes avulsos**: Essencial (10), Avançado (30), Profissional (100)
+- Administradores, usuários convidados via Resend e o e-mail srfernandesaraujo@gmail.com têm créditos ilimitados
+- Débito é server-side, após a resposta ser gerada
+- Histórico completo em \`/conta\`
 
 ## 🔑 Chaves de API Próprias
 - Em "Conta" → "Chaves de API", o usuário pode cadastrar suas próprias chaves
@@ -5839,12 +5963,15 @@ Você tem duas missões principais:
 - Existem skills globais (disponíveis para todos) e skills do usuário
 - Cada skill injeta instruções adicionais no prompt do agente
 - Ative/desative skills na aba de configurações do agente
+- Exemplos: raciocínio clínico, citação ABNT, copywriting, uso de CID-10, prescrição segura
 
 ## 💬 Conversas
 - Todo histórico de chat é salvo automaticamente
 - Acesse conversas anteriores pelo menu "Conversas"
 - É possível exportar conversas em PDF
 - Conversas podem ser renomeadas e excluídas
+- No chat há um picker para **anexar conversa anterior** como contexto
+- Anexos suportados: PDF, DOCX, TXT, CSV, XLS/XLSX, PNG/JPG/GIF/WebP (modelos sem visão recebem o texto extraído)
 
 </CONHECIMENTO_DO_SISTEMA>
 
