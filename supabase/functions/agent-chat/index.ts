@@ -6967,6 +6967,15 @@ Deno.serve(async (req) => {
       .single();
 
     if (builtInAgent) {
+      if (builtInAgent.slug === "super-agente") {
+        const operationalHelp = getOracleOperationalHelp(input);
+        if (operationalHelp) {
+          return new Response(JSON.stringify({ output: operationalHelp }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       // Auto fine-tuning: try to load active prompt version
       let overridePrompt: string | null = null;
       try {
