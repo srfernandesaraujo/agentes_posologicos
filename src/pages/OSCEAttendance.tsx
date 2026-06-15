@@ -167,9 +167,13 @@ export default function OSCEAttendance() {
             <p className="text-xs text-muted-foreground whitespace-pre-wrap">{station.scenario_brief}</p>
           </div>
           <div className="text-right">
-            <Badge variant={overtime ? "destructive" : "outline"} className="gap-1">
-              <Clock className="h-3 w-3" /> {mm}:{ss} / {station.duration_minutes}:00
-            </Badge>
+            <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 shadow-sm ${overtime ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-primary/30 bg-primary/10 text-primary"}`}>
+              <Clock className="h-4 w-4 shrink-0" />
+              <div className="flex items-baseline gap-1 font-mono leading-none">
+                <span className="text-lg font-bold tabular-nums">{mm}:{ss}</span>
+                <span className="text-xs opacity-60 tabular-nums">/ {String(station.duration_minutes).padStart(2, "0")}:00</span>
+              </div>
+            </div>
           </div>
         </div>
         <Progress value={pct} className={overtime ? "[&>div]:bg-destructive" : ""} />
