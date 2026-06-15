@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
 
     const { data: station } = await supabase
       .from("osce_stations")
-      .select("title,patient_persona,patient_symptoms,patient_omissions,scenario_brief")
+      .select("title,patient_persona,patient_symptoms,patient_omissions,scenario_brief,exam_results")
       .eq("id", stationId)
       .maybeSingle();
     if (!station) {
@@ -30,6 +30,15 @@ Deno.serve(async (req) => {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const exams = Array.isArray((station as any).exam_results) ? (station as any).exam_results : [];
+    const examsBlock = exams.length
+      ? exams.map((ex: any, i: number) => {
+          const cat = ex.category || "exame";
+          const notes = ex.notes?.trim() ? `\nLaudo/observações: ${ex.notes.trim()}` : "";
+          return `### Exame ${i + 1} — ${ex.name || "(sem nome)"} [${cat}]\n${ex.content || ""}${notes}`;
+        }).join("\n\n")
+      : "(nenhum exame cadastrado)";
 
     const systemPrompt = `Você é um PACIENTE em uma simulação clínica OSCE. Responda SEMPRE em pt-BR, em primeira pessoa, com linguagem coloquial e realista, como uma pessoa leiga.
 
@@ -42,6 +51,12 @@ REGRAS CRÍTICAS:
 - Demonstre emoções coerentes (dor, ansiedade, vergonha quando aplicável).
 - Respostas curtas (1-4 frases). Sem listas, sem markdown.
 
+REGRA DE EXAMES:
+- Você TEM em mãos os exames listados em "## Exames disponíveis". Eles só devem ser entregues se o profissional solicitar/perguntar especificamente por algum exame (ex.: "trouxe algum exame?", "tem hemograma?", "me mostra o ECG").
+- Quando entregar um exame, MUDE o tom: diga uma frase curta em personagem ("Trouxe sim, doutor, aqui está:") e em seguida apresente o resultado EXATAMENTE como uma TABELA MARKDOWN bem formatada (use o conteúdo cadastrado; se já vier em tabela markdown, reproduza-o; se vier como texto, organize-o em tabela com colunas Parâmetro/Resultado/Referência quando fizer sentido). Inclua o laudo/observações quando houver.
+- Se o profissional perguntar por um exame que NÃO está na lista, diga em personagem que não trouxe / não fez / não tem esse exame.
+- Nunca invente valores de exame que não estejam cadastrados.
+
 ## Cenário
 ${station.scenario_brief}
 
@@ -52,7 +67,10 @@ ${station.patient_persona}
 ${station.patient_symptoms}
 
 ## Informações que você SÓ revela se perguntado diretamente (omissões)
-${station.patient_omissions || "(nenhuma omissão específica)"}`;
+${station.patient_omissions || "(nenhuma omissão específica)"}
+
+## Exames disponíveis (só entregar se solicitado)
+${examsBlock}`;
 
     const messages = [
       { role: "system", content: systemPrompt },

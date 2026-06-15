@@ -1474,6 +1474,7 @@ export type Database = {
           created_at: string
           difficulty: string
           duration_minutes: number
+          exam_results: Json
           expected_conducts: Json
           expected_questions: Json
           id: string
@@ -1492,6 +1493,7 @@ export type Database = {
           created_at?: string
           difficulty?: string
           duration_minutes?: number
+          exam_results?: Json
           expected_conducts?: Json
           expected_questions?: Json
           id?: string
@@ -1510,6 +1512,7 @@ export type Database = {
           created_at?: string
           difficulty?: string
           duration_minutes?: number
+          exam_results?: Json
           expected_conducts?: Json
           expected_questions?: Json
           id?: string

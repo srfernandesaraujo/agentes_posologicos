@@ -31,6 +31,7 @@ export default function OSCEStationEditor() {
     title: "", specialty: "", duration_minutes: 8, difficulty: "medio",
     scenario_brief: "", patient_persona: "", patient_symptoms: "", patient_omissions: "",
     expected_questions: [""], expected_conducts: [""], rubric: DEFAULT_RUBRIC, is_public: false,
+    exam_results: [],
   });
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function OSCEStationEditor() {
         expected_questions: data.expected_questions?.length ? data.expected_questions : [""],
         expected_conducts: data.expected_conducts?.length ? data.expected_conducts : [""],
         rubric: data.rubric?.length ? data.rubric : DEFAULT_RUBRIC,
+        exam_results: Array.isArray(data.exam_results) ? data.exam_results : [],
       });
     });
   }, [id]);
@@ -56,6 +58,7 @@ export default function OSCEStationEditor() {
       expected_questions: form.expected_questions.filter((s: string) => s.trim()),
       expected_conducts: form.expected_conducts.filter((s: string) => s.trim()),
       rubric: form.rubric.filter((r: any) => r.criterion?.trim()),
+      exam_results: (form.exam_results || []).filter((e: any) => e?.name?.trim() && e?.content?.trim()),
       user_id: user!.id,
     };
     delete payload.created_at; delete payload.updated_at;
@@ -120,6 +123,56 @@ export default function OSCEStationEditor() {
 
       <ListEditor label="Perguntas-chave esperadas" items={form.expected_questions} onChange={(v) => set("expected_questions", v)} />
       <ListEditor label="Condutas esperadas" items={form.expected_conducts} onChange={(v) => set("expected_conducts", v)} />
+
+      <Card>
+        <CardHeader><CardTitle>Resultados de exames (laboratoriais / imagem)</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Cadastre exames que o paciente possui. Eles só serão revelados se o aluno perguntar/solicitar. O paciente virtual apresentará o exame em tabela markdown bem formatada.
+          </p>
+          {(form.exam_results || []).map((ex: any, i: number) => (
+            <div key={i} className="border rounded-md p-3 space-y-2">
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-6">
+                  <Label>Nome do exame</Label>
+                  <Input value={ex.name || ""} placeholder="Ex.: Hemograma completo, ECG, Raio-X de tórax"
+                    onChange={(e) => { const arr = [...form.exam_results]; arr[i] = { ...arr[i], name: e.target.value }; set("exam_results", arr); }} />
+                </div>
+                <div className="col-span-4">
+                  <Label>Categoria</Label>
+                  <Select value={ex.category || "laboratorial"} onValueChange={(v) => { const arr = [...form.exam_results]; arr[i] = { ...arr[i], category: v }; set("exam_results", arr); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="laboratorial">Laboratorial</SelectItem>
+                      <SelectItem value="imagem">Imagem</SelectItem>
+                      <SelectItem value="outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2 flex items-end justify-end">
+                  <Button variant="ghost" size="icon" onClick={() => set("exam_results", form.exam_results.filter((_: any, j: number) => j !== i))}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label>Resultado (use tabela markdown ou descrição)</Label>
+                <Textarea rows={6} value={ex.content || ""}
+                  placeholder={"| Parâmetro | Resultado | Referência |\n|---|---|---|\n| Hemoglobina | 10,2 g/dL | 13-17 |\n| Leucócitos | 14.500 | 4.000-10.000 |"}
+                  onChange={(e) => { const arr = [...form.exam_results]; arr[i] = { ...arr[i], content: e.target.value }; set("exam_results", arr); }} />
+              </div>
+              <div>
+                <Label className="text-xs">Laudo/observações (opcional)</Label>
+                <Textarea rows={2} value={ex.notes || ""} placeholder="Ex.: Laudo do RX — infiltrado em base direita compatível com pneumonia."
+                  onChange={(e) => { const arr = [...form.exam_results]; arr[i] = { ...arr[i], notes: e.target.value }; set("exam_results", arr); }} />
+              </div>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => set("exam_results", [...(form.exam_results || []), { name: "", category: "laboratorial", content: "", notes: "" }])}>
+            <Plus className="h-3.5 w-3.5" /> Adicionar exame
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>Rubrica de avaliação</CardTitle></CardHeader>
