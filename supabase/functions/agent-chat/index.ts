@@ -5771,6 +5771,46 @@ Você tem duas missões principais:
 - Após a reunião, o sistema gera um resumo automático
 - Útil para atas de reunião, resumos de aula, etc.
 
+## 🏥 OSCE — Estações Clínicas com Paciente Virtual
+- Acesse pelo menu lateral "OSCE"
+- **Estações**: crie cenários clínicos com paciente virtual (rubrica, perguntas-chave, condutas esperadas, dificuldade fácil/médio/difícil)
+- **Provas**: agrupe várias estações em uma prova
+- **Modo assíncrono**: o aluno entra na estação, conversa com o paciente virtual (IA) e recebe boletim com nota, rubrica detalhada e feedback
+- **Modo ao vivo (sessão)**: o professor clica "Aplicar ao vivo" → gera um PIN de 6 dígitos. Alunos entram em \`/osce/entrar\` com o PIN (com ou sem conta). O professor vê os participantes em tempo real e controla Iniciar / Próxima estação / Encerrar. Todos avançam juntos
+- **Custo por estação avaliada**: 10 créditos (fácil), 15 (média), 20 (difícil). Admins e convidados não pagam
+- O professor vê ranking parcial e boletins consolidados de todos os alunos
+
+## 📱 Integração WhatsApp
+- No editor do agente personalizado, ative "Publicar no WhatsApp"
+- Suporta Evolution API e Z-API
+- O agente passa a responder mensagens recebidas no número conectado automaticamente
+- Mantém histórico das últimas 10 mensagens por contato
+
+## 🔬 Especialista PubMed
+- Agente nativo que busca artigos científicos em tempo real na base PubMed (NCBI)
+- Em "Conta" → "Monitor PubMed", cadastre seus interesses de pesquisa
+- Toda segunda-feira o sistema busca novos artigos dos últimos 7 dias e envia notificações na plataforma
+
+## 📋 Briefings
+- Acesse pelo menu lateral "Briefings"
+- Estruture briefings de projetos clínicos, educacionais ou de conteúdo com ajuda de IA
+- Útil para alinhar escopo antes de iniciar um trabalho com os agentes
+
+## 📁 Projetos e Colaboradores
+- Organize conversas, agentes e bases de conhecimento em projetos
+- Convide colaboradores para um projeto compartilhado
+- Cada item (conversa, agente, base) pode ser adicionado a um ou mais projetos
+
+## ✅ Certificado e Verificação de Conteúdo
+- Toda resposta gerada pode receber um certificado com hash SHA-256
+- Qualquer pessoa pode verificar a autenticidade do conteúdo em \`/verificar\` colando o texto ou o código do certificado
+- Útil para garantir que o conteúdo não foi adulterado após gerado pela IA
+
+## 📝 Templates de Entrada
+- Salve prompts que você usa com frequência por agente
+- No chat, clique no ícone de templates para reutilizar entradas salvas
+- Acelera o trabalho repetitivo
+
 ## 🤖 Criar Agentes Personalizados
 - Acesse "Meus Agentes" → botão "Criar Agente"
 - Defina: nome, descrição, modelo de IA, temperatura, provedor
