@@ -6163,6 +6163,125 @@ const ORACLE_MODULE_GUIDES: Array<{ key: string; patterns: RegExp[]; response: s
 
 💡 **Dica:** o cadastro gratuito recebe bônus inicial, e administradores/usuários convidados podem ter acesso ilimitado.`
   },
+  {
+    key: "agentes",
+    patterns: [/meus\s+agentes/i, /agentes?\s+personalizados?/i, /criar\s+agente/i, /editar\s+agente/i, /prompt\s+do\s+agente/i],
+    response: `🧭 **Meus Agentes** — use este módulo para criar, editar e publicar agentes personalizados.
+📍 Rota: \`/meus-agentes\`
+
+**Passo a passo:**
+1. Acesse **Meus Agentes** no menu lateral.
+2. Clique em **Criar Agente**.
+3. Defina nome, descrição, prompt, provedor/modelo e temperatura.
+4. Vincule bases de conhecimento e skills, se necessário.
+5. Teste o agente no chat e publique no Marketplace se quiser compartilhar.
+
+💡 **Dica:** agentes personalizados servem para tarefas recorrentes sem módulo próprio dedicado.`
+  },
+  {
+    key: "marketplace",
+    patterns: [/marketplace/i, /comprar\s+agente/i, /publicar\s+agente/i, /instalar\s+fluxo/i],
+    response: `🧭 **Marketplace** — use esta área para comprar, publicar ou instalar agentes e fluxos da comunidade.
+📍 Rota: \`/marketplace\` e \`/marketplace-fluxos\`
+
+**Passo a passo:**
+1. Acesse **Marketplace** para agentes ou **Marketplace de Fluxos** para pipelines.
+2. Veja descrição, categoria, custo e avaliações.
+3. Compre ou instale o item desejado.
+4. Depois da aquisição, use o agente na biblioteca ou o fluxo em **Fluxos**.
+5. Para publicar algo seu, edite o agente/fluxo e habilite a publicação.
+
+💡 **Dica:** agentes do Marketplace custam créditos; parte do valor vai para o autor.`
+  },
+  {
+    key: "whatsapp",
+    patterns: [/whatsapp/i, /evolution/i, /z-api/i, /webhook.*whatsapp/i],
+    response: `🧭 **WhatsApp para Agentes** — use esta integração para fazer um agente responder mensagens automaticamente no WhatsApp.
+📍 Rota: \`/meus-agentes\`
+
+**Passo a passo:**
+1. Acesse **Meus Agentes** e abra o agente desejado.
+2. Vá até a configuração de WhatsApp.
+3. Ative a publicação no WhatsApp.
+4. Informe os dados da Evolution API ou Z-API conforme seu provedor.
+5. Salve e teste enviando mensagem para o número conectado.
+
+💡 **Dica:** o sistema mantém um histórico curto por contato para preservar contexto sem crescer indefinidamente.`
+  },
+  {
+    key: "pubmed",
+    patterns: [/pubmed/i, /artigos?\s+cient[ií]ficos?/i, /monitor.*pesquisa/i, /interesses\s+de\s+pesquisa/i],
+    response: `🧭 **Especialista PubMed e Monitor de Pesquisa** — use esta função para buscar artigos em tempo real e receber alertas de novos estudos.
+📍 Rota: \`/agentes\` para consultar o agente; \`/conta\` para configurar interesses.
+
+**Passo a passo:**
+1. Para uma busca pontual, abra **Agentes** e selecione o **Especialista PubMed**.
+2. Descreva o tema, doença, medicamento ou pergunta científica.
+3. O agente busca no PubMed/NCBI e retorna artigos com links.
+4. Para alertas recorrentes, acesse **Conta** → **Monitor PubMed**.
+5. Cadastre seus interesses de pesquisa para receber notificações periódicas.
+
+💡 **Dica:** o sistema traduz termos pt-BR para inglês para melhorar a busca no PubMed.`
+  },
+  {
+    key: "verificar",
+    patterns: [/verificar/i, /certificado/i, /sha-?256/i, /autenticidade/i, /conte[uú]do\s+certificado/i],
+    response: `🧭 **Certificado e Verificação de Conteúdo** — use esta ferramenta para provar que uma resposta gerada não foi adulterada.
+📍 Rota: \`/verificar\`
+
+**Passo a passo:**
+1. Gere uma resposta em um chat da plataforma.
+2. Use a ação de certificado quando disponível na mensagem.
+3. Copie o código/certificado ou o texto certificado.
+4. Acesse **Verificar**.
+5. Cole o conteúdo ou código para validar a autenticidade.
+
+💡 **Dica:** a verificação usa hash SHA-256, útil para registros, auditoria e comprovação de integridade.`
+  },
+  {
+    key: "conversas",
+    patterns: [/conversas?/i, /hist[oó]rico/i, /exportar.*pdf/i, /renomear.*conversa/i],
+    response: `🧭 **Conversas** — use esta área para recuperar, organizar e exportar chats anteriores.
+📍 Rota: \`/conversas\`
+
+**Passo a passo:**
+1. Acesse **Conversas** no menu lateral.
+2. Abra a conversa desejada.
+3. Renomeie, exclua ou exporte em PDF conforme necessário.
+4. No chat, também é possível anexar uma conversa anterior como contexto.
+
+💡 **Dica:** use essa área para transformar interações importantes em documentação ou material de apoio.`
+  },
+  {
+    key: "conta",
+    patterns: [/\bconta\b/i, /chaves?\s+de\s+api/i, /mem[oó]ria\s+do\s+usu[aá]rio/i, /perfil/i],
+    response: `🧭 **Conta** — use esta área para gerenciar perfil, créditos, chaves próprias, memória e preferências.
+📍 Rota: \`/conta\`
+
+**Passo a passo:**
+1. Acesse **Conta** no menu lateral.
+2. Veja saldo e histórico de créditos.
+3. Cadastre chaves de API próprias se quiser usar seus provedores.
+4. Configure memória do usuário, preferências e interesses de pesquisa.
+5. Revise dados e ajustes sempre que mudar seu fluxo de trabalho.
+
+💡 **Dica:** chaves próprias podem reduzir ou zerar custo em créditos para determinadas chamadas.`
+  },
+  {
+    key: "aula-ao-vivo",
+    patterns: [/aula\s+ao\s+vivo/i, /apresenta[cç][aã]o\s+ao\s+vivo/i, /perguntas\s+an[oô]nimas/i],
+    response: `🧭 **Aula ao Vivo** — use este módulo para apoiar apresentações e interações síncronas com alunos.
+📍 Rota: \`/aula-ao-vivo\`
+
+**Passo a passo:**
+1. Acesse **Aula ao Vivo** no menu lateral.
+2. Configure o tema ou agente de apoio da aula.
+3. Use os recursos de interação para conduzir a sessão.
+4. Colete perguntas ou respostas dos alunos conforme o formato escolhido.
+5. Finalize usando o material gerado como registro da aula.
+
+💡 **Dica:** para avaliação clínica com paciente virtual, use **OSCE**; para interação geral em aula, use **Aula ao Vivo**.`
+  },
 ];
 
 function getOracleOperationalHelp(input: string): string | null {
