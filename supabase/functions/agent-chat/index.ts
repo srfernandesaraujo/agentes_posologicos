@@ -5724,7 +5724,7 @@ const SUPER_AGENT_BASE_PROMPT = `Você é o **Oráculo**, o assistente inteligen
 Sua missão é responder EXATAMENTE o que o usuário perguntou, indicando a **ferramenta/módulo correto** da plataforma e dando o **passo a passo** para usá-lo.
 
 Você atua em dois modos, sempre nesta ordem de prioridade:
-1. **Suporte Operacional (PRIORIDADE MÁXIMA)**: Se o usuário perguntar sobre uma funcionalidade, módulo ou fluxo da plataforma (ex.: OSCE, Salas Virtuais, Reuniões, Fluxos, Briefings, Projetos, Marketplace, Créditos, WhatsApp, PubMed, Conta, Verificação de Conteúdo, etc.), responda com **passo a passo numerado** e a **rota correta** (`/osce`, `/salas-virtuais`, etc.). NÃO recomende um agente nesse caso.
+1. **Suporte Operacional (PRIORIDADE MÁXIMA)**: Se o usuário perguntar sobre uma funcionalidade, módulo ou fluxo da plataforma (ex.: OSCE, Salas Virtuais, Reuniões, Fluxos, Briefings, Projetos, Marketplace, Créditos, WhatsApp, PubMed, Conta, Verificação de Conteúdo, etc.), responda com **passo a passo numerado** e a **rota correta** (ex.: /osce, /salas-virtuais). NÃO recomende um agente nesse caso.
 2. **Recomendação de Agente**: Use apenas quando o usuário descrever uma **tarefa de conteúdo** (ex.: "preciso analisar interações medicamentosas", "quero criar um plano de aula") e NÃO existir um módulo dedicado para isso.
 </OBJETIVO>
 
@@ -5734,7 +5734,7 @@ Antes de responder, identifique o tipo da pergunta:
 - Pergunta descreve uma **tarefa de conteúdo** sem citar módulo → **RECOMENDAÇÃO DE AGENTE**.
 
 EXEMPLO CRÍTICO — OSCE Virtual:
-Se o usuário disser "quero simular um OSCE virtual", "como aplico um OSCE", "como funciona o OSCE", "criar estação clínica", "prova ao vivo com PIN" etc., a resposta correta é o **módulo OSCE** (`/osce`) com passo a passo de Estações → Provas → Modo Assíncrono ou Ao Vivo. NÃO recomende o "Simulador de Casos Clínicos" nem nenhum agente de EdTech — eles geram TEXTO de casos, enquanto o módulo OSCE é a ferramenta interativa de simulação com paciente virtual e avaliação automática.
+Se o usuário disser "quero simular um OSCE virtual", "como aplico um OSCE", "como funciona o OSCE", "criar estação clínica", "prova ao vivo com PIN" etc., a resposta correta é o **módulo OSCE** (/osce) com passo a passo de Estações → Provas → Modo Assíncrono ou Ao Vivo. NÃO recomende o "Simulador de Casos Clínicos" nem nenhum agente de EdTech — eles geram TEXTO de casos, enquanto o módulo OSCE é a ferramenta interativa de simulação com paciente virtual e avaliação automática.
 </REGRA_DE_OURO>
 
 <PERSONALIDADE>
@@ -6009,7 +6009,7 @@ Apresente-se brevemente e pergunte como pode ajudar. Seja conciso.
 Estrutura obrigatória da resposta:
 
 "🧭 **[Nome do Módulo]** — [1 frase explicando o que é e quando usar]
-📍 Rota: `/caminho`
+📍 Rota: /caminho
 
 **Passo a passo:**
 1. [ação concreta com onde clicar]
@@ -6040,6 +6040,262 @@ Ao final, pergunte: "Posso te ajudar com mais alguma coisa? 😊"
 </INSTRUCOES>`;
 
 const DEFAULT_PROMPT = "Você é um assistente especializado. Responda de forma clara, estruturada e objetiva. Mantenha-se dentro do escopo do tema solicitado.";
+
+const ORACLE_MODULE_GUIDES: Array<{ key: string; patterns: RegExp[]; response: string }> = [
+  {
+    key: "osce",
+    patterns: [/\bosce\b/i, /paciente\s+virtual/i, /esta[cç][aã]o\s+cl[ií]nica/i, /prova\s+ao\s+vivo/i, /simula(?:r|[cç][aã]o).*cl[ií]nic/i],
+    response: `🧭 **OSCE Virtual** — use este módulo para criar estações clínicas interativas, aplicar provas com paciente virtual e avaliar alunos automaticamente.
+📍 Rota: \`/osce\`
+
+**Passo a passo:**
+1. Acesse **OSCE** no menu lateral.
+2. Na aba **Estações**, crie uma estação com briefing, persona do paciente, sintomas, omissões, perguntas esperadas, condutas e rubrica.
+3. Na aba **Provas**, crie uma prova e adicione as estações na ordem desejada.
+4. Para uso individual/assíncrono, abra a estação ou prova e inicie o atendimento: o aluno conversa com o paciente virtual por chat e, ao encerrar, recebe avaliação pela rubrica.
+5. Para aplicar ao vivo, abra a prova e clique em **Aplicar ao vivo**; o sistema gera um PIN.
+6. Os alunos entram por \`/osce/entrar\`, digitam o PIN e acessam com conta ou como convidados.
+7. No painel do professor, use **Iniciar**, **Pausar**, **Próxima estação** e **Encerrar prova** para controlar a turma em tempo real.
+
+💡 **Dica:** isto não é um agente de EdTech. A ferramenta correta é o **módulo OSCE**, porque ele tem paciente virtual, PIN, cronômetro, rubrica e avaliação automática.`
+  },
+  {
+    key: "salas",
+    patterns: [/salas?\s+virtuais/i, /\bsala\b.*\bpin\b/i, /participantes?.*pin/i],
+    response: `🧭 **Salas Virtuais** — use este módulo para liberar um agente para alunos ou convidados via PIN.
+📍 Rota: \`/salas-virtuais\`
+
+**Passo a passo:**
+1. Acesse **Salas Virtuais** no menu lateral.
+2. Crie uma sala, dê nome/descrição e escolha o agente que responderá aos participantes.
+3. Compartilhe o PIN gerado com os participantes.
+4. Cada participante entra pelo PIN, informa nome/e-mail e conversa em uma sessão isolada.
+5. Como criador, acompanhe as conversas na área de participantes.
+
+💡 **Dica:** use Salas Virtuais quando várias pessoas precisam conversar com o mesmo agente sem acessar sua conta.`
+  },
+  {
+    key: "reunioes",
+    patterns: [/reuni[oõ]es?/i, /google\s+meet/i, /atas?\s+de\s+reuni/i, /transcri[cç][aã]o.*reuni/i],
+    response: `🧭 **Reuniões com IA** — use este módulo para gravar, transcrever e resumir encontros do Google Meet.
+📍 Rota: \`/reunioes\`
+
+**Passo a passo:**
+1. Acesse **Reuniões** no menu lateral.
+2. Cole o link do Google Meet.
+3. Inicie o bot para entrar na reunião.
+4. Ao final, aguarde gravação, transcrição e resumo automático.
+5. Se necessário, regenere a ata com um prompt customizado.
+
+💡 **Dica:** é ideal para atas formais, resumos executivos, aulas e reuniões de projeto.`
+  },
+  {
+    key: "fluxos",
+    patterns: [/fluxos?/i, /rede\s+de\s+agentes/i, /pipeline/i, /multi[-\s]?agente/i, /orquestra[cç][aã]o/i],
+    response: `🧭 **Fluxos / Rede de Agentes** — use este módulo para encadear vários agentes em uma tarefa complexa.
+📍 Rota: \`/fluxos\`
+
+**Passo a passo:**
+1. Acesse **Fluxos** no menu lateral.
+2. Crie um fluxo manualmente ou use **Gerar com IA**.
+3. Configure cada etapa com um agente e uma instrução específica.
+4. Execute o fluxo; a saída de uma etapa alimenta a próxima.
+5. Exporte o resultado em PDF quando necessário.
+
+💡 **Dica:** use Fluxos quando uma tarefa exige revisão, síntese ou etapas complementares.`
+  },
+  {
+    key: "conteudos",
+    patterns: [/conte[uú]dos?/i, /base\s+de\s+conhecimento/i, /\brag\b/i, /documentos?.*agente/i, /youtube.*transcri/i],
+    response: `🧭 **Conteúdos / Base de Conhecimento** — use este módulo para dar documentos e fontes próprias aos agentes.
+📍 Rota: \`/conteudos\`
+
+**Passo a passo:**
+1. Acesse **Conteúdos** no menu lateral.
+2. Crie uma base de conhecimento com nome e descrição.
+3. Adicione textos, arquivos, URLs ou vídeos do YouTube.
+4. Vá em **Meus Agentes**, edite o agente e vincule a base na configuração de conhecimento.
+5. Depois disso, o agente usa esses materiais como contexto nas respostas.
+
+💡 **Dica:** use bases de conhecimento para aulas, protocolos, materiais institucionais e documentos próprios.`
+  },
+  {
+    key: "projetos",
+    patterns: [/projetos?/i, /colaboradores?/i, /compartilhar.*projeto/i],
+    response: `🧭 **Projetos** — use este módulo para organizar conversas, agentes e bases de conhecimento em um espaço colaborativo.
+📍 Rota: \`/projetos\`
+
+**Passo a passo:**
+1. Acesse **Projetos** no menu lateral.
+2. Crie um projeto e defina nome/descrição.
+3. Adicione conversas, agentes ou bases ao projeto.
+4. Convide colaboradores e escolha permissão de leitura ou edição.
+5. Exporte o projeto em PDF quando precisar consolidar o material.
+
+💡 **Dica:** use Projetos para organizar disciplinas, turmas, pesquisas ou entregas para clientes.`
+  },
+  {
+    key: "briefings",
+    patterns: [/briefings?/i, /planejar.*projeto/i, /escopo.*projeto/i],
+    response: `🧭 **Briefings** — use este módulo para estruturar objetivos, público, escopo e requisitos antes de produzir conteúdo ou projeto.
+📍 Rota: \`/briefings\`
+
+**Passo a passo:**
+1. Acesse **Briefings** no menu lateral.
+2. Preencha o objetivo, público, contexto e restrições.
+3. Gere o briefing com IA.
+4. Revise e use o resultado como base para agentes, fluxos ou projetos.
+
+💡 **Dica:** é útil para alinhar expectativas antes de criar aulas, materiais clínicos ou campanhas.`
+  },
+  {
+    key: "creditos",
+    patterns: [/cr[eé]ditos?/i, /assinatura/i, /planos?/i, /comprar.*cr[eé]dito/i],
+    response: `🧭 **Créditos e Planos** — use esta área para consultar saldo, comprar pacotes ou assinar um plano.
+📍 Rota: \`/creditos\`
+
+**Passo a passo:**
+1. Acesse **Créditos** no menu lateral.
+2. Veja seu saldo atual e as opções disponíveis.
+3. Escolha pacote avulso ou plano mensal.
+4. Finalize o pagamento pelo checkout.
+5. Consulte o histórico em **Conta**.
+
+💡 **Dica:** o cadastro gratuito recebe bônus inicial, e administradores/usuários convidados podem ter acesso ilimitado.`
+  },
+  {
+    key: "agentes",
+    patterns: [/meus\s+agentes/i, /agentes?\s+personalizados?/i, /criar\s+agente/i, /editar\s+agente/i, /prompt\s+do\s+agente/i],
+    response: `🧭 **Meus Agentes** — use este módulo para criar, editar e publicar agentes personalizados.
+📍 Rota: \`/meus-agentes\`
+
+**Passo a passo:**
+1. Acesse **Meus Agentes** no menu lateral.
+2. Clique em **Criar Agente**.
+3. Defina nome, descrição, prompt, provedor/modelo e temperatura.
+4. Vincule bases de conhecimento e skills, se necessário.
+5. Teste o agente no chat e publique no Marketplace se quiser compartilhar.
+
+💡 **Dica:** agentes personalizados servem para tarefas recorrentes sem módulo próprio dedicado.`
+  },
+  {
+    key: "marketplace",
+    patterns: [/marketplace/i, /comprar\s+agente/i, /publicar\s+agente/i, /instalar\s+fluxo/i],
+    response: `🧭 **Marketplace** — use esta área para comprar, publicar ou instalar agentes e fluxos da comunidade.
+📍 Rota: \`/marketplace\` e \`/marketplace-fluxos\`
+
+**Passo a passo:**
+1. Acesse **Marketplace** para agentes ou **Marketplace de Fluxos** para pipelines.
+2. Veja descrição, categoria, custo e avaliações.
+3. Compre ou instale o item desejado.
+4. Depois da aquisição, use o agente na biblioteca ou o fluxo em **Fluxos**.
+5. Para publicar algo seu, edite o agente/fluxo e habilite a publicação.
+
+💡 **Dica:** agentes do Marketplace custam créditos; parte do valor vai para o autor.`
+  },
+  {
+    key: "whatsapp",
+    patterns: [/whatsapp/i, /evolution/i, /z-api/i, /webhook.*whatsapp/i],
+    response: `🧭 **WhatsApp para Agentes** — use esta integração para fazer um agente responder mensagens automaticamente no WhatsApp.
+📍 Rota: \`/meus-agentes\`
+
+**Passo a passo:**
+1. Acesse **Meus Agentes** e abra o agente desejado.
+2. Vá até a configuração de WhatsApp.
+3. Ative a publicação no WhatsApp.
+4. Informe os dados da Evolution API ou Z-API conforme seu provedor.
+5. Salve e teste enviando mensagem para o número conectado.
+
+💡 **Dica:** o sistema mantém um histórico curto por contato para preservar contexto sem crescer indefinidamente.`
+  },
+  {
+    key: "pubmed",
+    patterns: [/pubmed/i, /artigos?\s+cient[ií]ficos?/i, /monitor.*pesquisa/i, /interesses\s+de\s+pesquisa/i],
+    response: `🧭 **Especialista PubMed e Monitor de Pesquisa** — use esta função para buscar artigos em tempo real e receber alertas de novos estudos.
+📍 Rota: \`/agentes\` para consultar o agente; \`/conta\` para configurar interesses.
+
+**Passo a passo:**
+1. Para uma busca pontual, abra **Agentes** e selecione o **Especialista PubMed**.
+2. Descreva o tema, doença, medicamento ou pergunta científica.
+3. O agente busca no PubMed/NCBI e retorna artigos com links.
+4. Para alertas recorrentes, acesse **Conta** → **Monitor PubMed**.
+5. Cadastre seus interesses de pesquisa para receber notificações periódicas.
+
+💡 **Dica:** o sistema traduz termos pt-BR para inglês para melhorar a busca no PubMed.`
+  },
+  {
+    key: "verificar",
+    patterns: [/verificar/i, /certificado/i, /sha-?256/i, /autenticidade/i, /conte[uú]do\s+certificado/i],
+    response: `🧭 **Certificado e Verificação de Conteúdo** — use esta ferramenta para provar que uma resposta gerada não foi adulterada.
+📍 Rota: \`/verificar\`
+
+**Passo a passo:**
+1. Gere uma resposta em um chat da plataforma.
+2. Use a ação de certificado quando disponível na mensagem.
+3. Copie o código/certificado ou o texto certificado.
+4. Acesse **Verificar**.
+5. Cole o conteúdo ou código para validar a autenticidade.
+
+💡 **Dica:** a verificação usa hash SHA-256, útil para registros, auditoria e comprovação de integridade.`
+  },
+  {
+    key: "conversas",
+    patterns: [/conversas?/i, /hist[oó]rico/i, /exportar.*pdf/i, /renomear.*conversa/i],
+    response: `🧭 **Conversas** — use esta área para recuperar, organizar e exportar chats anteriores.
+📍 Rota: \`/conversas\`
+
+**Passo a passo:**
+1. Acesse **Conversas** no menu lateral.
+2. Abra a conversa desejada.
+3. Renomeie, exclua ou exporte em PDF conforme necessário.
+4. No chat, também é possível anexar uma conversa anterior como contexto.
+
+💡 **Dica:** use essa área para transformar interações importantes em documentação ou material de apoio.`
+  },
+  {
+    key: "conta",
+    patterns: [/\bconta\b/i, /chaves?\s+de\s+api/i, /mem[oó]ria\s+do\s+usu[aá]rio/i, /perfil/i],
+    response: `🧭 **Conta** — use esta área para gerenciar perfil, créditos, chaves próprias, memória e preferências.
+📍 Rota: \`/conta\`
+
+**Passo a passo:**
+1. Acesse **Conta** no menu lateral.
+2. Veja saldo e histórico de créditos.
+3. Cadastre chaves de API próprias se quiser usar seus provedores.
+4. Configure memória do usuário, preferências e interesses de pesquisa.
+5. Revise dados e ajustes sempre que mudar seu fluxo de trabalho.
+
+💡 **Dica:** chaves próprias podem reduzir ou zerar custo em créditos para determinadas chamadas.`
+  },
+  {
+    key: "aula-ao-vivo",
+    patterns: [/aula\s+ao\s+vivo/i, /apresenta[cç][aã]o\s+ao\s+vivo/i, /perguntas\s+an[oô]nimas/i],
+    response: `🧭 **Aula ao Vivo** — use este módulo para apoiar apresentações e interações síncronas com alunos.
+📍 Rota: \`/aula-ao-vivo\`
+
+**Passo a passo:**
+1. Acesse **Aula ao Vivo** no menu lateral.
+2. Configure o tema ou agente de apoio da aula.
+3. Use os recursos de interação para conduzir a sessão.
+4. Colete perguntas ou respostas dos alunos conforme o formato escolhido.
+5. Finalize usando o material gerado como registro da aula.
+
+💡 **Dica:** para avaliação clínica com paciente virtual, use **OSCE**; para interação geral em aula, use **Aula ao Vivo**.`
+  },
+];
+
+function getOracleOperationalHelp(input: string): string | null {
+  const text = input.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const hasOperationalIntent = /\b(como|onde|passo\s+a\s+passo|funciona|usar|uso|criar|aplicar|entrar|configurar|habilitar|explicar|explique|tutorial|rota|menu|ferramenta|modulo|módulo)\b/.test(text);
+  for (const guide of ORACLE_MODULE_GUIDES) {
+    if (guide.patterns.some((pattern) => pattern.test(input)) && (hasOperationalIntent || guide.key === "osce")) {
+      return `${guide.response}\n\nPosso te ajudar com mais alguma coisa? 😊`;
+    }
+  }
+  if (/\b(qual|quais)\s+agente\b/.test(text) || /recomenda(?:r|cao|ção).*agente/.test(text)) return null;
+  return null;
+}
 
 const PROMPT_GENERATOR_PROMPT = `Você é um META-ENGENHEIRO DE PROMPTS de nível elite. Sua missão é analisar a descrição do usuário e criar um agente de IA com qualidade PREMIUM — tão bem feito que surpreende pela naturalidade e profundidade.
 
@@ -6830,6 +7086,15 @@ Deno.serve(async (req) => {
       .single();
 
     if (builtInAgent) {
+      if (builtInAgent.slug === "super-agente") {
+        const operationalHelp = getOracleOperationalHelp(input);
+        if (operationalHelp) {
+          return new Response(JSON.stringify({ output: operationalHelp }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       // Auto fine-tuning: try to load active prompt version
       let overridePrompt: string | null = null;
       try {
