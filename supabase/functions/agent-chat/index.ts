@@ -6167,7 +6167,6 @@ const ORACLE_MODULE_GUIDES: Array<{ key: string; patterns: RegExp[]; response: s
 
 function getOracleOperationalHelp(input: string): string | null {
   const text = input.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  if (/\b(qual|quais)\s+agente\b/.test(text) || /recomenda(?:r|cao|ção).*agente/.test(text)) return null;
 
   const hasOperationalIntent = /\b(como|onde|passo\s+a\s+passo|funciona|usar|uso|criar|aplicar|entrar|configurar|habilitar|explicar|explique|tutorial|rota|menu|ferramenta|modulo|módulo)\b/.test(text);
   for (const guide of ORACLE_MODULE_GUIDES) {
@@ -6175,6 +6174,7 @@ function getOracleOperationalHelp(input: string): string | null {
       return `${guide.response}\n\nPosso te ajudar com mais alguma coisa? 😊`;
     }
   }
+  if (/\b(qual|quais)\s+agente\b/.test(text) || /recomenda(?:r|cao|ção).*agente/.test(text)) return null;
   return null;
 }
 
