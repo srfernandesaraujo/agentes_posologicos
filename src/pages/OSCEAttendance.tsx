@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Send, Square, Clock } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const sb: any = supabase;
 
@@ -182,9 +184,31 @@ export default function OSCEAttendance() {
           )}
           {history.map((m, i) => (
             <div key={i} className={`flex ${m.role === "student" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${m.role === "student" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+              <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${m.role === "student" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
                 <div className="text-[10px] opacity-70 mb-0.5">{m.role === "student" ? "Você (aluno)" : "Paciente"}</div>
-                {m.content}
+                {m.role === "patient" ? (
+                  <div className="space-y-2 [&_p]:m-0 [&_p+p]:mt-2">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        table: ({ node, ...props }) => (
+                          <div className="my-2 overflow-x-auto rounded-md border border-border bg-background">
+                            <table className="w-full text-xs" {...props} />
+                          </div>
+                        ),
+                        thead: (props) => <thead className="bg-muted/60" {...props} />,
+                        th: (props) => <th className="border-b border-border px-3 py-2 text-left font-semibold" {...props} />,
+                        td: (props) => <td className="border-b border-border/60 px-3 py-1.5 align-top" {...props} />,
+                        tr: (props) => <tr className="even:bg-muted/20" {...props} />,
+                        code: (props) => <code className="rounded bg-background/60 px-1 py-0.5 text-[11px]" {...props} />,
+                      }}
+                    >
+                      {m.content}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className="whitespace-pre-wrap">{m.content}</div>
+                )}
               </div>
             </div>
           ))}
