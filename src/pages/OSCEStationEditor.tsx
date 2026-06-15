@@ -31,6 +31,7 @@ export default function OSCEStationEditor() {
     title: "", specialty: "", duration_minutes: 8, difficulty: "medio",
     scenario_brief: "", patient_persona: "", patient_symptoms: "", patient_omissions: "",
     expected_questions: [""], expected_conducts: [""], rubric: DEFAULT_RUBRIC, is_public: false,
+    exam_results: [],
   });
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function OSCEStationEditor() {
         expected_questions: data.expected_questions?.length ? data.expected_questions : [""],
         expected_conducts: data.expected_conducts?.length ? data.expected_conducts : [""],
         rubric: data.rubric?.length ? data.rubric : DEFAULT_RUBRIC,
+        exam_results: Array.isArray(data.exam_results) ? data.exam_results : [],
       });
     });
   }, [id]);
@@ -56,6 +58,7 @@ export default function OSCEStationEditor() {
       expected_questions: form.expected_questions.filter((s: string) => s.trim()),
       expected_conducts: form.expected_conducts.filter((s: string) => s.trim()),
       rubric: form.rubric.filter((r: any) => r.criterion?.trim()),
+      exam_results: (form.exam_results || []).filter((e: any) => e?.name?.trim() && e?.content?.trim()),
       user_id: user!.id,
     };
     delete payload.created_at; delete payload.updated_at;

@@ -1,0 +1,1 @@
+ALTER TABLE public.osce_stations ADD COLUMN IF NOT EXISTS exam_results jsonb NOT NULL DEFAULT '[]'::jsonb;
