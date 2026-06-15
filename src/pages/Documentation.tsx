@@ -373,6 +373,134 @@ export default function Documentation() {
       ),
     },
     {
+      id: "osce",
+      title: "OSCE — Estações Clínicas",
+      icon: ClipboardCheck,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            O módulo <strong className="text-white">OSCE</strong> (Objective Structured Clinical Examination) permite criar <strong className="text-white">estações clínicas com paciente virtual</strong> alimentado por IA, agrupá-las em provas e aplicá-las de forma assíncrona ou ao vivo para uma turma inteira com PIN de acesso.
+          </p>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Estrutura</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">Estação</strong> — cenário clínico com título, briefing, perguntas-chave esperadas, condutas, rubrica de avaliação e dificuldade (fácil / média / difícil).</li>
+              <li><strong className="text-white/80">Prova</strong> — agrupa várias estações em ordem para compor um exame.</li>
+              <li><strong className="text-white/80">Sessão ao vivo</strong> — aplicação sincronizada da prova para uma turma, controlada pelo professor em tempo real.</li>
+            </ul>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Modo assíncrono</h4>
+            <ol className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">1.</strong> O aluno entra na estação a qualquer momento.</li>
+              <li><strong className="text-white/80">2.</strong> Conversa com o paciente virtual (IA) — anamnese, conduta, contraindicações.</li>
+              <li><strong className="text-white/80">3.</strong> Ao encerrar, o sistema avalia conforme a rubrica e gera boletim com nota, evidências e feedback.</li>
+            </ol>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Modo ao vivo (sessão)</h4>
+            <ol className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">1.</strong> Em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/osce</code>, abra a prova e clique em <strong className="text-white">"Aplicar ao vivo"</strong>. O sistema gera um <strong className="text-white">PIN de 6 dígitos</strong>.</li>
+              <li><strong className="text-white/80">2.</strong> Alunos acessam <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/osce/entrar</code>, digitam o PIN e entram na sala — com conta ou como convidados (nome + e-mail).</li>
+              <li><strong className="text-white/80">3.</strong> O professor vê os participantes em tempo real e clica <strong className="text-white">"Iniciar"</strong> — todos começam a primeira estação juntos.</li>
+              <li><strong className="text-white/80">4.</strong> O painel mostra cronômetro, ranking parcial e status de cada aluno. Controles: <em>Próxima estação</em>, <em>Pausar</em>, <em>Encerrar</em>.</li>
+              <li><strong className="text-white/80">5.</strong> Ao final, cada aluno recebe boletim consolidado e o professor visualiza notas e rubricas da turma.</li>
+            </ol>
+          </div>
+
+          <div className="rounded-xl border border-[hsl(38,92%,50%)]/20 bg-[hsl(38,92%,50%)]/5 p-4">
+            <p className="text-sm text-[hsl(38,92%,50%)]">
+              <strong>Créditos:</strong> 10 (fácil), 15 (média) ou 20 (difícil) por estação avaliada. Cada sessão ao vivo gera um PIN novo — depois de encerrada, gere uma nova aplicação para reutilizar a mesma prova.
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "meetings",
+      title: "Reuniões com IA (Atas)",
+      icon: Video,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            Em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/reunioes</code>, cole o link de uma reunião do <strong className="text-white">Google Meet</strong> — o sistema envia um bot (via Recall.ai) que entra na sala, grava, transcreve e gera ata automaticamente com IA.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">O que você recebe</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">Transcrição completa</strong> com identificação dos falantes.</li>
+              <li><strong className="text-white/80">Ata estruturada</strong> com tópicos discutidos, decisões e ações.</li>
+              <li><strong className="text-white/80">Regenerar com prompt customizado</strong> para diferentes formatos (ata formal, resumo executivo, plano de aula).</li>
+              <li><strong className="text-white/80">Status em tempo real</strong>: pending → recording → transcribing → summarizing → done.</li>
+            </ul>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "skills",
+      title: "Skills Modulares",
+      icon: Zap,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            <strong className="text-white">Skills</strong> são pacotes de instruções plugáveis que adicionam capacidades específicas a agentes personalizados — raciocínio clínico, citação ABNT, copywriting, uso de CID-10, etc.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Como usar</h4>
+            <ol className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">1.</strong> No editor do agente personalizado, abra a aba <em>Skills</em>.</li>
+              <li><strong className="text-white/80">2.</strong> Ative as skills desejadas — globais (compartilhadas) ou criadas por você.</li>
+              <li><strong className="text-white/80">3.</strong> O conteúdo da skill é injetado como bloco <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">&lt;SKILL&gt;</code> no prompt do agente em cada interação.</li>
+            </ol>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "projects",
+      title: "Projetos e Colaboração",
+      icon: FolderKanban,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            Organize conversas, agentes e bases de conhecimento em <strong className="text-white">Projetos</strong>. Convide colaboradores para compartilhar acesso e manter o trabalho centralizado.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Recursos</h4>
+            <ul className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">Itens no projeto</strong> — adicione conversas, agentes e bases via menu "Adicionar ao projeto".</li>
+              <li><strong className="text-white/80">Colaboradores</strong> — convide por e-mail, com permissão de visualização ou edição.</li>
+              <li><strong className="text-white/80">Exportação</strong> — gere relatório consolidado do projeto em PDF.</li>
+            </ul>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "verify",
+      title: "Certificado e Verificação de Conteúdo",
+      icon: ShieldCheck,
+      content: (
+        <div className="space-y-4">
+          <p className="text-white/70 leading-relaxed">
+            Toda resposta gerada pode receber um <strong className="text-white">certificado com hash SHA-256</strong>, garantindo a integridade do conteúdo. Qualquer pessoa pode verificar a autenticidade em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/verificar</code>.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+            <h4 className="text-sm font-semibold text-white mb-3">Como funciona</h4>
+            <ol className="space-y-2 text-sm text-white/60">
+              <li><strong className="text-white/80">1.</strong> Após uma resposta, clique em "Certificar" para gerar o código.</li>
+              <li><strong className="text-white/80">2.</strong> Compartilhe o código ou o link com quem precisar validar o conteúdo.</li>
+              <li><strong className="text-white/80">3.</strong> Em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/verificar</code>, cole o código ou o texto — o sistema confirma se bate com o original (hash idêntico).</li>
+            </ol>
+          </div>
+        </div>
+      ),
+    },
+    {
       id: "credits",
       title: "Sistema de Créditos",
       icon: CreditCard,
