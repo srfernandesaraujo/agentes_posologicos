@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysWithAdminFallback } from "../_shared/llmProvider.ts";
+import { transcribeWithFallback } from "../_shared/llmTranscription.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,7 +19,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY")!;
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -35,39 +36,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Audio too large (max ~6MB)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Normalize format for OpenAI-compatible input_audio
-    const fmt = mimeType.includes("mp4") || mimeType.includes("m4a") ? "m4a"
-              : mimeType.includes("wav") ? "wav"
-              : mimeType.includes("mp3") ? "mp3"
-              : mimeType.includes("ogg") ? "ogg"
-              : "webm";
+    const adminClient = createClient(supabaseUrl, serviceKey);
+    const orderedKeys = await getOrderedKeysWithAdminFallback(adminClient, user.id);
+    const transcription = await transcribeWithFallback(adminClient, orderedKeys, { audioBase64, mimeType });
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: "Transcreva o áudio em português do Brasil. Retorne APENAS o texto transcrito, sem comentários, sem marcações." },
-            { type: "input_audio", input_audio: { data: audioBase64, format: fmt } },
-          ],
-        }],
-      }),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error("Gateway error:", resp.status, errText);
+    if (!transcription.ok) {
+      console.error("Transcription error:", transcription.errorText);
       return new Response(JSON.stringify({ error: "Falha ao transcrever áudio" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const json = await resp.json();
-    const text = json?.choices?.[0]?.message?.content?.trim() || "";
+    const text = (transcription.text || "").trim();
 
     // Best-effort 1 credit debit (skip for admins/unlimited)
     try {
-      const adminClient = createClient(supabaseUrl, serviceKey);
       const [{ data: roleRow }, { data: unlimited }] = await Promise.all([
         adminClient.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle(),
         adminClient.from("unlimited_users").select("id").eq("email", user.email).maybeSingle(),

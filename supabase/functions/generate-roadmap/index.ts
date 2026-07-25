@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysWithAdminFallback, callWithFallback, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +22,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -67,14 +67,13 @@ serve(async (req) => {
       }
     }
 
-    const [{ data: existingUpdates }, { data: agents }, { data: userKeys }] = await Promise.all([
+    const [{ data: existingUpdates }, { data: agents }] = await Promise.all([
       supabase
         .from("system_updates")
         .select("title, description, status, category")
         .order("created_at", { ascending: false })
         .limit(30),
       supabase.from("agents").select("name, category").eq("active", true),
-      supabase.from("user_api_keys").select("provider, api_key_encrypted").eq("user_id", userId),
     ]);
 
     const existingContext = (existingUpdates || [])
@@ -105,127 +104,22 @@ Para cada sugestão, retorne um JSON array com objetos contendo:
 
 Retorne APENAS o JSON array, sem markdown ou texto adicional.`;
 
-    const decryptedKeys: Record<string, string> = {};
-    for (const key of userKeys || []) {
-      try {
-        const { data: decrypted } = await supabase.rpc("decrypt_api_key", { p_encrypted: key.api_key_encrypted });
-        if (decrypted) decryptedKeys[key.provider] = decrypted;
-      } catch {
-        // ignore invalid/decryption failures
-      }
-    }
-
-    let content = "";
-
-    if (decryptedKeys.openai) {
-      try {
-        console.log("Trying OpenAI user key...");
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${decryptedKeys.openai}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.8,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          content = data.choices?.[0]?.message?.content || "";
-          console.log("OpenAI user key succeeded");
-        } else {
-          console.log("OpenAI user key failed:", response.status, await response.text());
-        }
-      } catch (error) {
-        console.log("OpenAI user key error:", error);
-      }
-    }
-
-    if (!content && decryptedKeys.groq) {
-      try {
-        console.log("Trying Groq user key...");
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${decryptedKeys.groq}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.8,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          content = data.choices?.[0]?.message?.content || "";
-          console.log("Groq user key succeeded");
-        } else {
-          console.log("Groq user key failed:", response.status, await response.text());
-        }
-      } catch (error) {
-        console.log("Groq user key error:", error);
-      }
-    }
-
-    if (!content && decryptedKeys.google) {
-      try {
-        console.log("Trying Google user key...");
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${decryptedKeys.google}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.8 },
-            }),
-          },
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          console.log("Google user key succeeded");
-        } else {
-          console.log("Google user key failed:", response.status, await response.text());
-        }
-      } catch (error) {
-        console.log("Google user key error:", error);
-      }
-    }
-
-    if (!content) {
-      if (!LOVABLE_API_KEY) throw new Error("Nenhuma API externa disponível e LOVABLE_API_KEY não configurada");
-
-      console.log("Falling back to Lovable AI Gateway...");
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.8,
-        }),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Lovable Gateway error: ${response.status} ${errText}`);
-      }
-
-      const data = await response.json();
-      content = data.choices?.[0]?.message?.content || "";
-      console.log("Lovable AI Gateway succeeded");
-    }
+    const orderedKeys = await getOrderedKeysWithAdminFallback(supabase, userId);
+    const aiResult = await callWithFallback(supabase, orderedKeys, {
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.8,
+      mode: "text",
+    });
+    if (!aiResult) throw new Error("Nenhuma chave de IA configurada ou todas falharam");
+    await logAiUsage(supabase, {
+      userId,
+      provider: aiResult.provider!,
+      model: aiResult.model!,
+      tokensInput: aiResult.tokensInput,
+      tokensOutput: aiResult.tokensOutput,
+      promptType: "generate-roadmap",
+    });
+    const content = aiResult.output || "";
 
     let suggestions: any[];
     try {

@@ -1,9 +1,10 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysWithAdminFallback, callWithFallback } from "../_shared/llmProvider.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 async function openFdaLookup(drug: string): Promise<string | null> {
   try {
@@ -56,39 +57,19 @@ Deno.serve(async (req) => {
       required: ["drugs", "items"],
     };
 
-    const r = await fetch(GATEWAY_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "Você é um validador clínico de segurança. Analise prescrições/condutas e identifique: interações graves, doses fora de faixa, ajustes renais/hepáticos, contraindicações, alergias e alertas. Use níveis: red=risco grave/imediato, yellow=atenção/verificar, green=ok ou informativo positivo. Seja conciso. Não invente. Se não houver problemas, retorne items vazio. Português." },
-          { role: "user", content: `Analise este texto clínico:\n\n${text}` },
-        ],
-        tools: [{ type: "function", function: { name: "respond", parameters: schema } }],
-        tool_choice: { type: "function", function: { name: "respond" } },
-      }),
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const orderedKeys = await getOrderedKeysWithAdminFallback(admin, null);
+    const result = await callWithFallback(admin, orderedKeys, {
+      systemPrompt: "Você é um validador clínico de segurança. Analise prescrições/condutas e identifique: interações graves, doses fora de faixa, ajustes renais/hepáticos, contraindicações, alergias e alertas. Use níveis: red=risco grave/imediato, yellow=atenção/verificar, green=ok ou informativo positivo. Seja conciso. Não invente. Se não houver problemas, retorne items vazio. Português.",
+      messages: [{ role: "user", content: `Analise este texto clínico:\n\n${text}` }],
+      mode: "tools",
+      tools: [{ type: "function", function: { name: "respond", parameters: schema } }],
+      toolChoice: { type: "function", function: { name: "respond" } },
     });
-    if (r.status === 429) {
-      return new Response(JSON.stringify({ error: "Limite de requisições. Aguarde." }), {
-        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!result) {
+      throw new Error("Nenhum provedor de IA disponível");
     }
-    if (r.status === 402) {
-      return new Response(JSON.stringify({ error: "Créditos da plataforma esgotados." }), {
-        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!r.ok) {
-      const t = await r.text();
-      throw new Error(`Gateway ${r.status}: ${t.slice(0, 200)}`);
-    }
-    const j = await r.json();
-    const args = j.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const parsed = args ? JSON.parse(args) : { drugs: [], items: [] };
+    const parsed = result.toolCallArgs || { drugs: [], items: [] };
 
     // Enrich with OpenFDA (top 3 drugs)
     const drugs = (parsed.drugs || []).slice(0, 3);

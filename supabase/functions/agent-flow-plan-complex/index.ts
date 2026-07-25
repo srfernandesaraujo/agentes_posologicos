@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysForUser, callWithFallback, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -93,12 +94,6 @@ Deno.serve(async (req) => {
     }
 
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
     const supabase = createClient(supabaseUrl, serviceKey);
 
     // Catalog
@@ -162,74 +157,65 @@ RESPONDA APENAS com a tool call create_complex_flow_plan.`;
         : ""
     }`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "create_complex_flow_plan",
-            description: "Plano de fluxo complexo com roteamento condicional",
-            parameters: {
-              type: "object",
-              properties: {
-                preflight_questions: { type: "array", items: { type: "string" } },
-                nodes: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      agent_id: { type: "string", description: "id/slug existente ou 'CREATE_NEW'" },
-                      agent_type: { type: "string", enum: ["native", "custom", "new"] },
-                      input_prompt: { type: "string", description: "Instrução curta de contexto neste nó" },
-                      new_agent_name: { type: "string" },
-                      new_agent_description: { type: "string" },
-                      new_agent_prompt: { type: "string", description: "Prompt PREMIUM 500-1000 palavras" },
-                      branch_key: { type: "string", description: "Rótulo da esteira ('main' ou um dos branches do roteador)" },
-                      is_router: { type: "boolean" },
-                      router_branches: { type: "array", items: { type: "string" } },
-                      is_synthesizer: { type: "boolean" },
-                    },
-                    required: ["agent_type", "input_prompt", "new_agent_prompt", "branch_key", "is_router", "is_synthesizer"],
-                    additionalProperties: false,
+    const orderedKeys = await getOrderedKeysForUser(supabase, user_id);
+    const aiResult = await callWithFallback(supabase, orderedKeys, {
+      systemPrompt,
+      messages: [{ role: "user", content: userMessage }],
+      mode: "tools",
+      tools: [{
+        type: "function",
+        function: {
+          name: "create_complex_flow_plan",
+          description: "Plano de fluxo complexo com roteamento condicional",
+          parameters: {
+            type: "object",
+            properties: {
+              preflight_questions: { type: "array", items: { type: "string" } },
+              nodes: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    agent_id: { type: "string", description: "id/slug existente ou 'CREATE_NEW'" },
+                    agent_type: { type: "string", enum: ["native", "custom", "new"] },
+                    input_prompt: { type: "string", description: "Instrução curta de contexto neste nó" },
+                    new_agent_name: { type: "string" },
+                    new_agent_description: { type: "string" },
+                    new_agent_prompt: { type: "string", description: "Prompt PREMIUM 500-1000 palavras" },
+                    branch_key: { type: "string", description: "Rótulo da esteira ('main' ou um dos branches do roteador)" },
+                    is_router: { type: "boolean" },
+                    router_branches: { type: "array", items: { type: "string" } },
+                    is_synthesizer: { type: "boolean" },
                   },
+                  required: ["agent_type", "input_prompt", "new_agent_prompt", "branch_key", "is_router", "is_synthesizer"],
+                  additionalProperties: false,
                 },
               },
-              required: ["preflight_questions", "nodes"],
-              additionalProperties: false,
             },
+            required: ["preflight_questions", "nodes"],
+            additionalProperties: false,
           },
-        }],
-        tool_choice: { type: "function", function: { name: "create_complex_flow_plan" } },
-      }),
+        },
+      }],
+      toolChoice: { type: "function", function: { name: "create_complex_flow_plan" } },
     });
 
-    if (!aiResponse.ok) {
-      const t = await aiResponse.text();
-      console.error("AI error:", aiResponse.status, t);
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit excedido. Tente novamente em instantes." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes no gateway de IA." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error("Erro ao gerar plano com IA");
+    if (!aiResult) {
+      return new Response(JSON.stringify({ error: "Nenhuma chave de IA configurada ou todas falharam. Configure uma chave em Configurações." }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+    await logAiUsage(supabase, {
+      userId: user_id,
+      provider: aiResult.provider!,
+      model: aiResult.model!,
+      tokensInput: aiResult.tokensInput,
+      tokensOutput: aiResult.tokensOutput,
+      promptType: "agent-flow-plan-complex",
+    });
 
-    const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("IA não retornou plano estruturado");
-    const plan = JSON.parse(toolCall.function.arguments);
+    const plan = aiResult.toolCallArgs;
+    if (!plan) throw new Error("IA não retornou plano estruturado");
 
     if (plan.preflight_questions?.length > 0 && !preflight_answers) {
       return new Response(JSON.stringify({

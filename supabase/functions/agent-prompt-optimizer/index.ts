@@ -1,6 +1,7 @@
 // Edge function: Auto fine-tuning de agentes baseado em feedbacks
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getOrderedKeysWithAdminFallback, callWithFallback } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,6 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -18,99 +18,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function decrypt(svc: any, enc: string): Promise<string | null> {
-  try {
-    const { data, error } = await svc.rpc("decrypt_api_key", { p_encrypted: enc });
-    if (error) return null;
-    return data as string;
-  } catch { return null; }
-}
-
-// Provider order: Google > OpenAI > Anthropic > Groq > NVIDIA > GitHub > OpenRouter > Lovable
+// Uses the owner's configured API keys in priority order (falls back to the admin account's keys
+// if the owner has none configured, or if this is a native agent with no owner).
 async function callOptimizerLLM(svc: any, ownerUserId: string | null, systemMsg: string, userMsg: string): Promise<{ text: string; provider: string; model: string } | null> {
-  // 1) Try owner's API keys in order
-  if (ownerUserId) {
-    const { data: keys } = await svc
-      .from("user_api_keys")
-      .select("provider, api_key_encrypted, key_expires_at")
-      .eq("user_id", ownerUserId);
-    const now = Date.now();
-    const order = ["google", "openai", "anthropic", "groq", "nvidia", "github", "openrouter"];
-    for (const prov of order) {
-      const k = (keys || []).find((x: any) => x.provider === prov);
-      if (!k) continue;
-      if (k.key_expires_at && new Date(k.key_expires_at).getTime() < now) continue;
-      const apiKey = await decrypt(svc, k.api_key_encrypted);
-      if (!apiKey) continue;
-      try {
-        if (prov === "google") {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
-          const resp = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              systemInstruction: { role: "system", parts: [{ text: systemMsg }] },
-              contents: [{ role: "user", parts: [{ text: userMsg }] }],
-            }),
-          });
-          if (resp.ok) {
-            const j = await resp.json();
-            const text = j?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") || "";
-            if (text) return { text, provider: "google", model: "gemini-2.5-pro" };
-          }
-        } else if (prov === "openai") {
-          const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-            body: JSON.stringify({ model: "gpt-4o", messages: [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }] }),
-          });
-          if (resp.ok) {
-            const j = await resp.json();
-            const text = j?.choices?.[0]?.message?.content || "";
-            if (text) return { text, provider: "openai", model: "gpt-4o" };
-          }
-        } else if (prov === "anthropic") {
-          const resp = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-            body: JSON.stringify({ model: "claude-3-5-sonnet-20241022", max_tokens: 4096, system: systemMsg, messages: [{ role: "user", content: userMsg }] }),
-          });
-          if (resp.ok) {
-            const j = await resp.json();
-            const text = j?.content?.[0]?.text || "";
-            if (text) return { text, provider: "anthropic", model: "claude-3-5-sonnet" };
-          }
-        } else if (prov === "groq") {
-          const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-            body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }] }),
-          });
-          if (resp.ok) {
-            const j = await resp.json();
-            const text = j?.choices?.[0]?.message?.content || "";
-            if (text) return { text, provider: "groq", model: "llama-3.3-70b" };
-          }
-        }
-      } catch (_) { /* try next */ }
-    }
-  }
-  // 2) Fallback to Lovable AI Gateway
-  if (LOVABLE_API_KEY) {
-    try {
-      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${LOVABLE_API_KEY}` },
-        body: JSON.stringify({ model: "google/gemini-2.5-pro", messages: [{ role: "system", content: systemMsg }, { role: "user", content: userMsg }] }),
-      });
-      if (resp.ok) {
-        const j = await resp.json();
-        const text = j?.choices?.[0]?.message?.content || "";
-        if (text) return { text, provider: "lovable", model: "google/gemini-2.5-pro" };
-      }
-    } catch (_) { /* nothing */ }
-  }
-  return null;
+  const orderedKeys = await getOrderedKeysWithAdminFallback(svc, ownerUserId);
+  const result = await callWithFallback(svc, orderedKeys, {
+    systemPrompt: systemMsg,
+    messages: [{ role: "user", content: userMsg }],
+    mode: "text",
+  });
+  if (!result?.output) return null;
+  return { text: result.output, provider: result.provider!, model: result.model! };
 }
 
 function extractPromptAndSummary(raw: string): { prompt: string; summary: string } {

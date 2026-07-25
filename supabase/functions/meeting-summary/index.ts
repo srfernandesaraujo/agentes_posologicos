@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysForUser, callWithFallback, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,12 +57,7 @@ serve(async (req) => {
 
     await supabaseAdmin.from("meetings").update({ status: "summarizing" }).eq("id", meeting_id);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), { status: 500, headers: corsHeaders });
-    }
-
-    const systemPrompt = custom_prompt || `Você é um assistente especializado em criar atas de reunião profissionais. 
+    const systemPrompt = custom_prompt || `Você é um assistente especializado em criar atas de reunião profissionais.
 Analise a transcrição fornecida e gere uma ata estruturada com:
 
 ## Ata da Reunião
@@ -75,30 +71,28 @@ Analise a transcrição fornecida e gere uma ata estruturada com:
 
 Use formatação Markdown. Seja conciso mas completo.`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Gere a ata da seguinte reunião:\n\n${meeting.transcript}` },
-        ],
-      }),
+    const orderedKeys = await getOrderedKeysForUser(supabaseAdmin, userId);
+    const result = await callWithFallback(supabaseAdmin, orderedKeys, {
+      systemPrompt,
+      messages: [{ role: "user", content: `Gere a ata da seguinte reunião:\n\n${meeting.transcript}` }],
+      mode: "text",
     });
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error("AI error:", aiResponse.status, errText);
+    if (!result) {
+      console.error("meeting-summary: all providers failed");
       await supabaseAdmin.from("meetings").update({ status: "done" }).eq("id", meeting_id);
       return new Response(JSON.stringify({ error: "Failed to generate summary" }), { status: 500, headers: corsHeaders });
     }
 
-    const aiData = await aiResponse.json();
-    const summary = aiData.choices?.[0]?.message?.content || "Não foi possível gerar a ata.";
+    const summary = result.output || "Não foi possível gerar a ata.";
+    await logAiUsage(supabaseAdmin, {
+      userId,
+      provider: result.provider!,
+      model: result.model!,
+      tokensInput: result.tokensInput,
+      tokensOutput: result.tokensOutput,
+      promptType: "meeting-summary",
+    });
 
     await supabaseAdmin.from("meetings").update({ status: "done", summary }).eq("id", meeting_id);
 

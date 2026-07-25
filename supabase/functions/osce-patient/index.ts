@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysWithAdminFallback, callWithFallback } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,7 +81,6 @@ ${station.patient_omissions || "(nenhuma omissão específica)"}
 ${examsBlock}`;
 
     const messages = [
-      { role: "system", content: systemPrompt },
       ...(Array.isArray(history) ? history : []).map((m: any) => ({
         role: m.role === "patient" ? "assistant" : "user",
         content: String(m.content || ""),
@@ -88,20 +88,19 @@ ${examsBlock}`;
       { role: "user", content: String(userMessage) },
     ];
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: "google/gemini-2.5-flash", messages, temperature: 0.85 }),
+    const orderedKeys = await getOrderedKeysWithAdminFallback(supabase, null);
+    const result = await callWithFallback(supabase, orderedKeys, {
+      systemPrompt,
+      messages,
+      temperature: 0.85,
+      mode: "text",
     });
-    if (!aiRes.ok) {
-      const t = await aiRes.text();
-      return new Response(JSON.stringify({ error: "Falha na IA", detail: t }), {
+    if (!result) {
+      return new Response(JSON.stringify({ error: "Falha na IA", detail: "Nenhum provedor disponível" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const data = await aiRes.json();
-    const reply = data?.choices?.[0]?.message?.content || "...";
+    const reply = result.output || "...";
     return new Response(JSON.stringify({ reply }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

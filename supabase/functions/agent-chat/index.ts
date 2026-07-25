@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { unzipSync, strFromU8 } from "npm:fflate@0.8.2";
+import { resolveAdminFallbackUserId } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7007,25 +7008,7 @@ Deno.serve(async (req) => {
         return { name: "", description: "", system_prompt: textBlock?.text || "" };
       };
 
-      // === PRIORITY 1: Lovable AI Gateway (strongest, most reliable) ===
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (LOVABLE_API_KEY) {
-        try {
-          const result = await callOpenAICompatiblePremium(
-            "https://ai.gateway.lovable.dev/v1/chat/completions",
-            LOVABLE_API_KEY,
-            "google/gemini-2.5-pro"
-          );
-          console.log("Premium prompt generation: used Lovable AI Gateway (gemini-2.5-pro)");
-          return new Response(JSON.stringify({ output: result.system_prompt || "", agent_meta: { name: result.name || "", description: result.description || "" } }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        } catch (e) {
-          console.warn("Lovable AI gateway failed:", e.message);
-        }
-      }
-
-      // === PRIORITY 2: User's own STRONG API keys (skip Groq — too weak for prompt engineering) ===
+      // === User's own STRONG API keys (skip Groq — too weak for prompt engineering) ===
       const SKIP_PROVIDERS_FOR_PROMPT_GEN = ["groq"]; // Models too weak for premium prompt generation
       if (userId) {
         const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -7545,140 +7528,113 @@ Deno.serve(async (req) => {
         { role: "user", content: userContent },
       ];
 
-      // Try ALL user API keys in priority order (Google first, then others)
-      // Use room owner's API keys as fallback for virtual rooms
-      const apiKeyLookupId = userId || (typeof roomOwnerId !== "undefined" ? roomOwnerId : null);
-      if (apiKeyLookupId) {
+      // Try ALL user API keys in priority order (Google first, then others).
+      // Falls back to the room owner's keys for virtual rooms, then to the designated
+      // admin account's keys if neither has any configured (no more Lovable AI Gateway).
+      const tryNativeAgentWithOwnerKeys = async (ownerId: string): Promise<Response | null> => {
         const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
         const { data: allUserKeys } = await serviceClient
           .from("user_api_keys")
           .select("provider, api_key_encrypted")
-          .eq("user_id", apiKeyLookupId);
+          .eq("user_id", ownerId);
 
-        if (allUserKeys && allUserKeys.length > 0) {
-          // Sort keys by priority order
-          const sortedKeys = [...allUserKeys].sort((a, b) => {
-            const aIdx = PROVIDER_PRIORITY_ORDER.indexOf(a.provider);
-            const bIdx = PROVIDER_PRIORITY_ORDER.indexOf(b.provider);
-            return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
-          });
+        if (!allUserKeys || allUserKeys.length === 0) return null;
 
-          for (const userKey of sortedKeys) {
-            const provider = userKey.provider;
-            const endpoint = PROVIDER_ENDPOINTS[provider];
-            if (!endpoint) continue;
+        const sortedKeys = [...allUserKeys].sort((a, b) => {
+          const aIdx = PROVIDER_PRIORITY_ORDER.indexOf(a.provider);
+          const bIdx = PROVIDER_PRIORITY_ORDER.indexOf(b.provider);
+          return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+        });
 
-            const model = DEFAULT_MODELS_PER_PROVIDER[provider] || "gpt-4o";
-            const apiKey = await decryptApiKey(userKey.api_key_encrypted);
+        for (const userKey of sortedKeys) {
+          const provider = userKey.provider;
+          const endpoint = PROVIDER_ENDPOINTS[provider];
+          if (!endpoint) continue;
 
-            console.log(`Native agent: trying ${userId ? "user's" : "room owner's"} ${provider} key (priority order)`);
-            try {
-              if (provider === "anthropic") {
-                const anthropicResponse = await fetch(endpoint, {
-                  method: "POST",
-                  headers: {
-                    "x-api-key": apiKey,
-                    "Content-Type": "application/json",
-                    "anthropic-version": "2023-06-01",
-                  },
-                  body: JSON.stringify({
-                    model,
-                    max_tokens: 4096,
-                    system: systemPrompt,
-                    messages: [
-                      ...(conversationHistory || []),
-                      { role: "user", content: typeof userContent === "string" ? userContent : input },
-                    ],
-                  }),
-                });
+          const model = DEFAULT_MODELS_PER_PROVIDER[provider] || "gpt-4o";
+          const apiKey = await decryptApiKey(userKey.api_key_encrypted);
 
-                if (anthropicResponse.ok) {
-                  const data = await anthropicResponse.json();
-                  const output = data.content?.[0]?.text || "";
-                  if (!output.trim()) {
-                    console.error(`Native anthropic returned empty content — trying next provider`);
-                  } else {
-                    const usage = extractAnthropicUsage(data);
-                    return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
-                  }
+          console.log(`Native agent: trying ${provider} key (priority order)`);
+          try {
+            if (provider === "anthropic") {
+              const anthropicResponse = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                  "x-api-key": apiKey,
+                  "Content-Type": "application/json",
+                  "anthropic-version": "2023-06-01",
+                },
+                body: JSON.stringify({
+                  model,
+                  max_tokens: 4096,
+                  system: systemPrompt,
+                  messages: [
+                    ...(conversationHistory || []),
+                    { role: "user", content: typeof userContent === "string" ? userContent : input },
+                  ],
+                }),
+              });
+
+              if (anthropicResponse.ok) {
+                const data = await anthropicResponse.json();
+                const output = data.content?.[0]?.text || "";
+                if (!output.trim()) {
+                  console.error(`Native anthropic returned empty content — trying next provider`);
+                } else {
+                  const usage = extractAnthropicUsage(data);
+                  return await successResponse(output, { provider: "anthropic", model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
                 }
-                const errText = await anthropicResponse.text();
-                console.error(`User ${provider} key failed: ${anthropicResponse.status} ${errText} - trying next provider`);
-              } else {
-                const aiResponse = await fetch(endpoint, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${apiKey}`,
-                  },
-                  body: JSON.stringify({ model, messages }),
-                });
-
-                if (aiResponse.ok) {
-                  const data = await aiResponse.json();
-                  const output = data.choices?.[0]?.message?.content || "";
-                  if (!output.trim()) {
-                    console.error(`Native ${provider} returned empty content — trying next provider`);
-                  } else {
-                    const usage = extractUsage(data);
-                    return await successResponse(output, { provider, model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
-                  }
-                }
-                const errText = await aiResponse.text();
-                console.error(`User ${provider} key failed: ${aiResponse.status} ${errText} - trying next provider`);
               }
-            } catch (e) {
-              console.error(`User API key error (${provider}):`, e.message, "- trying next provider");
+              const errText = await anthropicResponse.text();
+              console.error(`Key ${provider} failed: ${anthropicResponse.status} ${errText} - trying next provider`);
+            } else {
+              const aiResponse = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({ model, messages }),
+              });
+
+              if (aiResponse.ok) {
+                const data = await aiResponse.json();
+                const output = data.choices?.[0]?.message?.content || "";
+                if (!output.trim()) {
+                  console.error(`Native ${provider} returned empty content — trying next provider`);
+                } else {
+                  const usage = extractUsage(data);
+                  return await successResponse(output, { provider, model, tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
+                }
+              }
+              const errText = await aiResponse.text();
+              console.error(`Key ${provider} failed: ${aiResponse.status} ${errText} - trying next provider`);
             }
+          } catch (e) {
+            console.error(`API key error (${provider}):`, e.message, "- trying next provider");
           }
-          console.log("All user API keys failed for native agent, falling back to Lovable AI Gateway");
         }
+        return null;
+      };
+
+      const apiKeyLookupId = userId || (typeof roomOwnerId !== "undefined" ? roomOwnerId : null);
+      if (apiKeyLookupId) {
+        const resp = await tryNativeAgentWithOwnerKeys(apiKeyLookupId);
+        if (resp) return resp;
+        console.log("All keys failed for native agent (userId/roomOwner), trying admin fallback");
       }
 
-      // Fallback: use Lovable AI Gateway
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      const adminServiceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const adminFallbackId = await resolveAdminFallbackUserId(adminServiceClient);
+      if (adminFallbackId && adminFallbackId !== apiKeyLookupId) {
+        const resp = await tryNativeAgentWithOwnerKeys(adminFallbackId);
+        if (resp) return resp;
       }
 
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages,
-        }),
+      return new Response(JSON.stringify({ error: "Nenhum provedor de IA disponível. Configure uma chave em Configurações." }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-
-      if (!aiResponse.ok) {
-        const status = aiResponse.status;
-        if (status === 429) {
-          return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (status === 402) {
-          return new Response(JSON.stringify({ error: "Créditos esgotados." }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        const errText = await aiResponse.text();
-        console.error("AI gateway error:", status, errText);
-        return new Response(JSON.stringify({ error: "Erro ao consultar o modelo de IA." }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const aiData = await aiResponse.json();
-      const output = aiData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-      const usage = extractUsage(aiData);
-      return await successResponse(output, { provider: "lovable", model: "google/gemini-2.5-flash", tokensInput: usage.tokensInput, tokensOutput: usage.tokensOutput });
     }
 
     // Check if it's a custom agent
@@ -7879,57 +7835,6 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
       .select("provider, api_key_encrypted")
       .eq("user_id", keyOwnerId);
 
-    // Helper: call Lovable AI Gateway as absolute last resort
-    const fallbackToLovable = async () => {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
-      console.log("All user API keys exhausted — falling back to Lovable AI Gateway (last resort)");
-      const nativeResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          temperature: Number(customAgent.temperature),
-          messages: [
-            { role: "system", content: finalSystemPrompt },
-            ...(conversationHistory || []),
-            { role: "user", content: buildUserMessage(input, files) },
-          ],
-        }),
-      });
-
-      if (!nativeResponse.ok) {
-        const status = nativeResponse.status;
-        if (status === 429) {
-          return new Response(JSON.stringify({ error: "Limite de requisições excedido." }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (status === 402) {
-          return new Response(JSON.stringify({ error: "Créditos esgotados." }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        const errText = await nativeResponse.text();
-        console.error("Lovable AI Gateway error:", status, errText);
-        return new Response(JSON.stringify({ error: "Erro ao consultar o modelo de IA." }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const nativeData = await nativeResponse.json();
-      const nativeOutput = nativeData.choices?.[0]?.message?.content || "Sem resposta do modelo.";
-      const nativeUsage = extractUsage(nativeData);
-      await logAiUsage("lovable", "google/gemini-3-flash-preview", nativeUsage.tokensInput, nativeUsage.tokensOutput, "chat-fallback");
-      return new Response(JSON.stringify({ output: nativeOutput, fallback: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    };
-
     // Helper: try a single provider key
     const tryProviderKey = async (provider: string, apiKey: string, model: string): Promise<Response | null> => {
       const endpoint = PROVIDER_ENDPOINTS[provider];
@@ -8064,13 +7969,38 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
         if (result) return result;
       }
 
-      console.log("All user API keys failed for custom agent, falling back to Lovable AI Gateway");
+      console.log("All user API keys failed for custom agent, trying admin fallback");
     } else {
-      console.log("No user API keys found, using Lovable AI Gateway directly");
+      console.log("No user API keys found for custom agent, trying admin fallback");
     }
 
-    // Absolute last resort: Lovable AI Gateway
-    return await fallbackToLovable();
+    // Admin-account fallback (no more Lovable AI Gateway): only reachable if keyOwnerId
+    // had no working keys above.
+    const adminFallbackId = await resolveAdminFallbackUserId(serviceClient);
+    if (adminFallbackId && adminFallbackId !== keyOwnerId) {
+      const { data: adminKeys } = await serviceClient
+        .from("user_api_keys")
+        .select("provider, api_key_encrypted")
+        .eq("user_id", adminFallbackId);
+
+      const sortedAdminKeys = (adminKeys || []).slice().sort((a, b) => {
+        const aIdx = PROVIDER_PRIORITY_ORDER.indexOf(a.provider);
+        const bIdx = PROVIDER_PRIORITY_ORDER.indexOf(b.provider);
+        return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+      });
+
+      for (const keyInfo of sortedAdminKeys) {
+        const decryptedKey = await decryptApiKey(keyInfo.api_key_encrypted);
+        const model = DEFAULT_MODELS_PER_PROVIDER[keyInfo.provider] || "gpt-4o";
+        const result = await tryProviderKey(keyInfo.provider, decryptedKey, model);
+        if (result) return result;
+      }
+    }
+
+    return new Response(JSON.stringify({ error: "Nenhum provedor de IA disponível. Configure uma chave em Configurações." }), {
+      status: 502,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error("agent-chat error:", err);
     return new Response(JSON.stringify({ error: err.message }), {

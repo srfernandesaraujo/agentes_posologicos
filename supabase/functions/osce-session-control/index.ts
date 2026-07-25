@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysWithAdminFallback, callWithFallback, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +25,7 @@ function json(body: unknown, status = 200) {
   });
 }
 
-async function evaluateAttempt(admin: any, apiKey: string, attemptId: string) {
+async function evaluateAttempt(admin: any, attemptId: string) {
   const { data: attempt } = await admin
     .from("osce_attempts")
     .select("*")
@@ -64,19 +65,24 @@ REGRAS: use a rubrica; feedback em pt-BR (300-500 chars); sem markdown.
 
   let parsed: any = {};
   try {
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-      }),
+    const orderedKeys = await getOrderedKeysWithAdminFallback(admin, attempt.user_id || null);
+    const result = await callWithFallback(admin, orderedKeys, {
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      mode: "json",
     });
-    if (aiRes.ok) {
-      const data = await aiRes.json();
-      try { parsed = JSON.parse(data?.choices?.[0]?.message?.content || "{}"); } catch { /* ignore */ }
+    if (result?.ok && result.output) {
+      try { parsed = JSON.parse(result.output); } catch { /* ignore */ }
+      if (attempt.user_id) {
+        await logAiUsage(admin, {
+          userId: attempt.user_id,
+          provider: result.provider!,
+          model: result.model!,
+          tokensInput: result.tokensInput,
+          tokensOutput: result.tokensOutput,
+          promptType: "osce-evaluate",
+        });
+      }
     }
   } catch { /* ignore */ }
 
@@ -160,7 +166,6 @@ Deno.serve(async (req) => {
     const action = body.action as string;
     const authHeader = req.headers.get("Authorization") || "";
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const apiKey = Deno.env.get("LOVABLE_API_KEY")!;
 
     // Lazy auth: only fetch the user if a token is present (guests have none)
     let user: any = null;
@@ -333,7 +338,7 @@ Deno.serve(async (req) => {
       // Evaluate all in-progress attempts for current station
       const { data: attempts } = await admin.from("osce_attempts")
         .select("id").eq("session_id", sessionId).eq("status", "in_progress");
-      await Promise.all((attempts || []).map((a: any) => evaluateAttempt(admin, apiKey, a.id)));
+      await Promise.all((attempts || []).map((a: any) => evaluateAttempt(admin, a.id)));
 
       if (action === "finish") {
         await admin.from("osce_exam_sessions").update({

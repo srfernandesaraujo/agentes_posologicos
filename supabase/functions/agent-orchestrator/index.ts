@@ -1,4 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { OrderedKey, callWithFallback, getOrderedKeysForUser, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,36 +7,31 @@ const corsHeaders = {
 };
 
 const ORCHESTRATOR_COST = 12;
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
-async function callGateway(messages: any[], schema?: any) {
-  const body: any = {
-    model: "google/gemini-2.5-flash",
+async function callGateway(
+  admin: SupabaseClient,
+  orderedKeys: OrderedKey[],
+  userId: string,
+  messages: any[],
+  schema?: any,
+) {
+  const result = await callWithFallback(admin, orderedKeys, {
     messages,
-  };
-  if (schema) {
-    body.tools = [{ type: "function", function: { name: "respond", parameters: schema } }];
-    body.tool_choice = { type: "function", function: { name: "respond" } };
-  }
-  const r = await fetch(GATEWAY_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-    },
-    body: JSON.stringify(body),
+    mode: schema ? "tools" : "text",
+    tools: schema ? [{ type: "function", function: { name: "respond", parameters: schema } }] : undefined,
+    toolChoice: schema ? { type: "function", function: { name: "respond" } } : undefined,
   });
-  if (!r.ok) {
-    const t = await r.text();
-    throw new Error(`Gateway ${r.status}: ${t.slice(0, 300)}`);
-  }
-  const j = await r.json();
-  const choice = j.choices?.[0];
-  if (schema) {
-    const args = choice?.message?.tool_calls?.[0]?.function?.arguments;
-    return args ? JSON.parse(args) : null;
-  }
-  return choice?.message?.content || "";
+  if (!result) throw new Error("Nenhum provedor de IA disponível (configure uma chave em Configurações)");
+  await logAiUsage(admin, {
+    userId,
+    provider: result.provider!,
+    model: result.model!,
+    tokensInput: result.tokensInput,
+    tokensOutput: result.tokensOutput,
+    promptType: "agent-orchestrator",
+  });
+  if (schema) return result.toolCallArgs;
+  return result.output || "";
 }
 
 Deno.serve(async (req) => {
@@ -101,7 +97,8 @@ Deno.serve(async (req) => {
     ).join("\n");
 
     // 2) Plan
-    const plan = await callGateway([
+    const orderedKeys = await getOrderedKeysForUser(admin, user.id);
+    const plan = await callGateway(admin, orderedKeys, user.id, [
       { role: "system", content: `Você é um Agente Orquestrador. Decomponha o objetivo do usuário em 2 a 5 subtarefas e roteie cada uma para o melhor agente especialista disponível. Use SOMENTE slugs do catálogo abaixo. Responda em português. Cada subtarefa deve ter um prompt completo e autônomo (o especialista não vê o objetivo geral).\n\nCATÁLOGO DE AGENTES:\n${catalogText}` },
       { role: "user", content: `Objetivo: ${goal}` },
     ], {
@@ -161,7 +158,7 @@ Deno.serve(async (req) => {
     );
 
     // 4) Consolidate
-    const dossier = await callGateway([
+    const dossier = await callGateway(admin, orderedKeys, user.id, [
       { role: "system", content: "Você consolida resultados de múltiplos agentes especialistas num dossiê único, claro e navegável em Markdown. Use cabeçalhos H2, listas e tabelas quando útil. Não invente informações além das fornecidas. Português." },
       { role: "user", content: `Objetivo original: ${goal}\n\nResultados dos especialistas:\n\n${results.map((r: any, i: number) =>
         `### Etapa ${i + 1}: ${r.title} (${r.agent_name || r.agent_slug})\n${r.output || `(erro: ${r.error})`}`).join("\n\n---\n\n")}` },

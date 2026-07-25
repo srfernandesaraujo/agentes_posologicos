@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysForUser, callWithFallback, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +26,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
 
     const user_id = await authenticateUser(req, supabaseUrl, supabaseAnonKey);
     if (!user_id) {
@@ -136,13 +136,6 @@ Quando um agente precisar de pesquisa externa, inclua instruções EXPLÍCITAS n
 
 RESPONDA APENAS com a tool call create_flow_plan.`;
 
-    if (!lovableKey) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     // If we have preflight answers, append them to the description
     let enrichedDescription = description;
     if (preflight_answers && typeof preflight_answers === "object") {
@@ -152,84 +145,71 @@ RESPONDA APENAS com a tool call create_flow_plan.`;
       enrichedDescription = `${description}\n\n--- INFORMAÇÕES ADICIONAIS DO USUÁRIO ---\n${answersText}`;
     }
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: enrichedDescription },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "create_flow_plan",
-              description: "Cria um plano de fluxo de agentes premium com prompts detalhados",
-              parameters: {
-                type: "object",
-                properties: {
-                  flow_name: { type: "string", description: "Nome do fluxo" },
-                  flow_description: { type: "string", description: "Descrição breve do fluxo" },
-                  execution_mode: { type: "string", enum: ["sequential", "parallel"], description: "Modo de execução auto-detectado" },
-                  preflight_questions: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "Perguntas que precisam ser respondidas ANTES da execução do fluxo. Array vazio se não necessário.",
-                  },
-                  nodes: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        agent_id: { type: "string", description: "ID ou slug do agente existente, ou 'CREATE_NEW' se precisa criar" },
-                        agent_type: { type: "string", enum: ["native", "custom", "new"] },
-                        input_prompt: { type: "string", description: "Instrução de contexto curta para o nó no pipeline" },
-                        new_agent_name: { type: "string", description: "Nome do novo agente (se agent_type=new)" },
-                        new_agent_description: { type: "string", description: "Descrição do novo agente (se agent_type=new)" },
-                        new_agent_prompt: { type: "string", description: "Prompt COMPLETO e DETALHADO do agente (500-1000 palavras) com seções OBJETIVO, INSTRUCOES, FORMATO_SAIDA, REGRAS, LIMITACOES" },
-                        is_synthesizer: { type: "boolean", description: "True se este é o nó sintetizador final (apenas em modo parallel)" },
-                      },
-                      required: ["agent_id", "agent_type", "input_prompt", "new_agent_prompt"],
-                      additionalProperties: false,
+    const orderedKeys = await getOrderedKeysForUser(supabase, user_id);
+    const aiResult = await callWithFallback(supabase, orderedKeys, {
+      systemPrompt,
+      messages: [{ role: "user", content: enrichedDescription }],
+      mode: "tools",
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "create_flow_plan",
+            description: "Cria um plano de fluxo de agentes premium com prompts detalhados",
+            parameters: {
+              type: "object",
+              properties: {
+                flow_name: { type: "string", description: "Nome do fluxo" },
+                flow_description: { type: "string", description: "Descrição breve do fluxo" },
+                execution_mode: { type: "string", enum: ["sequential", "parallel"], description: "Modo de execução auto-detectado" },
+                preflight_questions: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Perguntas que precisam ser respondidas ANTES da execução do fluxo. Array vazio se não necessário.",
+                },
+                nodes: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      agent_id: { type: "string", description: "ID ou slug do agente existente, ou 'CREATE_NEW' se precisa criar" },
+                      agent_type: { type: "string", enum: ["native", "custom", "new"] },
+                      input_prompt: { type: "string", description: "Instrução de contexto curta para o nó no pipeline" },
+                      new_agent_name: { type: "string", description: "Nome do novo agente (se agent_type=new)" },
+                      new_agent_description: { type: "string", description: "Descrição do novo agente (se agent_type=new)" },
+                      new_agent_prompt: { type: "string", description: "Prompt COMPLETO e DETALHADO do agente (500-1000 palavras) com seções OBJETIVO, INSTRUCOES, FORMATO_SAIDA, REGRAS, LIMITACOES" },
+                      is_synthesizer: { type: "boolean", description: "True se este é o nó sintetizador final (apenas em modo parallel)" },
                     },
+                    required: ["agent_id", "agent_type", "input_prompt", "new_agent_prompt"],
+                    additionalProperties: false,
                   },
                 },
-                required: ["flow_name", "flow_description", "execution_mode", "preflight_questions", "nodes"],
-                additionalProperties: false,
               },
+              required: ["flow_name", "flow_description", "execution_mode", "preflight_questions", "nodes"],
+              additionalProperties: false,
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "create_flow_plan" } },
-      }),
+        },
+      ],
+      toolChoice: { type: "function", function: { name: "create_flow_plan" } },
     });
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error("AI error:", errText);
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit excedido. Tente novamente em instantes." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes no gateway de IA." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error("Erro ao gerar plano com IA");
+    if (!aiResult) {
+      return new Response(JSON.stringify({ error: "Nenhuma chave de IA configurada ou todas falharam. Configure uma chave em Configurações." }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+    await logAiUsage(supabase, {
+      userId: user_id,
+      provider: aiResult.provider!,
+      model: aiResult.model!,
+      tokensInput: aiResult.tokensInput,
+      tokensOutput: aiResult.tokensOutput,
+      promptType: "agent-flow-plan",
+    });
 
-    const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("IA não retornou plano estruturado");
-
-    const plan = JSON.parse(toolCall.function.arguments);
+    const plan = aiResult.toolCallArgs;
+    if (!plan) throw new Error("IA não retornou plano estruturado");
 
     // If there are preflight questions and no answers yet, return them without creating the flow
     if (plan.preflight_questions?.length > 0 && !preflight_answers) {

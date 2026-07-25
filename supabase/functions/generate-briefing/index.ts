@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "npm:resend@4.0.0";
+import { getOrderedKeysWithAdminFallback, callWithFallback, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +26,6 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY")!;
     const resendKey = Deno.env.get("RESEND_API_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
     const resend = new Resend(resendKey);
@@ -97,24 +97,26 @@ Deno.serve(async (req) => {
           dateLabel: new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }),
         });
 
-        const llmResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              { role: "system", content: "Você é o apresentador do briefing matinal Agentes Posológicos. Fale em português do Brasil, tom profissional e caloroso, ritmo natural para narração em voz, de 3 a 5 minutos quando lido (cerca de 500-800 palavras). Estruture: saudação curta com a data; novidades em pesquisa (PubMed); atualizações de protocolos/sistema; resumo de conversas pendentes do usuário; fechamento com uma sugestão prática. Não use markdown, sem títulos com #, sem listas com hífen — texto corrido em parágrafos pois será lido em voz alta. Se faltar dado em alguma seção, mencione brevemente e siga adiante." },
-              { role: "user", content: `Gere o briefing com base nestes dados:\n${inputContext}` },
-            ],
-          }),
+        const orderedKeys = await getOrderedKeysWithAdminFallback(supabase, userId);
+        const result = await callWithFallback(supabase, orderedKeys, {
+          systemPrompt: "Você é o apresentador do briefing matinal Agentes Posológicos. Fale em português do Brasil, tom profissional e caloroso, ritmo natural para narração em voz, de 3 a 5 minutos quando lido (cerca de 500-800 palavras). Estruture: saudação curta com a data; novidades em pesquisa (PubMed); atualizações de protocolos/sistema; resumo de conversas pendentes do usuário; fechamento com uma sugestão prática. Não use markdown, sem títulos com #, sem listas com hífen — texto corrido em parágrafos pois será lido em voz alta. Se faltar dado em alguma seção, mencione brevemente e siga adiante.",
+          messages: [{ role: "user", content: `Gere o briefing com base nestes dados:\n${inputContext}` }],
+          mode: "text",
         });
-        if (!llmResp.ok) {
-          console.error("LLM error", userId, await llmResp.text());
+        if (!result) {
+          console.error("LLM error (all providers failed)", userId);
           continue;
         }
-        const llmJson = await llmResp.json();
-        const transcript: string = llmJson?.choices?.[0]?.message?.content?.trim() || "";
+        const transcript: string = (result.output || "").trim();
         if (!transcript) continue;
+        await logAiUsage(supabase, {
+          userId,
+          provider: result.provider!,
+          model: result.model!,
+          tokensInput: result.tokensInput,
+          tokensOutput: result.tokensOutput,
+          promptType: "generate-briefing",
+        });
 
         const title = `Briefing ${new Date().toLocaleDateString("pt-BR")}`;
         const sections = [

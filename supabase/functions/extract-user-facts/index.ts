@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysForUser, callWithFallback, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,10 +23,6 @@ Deno.serve(async (req: Request) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY missing" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
 
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader.startsWith("Bearer ")) {
@@ -61,55 +58,51 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ extracted: 0, skipped: "opt-out" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: `Mensagem do usuário:\n"""${userMessage}"""` },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "save_user_facts",
-            description: "Salva fatos duráveis sobre o usuário",
-            parameters: {
-              type: "object",
-              properties: {
-                facts: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      fact: { type: "string" },
-                      confidence: { type: "number" },
-                    },
-                    required: ["fact"],
+    const orderedKeys = await getOrderedKeysForUser(service, userId);
+    const result = await callWithFallback(service, orderedKeys, {
+      systemPrompt: SYSTEM,
+      messages: [{ role: "user", content: `Mensagem do usuário:\n"""${userMessage}"""` }],
+      mode: "tools",
+      tools: [{
+        type: "function",
+        function: {
+          name: "save_user_facts",
+          description: "Salva fatos duráveis sobre o usuário",
+          parameters: {
+            type: "object",
+            properties: {
+              facts: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    fact: { type: "string" },
+                    confidence: { type: "number" },
                   },
+                  required: ["fact"],
                 },
               },
-              required: ["facts"],
             },
+            required: ["facts"],
           },
-        }],
-        tool_choice: { type: "function", function: { name: "save_user_facts" } },
-      }),
+        },
+      }],
+      toolChoice: { type: "function", function: { name: "save_user_facts" } },
     });
 
-    if (!resp.ok) {
-      const t = await resp.text();
-      console.error("AI gateway error", resp.status, t);
+    if (!result) {
+      console.error("extract-user-facts: all providers failed");
       return new Response(JSON.stringify({ extracted: 0, error: "ai_error" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const data = await resp.json();
-    const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    let parsed: any = {};
-    try { parsed = typeof args === "string" ? JSON.parse(args) : (args || {}); } catch { parsed = {}; }
+    await logAiUsage(service, {
+      userId,
+      provider: result.provider!,
+      model: result.model!,
+      tokensInput: result.tokensInput,
+      tokensOutput: result.tokensOutput,
+      promptType: "extract-user-facts",
+    });
+    const parsed = result.toolCallArgs || {};
     const facts: Array<{ fact: string; confidence?: number }> = Array.isArray(parsed?.facts) ? parsed.facts : [];
 
     // Dedupe vs existing active facts

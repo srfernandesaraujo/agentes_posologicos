@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysForUser, callWithFallback, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,13 +47,6 @@ Deno.serve(async (req: Request) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY missing" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader.startsWith("Bearer ")) {
@@ -108,38 +102,30 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "Você é um assistente especialista em transformar conteúdo técnico de saúde/educação em outros formatos. Responda SEMPRE em pt-BR. Use Markdown. Tabelas devem ser Markdown puro (nunca dentro de blocos de código).",
-          },
-          {
-            role: "user",
-            content: `${transform.prompt}\n\n---\nCONTEÚDO ORIGINAL:\n${content}`,
-          },
-        ],
-      }),
+    const orderedKeys = await getOrderedKeysForUser(service, userId);
+    const result = await callWithFallback(service, orderedKeys, {
+      systemPrompt:
+        "Você é um assistente especialista em transformar conteúdo técnico de saúde/educação em outros formatos. Responda SEMPRE em pt-BR. Use Markdown. Tabelas devem ser Markdown puro (nunca dentro de blocos de código).",
+      messages: [{ role: "user", content: `${transform.prompt}\n\n---\nCONTEÚDO ORIGINAL:\n${content}` }],
+      mode: "text",
     });
 
-    if (!resp.ok) {
-      const t = await resp.text();
-      console.error("AI gateway error", resp.status, t);
-      return new Response(JSON.stringify({ error: "ai_error" }), {
+    if (!result) {
+      console.error("agent-transform: all providers failed — configure an API key in Settings");
+      return new Response(JSON.stringify({ error: "ai_error", details: "Nenhuma chave de IA configurada ou todas falharam" }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const data = await resp.json();
-    const output = data?.choices?.[0]?.message?.content || "";
+    const output = result.output || "";
+    await logAiUsage(service, {
+      userId,
+      provider: result.provider!,
+      model: result.model!,
+      tokensInput: result.tokensInput,
+      tokensOutput: result.tokensOutput,
+      promptType: "agent-transform",
+    });
 
     // Debit credits
     if (!hasFreeAccess && output) {

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOrderedKeysWithAdminFallback, callWithFallback, logAiUsage } from "../_shared/llmProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -135,26 +136,29 @@ ${JSON.stringify(rubric)}
 ## Transcrição da consulta
 ${transcriptText}`;
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: evalPrompt }],
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-      }),
+    const orderedKeys = await getOrderedKeysWithAdminFallback(admin, user?.id || null);
+    const result = await callWithFallback(admin, orderedKeys, {
+      messages: [{ role: "user", content: evalPrompt }],
+      temperature: 0.2,
+      mode: "json",
     });
-    if (!aiRes.ok) {
-      const t = await aiRes.text();
-      return new Response(JSON.stringify({ error: "Falha na avaliação", detail: t }), {
+    if (!result) {
+      return new Response(JSON.stringify({ error: "Falha na avaliação", detail: "Nenhum provedor de IA disponível" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const data = await aiRes.json();
+    if (user?.id) {
+      await logAiUsage(admin, {
+        userId: user.id,
+        provider: result.provider!,
+        model: result.model!,
+        tokensInput: result.tokensInput,
+        tokensOutput: result.tokensOutput,
+        promptType: "osce-evaluate",
+      });
+    }
     let parsed: any = {};
-    try { parsed = JSON.parse(data?.choices?.[0]?.message?.content || "{}"); } catch { parsed = {}; }
+    try { parsed = JSON.parse(result.output || "{}"); } catch { parsed = {}; }
 
     const items = Array.isArray(parsed.items) ? parsed.items : [];
     const maxScore = Number(parsed.max_score) || items.reduce((s: number, i: any) => s + (Number(i.max_score) || 0), 0) || 10;
