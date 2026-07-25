@@ -14,12 +14,9 @@ export default function Briefing() {
     let alive = true;
     (async () => {
       const { data } = await supabase
-        .from("briefings" as any)
-        .select("id, title, transcript, summary, sections, created_at")
-        .eq("id", id!)
-        .maybeSingle();
+        .rpc("get_briefing_by_id" as any, { p_id: id! });
       if (!alive) return;
-      setBriefing(data);
+      setBriefing(Array.isArray(data) ? data[0] ?? null : data);
       setLoading(false);
     })();
     return () => { alive = false; };

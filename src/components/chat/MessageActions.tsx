@@ -16,6 +16,12 @@ interface MessageActionsProps {
   messageId?: string;
 }
 
+function escapeHtml(value: string): string {
+  const div = document.createElement("div");
+  div.textContent = value;
+  return div.innerHTML;
+}
+
 export function MessageActions({ content, agentName, messageRef, sessionId, messageId }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -67,7 +73,7 @@ export function MessageActions({ content, agentName, messageRef, sessionId, mess
       header.innerHTML = `
         <div style="font-family:Helvetica,Arial,sans-serif;color:#111;font-size:22px;font-weight:bold;margin-bottom:6px;">RELATÓRIO</div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-family:Helvetica,Arial,sans-serif;color:#555;font-size:12px;">${agentName}</div>
+          <div style="font-family:Helvetica,Arial,sans-serif;color:#555;font-size:12px;">${escapeHtml(agentName)}</div>
           <div style="font-family:Helvetica,Arial,sans-serif;color:#555;font-size:12px;">${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
         </div>
         <div style="font-family:Helvetica,Arial,sans-serif;color:#999;font-size:9px;margin-top:4px;">Gerado por Agentes Posológicos</div>

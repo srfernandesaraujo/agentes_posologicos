@@ -2263,6 +2263,17 @@ export type Database = {
             Args: { p_encryption_key?: string; p_key: string }
             Returns: string
           }
+      get_briefing_by_id: {
+        Args: { p_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          sections: Json
+          summary: string
+          title: string
+          transcript: string
+        }[]
+      }
       get_current_user_email: { Args: never; Returns: string }
       get_marketplace_agents: {
         Args: never
