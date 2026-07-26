@@ -6797,6 +6797,12 @@ Deno.serve(async (req) => {
     // Server-side credit deduction helper
     const deductCredits = async (output: string) => {
       if (!userId || isVirtualRoom) return; // No deduction for virtual rooms or unauthenticated
+      // Only a genuine server-to-server caller (already holds the service role key) can skip
+      // billing here — this is how agent-orchestrator avoids double-charging: it bills a flat
+      // fee itself and dispatches subtasks with skipCredits so they aren't ALSO billed
+      // individually. An end user hitting this function directly can never present the service
+      // role key, so they cannot set isServerCall themselves.
+      if (isServerCall && skipCredits === true) return;
       const svc = createClient(supabaseUrl, serviceRoleKey);
 
       // SECURITY: compute cost server-side; never trust client-supplied creditCost
@@ -6840,26 +6846,19 @@ Deno.serve(async (req) => {
         if (unlimitedData) return; // Unlimited user - free access
       }
 
-      // Check balance
-      const { data: balanceData } = await svc
-        .from("credits_ledger")
-        .select("amount")
-        .eq("user_id", userId);
-      const balance = (balanceData || []).reduce((sum: number, r: any) => sum + Number(r.amount), 0);
-      if (balance < serverCost) {
-        console.warn(`User ${userId} has insufficient credits: ${balance} < ${serverCost}`);
-        // Still allow response since AI already ran, but log it
-        return;
+      // Atomic check-and-debit (race-safe — see spend_credits migration).
+      try {
+        await svc.rpc("spend_credits", {
+          p_user_id: userId,
+          p_amount: serverCost,
+          p_description: "Uso de agente via servidor",
+        });
+        console.log(`Credits deducted: ${serverCost} for user ${userId}`);
+      } catch (e: any) {
+        // Still allow the response since the AI already ran — matches prior behavior —
+        // but the debit did NOT happen (insufficient balance or other error), so log it.
+        console.warn(`Credit deduction skipped for user ${userId}: ${e?.message || e}`);
       }
-
-      // Deduct
-      await svc.from("credits_ledger").insert({
-        user_id: userId,
-        amount: -serverCost,
-        type: "usage",
-        description: `Uso de agente via servidor`,
-      });
-      console.log(`Credits deducted: ${serverCost} for user ${userId}`);
     };
 
     // Cost estimation per 1M tokens (input/output) in USD

@@ -64,49 +64,54 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Você já adquiriu este agente" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 3. Check buyer balance
-    const { data: credits } = await adminClient
-      .from("credits_ledger")
-      .select("amount")
-      .eq("user_id", user.id);
-
-    const balance = (credits || []).reduce((sum: number, r: any) => sum + Number(r.amount), 0);
-    if (balance < 5) {
-      return new Response(JSON.stringify({ error: "Créditos insuficientes. Você precisa de 5 créditos." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // 3+4. Debit buyer atomically (-5) — checks balance and debits in one transaction
+    // (see spend_credits migration), closing the race the old check-then-insert had.
+    try {
+      await adminClient.rpc("spend_credits", {
+        p_user_id: user.id,
+        p_amount: 5,
+        p_description: `Compra do agente "${agent.name}" no Marketplace`,
+        p_reference_id: `purchase-${agentId}`,
+      });
+    } catch (e: any) {
+      if (String(e?.message || "").includes("INSUFFICIENT_CREDITS")) {
+        return new Response(JSON.stringify({ error: "Créditos insuficientes. Você precisa de 5 créditos." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      throw e;
     }
 
-    // 4. Debit buyer (-5)
-    const { error: debitError } = await adminClient.from("credits_ledger").insert({
-      user_id: user.id,
-      amount: -5,
-      type: "usage",
-      description: `Compra do agente "${agent.name}" no Marketplace`,
-      reference_id: `purchase-${agentId}`,
-    });
-    if (debitError) throw debitError;
+    try {
+      // 5. Credit seller (+3)
+      const { error: creditError } = await adminClient.from("credits_ledger").insert({
+        user_id: agent.user_id,
+        amount: 3,
+        type: "bonus",
+        description: `Venda do agente "${agent.name}" no Marketplace`,
+        reference_id: `sale-${agentId}-${user.id}`,
+      });
+      if (creditError) throw creditError;
 
-    // 5. Credit seller (+3)
-    const { error: creditError } = await adminClient.from("credits_ledger").insert({
-      user_id: agent.user_id,
-      amount: 3,
-      type: "bonus",
-      description: `Venda do agente "${agent.name}" no Marketplace`,
-      reference_id: `sale-${agentId}-${user.id}`,
-    });
-    if (creditError) throw creditError;
+      // 6. Record purchase
+      const { error: purchaseError } = await adminClient.from("purchased_agents").insert({
+        buyer_id: user.id,
+        agent_id: agentId,
+        seller_id: agent.user_id,
+      });
+      if (purchaseError) throw purchaseError;
 
-    // 6. Record purchase
-    const { error: purchaseError } = await adminClient.from("purchased_agents").insert({
-      buyer_id: user.id,
-      agent_id: agentId,
-      seller_id: agent.user_id,
-    });
-    if (purchaseError) throw purchaseError;
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (postDebitError: any) {
+      // The buyer paid but never got the purchase recorded (or the seller wasn't
+      // credited) — refund the buyer immediately rather than leaving them shortchanged.
+      await adminClient.from("credits_ledger").insert({
+        user_id: user.id, amount: 5, type: "admin",
+        description: `Estorno: falha ao concluir compra do agente "${agent.name}"`,
+      });
+      throw postDebitError;
+    }
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,

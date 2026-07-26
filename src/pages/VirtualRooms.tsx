@@ -18,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { RoomConversations } from "@/components/rooms/RoomConversations";
+import { invokeFunction } from "@/lib/invokeFunction";
 
 const ROOM_AGENT_COST = 1;
 
@@ -173,7 +174,7 @@ export default function VirtualRooms() {
   const { data: nativeAgents = [] } = useAgents();
   const { data: purchasedSet = new Set<string>() } = usePurchasedAgents();
   const { data: marketplaceAgents = [] } = useMarketplaceAgents();
-  const { balance, refetch: refetchCredits } = useCredits();
+  const { refetch: refetchCredits } = useCredits();
   const { isAdmin } = useIsAdmin();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<VirtualRoom | null>(null);
@@ -201,39 +202,14 @@ export default function VirtualRooms() {
 
   const createRoom = useMutation({
     mutationFn: async () => {
-      const hasAgent = agentId !== "none";
-      if (hasAgent && !isAdmin && balance < ROOM_AGENT_COST) {
-        throw new Error("Créditos insuficientes para vincular um agente à sala.");
-      }
-
-      const agentExpiresAt = hasAgent ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
-      // Default expiration: if no date set, expire in 7 days
-      const expiresAt = roomExpiresAt
-        ? new Date(roomExpiresAt).toISOString()
-        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const { error } = await supabase
-        .from("virtual_rooms" as any)
-        .insert({
-          user_id: user!.id,
-          name,
-          description,
-          pin: generatePin(),
-          agent_id: hasAgent ? agentId : null,
-          is_active: isActive,
-          agent_expires_at: agentExpiresAt,
-          room_expires_at: expiresAt,
-        } as any);
-      if (error) throw error;
-
-      if (hasAgent && !isAdmin) {
-        await supabase.from("credits_ledger").insert({
-          user_id: user!.id,
-          amount: -ROOM_AGENT_COST,
-          type: "usage",
-          description: "Vincular agente a sala virtual (24h)",
-        });
-      }
+      await invokeFunction("create-virtual-room", {
+        action: "create",
+        name,
+        description,
+        agentId,
+        isActive,
+        roomExpiresAt: roomExpiresAt ? new Date(roomExpiresAt).toISOString() : null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["virtual-rooms"] });
@@ -251,25 +227,18 @@ export default function VirtualRooms() {
       const hasNewAgent = agentId !== "none";
       const agentChanged = hasNewAgent && agentId !== editingRoom.agent_id;
 
-      if (agentChanged && !isAdmin && balance < ROOM_AGENT_COST) {
-        throw new Error("Créditos insuficientes para vincular um novo agente.");
-      }
-
       const expiresAt = roomExpiresAt
         ? new Date(roomExpiresAt).toISOString()
         : null;
 
+      // Plain field updates (no credits involved) — RLS already restricts this to the room owner.
       const updateData: any = {
         name,
         description,
-        agent_id: hasNewAgent ? agentId : null,
         is_active: isActive,
+        ...(!agentChanged && { agent_id: hasNewAgent ? agentId : null }),
         ...(expiresAt !== null && { room_expires_at: expiresAt }),
       };
-
-      if (agentChanged) {
-        updateData.agent_expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      }
 
       const { error } = await supabase
         .from("virtual_rooms" as any)
@@ -278,12 +247,12 @@ export default function VirtualRooms() {
         .eq("user_id", user!.id);
       if (error) throw error;
 
-      if (agentChanged && !isAdmin) {
-        await supabase.from("credits_ledger").insert({
-          user_id: user!.id,
-          amount: -ROOM_AGENT_COST,
-          type: "usage",
-          description: "Vincular agente a sala virtual (24h)",
+      // Linking a *new* agent costs a credit and is enforced server-side (atomic debit).
+      if (agentChanged) {
+        await invokeFunction("create-virtual-room", {
+          action: "link-agent",
+          roomId: editingRoom.id,
+          agentId,
         });
       }
     },

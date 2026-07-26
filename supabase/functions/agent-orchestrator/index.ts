@@ -164,14 +164,17 @@ Deno.serve(async (req) => {
         `### Etapa ${i + 1}: ${r.title} (${r.agent_name || r.agent_slug})\n${r.output || `(erro: ${r.error})`}`).join("\n\n---\n\n")}` },
     ]);
 
-    // 5) Debit
+    // 5) Debit (atomic — see spend_credits migration)
     if (!hasUnlimited) {
-      await admin.from("credits_ledger").insert({
-        user_id: user.id,
-        amount: -ORCHESTRATOR_COST,
-        type: "usage",
-        description: `Agente Orquestrador: ${goal.slice(0, 80)}`,
-      });
+      try {
+        await admin.rpc("spend_credits", {
+          p_user_id: user.id,
+          p_amount: ORCHESTRATOR_COST,
+          p_description: `Agente Orquestrador: ${goal.slice(0, 80)}`,
+        });
+      } catch (e: any) {
+        console.warn(`orchestrator charge skipped for user ${user.id}: ${e?.message || e}`);
+      }
     }
 
     return new Response(JSON.stringify({

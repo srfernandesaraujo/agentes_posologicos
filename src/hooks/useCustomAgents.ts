@@ -36,18 +36,10 @@ export function useCustomAgents() {
     enabled: !!user,
   });
 
-  const createAgent = useMutation({
-    mutationFn: async (agent: { name: string; description: string }) => {
-      const { data, error } = await supabase
-        .from("custom_agents" as any)
-        .insert({ user_id: user!.id, name: agent.name, description: agent.description })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as unknown as CustomAgent;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-agents"] }),
-  });
+  // NOTE: agent creation is intentionally NOT a mutation here — it must go through the
+  // create-custom-agent edge function (src/pages/MyAgents.tsx), which enforces the
+  // Pro/Institucional plan gate and debits credits atomically. A direct table insert
+  // would bypass both.
 
   const updateAgent = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<CustomAgent> & { id: string }) => {
@@ -73,7 +65,7 @@ export function useCustomAgents() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-agents"] }),
   });
 
-  return { ...query, createAgent, updateAgent, deleteAgent };
+  return { ...query, updateAgent, deleteAgent };
 }
 
 export function useCustomAgent(id: string | undefined) {

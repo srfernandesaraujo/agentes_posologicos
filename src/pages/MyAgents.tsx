@@ -17,12 +17,14 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { invokeFunction } from "@/lib/invokeFunction";
 
 const AGENT_CREATION_COST = 5;
 
 export default function MyAgents() {
   const navigate = useNavigate();
-  const { data: agents = [], createAgent } = useCustomAgents();
+  const { data: agents = [] } = useCustomAgents();
+  const [creating, setCreating] = useState(false);
   const { balance, refetch: refetchCredits } = useCredits();
   const { isAdmin } = useIsAdmin();
   const { user } = useAuth();
@@ -35,38 +37,32 @@ export default function MyAgents() {
 
   const handleCreate = async () => {
     if (!name.trim()) return;
-    
-    if (!isAdmin && balance < AGENT_CREATION_COST) {
-      toast.error(`Créditos insuficientes. Criar um agente custa ${AGENT_CREATION_COST} créditos.`, {
-        action: { label: "Comprar", onClick: () => navigate("/creditos") },
-      });
-      return;
-    }
 
+    setCreating(true);
     try {
-      const agent = await createAgent.mutateAsync({
+      const { agent } = await invokeFunction<{ agent: { id: string } }>("create-custom-agent", {
+        mode: "manual",
         name: name.trim(),
         description: description.trim(),
       });
 
-      if (!isAdmin && user) {
-        await supabase.from("credits_ledger").insert({
-          user_id: user.id,
-          amount: -AGENT_CREATION_COST,
-          type: "usage",
-          description: "Criação de agente personalizado",
-        });
-        refetchCredits();
-      }
-
+      refetchCredits();
       toast.success("Agente criado com sucesso!");
       setShowCreate(false);
       setName("");
       setDescription("");
       setAiPrompt("");
       navigate(`/meus-agentes/${agent.id}`);
-    } catch {
-      toast.error("Erro ao criar agente");
+    } catch (e: any) {
+      if (e?.message?.includes("Créditos insuficientes")) {
+        toast.error(e.message, { action: { label: "Comprar", onClick: () => navigate("/creditos") } });
+      } else if (e?.message?.includes("exclusivos dos planos")) {
+        toast.error(e.message, { action: { label: "Ver planos", onClick: () => navigate("/creditos") } });
+      } else {
+        toast.error(e?.message || "Erro ao criar agente");
+      }
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -76,55 +72,26 @@ export default function MyAgents() {
       return;
     }
 
-    if (!isAdmin && balance < AGENT_CREATION_COST) {
-      toast.error(`Créditos insuficientes. Criar um agente custa ${AGENT_CREATION_COST} créditos.`, {
-        action: { label: "Comprar", onClick: () => navigate("/creditos") },
-      });
-      return;
-    }
-
     setGenerating(true);
     try {
-      // Generate system prompt via AI (Premium)
-      const { data: promptData, error: promptError } = await supabase.functions.invoke("agent-chat", {
-        body: { agentId: "__generate_prompt__", input: aiPrompt },
-      });
-      if (promptError) throw promptError;
-
-      const generatedPrompt = promptData?.output || "";
-      const agentMeta = promptData?.agent_meta || {};
-      const agentName = agentMeta.name?.trim() || aiPrompt.slice(0, 60).trim();
-      const agentDescription = agentMeta.description?.trim() || aiPrompt.trim();
-
-      // Create agent with AI-generated name and description
-      const agent = await createAgent.mutateAsync({
-        name: agentName,
-        description: agentDescription,
+      const { agent } = await invokeFunction<{ agent: { id: string } }>("create-custom-agent", {
+        mode: "ai",
+        aiPrompt: aiPrompt.trim(),
       });
 
-      // Update with generated system prompt
-      await supabase
-        .from("custom_agents" as any)
-        .update({ system_prompt: generatedPrompt })
-        .eq("id", agent.id)
-        .eq("user_id", user!.id);
-
-      if (!isAdmin && user) {
-        await supabase.from("credits_ledger").insert({
-          user_id: user.id,
-          amount: -AGENT_CREATION_COST,
-          type: "usage",
-          description: "Criação de agente personalizado (IA)",
-        });
-        refetchCredits();
-      }
-
+      refetchCredits();
       toast.success("Agente premium criado com IA!");
       setShowCreate(false);
       setAiPrompt("");
       navigate(`/meus-agentes/${agent.id}`);
-    } catch {
-      toast.error("Erro ao criar agente com IA");
+    } catch (e: any) {
+      if (e?.message?.includes("Créditos insuficientes")) {
+        toast.error(e.message, { action: { label: "Comprar", onClick: () => navigate("/creditos") } });
+      } else if (e?.message?.includes("exclusivos dos planos")) {
+        toast.error(e.message, { action: { label: "Ver planos", onClick: () => navigate("/creditos") } });
+      } else {
+        toast.error(e?.message || "Erro ao criar agente com IA");
+      }
     } finally {
       setGenerating(false);
     }
@@ -247,10 +214,10 @@ export default function MyAgents() {
                 </div>
                 <Button
                   onClick={handleCreate}
-                  disabled={!name.trim() || createAgent.isPending || (!isAdmin && balance < AGENT_CREATION_COST)}
+                  disabled={!name.trim() || creating || (!isAdmin && balance < AGENT_CREATION_COST)}
                   className="w-full bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white"
                 >
-                  {createAgent.isPending ? "Criando..." : `Criar o Agente (${AGENT_CREATION_COST} créditos)`}
+                  {creating ? "Criando..." : `Criar o Agente (${AGENT_CREATION_COST} créditos)`}
                 </Button>
               </>
             ) : (

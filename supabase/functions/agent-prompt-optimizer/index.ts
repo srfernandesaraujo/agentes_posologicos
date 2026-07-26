@@ -61,6 +61,25 @@ Deno.serve(async (req) => {
       return json({ error: "agentId e agentType (native|custom) são obrigatórios" }, 400);
     }
 
+    // Authenticate: either the daily cron job (shared secret) or a real logged-in
+    // user manually triggering a run for an agent they own (or an admin).
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const authVal = req.headers.get("Authorization") || "";
+    const isCron = triggeredBy === "cron" && (
+      (!!cronSecret && req.headers.get("x-cron-secret") === cronSecret) ||
+      (!!anonKey && authVal === `Bearer ${anonKey}`)
+    );
+
+    let callerUserId: string | null = null;
+    if (!isCron) {
+      if (!authVal) return json({ error: "Não autenticado" }, 401);
+      const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authVal } } });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) return json({ error: "Não autenticado" }, 401);
+      callerUserId = user.id;
+    }
+
     // Identify agent owner + current prompt
     let ownerUserId: string | null = null;
     let currentPrompt = "";
@@ -77,6 +96,16 @@ Deno.serve(async (req) => {
       currentPrompt = (ag as any).system_prompt || "";
       agentName = (ag as any).name || "";
     }
+
+    // Authorization: manual triggers require ownership (custom agents) or admin (native agents).
+    if (!isCron) {
+      const isOwner = agentType === "custom" && ownerUserId === callerUserId;
+      if (!isOwner) {
+        const { data: isAdminFlag } = await svc.rpc("has_role", { _user_id: callerUserId, _role: "admin" });
+        if (!isAdminFlag) return json({ error: "Sem permissão" }, 403);
+      }
+    }
+
     // Use latest active version as base if exists
     const { data: activeVer } = await svc
       .from("agent_prompt_versions")

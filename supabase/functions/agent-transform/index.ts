@@ -127,14 +127,17 @@ Deno.serve(async (req: Request) => {
       promptType: "agent-transform",
     });
 
-    // Debit credits
+    // Debit credits (atomic — see spend_credits migration)
     if (!hasFreeAccess && output) {
-      await service.from("credits_ledger").insert({
-        user_id: userId,
-        amount: -transform.cost,
-        type: "usage",
-        description: `Output Action: ${transform.label}`,
-      });
+      try {
+        await service.rpc("spend_credits", {
+          p_user_id: userId,
+          p_amount: transform.cost,
+          p_description: `Output Action: ${transform.label}`,
+        });
+      } catch (e: any) {
+        console.warn(`agent-transform charge skipped for user ${userId}: ${e?.message || e}`);
+      }
     }
 
     return new Response(

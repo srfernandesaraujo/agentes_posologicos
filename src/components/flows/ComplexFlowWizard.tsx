@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, Loader2, Network, Plus, Trash2, ArrowUp, ArrowDown, Sparkles, AlertTriangle, CheckCircle2, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeFunction } from "@/lib/invokeFunction";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface AgentSpec {
@@ -199,8 +199,7 @@ export function ComplexFlowWizard({ open, onOpenChange }: { open: boolean; onOpe
         })),
         ...(answers ? { preflight_answers: answers } : {}),
       };
-      const { data, error } = await supabase.functions.invoke("agent-flow-plan-complex", { body: payload });
-      if (error) throw error;
+      const data = await invokeFunction<any>("agent-flow-plan-complex", payload);
       if (data?.needs_preflight && data?.preflight_questions?.length > 0) {
         setPreflightQs(data.preflight_questions);
         setPreflightAns(Object.fromEntries(data.preflight_questions.map((q: string) => [q, ""])));

@@ -104,10 +104,19 @@ REGRAS: use a rubrica; feedback em pt-BR (300-500 chars); sem markdown.
   }).eq("id", attemptId);
 
   if (!isFree && cost > 0 && attempt.user_id) {
-    await admin.from("credits_ledger").insert({
-      user_id: attempt.user_id, amount: -cost, type: "usage",
-      description: `OSCE (sessão ao vivo): ${station.title}`,
-    });
+    try {
+      await admin.rpc("spend_credits", {
+        p_user_id: attempt.user_id,
+        p_amount: cost,
+        p_description: `OSCE (sessão ao vivo): ${station.title}`,
+      });
+    } catch (e: any) {
+      // Insufficient balance (or other error): don't block the live exam for other
+      // participants — just don't take this one negative. Reflect the real amount
+      // charged (0) instead of the nominal station cost.
+      console.warn(`OSCE live charge skipped for user ${attempt.user_id}: ${e?.message || e}`);
+      await admin.from("osce_attempts").update({ credits_charged: 0 }).eq("id", attemptId);
+    }
   }
 }
 

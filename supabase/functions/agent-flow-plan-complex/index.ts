@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const FLOW_PLAN_COST = 8;
+
 interface AgentSpec {
   name: string;
   role: string;
@@ -228,6 +230,29 @@ RESPONDA APENAS com a tool call create_complex_flow_plan.`;
           node_names: plan.nodes.map((n: any, i: number) => n.new_agent_name || agents[i]?.name || n.agent_id),
         },
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Charge for the generation (not the preflight round-trip above) — a flat fee
+    // per flow actually created, consistent with agent-transform/agent-orchestrator.
+    const [{ data: roleRow }, { data: unlimited }] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", user_id).eq("role", "admin").maybeSingle(),
+      supabase.from("unlimited_users").select("user_id").eq("user_id", user_id).maybeSingle(),
+    ]);
+    if (!roleRow && !unlimited) {
+      try {
+        await supabase.rpc("spend_credits", {
+          p_user_id: user_id,
+          p_amount: FLOW_PLAN_COST,
+          p_description: `Planejamento de fluxo complexo: ${flow_name}`,
+        });
+      } catch (e: any) {
+        if (String(e?.message || "").includes("INSUFFICIENT_CREDITS")) {
+          return new Response(JSON.stringify({ error: `Créditos insuficientes. Planejar um fluxo custa ${FLOW_PLAN_COST} créditos.` }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        throw e;
+      }
     }
 
     // Create the flow

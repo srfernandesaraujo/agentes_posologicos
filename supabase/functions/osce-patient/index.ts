@@ -9,9 +9,9 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { stationId, history, userMessage } = await req.json();
-    if (!stationId || !userMessage) {
-      return new Response(JSON.stringify({ error: "stationId e userMessage obrigatórios" }), {
+    const { attemptId, guestToken, history, userMessage } = await req.json();
+    if (!attemptId || !userMessage) {
+      return new Response(JSON.stringify({ error: "attemptId e userMessage obrigatórios" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -21,10 +21,48 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Identify caller: registered user (JWT) or guest (token issued by osce-session-control's "join").
+    let user: any = null;
+    const authHeader = req.headers.get("Authorization") || "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    if (authHeader && authHeader !== `Bearer ${anonKey}`) {
+      const userClient = createClient(Deno.env.get("SUPABASE_URL")!, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: u } = await userClient.auth.getUser();
+      user = u?.user || null;
+    }
+    if (!user && !guestToken) {
+      return new Response(JSON.stringify({ error: "Sem autenticação nem token de convidado" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // The attempt is the source of truth for which station this conversation belongs to —
+    // never trust a client-supplied stationId directly, and require a real, owned,
+    // in-progress attempt (created by osce-session-control) before generating any reply.
+    const { data: attempt } = await supabase
+      .from("osce_attempts")
+      .select("id,user_id,guest_token,station_id,status")
+      .eq("id", attemptId)
+      .maybeSingle();
+    const okUser = user && attempt?.user_id === user.id;
+    const okGuest = guestToken && attempt?.guest_token === guestToken;
+    if (!attempt || (!okUser && !okGuest)) {
+      return new Response(JSON.stringify({ error: "Tentativa inválida" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (attempt.status !== "in_progress") {
+      return new Response(JSON.stringify({ error: "Atendimento já encerrado" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: station } = await supabase
       .from("osce_stations")
       .select("title,patient_persona,patient_symptoms,patient_omissions,scenario_brief,exam_results")
-      .eq("id", stationId)
+      .eq("id", attempt.station_id)
       .maybeSingle();
     if (!station) {
       return new Response(JSON.stringify({ error: "Estação não encontrada" }), {
@@ -88,7 +126,7 @@ ${examsBlock}`;
       { role: "user", content: String(userMessage) },
     ];
 
-    const orderedKeys = await getOrderedKeysWithAdminFallback(supabase, null);
+    const orderedKeys = await getOrderedKeysWithAdminFallback(supabase, attempt.user_id || null);
     const result = await callWithFallback(supabase, orderedKeys, {
       systemPrompt,
       messages,

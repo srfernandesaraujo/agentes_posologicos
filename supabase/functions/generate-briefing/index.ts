@@ -51,6 +51,22 @@ Deno.serve(async (req) => {
       const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
       const { data: { user } } = await userClient.auth.getUser();
       if (!user || user.id !== forceUserId) return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+      // Same cooldown as the cron path — a manual trigger shouldn't let a user
+      // generate unlimited briefings (real LLM + PubMed + email cost) in a loop.
+      const { data: settings } = await supabase
+        .from("briefing_settings").select("frequency, last_sent_at").eq("user_id", forceUserId).maybeSingle();
+      if (settings?.last_sent_at) {
+        const minHours = settings.frequency === "weekly" ? 24 * 6 : 20;
+        const elapsedMs = Date.now() - new Date(settings.last_sent_at).getTime();
+        if (elapsedMs < minHours * 60 * 60 * 1000) {
+          const waitHours = Math.ceil((minHours * 60 * 60 * 1000 - elapsedMs) / (60 * 60 * 1000));
+          return new Response(JSON.stringify({ error: `Aguarde cerca de ${waitHours}h antes de gerar outro briefing.` }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       targetUserIds = [forceUserId];
     } else {
       return new Response(JSON.stringify({ error: "missing userId or cron secret" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });

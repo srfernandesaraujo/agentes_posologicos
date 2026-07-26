@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Workflow, Trash2, Sparkles, Loader2, ArrowLeft, ArrowRight, MessageSquare, Network, Store } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { ComplexFlowWizard } from "@/components/flows/ComplexFlowWizard";
 import { AddToProjectMenu } from "@/components/projects/AddToProjectMenu";
+import { invokeFunction } from "@/lib/invokeFunction";
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   draft: { label: "Rascunho", variant: "secondary" },
@@ -81,14 +81,11 @@ export default function Flows() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("agent-flow-plan", {
-        body: {
-          description: aiPrompt,
-          user_id: user?.id,
-          ...(preflightAnswers ? { preflight_answers: preflightAnswers } : {}),
-        },
+      const data = await invokeFunction<any>("agent-flow-plan", {
+        description: aiPrompt,
+        user_id: user?.id,
+        ...(preflightAnswers ? { preflight_answers: preflightAnswers } : {}),
       });
-      if (error) throw error;
 
       // Check if the planner needs preflight questions
       if (data?.needs_preflight && data?.preflight_questions?.length > 0) {

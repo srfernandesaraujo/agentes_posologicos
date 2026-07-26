@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Headphones, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
+import { invokeFunction } from "@/lib/invokeFunction";
 
 type Settings = {
   enabled: boolean;
@@ -49,13 +50,9 @@ export function BriefingSettings() {
   });
 
   const testSend = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("generate-briefing", { body: { userId: user!.id } });
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: async () => invokeFunction("generate-briefing", { userId: user!.id }),
     onSuccess: () => { toast.success("Briefing gerado e enviado por e-mail!"); qc.invalidateQueries({ queryKey: ["briefings_recent", user?.id] }); },
-    onError: () => toast.error("Falha ao gerar briefing"),
+    onError: (e: any) => toast.error(e?.message || "Falha ao gerar briefing"),
   });
 
   const { data: recent } = useQuery({

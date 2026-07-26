@@ -295,7 +295,6 @@ REGRAS OBRIGATÓRIAS DO MODO FLUXO:
               input: enrichedInput,
               userId,
               conversationHistory: [],
-              skipCredits: true,
               flowMode: true,
             }),
           });
@@ -398,7 +397,6 @@ REGRAS:
             input: synthInput + flowInstruction,
             userId,
             conversationHistory: [],
-            skipCredits: true,
             flowMode: true,
           }),
         });
@@ -525,7 +523,6 @@ ${previous_stage_output}
             input: enrichedInput,
             userId,
             conversationHistory: history,
-            skipCredits: true,
             flowMode: true,
           }),
         });
@@ -655,7 +652,7 @@ ${previous_stage_output}
         const chatResponse = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-          body: JSON.stringify({ agentId: node.agent_id, input: contextMessage, userId, conversationHistory: [], skipCredits: true }),
+          body: JSON.stringify({ agentId: node.agent_id, input: contextMessage, userId, conversationHistory: [] }),
         });
 
         const responseText = await chatResponse.text();

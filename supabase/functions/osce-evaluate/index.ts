@@ -179,12 +179,18 @@ ${transcriptText}`;
     }).eq("id", attemptId);
 
     if (!isFree && user) {
-      await admin.from("credits_ledger").insert({
-        user_id: user.id,
-        amount: -cost,
-        type: "usage",
-        description: `OSCE: ${station.title}`,
-      });
+      try {
+        await admin.rpc("spend_credits", {
+          p_user_id: user.id,
+          p_amount: cost,
+          p_description: `OSCE: ${station.title}`,
+        });
+      } catch (e: any) {
+        // Balance dropped between the pre-check above and now (race) — don't discard
+        // the evaluation that already ran, just reflect that it wasn't actually charged.
+        console.warn(`OSCE evaluate charge skipped for user ${user.id}: ${e?.message || e}`);
+        await admin.from("osce_attempts").update({ credits_charged: 0 }).eq("id", attemptId);
+      }
     }
 
     const { data: updated } = await admin.from("osce_attempts").select("*").eq("id", attemptId).maybeSingle();

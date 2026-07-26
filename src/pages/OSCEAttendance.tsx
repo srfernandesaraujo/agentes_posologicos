@@ -110,7 +110,7 @@ export default function OSCEAttendance() {
     setHistory(next);
     try {
       const { data, error } = await supabase.functions.invoke("osce-patient", {
-        body: { stationId: station.id, history, userMessage: message },
+        body: { attemptId, guestToken, history, userMessage: message },
       });
       if (error) throw error;
       const reply = (data as any)?.reply || "...";
