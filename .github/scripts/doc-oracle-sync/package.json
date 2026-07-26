@@ -1,0 +1,10 @@
+{
+  "name": "doc-oracle-sync",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CI script: keeps CHANGELOG.md and the Oraculo agent's system-knowledge block in sync with pushes to main.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0"
+  }
+}

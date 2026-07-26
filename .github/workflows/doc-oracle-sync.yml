@@ -1,0 +1,56 @@
+name: Doc & Oraculo Sync
+
+# Keeps CHANGELOG.md dated and the Oraculo agent's system-knowledge block
+# (supabase/functions/agent-chat/index.ts) synced with every push to main.
+# Opens a PR for human review instead of committing directly.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "CHANGELOG.md"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Safety valve: never re-trigger on the bot's own sync commits.
+    if: ${{ !contains(github.event.head_commit.message, '[doc-sync]') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install sync script dependencies
+        working-directory: .github/scripts/doc-oracle-sync
+        run: npm install --no-audit --no-fund
+
+      - name: Run doc & oracle sync
+        id: sync
+        working-directory: .github/scripts/doc-oracle-sync
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SYNC_BEFORE_SHA: ${{ github.event.before }}
+          SYNC_AFTER_SHA: ${{ github.sha }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: node index.mjs
+
+      - name: Open pull request
+        if: steps.sync.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "docs: sync changelog and Oraculo knowledge [doc-sync]"
+          branch: doc-oracle-sync/auto
+          delete-branch: true
+          title: "docs: sync changelog and Oráculo knowledge (auto) [doc-sync]"
+          body: ${{ steps.sync.outputs.pr_body }}
+          add-paths: |
+            CHANGELOG.md
+            supabase/functions/agent-chat/index.ts

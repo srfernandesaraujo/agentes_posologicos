@@ -5759,22 +5759,24 @@ Se o usuário disser "quero simular um OSCE virtual", "como aplico um OSCE", "co
 - \`/meus-agentes/:id\` — editor de agente personalizado
 - \`/conteudos\` e \`/conteudos/:id\` — bases de conhecimento (RAG)
 - \`/fluxos\` e \`/fluxos/:id\` — Rede de Agentes (pipelines)
-- \`/marketplace\` e \`/marketplace-fluxos\` — agentes e fluxos publicados pela comunidade
+- \`/marketplace\` e \`/marketplace/fluxos\` — agentes e fluxos publicados pela comunidade
 - \`/salas-virtuais\` e \`/sala/:pin\` — Salas Virtuais
+- \`/salas-virtuais/aula/:pin\` — modo Aula ao Vivo de uma sala virtual (broadcast + perguntas anônimas)
 - \`/reunioes\` — Reuniões com IA (Google Meet)
 - \`/osce\`, \`/osce/estacao/:id\`, \`/osce/prova/:id\`, \`/osce/entrar\`, \`/osce/sala/:sessionId\`, \`/osce/sessao/:sessionId\`, \`/osce/atendimento/:attemptId\`, \`/osce/resultado/:attemptId\` — módulo OSCE
-- \`/briefings\` — geração assistida de briefings
+- \`/briefing/:id\` — página de um Briefing por Voz gerado (configurado em "Conta"; não há listagem própria no menu)
 - \`/projetos\` e \`/projetos/:id\` — projetos colaborativos
-- \`/aula-ao-vivo\` — aula ao vivo com agente
 - \`/orquestrador\` — orquestrador multi-agente
 - \`/conversas\` — histórico central de conversas
 - \`/creditos\` — comprar créditos / assinaturas
-- \`/conta\` — perfil, créditos, chaves de API, monitor PubMed, interesses, memória
+- \`/conta\` — perfil, créditos, chaves de API, monitor PubMed, interesses, memória, Briefing por Voz
 - \`/dashboard\` — visão geral do usuário
-- \`/docs\` — documentação completa
-- \`/precos\`, \`/fale-conosco\` — páginas públicas
+- \`/docs\` — documentação pública (sem login)
+- \`/documentacao\` — documentação completa dentro do app (logado; admins veem seções técnicas extras)
+- \`/configuracoes\` — configurações administrativas (apenas admins)
+- \`/precos\`, \`/fale-conosco\`, \`/contato\` — páginas públicas/institucionais
 - \`/verificar\` — verificar certificado de conteúdo (autenticidade SHA-256)
-- \`/admin\` — painel administrativo (apenas admins)
+- \`/admin\` e \`/admin/agente/:agentId\` — painel administrativo e editor de agentes nativos (apenas admins)
 
 ## 📚 Bases de Conhecimento (Conteúdos)
 - Acesse pelo menu lateral "Conteúdos"
@@ -5809,7 +5811,7 @@ Se o usuário disser "quero simular um OSCE virtual", "como aplico um OSCE", "co
 - Suporta **execução paralela** com Agente Sintetizador ao final
 - Detecção automática de perguntas: se um agente faz perguntas no final, o fluxo pausa e exibe chat inline para o usuário responder
 - Mapas mentais em formato ┣/┗ são renderizados como SVG interativo (zoom/pan)
-- Marketplace de Fluxos em \`/marketplace-fluxos\` para publicar/instalar pipelines prontos
+- Marketplace de Fluxos em \`/marketplace/fluxos\` para publicar/instalar pipelines prontos
 
 ## 🎥 Reuniões com IA
 - Acesse pelo menu lateral "Reuniões"
@@ -5880,11 +5882,12 @@ Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no coma
 - Toda segunda-feira o sistema busca novos artigos dos últimos 7 dias e envia notificações na plataforma
 - Limite de 15 artigos por consulta. Traduz pt→en automaticamente para a busca e devolve em pt-BR com links diretos para PubMed
 
-## 📋 Briefings
-- Acesse pelo menu lateral "Briefings"
-- Estruture briefings de projetos clínicos, educacionais ou de conteúdo com ajuda de IA
-- Útil para alinhar escopo antes de iniciar um trabalho com os agentes
-- Configurações em "Conta" controlam tom, idioma e estilo padrão dos briefings
+## 🎧 Briefing por Voz
+- Não é um item de menu próprio: configure em **Conta** → "Briefing por Voz"
+- Gera um resumo narrado (áudio) e em texto cruzando seus interesses de pesquisa cadastrados com novidades recentes da plataforma
+- Frequência configurável (diária ou semanal) e horário de envio por e-mail
+- Também é possível gerar um briefing avulso na hora com o botão "Gerar briefing agora"
+- Cada briefing tem página própria em \`/briefing/:id\`, acessível e compartilhável mesmo sem login
 
 ## 📁 Projetos e Colaboradores
 - Organize conversas, agentes e bases de conhecimento em projetos
@@ -5917,7 +5920,7 @@ Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no coma
 
 ## 🧪 Outras funcionalidades
 - **Orquestrador** (\`/orquestrador\`): roteia automaticamente a pergunta para o melhor agente disponível
-- **Aula ao Vivo** (\`/aula-ao-vivo\`): formato dedicado para apresentações em sala
+- **Aula ao Vivo** (\`/salas-virtuais/aula/:pin\`): modo ao vivo de uma Sala Virtual, com broadcast de prompt e perguntas anônimas, para apresentações em sala
 - **Aba de mapa mental**: agentes com saída ┣/┗ renderizam SVG interativo
 - **Validador Clínico**: blocos \`[PACIENTE]\` e \`[ALERTAS]\` viram cards visuais
 - **Simulador de Prescrição**: validação gamificada com hotspots
@@ -5954,7 +5957,7 @@ Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no coma
 - Agentes adquiridos ficam disponíveis na sua biblioteca
 - Custo padrão: 5 créditos (3 vão para o autor)
 - Reviews/avaliações disponíveis antes da compra
-- Também existe **Marketplace de Fluxos** em \`/marketplace-fluxos\`
+- Também existe **Marketplace de Fluxos** em \`/marketplace/fluxos\`
 
 ## 💳 Créditos
 - Cada interação debita créditos (geralmente 1-5; OSCE custa 10/15/20 por estação)
@@ -6137,17 +6140,17 @@ const ORACLE_MODULE_GUIDES: Array<{ key: string; patterns: RegExp[]; response: s
   },
   {
     key: "briefings",
-    patterns: [/briefings?/i, /planejar.*projeto/i, /escopo.*projeto/i],
-    response: `🧭 **Briefings** — use este módulo para estruturar objetivos, público, escopo e requisitos antes de produzir conteúdo ou projeto.
-📍 Rota: \`/briefings\`
+    patterns: [/briefings?/i, /resumo.*voz/i, /planejar.*projeto/i, /escopo.*projeto/i],
+    response: `🧭 **Briefing por Voz** — use este recurso para receber um resumo narrado (áudio) e em texto cruzando seus interesses de pesquisa com as novidades recentes da plataforma.
+📍 Rota: \`/conta\` (configuração) e \`/briefing/:id\` (cada briefing gerado)
 
 **Passo a passo:**
-1. Acesse **Briefings** no menu lateral.
-2. Preencha o objetivo, público, contexto e restrições.
-3. Gere o briefing com IA.
-4. Revise e use o resultado como base para agentes, fluxos ou projetos.
+1. Acesse **Conta** no menu lateral e localize o card **Briefing por Voz**.
+2. Ative o envio por e-mail e escolha frequência (diária ou semanal) e horário.
+3. Use **Gerar briefing agora** para criar um briefing avulso na hora, sem esperar o agendamento.
+4. Abra o link \`/briefing/:id\` para ler ou ouvir o resumo — pode ser compartilhado mesmo sem login.
 
-💡 **Dica:** é útil para alinhar expectativas antes de criar aulas, materiais clínicos ou campanhas.`
+💡 **Dica:** não existe um item de menu "Briefings"; o recurso fica dentro de **Conta**.`
   },
   {
     key: "creditos",
@@ -6183,7 +6186,7 @@ const ORACLE_MODULE_GUIDES: Array<{ key: string; patterns: RegExp[]; response: s
     key: "marketplace",
     patterns: [/marketplace/i, /comprar\s+agente/i, /publicar\s+agente/i, /instalar\s+fluxo/i],
     response: `🧭 **Marketplace** — use esta área para comprar, publicar ou instalar agentes e fluxos da comunidade.
-📍 Rota: \`/marketplace\` e \`/marketplace-fluxos\`
+📍 Rota: \`/marketplace\` e \`/marketplace/fluxos\`
 
 **Passo a passo:**
 1. Acesse **Marketplace** para agentes ou **Marketplace de Fluxos** para pipelines.
@@ -6271,17 +6274,17 @@ const ORACLE_MODULE_GUIDES: Array<{ key: string; patterns: RegExp[]; response: s
   {
     key: "aula-ao-vivo",
     patterns: [/aula\s+ao\s+vivo/i, /apresenta[cç][aã]o\s+ao\s+vivo/i, /perguntas\s+an[oô]nimas/i],
-    response: `🧭 **Aula ao Vivo** — use este módulo para apoiar apresentações e interações síncronas com alunos.
-📍 Rota: \`/aula-ao-vivo\`
+    response: `🧭 **Aula ao Vivo** — modo ao vivo de uma **Sala Virtual**, para apoiar apresentações e interações síncronas com broadcast de prompt e perguntas anônimas.
+📍 Rota: \`/salas-virtuais/aula/:pin\` (não é um item separado do menu — nasce de uma Sala Virtual)
 
 **Passo a passo:**
-1. Acesse **Aula ao Vivo** no menu lateral.
-2. Configure o tema ou agente de apoio da aula.
-3. Use os recursos de interação para conduzir a sessão.
-4. Colete perguntas ou respostas dos alunos conforme o formato escolhido.
-5. Finalize usando o material gerado como registro da aula.
+1. Acesse **Salas Virtuais** no menu lateral e crie (ou abra) uma sala com o agente desejado.
+2. Entre no modo ao vivo da sala para acessar \`/salas-virtuais/aula/:pin\`.
+3. Envie broadcasts de prompt para todos os participantes conectados pelo PIN.
+4. Ative o modo de perguntas anônimas para coletar dúvidas da turma em tempo real.
+5. Ao final, gere o resumo da aula a partir do material trocado na sala.
 
-💡 **Dica:** para avaliação clínica com paciente virtual, use **OSCE**; para interação geral em aula, use **Aula ao Vivo**.`
+💡 **Dica:** para avaliação clínica com paciente virtual, use **OSCE**; para interação geral em aula com uma turma via PIN, use **Aula ao Vivo** dentro de Salas Virtuais.`
   },
 ];
 
