@@ -14,6 +14,16 @@ const SUBSCRIPTION_CREDITS: Record<string, number> = {
   "prod_U1QUXJ141hfnYw": 300,  // Institucional
 };
 
+// Resolve a Stripe customer id to one of our users via their billing email.
+async function findUserByCustomerId(stripe: Stripe, supabase: ReturnType<typeof createClient>, customerId: string) {
+  const customer = await stripe.customers.retrieve(customerId);
+  if ((customer as Stripe.DeletedCustomer).deleted) return null;
+  const email = (customer as Stripe.Customer).email;
+  if (!email) return null;
+  const { data: users } = await supabase.auth.admin.listUsers();
+  return users?.users?.find((u) => u.email === email) || null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -166,6 +176,51 @@ serve(async (req) => {
       }
 
       console.log("[STRIPE-WEBHOOK] Subscription credits granted successfully");
+    }
+
+    if (event.type === "customer.subscription.deleted") {
+      // Access to plan-gated features already falls immediately because
+      // check-subscription/index.ts queries Stripe live on every check — nothing to
+      // do there. Credits already granted for the current cycle are intentionally
+      // NOT clawed back (the user paid for that cycle and keeps what it granted).
+      // This handler exists purely to let the user know their subscription ended.
+      const subscription = event.data.object as Stripe.Subscription;
+      const customerId = subscription.customer as string;
+      const user = await findUserByCustomerId(stripe, supabase, customerId);
+      if (user) {
+        await supabase.from("notifications").insert({
+          user_id: user.id,
+          type: "info",
+          title: "Assinatura cancelada",
+          message: "Sua assinatura foi cancelada. Você mantém os créditos já concedidos, mas não receberá novos créditos mensais até assinar novamente.",
+          link: "/creditos",
+        });
+        console.log(`[STRIPE-WEBHOOK] Subscription ended notification sent to ${user.id}`);
+      } else {
+        console.warn("[STRIPE-WEBHOOK] customer.subscription.deleted: user not found for customer", customerId);
+      }
+    }
+
+    if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object as Stripe.Invoice;
+      if (!invoice.subscription) {
+        console.log("[STRIPE-WEBHOOK] invoice.payment_failed without subscription, skipping");
+        return new Response(JSON.stringify({ received: true }), { status: 200 });
+      }
+      const customerId = invoice.customer as string;
+      const user = await findUserByCustomerId(stripe, supabase, customerId);
+      if (user) {
+        await supabase.from("notifications").insert({
+          user_id: user.id,
+          type: "warning",
+          title: "Falha no pagamento da assinatura",
+          message: "Não conseguimos cobrar sua assinatura. Atualize sua forma de pagamento para evitar a perda de acesso aos benefícios do seu plano.",
+          link: "/creditos",
+        });
+        console.log(`[STRIPE-WEBHOOK] Payment failed notification sent to ${user.id}`);
+      } else {
+        console.warn("[STRIPE-WEBHOOK] invoice.payment_failed: user not found for customer", customerId);
+      }
     }
 
     return new Response(JSON.stringify({ received: true }), {
