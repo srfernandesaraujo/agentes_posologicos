@@ -11,7 +11,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 
-const SUPABASE_URL = SUPABASE_URL;
 const SUPABASE_ANON_KEY = SUPABASE_PUBLISHABLE_KEY;
 
 // Direct REST helper to bypass SDK auth issues for anonymous users
