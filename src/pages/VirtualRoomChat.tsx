@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -10,8 +11,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_ANON_KEY = SUPABASE_PUBLISHABLE_KEY;
 
 // Direct REST helper to bypass SDK auth issues for anonymous users
 async function roomMessagesRest(method: "GET" | "POST", params?: Record<string, string>, body?: any) {
@@ -243,8 +243,8 @@ export default function VirtualRoomChat() {
       }));
 
       // Call agent via direct fetch (bypass SDK auth header for anonymous users)
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const supabaseUrl = SUPABASE_URL;
+      const supabaseAnonKey = SUPABASE_PUBLISHABLE_KEY;
       console.log("[VirtualRoom] Calling agent-chat...", { agentId: room.agent_id, roomId: room.id });
       
       const response = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {

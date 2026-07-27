@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { supabase } from "@/integrations/supabase/client";
 
 // supabase.functions.invoke() swallows the JSON body of non-2xx responses, which
@@ -7,12 +8,12 @@ import { supabase } from "@/integrations/supabase/client";
 export async function invokeFunction<T = any>(name: string, body: unknown): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`;
+  const url = `${SUPABASE_URL}/functions/v1/${name}`;
   const resp = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      apikey: SUPABASE_PUBLISHABLE_KEY,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),

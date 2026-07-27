@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useState, useRef, useEffect, createRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -507,12 +508,12 @@ export default function Chat() {
       // error body (supabase.functions.invoke swallows non-2xx response bodies).
       const { data: { session: _sess } } = await supabase.auth.getSession();
       const token = _sess?.access_token;
-      const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`;
+      const fnUrl = `${SUPABASE_URL}/functions/v1/agent-chat`;
       const resp = await fetch(fnUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "apikey": SUPABASE_PUBLISHABLE_KEY,
           ...(token ? { "Authorization": `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
