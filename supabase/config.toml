@@ -101,3 +101,9 @@ verify_jwt = false
 
 [functions.create-virtual-room]
 verify_jwt = false
+
+[functions.support-ticket]
+verify_jwt = false
+
+[functions.admin-user-diagnostics]
+verify_jwt = false

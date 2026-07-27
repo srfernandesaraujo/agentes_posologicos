@@ -12,11 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Shield, Users, Bot, Coins, Search, Plus, ToggleLeft, DoorOpen, Clock, Edit2,
-  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown, Rocket,
+  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown, Rocket, LifeBuoy,
 } from "lucide-react";
 import { SystemUpdatesManager } from "@/components/admin/SystemUpdatesManager";
+import { SupportTicketsPanel } from "@/components/admin/SupportTicketsPanel";
 import { toast } from "sonner";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell,
 } from "recharts";
@@ -39,6 +40,9 @@ export default function Admin() {
   const { isAdmin, isLoading: adminLoading } = useIsAdmin();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || "dashboard";
+  const initialTicketId = searchParams.get("ticket");
   const [userSearch, setUserSearch] = useState("");
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<any>(null);
@@ -291,7 +295,7 @@ export default function Admin() {
         <p className="text-white/50">Gerencie agentes, usuários, assinaturas e analise métricas de uso</p>
       </div>
 
-      <Tabs defaultValue="dashboard" className="space-y-6">
+      <Tabs defaultValue={initialTab} className="space-y-6">
         <TabsList className="bg-white/[0.05] border border-white/10">
           <TabsTrigger value="dashboard" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
             <BarChart3 className="h-4 w-4 mr-1.5" /> Dashboard
@@ -307,6 +311,9 @@ export default function Admin() {
           </TabsTrigger>
           <TabsTrigger value="unlimited" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
             <Crown className="h-4 w-4 mr-1.5" /> Convidados
+          </TabsTrigger>
+          <TabsTrigger value="suporte" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+            <LifeBuoy className="h-4 w-4 mr-1.5" /> Suporte
           </TabsTrigger>
           <TabsTrigger value="updates" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
             <Rocket className="h-4 w-4 mr-1.5" /> Pipeline
@@ -717,6 +724,11 @@ export default function Admin() {
               ))
             )}
           </div>
+        </TabsContent>
+
+        {/* SUPPORT TAB */}
+        <TabsContent value="suporte" className="space-y-4">
+          <SupportTicketsPanel initialTicketId={initialTicketId} />
         </TabsContent>
 
         {/* PIPELINE TAB */}

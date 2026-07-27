@@ -36,6 +36,7 @@ import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import UserDashboard from "./pages/UserDashboard";
 import Contact from "./pages/Contact";
+import Support from "./pages/Support";
 import ResetPassword from "./pages/ResetPassword";
 import Documentation from "./pages/Documentation";
 import PublicCredits from "./pages/PublicCredits";
@@ -110,6 +111,7 @@ const App = () => (
               <Route path="/marketplace/fluxos" element={<MarketplaceFlows />} />
               <Route path="/orquestrador" element={<Orchestrator />} />
               <Route path="/contato" element={<Contact />} />
+              <Route path="/suporte" element={<Support />} />
               <Route path="/documentacao" element={<Documentation />} />
               <Route path="/fluxos" element={<Flows />} />
               <Route path="/fluxos/:flowId" element={<FlowEditor />} />
