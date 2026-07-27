@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, X, Send, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,13 +56,13 @@ export function OraculoWidget() {
       const token = session?.access_token;
       
       const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`,
+        `${SUPABASE_URL}/functions/v1/agent-chat`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            apikey: SUPABASE_PUBLISHABLE_KEY,
           },
           body: JSON.stringify({
             agentId: superAgent.id,

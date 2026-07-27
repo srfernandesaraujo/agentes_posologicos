@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -118,8 +119,8 @@ export default function LiveClass() {
       if (uErr) throw uErr;
 
       // 2. Call agent-chat (virtual room mode, no auth needed)
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const supabaseUrl = SUPABASE_URL;
+      const supabaseAnonKey = SUPABASE_PUBLISHABLE_KEY;
       const resp = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}` },

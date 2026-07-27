@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useEffect, useRef, useState } from "react";
 import { Volume2, Pause, Play, Square, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,7 +45,7 @@ export function MessageTTS({ text }: MessageTTSProps) {
         toast.error("Faça login para ouvir a narração");
         return null;
       }
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tts-elevenlabs`;
+      const url = `${SUPABASE_URL}/functions/v1/tts-elevenlabs`;
       const res = await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

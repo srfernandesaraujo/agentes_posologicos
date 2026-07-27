@@ -1,3 +1,4 @@
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, ArrowRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -12,7 +13,7 @@ const SUGGESTIONS = [
   "Quero entender como funciona a plataforma",
 ];
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sales-agent`;
+const CHAT_URL = `${SUPABASE_URL}/functions/v1/sales-agent`;
 
 export function SalesAgentWidget() {
   const [open, setOpen] = useState(false);
@@ -48,7 +49,7 @@ export function SalesAgentWidget() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({ messages: allMessages }),
       });
