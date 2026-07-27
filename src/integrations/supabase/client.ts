@@ -2,8 +2,14 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Fallbacks are the project's public URL + anon key (safe to ship in the bundle,
+// protected by RLS). They keep the app from crashing with "supabaseUrl is required"
+// if the build runs without the VITE_ env vars.
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || "https://kmpwowdvljizswkhwhtq.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImttcHdvd2R2bGppenN3a2h3aHRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NzY2MDgsImV4cCI6MjA4NzA1MjYwOH0.9oOanYAZ2d2jb43deVvFkLBmy5A7t4SqfB4EO0RRmvE";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
