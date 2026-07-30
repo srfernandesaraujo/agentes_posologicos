@@ -105,6 +105,17 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+
+  /* Radix/react-remove-scroll locks background scroll by measuring the native
+     scrollbar width and reserving that gap with margin-right on <body> while
+     any Dialog/Sheet/Popover/DropdownMenu is open. Mobile browsers use overlay
+     scrollbars (zero width), but if that measurement ever comes back wrong it
+     shifts/clips the whole page by that many px. Keep the scroll-lock's
+     overflow:hidden (still useful) but never let it reserve horizontal space. */
+  html body[data-scroll-locked] {
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+  }
 }
 
 @layer utilities {

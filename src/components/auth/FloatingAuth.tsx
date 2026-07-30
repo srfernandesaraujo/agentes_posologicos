@@ -77,7 +77,7 @@ export function FloatingAuth() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-[360px] border-white/10 bg-[hsl(220,25%,8%)] p-0 shadow-2xl shadow-black/50"
+        className="w-[360px] max-w-[calc(100vw-2rem)] border-white/10 bg-[hsl(220,25%,8%)] p-0 shadow-2xl shadow-black/50"
         sideOffset={8}
       >
         {/* Tabs */}

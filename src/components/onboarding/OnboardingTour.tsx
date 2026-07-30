@@ -182,7 +182,7 @@ export function OnboardingTour() {
 
       {/* Tooltip */}
       <div
-        className="fixed z-[9999] w-[340px] rounded-2xl border border-white/15 bg-[hsl(220,25%,10%)] p-5 shadow-2xl animate-fade-in"
+        className="fixed z-[9999] w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-white/15 bg-[hsl(220,25%,10%)] p-5 shadow-2xl animate-fade-in"
         style={
           isCenter
             ? { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }

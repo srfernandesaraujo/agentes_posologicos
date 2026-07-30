@@ -348,39 +348,41 @@ export default function KnowledgeDetail() {
           </div>
 
           {/* Sources table */}
-          <div className="rounded-xl border border-white/10 overflow-hidden">
-            <div className="grid grid-cols-5 gap-4 bg-white/[0.03] px-4 py-3 text-xs font-medium text-white/50 border-b border-white/10">
-              <span>Nome</span>
-              <span>Tipo</span>
-              <span>Tamanho</span>
-              <span>Última Sincronização</span>
-              <span>Status</span>
-            </div>
-            {filteredSources.length === 0 ? (
-              <div className="py-12 text-center text-sm text-white/30">Nenhuma fonte encontrada</div>
-            ) : (
-              filteredSources.map((src) => (
-                <div key={src.id} className="grid grid-cols-5 gap-4 items-center px-4 py-3 text-sm border-b border-white/10 last:border-0 hover:bg-white/[0.02]">
-                  <span className="text-white truncate">{src.name}</span>
-                  <span className="text-white/50 capitalize">{src.type}</span>
-                  <span className="text-white/50">{(src.content?.length || 0) > 1000 ? `${(src.content.length / 1024).toFixed(1)}KB` : `${src.content?.length || 0} chars`}</span>
-                  <span className="text-white/50">{new Date(src.updated_at).toLocaleDateString("pt-BR")}</span>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${src.status === "ready" ? "bg-green-500/20 text-green-400" : src.status === "error" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"}`}>
-                      {src.status === "ready" ? "Pronto" : src.status === "error" ? "Erro" : "Pendente"}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteSource.mutate(src.id)}
-                      className="h-7 w-7 text-white/30 hover:text-red-400 hover:bg-red-500/10"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+          <div className="rounded-xl border border-white/10 overflow-x-auto">
+            <div className="min-w-[640px]">
+              <div className="grid grid-cols-5 gap-4 bg-white/[0.03] px-4 py-3 text-xs font-medium text-white/50 border-b border-white/10">
+                <span>Nome</span>
+                <span>Tipo</span>
+                <span>Tamanho</span>
+                <span>Última Sincronização</span>
+                <span>Status</span>
+              </div>
+              {filteredSources.length === 0 ? (
+                <div className="py-12 text-center text-sm text-white/30">Nenhuma fonte encontrada</div>
+              ) : (
+                filteredSources.map((src) => (
+                  <div key={src.id} className="grid grid-cols-5 gap-4 items-center px-4 py-3 text-sm border-b border-white/10 last:border-0 hover:bg-white/[0.02]">
+                    <span className="text-white truncate">{src.name}</span>
+                    <span className="text-white/50 capitalize">{src.type}</span>
+                    <span className="text-white/50">{(src.content?.length || 0) > 1000 ? `${(src.content.length / 1024).toFixed(1)}KB` : `${src.content?.length || 0} chars`}</span>
+                    <span className="text-white/50">{new Date(src.updated_at).toLocaleDateString("pt-BR")}</span>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${src.status === "ready" ? "bg-green-500/20 text-green-400" : src.status === "error" ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-400"}`}>
+                        {src.status === "ready" ? "Pronto" : src.status === "error" ? "Erro" : "Pendente"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteSource.mutate(src.id)}
+                        className="h-7 w-7 text-white/30 hover:text-red-400 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
         </TabsContent>
 
