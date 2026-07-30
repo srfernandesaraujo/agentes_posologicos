@@ -178,6 +178,18 @@ ${transcriptText}`;
       credits_charged: isFree ? 0 : cost,
     }).eq("id", attemptId);
 
+    // Formal rating row for the LLM's own grading — lets a teacher later add a 'human'
+    // rating for the same attempt and compare the two (inter-rater calibration).
+    await admin.from("osce_attempt_ratings").insert({
+      attempt_id: attemptId,
+      rater_id: null,
+      rater_type: "llm",
+      items,
+      score,
+      max_score: maxScore,
+      feedback,
+    });
+
     if (!isFree && user) {
       try {
         await admin.rpc("spend_credits", {

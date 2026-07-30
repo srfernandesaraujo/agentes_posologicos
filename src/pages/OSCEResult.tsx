@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Trophy, CheckCircle2, AlertTriangle } from "lucide-react";
+import { RaterReview } from "@/components/osce/RaterReview";
 
 const sb: any = supabase;
 
@@ -71,6 +72,10 @@ export default function OSCEResult() {
             })}
           </CardContent>
         </Card>
+      )}
+
+      {Array.isArray(r.items) && r.items.length > 0 && (
+        <RaterReview attemptId={attemptId!} stationOwnerId={station?.user_id || null} llmItems={r.items} />
       )}
 
       {(r.strengths?.length || r.improvements?.length) && (
