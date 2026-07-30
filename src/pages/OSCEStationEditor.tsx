@@ -9,10 +9,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { useMyInstitutions } from "@/hooks/useInstitutions";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, Award } from "lucide-react";
 
 const sb: any = supabase;
+
+const CERTIFICATION_LABELS: Record<string, { label: string; className: string }> = {
+  pending: { label: "Em análise", className: "bg-amber-500/20 text-amber-300" },
+  certified: { label: "Certificada", className: "bg-emerald-500/20 text-emerald-300" },
+  rejected: { label: "Rejeitada", className: "bg-red-500/20 text-red-300" },
+};
 
 const DEFAULT_RUBRIC = [
   { criterion: "Apresentação e empatia inicial", max_score: 2 },
@@ -31,8 +39,13 @@ export default function OSCEStationEditor() {
     title: "", specialty: "", duration_minutes: 8, difficulty: "medio",
     scenario_brief: "", patient_persona: "", patient_symptoms: "", patient_omissions: "",
     expected_questions: [""], expected_conducts: [""], rubric: DEFAULT_RUBRIC, is_public: false,
-    exam_results: [],
+    exam_results: [], institution_id: null, certification_status: "none", review_note: null,
   });
+  const [submitting, setSubmitting] = useState(false);
+  const { data: myInstitutions } = useMyInstitutions();
+  const eligibleInstitutions = (myInstitutions || []).filter(
+    (m) => m.role === "institution_admin" || m.role === "teacher"
+  );
 
   useEffect(() => {
     if (isNew) return;
@@ -62,6 +75,8 @@ export default function OSCEStationEditor() {
       user_id: user!.id,
     };
     delete payload.created_at; delete payload.updated_at;
+    delete payload.certification_status; delete payload.submitted_at;
+    delete payload.certified_at; delete payload.certified_by; delete payload.review_note;
     const res = isNew
       ? await sb.from("osce_stations").insert(payload).select().single()
       : await sb.from("osce_stations").update(payload).eq("id", id).select().single();
@@ -75,6 +90,17 @@ export default function OSCEStationEditor() {
     if (!confirm("Excluir esta estação?")) return;
     await sb.from("osce_stations").delete().eq("id", id);
     navigate("/osce");
+  }
+
+  async function submitForCertification() {
+    if (isNew || !form.institution_id) return;
+    if (!confirm("Submeter esta estação para certificação? Um admin da plataforma vai revisar antes de disponibilizá-la no banco compartilhado entre instituições.")) return;
+    setSubmitting(true);
+    const { error } = await sb.rpc("submit_station_for_certification", { p_station_id: id });
+    setSubmitting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Submetida para certificação.");
+    set("certification_status", "pending");
   }
 
   return (
@@ -104,6 +130,38 @@ export default function OSCEStationEditor() {
             <Switch checked={form.is_public} onCheckedChange={(v) => set("is_public", v)} />
             <Label>Pública (qualquer aluno pode atender)</Label>
           </div>
+          {eligibleInstitutions.length > 0 && (
+            <div>
+              <Label>Instituição (compartilhar com membros dela)</Label>
+              <Select
+                value={form.institution_id || "none"}
+                onValueChange={(v) => set("institution_id", v === "none" ? null : v)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma</SelectItem>
+                  {eligibleInstitutions.map((m) => (
+                    <SelectItem key={m.institution_id} value={m.institution_id}>{m.institution_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {form.certification_status && form.certification_status !== "none" && (
+            <div className="flex items-center gap-2">
+              <Badge className={CERTIFICATION_LABELS[form.certification_status]?.className}>
+                {CERTIFICATION_LABELS[form.certification_status]?.label}
+              </Badge>
+              {form.certification_status === "rejected" && form.review_note && (
+                <span className="text-xs text-muted-foreground">Motivo: {form.review_note}</span>
+              )}
+            </div>
+          )}
+          {!isNew && form.institution_id && ["none", "rejected"].includes(form.certification_status) && (
+            <Button variant="outline" size="sm" className="gap-1" disabled={submitting} onClick={submitForCertification}>
+              <Award className="h-3.5 w-3.5" /> Submeter para certificação
+            </Button>
+          )}
         </CardContent>
       </Card>
 

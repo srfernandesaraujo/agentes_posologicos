@@ -12,10 +12,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Shield, Users, Bot, Coins, Search, Plus, ToggleLeft, DoorOpen, Clock, Edit2,
-  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown, Rocket, LifeBuoy,
+  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown, Rocket, LifeBuoy, Award,
 } from "lucide-react";
 import { SystemUpdatesManager } from "@/components/admin/SystemUpdatesManager";
 import { SupportTicketsPanel } from "@/components/admin/SupportTicketsPanel";
+import { OsceCertificationPanel } from "@/components/admin/OsceCertificationPanel";
 import { toast } from "sonner";
 import { Navigate, useSearchParams } from "react-router-dom";
 import {
@@ -317,6 +318,9 @@ export default function Admin() {
           </TabsTrigger>
           <TabsTrigger value="updates" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
             <Rocket className="h-4 w-4 mr-1.5" /> Pipeline
+          </TabsTrigger>
+          <TabsTrigger value="osce" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+            <Award className="h-4 w-4 mr-1.5" /> OSCE
           </TabsTrigger>
         </TabsList>
 
@@ -734,6 +738,11 @@ export default function Admin() {
         {/* PIPELINE TAB */}
         <TabsContent value="updates" className="space-y-4">
           <SystemUpdatesManager />
+        </TabsContent>
+
+        {/* OSCE CERTIFICATION TAB */}
+        <TabsContent value="osce" className="space-y-4">
+          <OsceCertificationPanel />
         </TabsContent>
       </Tabs>
 

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Stethoscope, Plus, Play, BarChart3, Clock, Trophy, Radio, LogIn } from "lucide-react";
+import { Stethoscope, Plus, Play, BarChart3, Clock, Trophy, Radio, LogIn, Award } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -127,7 +127,12 @@ export default function OSCE() {
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-base">{st.title}</CardTitle>
-                      <Badge variant={st.is_public ? "default" : "secondary"}>{st.is_public ? "Pública" : "Privada"}</Badge>
+                      <div className="flex flex-col gap-1 items-end">
+                        <Badge variant={st.is_public ? "default" : "secondary"}>{st.is_public ? "Pública" : "Privada"}</Badge>
+                        {st.certification_status === "certified" && (
+                          <Badge className="gap-1 bg-emerald-500/20 text-emerald-300"><Award className="h-3 w-3" /> Certificada</Badge>
+                        )}
+                      </div>
                     </div>
                     <CardDescription className="line-clamp-2">{st.scenario_brief}</CardDescription>
                   </CardHeader>

@@ -1646,6 +1646,9 @@ export type Database = {
       }
       osce_stations: {
         Row: {
+          certification_status: string
+          certified_at: string | null
+          certified_by: string | null
           created_at: string
           difficulty: string
           duration_minutes: number
@@ -1658,14 +1661,19 @@ export type Database = {
           patient_omissions: string | null
           patient_persona: string
           patient_symptoms: string
+          review_note: string | null
           rubric: Json
           scenario_brief: string
           specialty: string | null
+          submitted_at: string | null
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          certification_status?: string
+          certified_at?: string | null
+          certified_by?: string | null
           created_at?: string
           difficulty?: string
           duration_minutes?: number
@@ -1678,14 +1686,19 @@ export type Database = {
           patient_omissions?: string | null
           patient_persona: string
           patient_symptoms: string
+          review_note?: string | null
           rubric?: Json
           scenario_brief: string
           specialty?: string | null
+          submitted_at?: string | null
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          certification_status?: string
+          certified_at?: string | null
+          certified_by?: string | null
           created_at?: string
           difficulty?: string
           duration_minutes?: number
@@ -1698,9 +1711,11 @@ export type Database = {
           patient_omissions?: string | null
           patient_persona?: string
           patient_symptoms?: string
+          review_note?: string | null
           rubric?: Json
           scenario_brief?: string
           specialty?: string | null
+          submitted_at?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -2729,6 +2744,10 @@ export type Database = {
         Args: { p_trigger_id: string }
         Returns: string
       }
+      review_station_certification: {
+        Args: { p_approve: boolean; p_note?: string; p_station_id: string }
+        Returns: undefined
+      }
       spend_credits: {
         Args: {
           p_amount: number
@@ -2738,6 +2757,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: number
+      }
+      submit_station_for_certification: {
+        Args: { p_station_id: string }
+        Returns: undefined
       }
     }
     Enums: {
