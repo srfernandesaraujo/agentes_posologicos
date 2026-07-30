@@ -4,7 +4,7 @@ import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { OraculoWidget } from "@/components/oraculo/OraculoWidget";
 import { CommandPaletteProvider } from "@/components/command/CommandPalette";
-import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3, Mail, BookOpen, Workflow, Video, LifeBuoy } from "lucide-react";
+import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3, Mail, BookOpen, Workflow, Video, LifeBuoy, Building2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -92,6 +92,7 @@ export function AppLayout() {
             {isAdmin && <SidebarLink to="/configuracoes" icon={Settings} label={t("nav.settings")} />}
             <SidebarLink to="/creditos" icon={CreditCard} label={t("nav.credits")} />
             <SidebarLink to="/conta" icon={User} label={t("nav.account")} />
+            <SidebarLink to="/instituicao" icon={Building2} label="Instituição" />
             <SidebarLink to="/suporte" icon={LifeBuoy} label="Suporte" count={pendingTicketsCount || undefined} />
             <SidebarLink to="/contato" icon={Mail} label="Contato" />
             <SidebarLink to="/documentacao" icon={BookOpen} label="Documentação" />

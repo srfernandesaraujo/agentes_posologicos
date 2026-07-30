@@ -99,6 +99,12 @@ verify_jwt = false
 [functions.osce-session-control]
 verify_jwt = false
 
+[functions.institution-invite]
+verify_jwt = false
+
+[functions.osce-submit-rating]
+verify_jwt = false
+
 [functions.create-custom-agent]
 verify_jwt = false
 

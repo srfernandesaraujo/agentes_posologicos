@@ -14,6 +14,7 @@ import Agents from "./pages/Agents";
 import Chat from "./pages/Chat";
 import Credits from "./pages/Credits";
 import Account from "./pages/Account";
+import Institution from "./pages/Institution";
 import Admin from "./pages/Admin";
 import Settings from "./pages/Settings";
 import MyAgents from "./pages/MyAgents";
@@ -97,6 +98,7 @@ const App = () => (
               <Route path="/chat/:agentId" element={<Chat />} />
               <Route path="/creditos" element={<Credits />} />
               <Route path="/conta" element={<Account />} />
+              <Route path="/instituicao" element={<Institution />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/configuracoes" element={<Settings />} />
               <Route path="/meus-agentes" element={<MyAgents />} />
