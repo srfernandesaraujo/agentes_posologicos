@@ -8,7 +8,7 @@ import path from "node:path";
 // "google" provider — see supabase/functions/_shared/llmProvider.ts). Avoids
 // needing a paid ANTHROPIC_API_KEY secret just for this CI automation.
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-const GEMINI_MODEL = "gemini-2.5-pro";
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 const REPO_ROOT = process.env.GITHUB_WORKSPACE || process.cwd();
 const BEFORE_SHA = process.env.SYNC_BEFORE_SHA;
