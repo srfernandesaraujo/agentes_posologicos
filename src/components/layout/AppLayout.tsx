@@ -5,6 +5,7 @@ import { MobileBottomNav } from "./MobileBottomNav";
 import { OfflineBanner } from "./OfflineBanner";
 import { OraculoWidget } from "@/components/oraculo/OraculoWidget";
 import { CommandPaletteProvider } from "@/components/command/CommandPalette";
+import { DebugOverlay } from "./DebugOverlay";
 import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3, Mail, BookOpen, Workflow, Video, LifeBuoy, Building2, Calculator } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,6 +78,7 @@ export function AppLayout() {
       <AppHeader />
       <OfflineBanner />
       <OnboardingTour />
+      <DebugOverlay />
       <div className="flex">
         <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-56 shrink-0 border-r border-white/10 bg-[hsl(220,25%,5%)] p-4 md:block overflow-y-auto">
           <nav className="space-y-1">
