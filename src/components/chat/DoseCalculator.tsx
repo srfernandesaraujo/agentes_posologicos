@@ -262,6 +262,33 @@ function PediatricTab() {
   );
 }
 
+// Conteúdo puro da calculadora (abas + disclaimer), sem o wrapper fixed/FAB — reutilizado
+// tanto pelo widget flutuante do chat quanto pela página standalone em /calculadora.
+export function DoseCalculatorPanel({ className }: { className?: string }) {
+  return (
+    <div className={className}>
+      <Tabs defaultValue="peso" className="flex flex-col">
+        <TabsList className="grid grid-cols-4 h-8 bg-white/5">
+          <TabsTrigger value="peso" className="text-[10px] px-1">Peso</TabsTrigger>
+          <TabsTrigger value="bsa" className="text-[10px] px-1">SC</TabsTrigger>
+          <TabsTrigger value="renal" className="text-[10px] px-1">Renal</TabsTrigger>
+          <TabsTrigger value="pediatrico" className="text-[10px] px-1">Pediatria</TabsTrigger>
+        </TabsList>
+        <div className="mt-2">
+          <TabsContent value="peso" className="mt-0"><WeightTab /></TabsContent>
+          <TabsContent value="bsa" className="mt-0"><BsaTab /></TabsContent>
+          <TabsContent value="renal" className="mt-0"><RenalTab /></TabsContent>
+          <TabsContent value="pediatrico" className="mt-0"><PediatricTab /></TabsContent>
+        </div>
+      </Tabs>
+
+      <div className="pt-3 mt-2 border-t border-white/10 text-[10px] text-white/30">
+        ⚠️ Cálculo de apoio — confirme sempre com a bula e o julgamento clínico
+      </div>
+    </div>
+  );
+}
+
 export function DoseCalculator({ enabled }: Props) {
   const [collapsed, setCollapsed] = useState(true);
 
@@ -290,24 +317,8 @@ export function DoseCalculator({ enabled }: Props) {
           <X className="h-3 w-3" />
         </Button>
       </div>
-
-      <Tabs defaultValue="peso" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="mx-3 mt-2 grid grid-cols-4 h-8 bg-white/5">
-          <TabsTrigger value="peso" className="text-[10px] px-1">Peso</TabsTrigger>
-          <TabsTrigger value="bsa" className="text-[10px] px-1">SC</TabsTrigger>
-          <TabsTrigger value="renal" className="text-[10px] px-1">Renal</TabsTrigger>
-          <TabsTrigger value="pediatrico" className="text-[10px] px-1">Pediatria</TabsTrigger>
-        </TabsList>
-        <div className="flex-1 overflow-y-auto p-3">
-          <TabsContent value="peso" className="mt-0"><WeightTab /></TabsContent>
-          <TabsContent value="bsa" className="mt-0"><BsaTab /></TabsContent>
-          <TabsContent value="renal" className="mt-0"><RenalTab /></TabsContent>
-          <TabsContent value="pediatrico" className="mt-0"><PediatricTab /></TabsContent>
-        </div>
-      </Tabs>
-
-      <div className="px-3 py-1.5 border-t border-white/10 text-[10px] text-white/30">
-        ⚠️ Cálculo de apoio — confirme sempre com a bula e o julgamento clínico
+      <div className="flex-1 overflow-y-auto p-3">
+        <DoseCalculatorPanel />
       </div>
     </aside>
   );

@@ -2,9 +2,10 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { OfflineBanner } from "./OfflineBanner";
 import { OraculoWidget } from "@/components/oraculo/OraculoWidget";
 import { CommandPaletteProvider } from "@/components/command/CommandPalette";
-import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3, Mail, BookOpen, Workflow, Video, LifeBuoy, Building2 } from "lucide-react";
+import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3, Mail, BookOpen, Workflow, Video, LifeBuoy, Building2, Calculator } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -74,11 +75,13 @@ export function AppLayout() {
   return (
     <div className="min-h-screen bg-[hsl(220,25%,5%)] text-white">
       <AppHeader />
+      <OfflineBanner />
       <OnboardingTour />
       <div className="flex">
         <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-56 shrink-0 border-r border-white/10 bg-[hsl(220,25%,5%)] p-4 md:block overflow-y-auto">
           <nav className="space-y-1">
             <SidebarLink to="/dashboard" icon={BarChart3} label="Dashboard" />
+            <SidebarLink to="/calculadora" icon={Calculator} label="Calculadora de Dose" />
             <SidebarLink to="/agentes" icon={LayoutGrid} label={t("nav.agents")} />
             <SidebarLink to="/meus-agentes" icon={Bot} label={t("nav.myAgents")} count={customAgents.length} dataTour="my-agents" />
             <SidebarLink to="/conteudos" icon={Database} label={t("nav.content")} count={knowledgeBases.length} />

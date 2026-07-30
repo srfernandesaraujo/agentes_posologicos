@@ -36,6 +36,7 @@ import FlowEditor from "./pages/FlowEditor";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import UserDashboard from "./pages/UserDashboard";
+import DoseCalculatorPage from "./pages/DoseCalculatorPage";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
 import ResetPassword from "./pages/ResetPassword";
@@ -58,10 +59,12 @@ import OSCEJoin from "./pages/OSCEJoin";
 import OSCESessionTeacher from "./pages/OSCESessionTeacher";
 import OSCESessionStudent from "./pages/OSCESessionStudent";
 import { CookieConsent } from "./components/cookies/CookieConsent";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
 const App = () => (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -95,6 +98,7 @@ const App = () => (
             }>
               <Route path="/agentes" element={<Agents />} />
               <Route path="/dashboard" element={<UserDashboard />} />
+              <Route path="/calculadora" element={<DoseCalculatorPage />} />
               <Route path="/chat/:agentId" element={<Chat />} />
               <Route path="/creditos" element={<Credits />} />
               <Route path="/conta" element={<Account />} />
@@ -134,6 +138,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
