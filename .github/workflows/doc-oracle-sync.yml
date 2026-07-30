@@ -28,15 +28,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install sync script dependencies
-        working-directory: .github/scripts/doc-oracle-sync
-        run: npm install --no-audit --no-fund
-
       - name: Run doc & oracle sync
         id: sync
         working-directory: .github/scripts/doc-oracle-sync
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SYNC_BEFORE_SHA: ${{ github.event.before }}
           SYNC_AFTER_SHA: ${{ github.sha }}
           GITHUB_WORKSPACE: ${{ github.workspace }}

@@ -3,7 +3,12 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
-import Anthropic from "@anthropic-ai/sdk";
+
+// Google's OpenAI-compatible endpoint (same one the app itself uses for the
+// "google" provider — see supabase/functions/_shared/llmProvider.ts). Avoids
+// needing a paid ANTHROPIC_API_KEY secret just for this CI automation.
+const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_MODEL = "gemini-2.5-pro";
 
 const REPO_ROOT = process.env.GITHUB_WORKSPACE || process.cwd();
 const BEFORE_SHA = process.env.SYNC_BEFORE_SHA;
@@ -85,35 +90,39 @@ async function main() {
     );
   }
 
-  const client = new Anthropic(); // reads ANTHROPIC_API_KEY from env
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is not set (repo secret missing).");
+  }
 
   const tool = {
-    name: "sync_docs",
-    description:
-      "Report the changelog entry for this diff and whether the Oraculo agent's system-knowledge block needs updating.",
-    input_schema: {
-      type: "object",
-      properties: {
-        changelog_entry: {
-          type: "string",
-          description:
-            "Concise changelog body in pt-BR Markdown (bullet list, no heading/date — the script adds those). Describe the change from a product perspective (what a user or admin would notice), not a line-by-line code diff. If the diff is purely internal/refactor with no product impact, say so briefly.",
+    type: "function",
+    function: {
+      name: "sync_docs",
+      description:
+        "Report the changelog entry for this diff and whether the Oraculo agent's system-knowledge block needs updating.",
+      parameters: {
+        type: "object",
+        properties: {
+          changelog_entry: {
+            type: "string",
+            description:
+              "Concise changelog body in pt-BR Markdown (bullet list, no heading/date — the script adds those). Describe the change from a product perspective (what a user or admin would notice), not a line-by-line code diff. If the diff is purely internal/refactor with no product impact, say so briefly.",
+          },
+          oracle_needs_update: {
+            type: "boolean",
+            description:
+              "True only if the diff changes something the Oraculo's CONHECIMENTO_DO_SISTEMA block currently describes or should describe: routes, page locations, how a module is accessed, or a described feature's behavior. False for internal refactors, styling, or backend changes invisible to the end user.",
+          },
+          oracle_new_block: {
+            type: "string",
+            description:
+              "REQUIRED when oracle_needs_update is true, omitted otherwise. The FULL replacement text for the knowledge block (everything that goes between the <CONHECIMENTO_DO_SISTEMA> and </CONHECIMENTO_DO_SISTEMA> markers, exclusive of the markers themselves). Must be the complete block with your edits merged in — not just the changed lines — preserving the existing Markdown structure, headings and style. Only change what the diff actually justifies; do not invent routes or features not present in the code.",
+          },
         },
-        oracle_needs_update: {
-          type: "boolean",
-          description:
-            "True only if the diff changes something the Oraculo's CONHECIMENTO_DO_SISTEMA block currently describes or should describe: routes, page locations, how a module is accessed, or a described feature's behavior. False for internal refactors, styling, or backend changes invisible to the end user.",
-        },
-        oracle_new_block: {
-          type: "string",
-          description:
-            "REQUIRED when oracle_needs_update is true, omitted otherwise. The FULL replacement text for the knowledge block (everything that goes between the <CONHECIMENTO_DO_SISTEMA> and </CONHECIMENTO_DO_SISTEMA> markers, exclusive of the markers themselves). Must be the complete block with your edits merged in — not just the changed lines — preserving the existing Markdown structure, headings and style. Only change what the diff actually justifies; do not invent routes or features not present in the code.",
-        },
+        required: ["changelog_entry", "oracle_needs_update"],
       },
-      required: ["changelog_entry", "oracle_needs_update"],
-      additionalProperties: false,
     },
-    strict: true,
   };
 
   const system = `Você mantém a documentação e o agente "Oráculo" da plataforma Agentes Posológicos sincronizados com o código real.
@@ -131,26 +140,42 @@ Analise o diff fornecido e chame a ferramenta sync_docs com:
 
 Nunca invente rotas, telas ou funcionalidades que não estejam no diff ou no bloco atual. Se o diff não afeta nada do que o Oráculo descreve, responda oracle_needs_update: false.`;
 
-  const response = await client.messages.create({
-    model: "claude-opus-5",
-    max_tokens: 8192,
-    output_config: { effort: "medium" },
-    system,
-    messages: [
-      {
-        role: "user",
-        content: `Diff (${truncated ? "truncado, " : ""}caminhos: ${DIFF_PATHS.join(", ")}):\n\n\`\`\`diff\n${diff}\n\`\`\``,
-      },
-    ],
-    tools: [tool],
-    tool_choice: { type: "tool", name: "sync_docs" },
+  const resp = await fetch(GEMINI_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GEMINI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GEMINI_MODEL,
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content: `Diff (${truncated ? "truncado, " : ""}caminhos: ${DIFF_PATHS.join(", ")}):\n\n\`\`\`diff\n${diff}\n\`\`\``,
+        },
+      ],
+      tools: [tool],
+      tool_choice: { type: "function", function: { name: "sync_docs" } },
+    }),
   });
 
-  const toolUse = response.content.find((b) => b.type === "tool_use");
-  if (!toolUse) {
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Gemini API error ${resp.status}: ${errText}`);
+  }
+
+  const data = await resp.json();
+  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+  if (!toolCall) {
     throw new Error("Model did not return the expected sync_docs tool call.");
   }
-  const result = toolUse.input;
+  let result;
+  try {
+    result = JSON.parse(toolCall.function.arguments);
+  } catch {
+    throw new Error(`Model returned invalid JSON in tool call arguments: ${toolCall.function.arguments}`);
+  }
 
   // 1) Changelog — insert dated entry right after the automation marker.
   const changelog = readFileSync(CHANGELOG_PATH, "utf8");
