@@ -1022,6 +1022,59 @@ export type Database = {
           },
         ]
       }
+      institution_members: {
+        Row: {
+          created_at: string
+          id: string
+          institution_id: string
+          role: Database["public"]["Enums"]["institution_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          institution_id: string
+          role: Database["public"]["Enums"]["institution_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          institution_id?: string
+          role?: Database["public"]["Enums"]["institution_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "institution_members_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institutions: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       knowledge_bases: {
         Row: {
           created_at: string
@@ -1306,6 +1359,50 @@ export type Database = {
           },
         ]
       }
+      osce_attempt_ratings: {
+        Row: {
+          attempt_id: string
+          created_at: string
+          feedback: string
+          id: string
+          items: Json
+          max_score: number
+          rater_id: string | null
+          rater_type: string
+          score: number
+        }
+        Insert: {
+          attempt_id: string
+          created_at?: string
+          feedback?: string
+          id?: string
+          items?: Json
+          max_score?: number
+          rater_id?: string | null
+          rater_type: string
+          score?: number
+        }
+        Update: {
+          attempt_id?: string
+          created_at?: string
+          feedback?: string
+          id?: string
+          items?: Json
+          max_score?: number
+          rater_id?: string | null
+          rater_type?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "osce_attempt_ratings_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "osce_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       osce_exam_sessions: {
         Row: {
           auto_advance: boolean
@@ -1484,6 +1581,7 @@ export type Database = {
           expected_conducts: Json
           expected_questions: Json
           id: string
+          institution_id: string | null
           is_public: boolean
           patient_omissions: string | null
           patient_persona: string
@@ -1503,6 +1601,7 @@ export type Database = {
           expected_conducts?: Json
           expected_questions?: Json
           id?: string
+          institution_id?: string | null
           is_public?: boolean
           patient_omissions?: string | null
           patient_persona: string
@@ -1522,6 +1621,7 @@ export type Database = {
           expected_conducts?: Json
           expected_questions?: Json
           id?: string
+          institution_id?: string | null
           is_public?: boolean
           patient_omissions?: string | null
           patient_persona?: string
@@ -1533,7 +1633,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "osce_stations_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1986,6 +2094,70 @@ export type Database = {
         }
         Relationships: []
       }
+      turma_enrollments: {
+        Row: {
+          enrolled_at: string
+          id: string
+          student_id: string
+          turma_id: string
+        }
+        Insert: {
+          enrolled_at?: string
+          id?: string
+          student_id: string
+          turma_id: string
+        }
+        Update: {
+          enrolled_at?: string
+          id?: string
+          student_id?: string
+          turma_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turma_enrollments_turma_id_fkey"
+            columns: ["turma_id"]
+            isOneToOne: false
+            referencedRelation: "turmas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turmas: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          institution_id: string
+          name: string
+          teacher_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          institution_id: string
+          name: string
+          teacher_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          institution_id?: string
+          name?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turmas_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unlimited_users: {
         Row: {
           created_at: string
@@ -2073,6 +2245,7 @@ export type Database = {
       user_preferences: {
         Row: {
           created_at: string
+          email_notifications_enabled: boolean
           id: string
           onboarding_completed: boolean
           updated_at: string
@@ -2080,6 +2253,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email_notifications_enabled?: boolean
           id?: string
           onboarding_completed?: boolean
           updated_at?: string
@@ -2087,6 +2261,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email_notifications_enabled?: boolean
           id?: string
           onboarding_completed?: boolean
           updated_at?: string
@@ -2427,6 +2602,25 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_turma_gradebook: {
+        Args: { _turma_id: string }
+        Returns: {
+          completed_at: string | null
+          max_score: number | null
+          score: number | null
+          station_title: string | null
+          student_id: string
+          student_name: string | null
+        }[]
+      }
+      has_institution_role: {
+        Args: {
+          _institution_id: string
+          _role: Database["public"]["Enums"]["institution_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_project_access: {
         Args: { _min_role?: string; _project_id: string; _user_id: string }
         Returns: boolean
@@ -2439,6 +2633,10 @@ export type Database = {
         Returns: boolean
       }
       is_active_virtual_room: { Args: { _room_id: string }; Returns: boolean }
+      is_institution_member: {
+        Args: { _institution_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_osce_session_owner: {
         Args: { _session_id: string; _user_id: string }
         Returns: boolean
@@ -2468,6 +2666,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      institution_role: "institution_admin" | "teacher" | "student"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2596,6 +2795,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      institution_role: ["institution_admin", "teacher", "student"],
     },
   },
 } as const
