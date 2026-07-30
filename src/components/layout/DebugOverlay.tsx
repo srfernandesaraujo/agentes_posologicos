@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+// Temporary diagnostic tool for the iOS Safari layout-gap investigation.
+// Only renders with ?debug=1 in the URL. Safe to remove once that bug is confirmed fixed.
 export function DebugOverlay() {
   const [info, setInfo] = useState<string[]>([]);
 
