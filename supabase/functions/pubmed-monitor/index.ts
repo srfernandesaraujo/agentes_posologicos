@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendUserEmail } from "../_shared/notify.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -138,6 +139,29 @@ Deno.serve(async (req) => {
 
         totalNotifications++;
         console.log(`Notified user ${userId}: ${allNewArticles.length} new articles`);
+
+        // Optional e-mail channel, opt-in via user_preferences.email_notifications_enabled.
+        const { data: prefs } = await supabase
+          .from("user_preferences")
+          .select("email_notifications_enabled")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (prefs?.email_notifications_enabled) {
+          const articleListHtml = allNewArticles
+            .slice(0, 10)
+            .map((a) => `<li style="margin-bottom:8px;"><a href="https://pubmed.ncbi.nlm.nih.gov/${a.pmid}/" style="color:#0ea5e9;">${a.title}</a> — ${a.authors} <span style="color:#999;">(Interesse: "${a.interest}")</span></li>`)
+            .join("");
+          await sendUserEmail(
+            supabase,
+            userId,
+            `🔬 ${allNewArticles.length} novos artigos PubMed esta semana`,
+            `<div style="font-family:'Segoe UI',Arial,sans-serif; max-width:600px; margin:0 auto; padding:32px;">
+              <h1 style="color:#1a1a2e; font-size:20px;">${allNewArticles.length} novo(s) artigo(s) encontrado(s)</h1>
+              <ul style="padding-left:20px; color:#333; font-size:14px; line-height:1.6;">${articleListHtml}</ul>
+              <p style="color:#999; font-size:11px; margin-top:24px; border-top:1px solid #eee; padding-top:16px;">Você está recebendo este e-mail porque ativou alertas por e-mail em Minha Conta.</p>
+            </div>`,
+          );
+        }
       }
     }
 

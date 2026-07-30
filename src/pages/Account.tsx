@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
 import { BriefingSettings } from "@/components/briefing/BriefingSettings";
+import { NotificationPreferences } from "@/components/account/NotificationPreferences";
 import { UserMemoryPanel } from "@/components/account/UserMemoryPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
@@ -258,7 +259,10 @@ export default function Account() {
       </div>
 
       <ResearchInterestsManager />
-      <BriefingSettings />
+      <div className="mt-6 space-y-6">
+        <NotificationPreferences />
+        <BriefingSettings />
+      </div>
       <UserMemoryPanel />
     </div>
   );
