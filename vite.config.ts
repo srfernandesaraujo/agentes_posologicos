@@ -36,6 +36,11 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
+        // injectRegister:"inline" não usa o virtual:pwa-register, então o SW
+        // nunca recebia SKIP_WAITING do cliente e ficava "waiting" para sempre,
+        // travando dispositivos já instalados numa versão antiga (ícone/CSS velhos).
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         navigateFallback: "/index.html",
         // O bundle principal (não code-splitted ainda) passa de 3MB — acima do limite
