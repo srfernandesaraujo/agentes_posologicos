@@ -179,16 +179,21 @@ ${transcriptText}`;
     }).eq("id", attemptId);
 
     // Formal rating row for the LLM's own grading — lets a teacher later add a 'human'
-    // rating for the same attempt and compare the two (inter-rater calibration).
-    await admin.from("osce_attempt_ratings").insert({
-      attempt_id: attemptId,
-      rater_id: null,
-      rater_type: "llm",
-      items,
-      score,
-      max_score: maxScore,
-      feedback,
-    });
+    // rating for the same attempt and compare the two (inter-rater calibration). Best
+    // effort: never let this block the main scoring flow above.
+    try {
+      await admin.from("osce_attempt_ratings").insert({
+        attempt_id: attemptId,
+        rater_id: null,
+        rater_type: "llm",
+        items,
+        score,
+        max_score: maxScore,
+        feedback,
+      });
+    } catch (e) {
+      console.warn("osce_attempt_ratings insert skipped:", (e as Error).message);
+    }
 
     if (!isFree && user) {
       try {

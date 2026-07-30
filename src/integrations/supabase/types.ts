@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       agent_active_skills: {
@@ -598,7 +623,6 @@ export type Database = {
           slug: string
           system_prompt: string | null
           temperature: number | null
-          voice_id: string | null
         }
         Insert: {
           active?: boolean
@@ -614,7 +638,6 @@ export type Database = {
           slug: string
           system_prompt?: string | null
           temperature?: number | null
-          voice_id?: string | null
         }
         Update: {
           active?: boolean
@@ -630,7 +653,6 @@ export type Database = {
           slug?: string
           system_prompt?: string | null
           temperature?: number | null
-          voice_id?: string | null
         }
         Relationships: []
       }
@@ -887,7 +909,6 @@ export type Database = {
           temperature: number
           updated_at: string
           user_id: string
-          voice_id: string | null
         }
         Insert: {
           created_at?: string
@@ -907,7 +928,6 @@ export type Database = {
           temperature?: number
           updated_at?: string
           user_id: string
-          voice_id?: string | null
         }
         Update: {
           created_at?: string
@@ -927,7 +947,6 @@ export type Database = {
           temperature?: number
           updated_at?: string
           user_id?: string
-          voice_id?: string | null
         }
         Relationships: [
           {
@@ -1268,6 +1287,50 @@ export type Database = {
         }
         Relationships: []
       }
+      osce_attempt_ratings: {
+        Row: {
+          attempt_id: string
+          created_at: string
+          feedback: string
+          id: string
+          items: Json
+          max_score: number
+          rater_id: string | null
+          rater_type: string
+          score: number
+        }
+        Insert: {
+          attempt_id: string
+          created_at?: string
+          feedback?: string
+          id?: string
+          items?: Json
+          max_score?: number
+          rater_id?: string | null
+          rater_type: string
+          score?: number
+        }
+        Update: {
+          attempt_id?: string
+          created_at?: string
+          feedback?: string
+          id?: string
+          items?: Json
+          max_score?: number
+          rater_id?: string | null
+          rater_type?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "osce_attempt_ratings_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "osce_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       osce_attempts: {
         Row: {
           created_at: string
@@ -1355,50 +1418,6 @@ export type Database = {
             columns: ["station_id"]
             isOneToOne: false
             referencedRelation: "osce_stations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      osce_attempt_ratings: {
-        Row: {
-          attempt_id: string
-          created_at: string
-          feedback: string
-          id: string
-          items: Json
-          max_score: number
-          rater_id: string | null
-          rater_type: string
-          score: number
-        }
-        Insert: {
-          attempt_id: string
-          created_at?: string
-          feedback?: string
-          id?: string
-          items?: Json
-          max_score?: number
-          rater_id?: string | null
-          rater_type: string
-          score?: number
-        }
-        Update: {
-          attempt_id?: string
-          created_at?: string
-          feedback?: string
-          id?: string
-          items?: Json
-          max_score?: number
-          rater_id?: string | null
-          rater_type?: string
-          score?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "osce_attempt_ratings_attempt_id_fkey"
-            columns: ["attempt_id"]
-            isOneToOne: false
-            referencedRelation: "osce_attempts"
             referencedColumns: ["id"]
           },
         ]
@@ -2605,12 +2624,12 @@ export type Database = {
       get_turma_gradebook: {
         Args: { _turma_id: string }
         Returns: {
-          completed_at: string | null
-          max_score: number | null
-          score: number | null
-          station_title: string | null
+          completed_at: string
+          max_score: number
+          score: number
+          station_title: string
           student_id: string
-          student_name: string | null
+          student_name: string
         }[]
       }
       has_institution_role: {
@@ -2792,6 +2811,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "user"],
