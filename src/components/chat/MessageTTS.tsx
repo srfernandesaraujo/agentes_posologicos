@@ -4,7 +4,7 @@ import { Volume2, Pause, Play, Square, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-interface MessageTTSProps { text: string }
+interface MessageTTSProps { text: string; voiceId?: string }
 
 function stripMarkdown(text: string) {
   return text
@@ -19,7 +19,7 @@ function stripMarkdown(text: string) {
     .trim();
 }
 
-export function MessageTTS({ text }: MessageTTSProps) {
+export function MessageTTS({ text, voiceId }: MessageTTSProps) {
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -49,7 +49,7 @@ export function MessageTTS({ text }: MessageTTSProps) {
       const res = await fetch(url, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ text: clean }),
+        body: JSON.stringify({ text: clean, voiceId }),
       });
       if (!res.ok) {
         toast.error("Falha ao gerar áudio");

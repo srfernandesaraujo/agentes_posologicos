@@ -3,12 +3,12 @@ import { useCredits } from "@/hooks/useCredits";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useMemo } from "react";
-import { Coins, BarChart3, Activity, Bot, FileText, TrendingDown, Calendar } from "lucide-react";
+import { Coins, BarChart3, Activity, Bot, FileText, TrendingDown, Calendar, GraduationCap } from "lucide-react";
 import { RoadmapBanner } from "@/components/admin/RoadmapBanner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area,
+  PieChart, Pie, Cell, AreaChart, Area, LineChart, Line,
 } from "recharts";
 
 const CHART_COLORS = [
@@ -68,6 +68,23 @@ export default function UserDashboard() {
         .select("id, created_at, agent_id, agents(name)")
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!user,
+  });
+
+  // Fetch user's completed OSCE attempts (score evolution over time)
+  const { data: osceAttempts = [] } = useQuery({
+    queryKey: ["user-osce-attempts", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("osce_attempts")
+        .select("id, created_at, ended_at, score, max_score, station_id, osce_stations(title)")
+        .eq("user_id", user!.id)
+        .eq("status", "completed")
+        .not("score", "is", null)
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return data as any[];
     },
@@ -137,6 +154,26 @@ export default function UserDashboard() {
     return sessions.filter((s) => s.created_at >= periodStart).length;
   }, [sessions, periodStart]);
 
+  // OSCE score evolution (as % of max score), filtered by the same period
+  const osceEvolution = useMemo(() => {
+    const filtered = periodStart
+      ? osceAttempts.filter((a) => (a.ended_at || a.created_at) >= periodStart)
+      : osceAttempts;
+    return filtered
+      .filter((a) => a.score != null && a.max_score)
+      .map((a, i) => ({
+        attempt: i + 1,
+        date: (a.ended_at || a.created_at).slice(5, 10),
+        percentual: Math.round((a.score / a.max_score) * 100),
+        titulo: a.osce_stations?.title || "Estação",
+      }));
+  }, [osceAttempts, periodStart]);
+
+  const avgOsceScore = useMemo(() => {
+    if (osceEvolution.length === 0) return null;
+    return Math.round(osceEvolution.reduce((s, e) => s + e.percentual, 0) / osceEvolution.length);
+  }, [osceEvolution]);
+
   if (isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -172,12 +209,13 @@ export default function UserDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8">
         {[
           { label: "Saldo Atual", value: balance.toFixed(1), icon: Coins, color: "hsl(38,92%,50%)" },
           { label: "Créditos Consumidos", value: totalCreditsUsed.toFixed(1), icon: TrendingDown, color: "hsl(14,90%,58%)" },
           { label: "Interações", value: usageEntries.length, icon: Activity, color: "hsl(174,62%,47%)" },
           { label: "Sessões de Chat", value: totalSessions, icon: FileText, color: "hsl(199,89%,48%)" },
+          { label: "Nota Média OSCE", value: avgOsceScore !== null ? `${avgOsceScore}%` : "—", icon: GraduationCap, color: "hsl(280,60%,55%)" },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 animate-fade-in">
             <div className="flex items-center gap-3 mb-2">
@@ -293,6 +331,31 @@ export default function UserDashboard() {
             <p className="text-sm text-white/30 py-16 text-center">Sem dados neste período</p>
           )}
         </div>
+      </div>
+
+      {/* OSCE evolution */}
+      <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-5">
+        <h3 className="mb-4 text-sm font-semibold text-white/70 flex items-center gap-2">
+          <GraduationCap className="h-4 w-4 text-[hsl(280,60%,55%)]" />
+          Evolução no OSCE
+        </h3>
+        {osceEvolution.length > 0 ? (
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={osceEvolution}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} />
+              <YAxis domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} unit="%" />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(value: number) => [`${value}%`, "Nota"]}
+                labelFormatter={(_, payload) => payload?.[0]?.payload?.titulo || ""}
+              />
+              <Line type="monotone" dataKey="percentual" stroke="hsl(280,60%,55%)" strokeWidth={2} dot={{ r: 4, fill: "hsl(280,60%,55%)" }} name="Nota (%)" />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="text-sm text-white/30 py-16 text-center">Nenhuma simulação OSCE concluída neste período</p>
+        )}
       </div>
     </div>
   );

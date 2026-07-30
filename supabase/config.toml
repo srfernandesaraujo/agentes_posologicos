@@ -87,6 +87,9 @@ verify_jwt = false
 [functions.clinical-validator]
 verify_jwt = false
 
+[functions.pubmed-evidence-grade]
+verify_jwt = false
+
 [functions.osce-patient]
 verify_jwt = false
 

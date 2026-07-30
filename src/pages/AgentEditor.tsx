@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { WhatsAppConnect } from "@/components/agents/WhatsAppConnect";
 import { DocumentManager } from "@/components/agents/DocumentManager";
+import { VoicePicker } from "@/components/agents/VoicePicker";
+import { DEFAULT_VOICE_ID } from "@/lib/elevenLabsVoices";
 
 export default function AgentEditor() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -48,6 +50,7 @@ export default function AgentEditor() {
   const [restrictContent, setRestrictContent] = useState(false);
   const [markdownResponse, setMarkdownResponse] = useState(true);
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [voiceId, setVoiceId] = useState(DEFAULT_VOICE_ID);
   const [promptMode, setPromptMode] = useState<"simple" | "advanced">("simple");
   const [simplePrompt, setSimplePrompt] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -78,6 +81,7 @@ export default function AgentEditor() {
     setRestrictContent(agent.restrict_content);
     setMarkdownResponse(agent.markdown_response);
     setSystemPrompt(agent.system_prompt);
+    setVoiceId((agent as any).voice_id || DEFAULT_VOICE_ID);
     setPublishWhatsApp((agent as any).publish_whatsapp || false);
     setPublishVirtualPatient((agent as any).publish_virtual_patient || false);
     setPublishMarketplace((agent as any).published_to_marketplace || false);
@@ -128,7 +132,7 @@ export default function AgentEditor() {
   const handleSaveModel = async () => {
     if (!agentId) return;
     try {
-      await updateAgent.mutateAsync({ id: agentId, model, temperature, provider, restrict_content: restrictContent, markdown_response: markdownResponse });
+      await updateAgent.mutateAsync({ id: agentId, model, temperature, provider, restrict_content: restrictContent, markdown_response: markdownResponse, voice_id: voiceId } as any);
       toast.success("Modelo salvo!");
     } catch {
       toast.error("Erro ao salvar");
@@ -582,6 +586,11 @@ export default function AgentEditor() {
                       </div>
                       <Switch checked={markdownResponse} onCheckedChange={setMarkdownResponse} />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-white/70">Voz (leitura em áudio)</label>
+                    <VoicePicker value={voiceId} onChange={setVoiceId} />
                   </div>
 
                   <p className="text-xs text-white/30">As bases de conhecimento podem ser gerenciadas na aba "Visão Geral".</p>

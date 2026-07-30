@@ -14,6 +14,8 @@ import { ArrowLeft, Bot, Wand2, FileText, MessageSquare, Settings2, Eye } from "
 import { toast } from "sonner";
 import { DocumentManager } from "@/components/agents/DocumentManager";
 import { AutoFineTuningPanel } from "@/components/agents/AutoFineTuningPanel";
+import { VoicePicker } from "@/components/agents/VoicePicker";
+import { DEFAULT_VOICE_ID } from "@/lib/elevenLabsVoices";
 
 export default function NativeAgentEditor() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -31,6 +33,7 @@ export default function NativeAgentEditor() {
   const [creditCost, setCreditCost] = useState(1);
   const [category, setCategory] = useState("");
   const [icon, setIcon] = useState("");
+  const [voiceId, setVoiceId] = useState(DEFAULT_VOICE_ID);
   const [systemPrompt, setSystemPrompt] = useState("");
   const [temperature, setTemperature] = useState(0.5);
   const [simplePrompt, setSimplePrompt] = useState("");
@@ -77,6 +80,7 @@ export default function NativeAgentEditor() {
       setCreditCost(agent.credit_cost);
       setCategory(agent.category);
       setIcon(agent.icon);
+      setVoiceId((agent as any).voice_id || DEFAULT_VOICE_ID);
       setSystemPrompt((agent as any).system_prompt || "");
       setTemperature(Number((agent as any).temperature) || 0.5);
       setInitialized(true);
@@ -99,7 +103,7 @@ export default function NativeAgentEditor() {
 
   const handleSaveGeneral = async () => {
     try {
-      await updateMutation.mutateAsync({ name, description, credit_cost: creditCost, category, icon });
+      await updateMutation.mutateAsync({ name, description, credit_cost: creditCost, category, icon, voice_id: voiceId });
       toast.success("Salvo!");
     } catch {
       toast.error("Erro ao salvar");
@@ -258,6 +262,11 @@ export default function NativeAgentEditor() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-white/70">Voz (leitura em áudio)</label>
+                    <VoicePicker value={voiceId} onChange={setVoiceId} />
+                  </div>
+
                   <Button onClick={handleSaveGeneral} disabled={updateMutation.isPending} className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white">
                     Salvar
                   </Button>

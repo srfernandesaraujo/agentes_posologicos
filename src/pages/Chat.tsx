@@ -29,6 +29,8 @@ import { MessageActions } from "@/components/chat/MessageActions";
 import { OutputActions } from "@/components/chat/OutputActions";
 import { ResponseFeedback } from "@/components/chat/ResponseFeedback";
 import { ClinicalValidator } from "@/components/chat/ClinicalValidator";
+import { DoseCalculator } from "@/components/chat/DoseCalculator";
+import { extractPubmedIds, usePubmedEvidenceGrades, makeCitationLinkComponent } from "@/components/chat/EvidenceCitation";
 import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
@@ -198,6 +200,13 @@ const markdownComponents = {
 };
 
 function ChatMessageContent({ content }: { content: string }) {
+  const pmids = extractPubmedIds(content);
+  const { data: evidenceGrades } = usePubmedEvidenceGrades(pmids);
+  const messageMarkdownComponents = {
+    ...markdownComponents,
+    a: makeCitationLinkComponent(evidenceGrades),
+  };
+
   const parts: Array<{ type: "text" | "chart" | "mindmap"; content: string }> = [];
   const regex = /```chart\s*\n([\s\S]*?)```/g;
   let lastIndex = 0;
@@ -237,7 +246,7 @@ function ChatMessageContent({ content }: { content: string }) {
         ) : part.type === "mindmap" ? (
           <MindMapRenderer key={i} content={part.content} />
         ) : (
-          <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={markdownComponents}>{sanitizeMarkdownTables(part.content)}</ReactMarkdown>
+          <ReactMarkdown key={i} remarkPlugins={[remarkGfm]} components={messageMarkdownComponents}>{sanitizeMarkdownTables(part.content)}</ReactMarkdown>
         )
       )}
     </>
@@ -296,7 +305,7 @@ export default function Chat() {
 
   const agent = isCustom
     ? customAgent
-      ? { id: customAgent.id, name: customAgent.name, description: customAgent.description, category: "Personalizado", icon: "Bot", credit_cost: CUSTOM_AGENT_INTERACTION_COST }
+      ? { id: customAgent.id, name: customAgent.name, description: customAgent.description, category: "Personalizado", icon: "Bot", credit_cost: CUSTOM_AGENT_INTERACTION_COST, voice_id: (customAgent as any).voice_id }
       : null
     : builtInAgent;
 
@@ -822,7 +831,7 @@ export default function Chat() {
                   )}
                   <div className={`relative group ${msg.role === "assistant" ? "max-w-[85%]" : ""}`}>
                     {msg.role === "assistant" && (
-                      <MessageActions content={msg.content} agentName={agent?.name || "Agente"} messageRef={contentRef} sessionId={sessionId} messageId={msg.id} />
+                      <MessageActions content={msg.content} agentName={agent?.name || "Agente"} messageRef={contentRef} sessionId={sessionId} messageId={msg.id} voiceId={(agent as any)?.voice_id} />
                     )}
                     <div
                       ref={msg.role === "assistant" ? contentRef : undefined}
@@ -993,6 +1002,7 @@ export default function Chat() {
 
     {/* Clinical Validator — Pro+ only, only for clinical agents */}
     <ClinicalValidatorMount input={input} category={agent?.category} />
+    <DoseCalculatorMount category={agent?.category} />
     </>
   );
 }
@@ -1004,4 +1014,9 @@ function ClinicalValidatorMount({ input, category }: { input: string; category?:
     category === "Prática Clínica e Farmácia" &&
     (subscribed || hasUnlimitedAccess || true); // habilitado para todos enquanto em beta
   return <ClinicalValidator text={input} enabled={enabled} />;
+}
+
+function DoseCalculatorMount({ category }: { category?: string }) {
+  const enabled = category === "Prática Clínica e Farmácia";
+  return <DoseCalculator enabled={enabled} />;
 }

@@ -14,6 +14,7 @@ interface MessageActionsProps {
   messageRef: React.RefObject<HTMLDivElement>;
   sessionId?: string;
   messageId?: string;
+  voiceId?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -22,7 +23,7 @@ function escapeHtml(value: string): string {
   return div.innerHTML;
 }
 
-export function MessageActions({ content, agentName, messageRef, sessionId, messageId }: MessageActionsProps) {
+export function MessageActions({ content, agentName, messageRef, sessionId, messageId, voiceId }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showCert, setShowCert] = useState(false);
@@ -185,7 +186,7 @@ export function MessageActions({ content, agentName, messageRef, sessionId, mess
   return (
     <>
       <div className="absolute -top-8 right-2 flex items-center gap-1 rounded-lg border border-white/10 bg-[hsl(220,25%,12%)] px-1 py-0.5 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-        <MessageTTS text={content} />
+        <MessageTTS text={content} voiceId={voiceId} />
         <button
           onClick={handleCopy}
           aria-label="Copiar texto"

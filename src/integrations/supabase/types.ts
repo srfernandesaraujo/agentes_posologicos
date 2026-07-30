@@ -598,6 +598,7 @@ export type Database = {
           slug: string
           system_prompt: string | null
           temperature: number | null
+          voice_id: string | null
         }
         Insert: {
           active?: boolean
@@ -613,6 +614,7 @@ export type Database = {
           slug: string
           system_prompt?: string | null
           temperature?: number | null
+          voice_id?: string | null
         }
         Update: {
           active?: boolean
@@ -628,6 +630,7 @@ export type Database = {
           slug?: string
           system_prompt?: string | null
           temperature?: number | null
+          voice_id?: string | null
         }
         Relationships: []
       }
@@ -884,6 +887,7 @@ export type Database = {
           temperature: number
           updated_at: string
           user_id: string
+          voice_id: string | null
         }
         Insert: {
           created_at?: string
@@ -903,6 +907,7 @@ export type Database = {
           temperature?: number
           updated_at?: string
           user_id: string
+          voice_id?: string | null
         }
         Update: {
           created_at?: string
@@ -922,6 +927,7 @@ export type Database = {
           temperature?: number
           updated_at?: string
           user_id?: string
+          voice_id?: string | null
         }
         Relationships: [
           {
