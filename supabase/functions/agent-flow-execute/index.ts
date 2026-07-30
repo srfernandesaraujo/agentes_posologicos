@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { runFlowHeadless } from "../_shared/flowRunner.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -593,92 +594,8 @@ ${previous_stage_output}
       });
     }
 
-    const [{ data: nodes, error: nodesErr }, { data: edges }] = await Promise.all([
-      supabase.from("agent_flow_nodes").select("*").eq("flow_id", flow_id).order("sort_order"),
-      supabase.from("agent_flow_edges").select("*").eq("flow_id", flow_id),
-    ]);
-
-    if (nodesErr || !nodes?.length) {
-      return new Response(JSON.stringify({ error: "Fluxo sem nós configurados" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const executionOrder = topologicalSort(nodes, edges || []);
-
-    const nativeIds = executionOrder.filter((n: any) => n.agent_type === "native").map((n: any) => n.agent_id);
-    const customIds = executionOrder.filter((n: any) => n.agent_type === "custom").map((n: any) => n.agent_id);
-    const [nativeRes, customRes] = await Promise.all([
-      nativeIds.length ? supabase.from("agents").select("id, name, slug").in("id", nativeIds) : { data: [] },
-      customIds.length ? supabase.from("custom_agents").select("id, name").in("id", customIds) : { data: [] },
-    ]);
-
-    const agentMap = new Map<string, any>();
-    (nativeRes.data || []).forEach((a: any) => agentMap.set(a.id, { ...a, type: "native" }));
-    (customRes.data || []).forEach((a: any) => agentMap.set(a.id, { ...a, type: "custom" }));
-
-    for (const node of executionOrder) {
-      if (!agentMap.has(node.agent_id)) {
-        return new Response(JSON.stringify({ error: `Agente não encontrado (agent_id: ${node.agent_id})` }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    const { data: execution, error: execErr } = await supabase
-      .from("agent_flow_executions")
-      .insert({ flow_id, user_id: userId, status: "running", initial_input })
-      .select().single();
-    if (execErr) throw execErr;
-
-    let currentInput = initial_input;
-    const nodeResults: any[] = [];
-
-    for (const node of executionOrder) {
-      const agent = agentMap.get(node.agent_id);
-      const agentName = agent?.name || "Agente";
-
-      const { data: nodeResult } = await supabase
-        .from("agent_flow_node_results")
-        .insert({ execution_id: execution.id, node_id: node.id, input_text: currentInput, status: "running", started_at: new Date().toISOString() })
-        .select().single();
-
-      try {
-        let contextMessage = currentInput;
-        if (node.input_prompt) {
-          contextMessage = `${node.input_prompt}\n\n---\n\nConteúdo de entrada:\n${currentInput}`;
-        }
-
-        const chatResponse = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-          body: JSON.stringify({ agentId: node.agent_id, input: contextMessage, userId, conversationHistory: [] }),
-        });
-
-        const responseText = await chatResponse.text();
-        if (!chatResponse.ok) throw new Error(`Erro do agente "${agentName}": ${responseText}`);
-
-        let fullOutput = "";
-        try { const json = JSON.parse(responseText); fullOutput = json.output || json.response || responseText; } catch { fullOutput = responseText; }
-        if (!fullOutput || fullOutput.trim().length === 0) throw new Error(`Agente "${agentName}" retornou resposta vazia`);
-
-        await supabase.from("agent_flow_node_results").update({ output_text: fullOutput, status: "completed", completed_at: new Date().toISOString() }).eq("id", nodeResult!.id);
-        nodeResults.push({ node_id: node.id, agent_name: agentName, agent_id: node.agent_id, agent_type: node.agent_type, input_text: currentInput, output_text: fullOutput, status: "completed" });
-        currentInput = fullOutput;
-      } catch (e: any) {
-        await supabase.from("agent_flow_node_results").update({ status: "error", output_text: e.message, completed_at: new Date().toISOString() }).eq("id", nodeResult!.id);
-        nodeResults.push({ node_id: node.id, agent_name: agentName, agent_id: node.agent_id, agent_type: node.agent_type, input_text: currentInput, output_text: e.message, status: "error" });
-        await supabase.from("agent_flow_executions").update({ status: "error", final_output: `Erro no nó "${agentName}": ${e.message}`, completed_at: new Date().toISOString() }).eq("id", execution.id);
-        return new Response(JSON.stringify({ execution_id: execution.id, node_results: nodeResults, final_output: "", error: e.message }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    await supabase.from("agent_flow_executions").update({ status: "completed", final_output: currentInput, completed_at: new Date().toISOString() }).eq("id", execution.id);
-    await supabase.from("agent_flows").update({ status: "completed" }).eq("id", flow_id);
-
-    return new Response(JSON.stringify({ execution_id: execution.id, node_results: nodeResults, final_output: currentInput }), {
+    const result = await runFlowHeadless(supabase, supabaseUrl, serviceKey, flow_id, userId, initial_input);
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {

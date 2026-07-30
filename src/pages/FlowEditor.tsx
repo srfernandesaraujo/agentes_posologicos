@@ -13,6 +13,7 @@ import {
   AgentFlowNode,
   AgentFlowEdge,
 } from "@/hooks/useAgentFlows";
+import { useFlowTriggers, useUpsertFlowTrigger, useRegenerateWebhookToken, FlowTriggerFrequency } from "@/hooks/useFlowTriggers";
 import { useAgents } from "@/hooks/useAgents";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { Button } from "@/components/ui/button";
@@ -21,10 +22,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, Download, GitBranch, Sparkles, Store, Check } from "lucide-react";
+import { ArrowLeft, Plus, Play, Trash2, Loader2, Settings2, Search, Link2, MousePointerClick, Zap, ChevronRight, Send, Download, GitBranch, Sparkles, Store, Check, Clock, Webhook, Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -409,6 +410,98 @@ export default function FlowEditor() {
   const [publishCategory, setPublishCategory] = useState<string>("outros");
   const [publishing, setPublishing] = useState(false);
   const [isPublished, setIsPublished] = useState<boolean>(false);
+
+  // Gatilhos (cron + webhook)
+  const [triggersOpen, setTriggersOpen] = useState(false);
+  const { data: flowTriggers } = useFlowTriggers(flowId);
+  const upsertTrigger = useUpsertFlowTrigger();
+  const regenerateToken = useRegenerateWebhookToken();
+  const cronTrigger = flowTriggers?.find((t) => t.trigger_type === "cron");
+  const webhookTrigger = flowTriggers?.find((t) => t.trigger_type === "webhook");
+  const [cronEnabled, setCronEnabled] = useState(false);
+  const [cronFrequency, setCronFrequency] = useState<FlowTriggerFrequency>("daily");
+  const [cronHour, setCronHour] = useState(8);
+  const [cronDayOfWeek, setCronDayOfWeek] = useState(1);
+  const [cronDefaultInput, setCronDefaultInput] = useState("");
+  const [savingCron, setSavingCron] = useState(false);
+  const [webhookEnabled, setWebhookEnabled] = useState(false);
+  const [webhookDefaultInput, setWebhookDefaultInput] = useState("");
+  const [savingWebhook, setSavingWebhook] = useState(false);
+  const [regeneratingToken, setRegeneratingToken] = useState(false);
+
+  useEffect(() => {
+    if (!triggersOpen) return;
+    setCronEnabled(cronTrigger?.enabled ?? false);
+    setCronFrequency(cronTrigger?.frequency ?? "daily");
+    setCronHour(cronTrigger?.run_hour ?? 8);
+    setCronDayOfWeek(cronTrigger?.run_day_of_week ?? 1);
+    setCronDefaultInput(cronTrigger?.default_input ?? "");
+    setWebhookEnabled(webhookTrigger?.enabled ?? false);
+    setWebhookDefaultInput(webhookTrigger?.default_input ?? "");
+  }, [triggersOpen, cronTrigger, webhookTrigger]);
+
+  const handleSaveCron = async () => {
+    if (!flowId) return;
+    setSavingCron(true);
+    try {
+      await upsertTrigger.mutateAsync({
+        flow_id: flowId,
+        trigger_type: "cron",
+        enabled: cronEnabled,
+        default_input: cronDefaultInput,
+        frequency: cronFrequency,
+        run_hour: cronFrequency === "hourly" ? null : cronHour,
+        run_day_of_week: cronFrequency === "weekly" ? cronDayOfWeek : null,
+      });
+      toast.success("Agendamento salvo.");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao salvar agendamento.");
+    } finally {
+      setSavingCron(false);
+    }
+  };
+
+  const handleSaveWebhook = async () => {
+    if (!flowId) return;
+    setSavingWebhook(true);
+    try {
+      await upsertTrigger.mutateAsync({
+        flow_id: flowId,
+        trigger_type: "webhook",
+        enabled: webhookEnabled,
+        default_input: webhookDefaultInput,
+      });
+      toast.success("Webhook salvo.");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao salvar webhook.");
+    } finally {
+      setSavingWebhook(false);
+    }
+  };
+
+  const handleRegenerateToken = async () => {
+    if (!webhookTrigger || !flowId) return;
+    if (!confirm("Regenerar o token invalida a URL atual imediatamente. Continuar?")) return;
+    setRegeneratingToken(true);
+    try {
+      await regenerateToken.mutateAsync({ trigger_id: webhookTrigger.id, flow_id: flowId });
+      toast.success("Token regenerado.");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao regenerar token.");
+    } finally {
+      setRegeneratingToken(false);
+    }
+  };
+
+  const webhookUrl = webhookTrigger?.webhook_token
+    ? `${SUPABASE_URL}/functions/v1/flow-webhook-trigger?token=${webhookTrigger.webhook_token}`
+    : "";
+
+  const handleCopyWebhookUrl = () => {
+    if (!webhookUrl) return;
+    navigator.clipboard.writeText(webhookUrl);
+    toast.success("URL copiada!");
+  };
   const [execInput, setExecInput] = useState("");
   const [executing, setExecuting] = useState(false);
   const [executionId, setExecutionId] = useState<string | null>(null);
@@ -1120,6 +1213,18 @@ export default function FlowEditor() {
             {isPublished ? <Check className="h-4 w-4" /> : <Store className="h-4 w-4" />}
             {isPublished ? "Publicado" : "Publicar"}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTriggersOpen(true)}
+            disabled={nodes.length < 2 || edges.length === 0}
+            className={(cronTrigger?.enabled || webhookTrigger?.enabled)
+              ? "gap-1 border-emerald-400/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+              : "gap-1 border-white/30 bg-white/10 text-white hover:bg-white/20"}
+          >
+            <Clock className="h-4 w-4" />
+            Gatilhos
+          </Button>
           </div>
         </div>
       </div>
@@ -1604,6 +1709,131 @@ export default function FlowEditor() {
                 {isPublished ? "Despublicar" : "Publicar"}
               </Button>
               <Button variant="outline" onClick={() => setPublishOpen(false)}>Cancelar</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={triggersOpen} onOpenChange={setTriggersOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Gatilhos do Fluxo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-2">
+            {/* Agendamento */}
+            <div className="space-y-3 rounded-lg border border-input p-4">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Clock className="h-4 w-4" /> Agendamento
+                </label>
+                <Switch checked={cronEnabled} onCheckedChange={setCronEnabled} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Roda o fluxo automaticamente. Horários são interpretados em UTC.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Frequência</label>
+                  <select
+                    value={cronFrequency}
+                    onChange={(e) => setCronFrequency(e.target.value as FlowTriggerFrequency)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    disabled={!cronEnabled}
+                  >
+                    <option value="hourly">A cada hora</option>
+                    <option value="daily">Diariamente</option>
+                    <option value="weekly">Semanalmente</option>
+                  </select>
+                </div>
+                {cronFrequency !== "hourly" && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Hora (UTC)</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={23}
+                      value={cronHour}
+                      onChange={(e) => setCronHour(Number(e.target.value))}
+                      disabled={!cronEnabled}
+                    />
+                  </div>
+                )}
+                {cronFrequency === "weekly" && (
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">Dia da semana</label>
+                    <select
+                      value={cronDayOfWeek}
+                      onChange={(e) => setCronDayOfWeek(Number(e.target.value))}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      disabled={!cronEnabled}
+                    >
+                      <option value={0}>Domingo</option>
+                      <option value={1}>Segunda</option>
+                      <option value={2}>Terça</option>
+                      <option value={3}>Quarta</option>
+                      <option value={4}>Quinta</option>
+                      <option value={5}>Sexta</option>
+                      <option value={6}>Sábado</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Input inicial</label>
+                <Textarea
+                  value={cronDefaultInput}
+                  onChange={(e) => setCronDefaultInput(e.target.value)}
+                  placeholder="Texto enviado ao primeiro agente do fluxo em cada execução automática"
+                  className="min-h-[70px] text-sm"
+                  disabled={!cronEnabled}
+                />
+              </div>
+              <Button onClick={handleSaveCron} disabled={savingCron} size="sm" className="w-full gap-2">
+                {savingCron ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />}
+                Salvar agendamento
+              </Button>
+            </div>
+
+            {/* Webhook */}
+            <div className="space-y-3 rounded-lg border border-input p-4">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Webhook className="h-4 w-4" /> Webhook
+                </label>
+                <Switch checked={webhookEnabled} onCheckedChange={setWebhookEnabled} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Qualquer sistema externo pode chamar esta URL (POST) para disparar o fluxo. O corpo da requisição
+                (JSON com campo <code>input</code>, ou texto puro) vira o input inicial; se vazio, usa o input padrão abaixo.
+              </p>
+              {webhookTrigger?.webhook_token && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">URL do webhook</label>
+                  <div className="flex gap-1">
+                    <Input readOnly value={webhookUrl} className="text-xs font-mono" />
+                    <Button variant="outline" size="icon" onClick={handleCopyWebhookUrl} title="Copiar">
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={handleRegenerateToken} disabled={regeneratingToken} title="Regenerar token">
+                      {regeneratingToken ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Input padrão (fallback)</label>
+                <Textarea
+                  value={webhookDefaultInput}
+                  onChange={(e) => setWebhookDefaultInput(e.target.value)}
+                  placeholder="Usado quando a requisição do webhook não traz um input"
+                  className="min-h-[70px] text-sm"
+                  disabled={!webhookEnabled}
+                />
+              </div>
+              <Button onClick={handleSaveWebhook} disabled={savingWebhook} size="sm" className="w-full gap-2">
+                {savingWebhook ? <Loader2 className="h-4 w-4 animate-spin" /> : <Webhook className="h-4 w-4" />}
+                Salvar webhook
+              </Button>
             </div>
           </div>
         </DialogContent>

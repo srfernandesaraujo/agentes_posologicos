@@ -272,6 +272,59 @@ export type Database = {
           },
         ]
       }
+      agent_flow_triggers: {
+        Row: {
+          created_at: string
+          default_input: string
+          enabled: boolean
+          flow_id: string
+          frequency: string | null
+          id: string
+          last_run_at: string | null
+          run_day_of_week: number | null
+          run_hour: number | null
+          trigger_type: string
+          updated_at: string
+          webhook_token: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_input?: string
+          enabled?: boolean
+          flow_id: string
+          frequency?: string | null
+          id?: string
+          last_run_at?: string | null
+          run_day_of_week?: number | null
+          run_hour?: number | null
+          trigger_type: string
+          updated_at?: string
+          webhook_token?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_input?: string
+          enabled?: boolean
+          flow_id?: string
+          frequency?: string | null
+          id?: string
+          last_run_at?: string | null
+          run_day_of_week?: number | null
+          run_hour?: number | null
+          trigger_type?: string
+          updated_at?: string
+          webhook_token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_flow_triggers_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_flows: {
         Row: {
           category: string | null
@@ -2671,6 +2724,10 @@ export type Database = {
       is_virtual_room_owner: {
         Args: { _room_id: string; _user_id: string }
         Returns: boolean
+      }
+      regenerate_flow_webhook_token: {
+        Args: { p_trigger_id: string }
+        Returns: string
       }
       spend_credits: {
         Args: {

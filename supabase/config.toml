@@ -116,3 +116,9 @@ verify_jwt = false
 
 [functions.admin-user-diagnostics]
 verify_jwt = false
+
+[functions.flow-cron-trigger]
+verify_jwt = false
+
+[functions.flow-webhook-trigger]
+verify_jwt = false
