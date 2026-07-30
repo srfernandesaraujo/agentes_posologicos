@@ -1,4 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+/* Self-hosted (no external CDN) so fonts precache with the app shell and keep
+   working offline — was previously a Google Fonts @import, a network dependency
+   that undermines the PWA's offline-first goal. */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/inter/800.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
 
 @tailwind base;
 @tailwind components;
@@ -84,6 +94,12 @@
 @layer base {
   * {
     @apply border-border;
+  }
+
+  html, body {
+    /* Defensive: keeps a single wide/overflowing element (fixed-position popovers,
+       tooltips) from ever creating page-level horizontal scroll on mobile. */
+    overflow-x: hidden;
   }
 
   body {
