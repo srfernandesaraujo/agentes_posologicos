@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
-import { Bot, Plus, Coins, Wand2, Sparkles } from "lucide-react";
+import { Bot, Plus, Coins, Wand2, Sparkles, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { invokeFunction } from "@/lib/invokeFunction";
+import { AgentBackupPanel } from "@/components/agents/AgentBackupPanel";
 
 const AGENT_CREATION_COST = 5;
 
@@ -29,6 +30,7 @@ export default function MyAgents() {
   const { isAdmin } = useIsAdmin();
   const { user } = useAuth();
   const [showCreate, setShowCreate] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
   const [createMode, setCreateMode] = useState<"manual" | "ai">("manual");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -99,11 +101,21 @@ export default function MyAgents() {
 
   return (
     <div className="container max-w-4xl py-8">
-      <div className="mb-8 animate-slide-up">
-        <h1 className="mb-2 font-display text-3xl font-bold text-white">Meus Agentes</h1>
-        <p className="text-white/50">
-          Gerencie seus agentes personalizados
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4 animate-slide-up">
+        <div>
+          <h1 className="mb-2 font-display text-3xl font-bold text-white">Meus Agentes</h1>
+          <p className="text-white/50">
+            Gerencie seus agentes personalizados
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => setShowBackup(true)}
+          className="shrink-0 border-white/10 bg-white/[0.05] text-white hover:bg-white/10"
+        >
+          <Archive className="mr-1.5 h-4 w-4" />
+          Backup
+        </Button>
       </div>
 
       {/* New agent button */}
@@ -253,6 +265,15 @@ export default function MyAgents() {
               </>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBackup} onOpenChange={setShowBackup}>
+        <DialogContent className="border-white/10 bg-[hsl(220,25%,8%)] text-white sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display">Backup dos meus agentes</DialogTitle>
+          </DialogHeader>
+          <AgentBackupPanel scope="custom" />
         </DialogContent>
       </Dialog>
     </div>

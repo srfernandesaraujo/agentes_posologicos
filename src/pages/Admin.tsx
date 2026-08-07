@@ -12,11 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Shield, Users, Bot, Coins, Search, Plus, ToggleLeft, DoorOpen, Clock, Edit2,
-  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown, Rocket, LifeBuoy, Award,
+  TrendingUp, CreditCard, BarChart3, Activity, UserPlus, XCircle, Loader2, Mail, Trash2, Crown, Rocket, LifeBuoy, Award, Archive,
 } from "lucide-react";
 import { SystemUpdatesManager } from "@/components/admin/SystemUpdatesManager";
 import { SupportTicketsPanel } from "@/components/admin/SupportTicketsPanel";
 import { OsceCertificationPanel } from "@/components/admin/OsceCertificationPanel";
+import { AgentBackupPanel } from "@/components/agents/AgentBackupPanel";
 import { toast } from "sonner";
 import { Navigate, useSearchParams } from "react-router-dom";
 import {
@@ -321,6 +322,9 @@ export default function Admin() {
           </TabsTrigger>
           <TabsTrigger value="osce" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
             <Award className="h-4 w-4 mr-1.5" /> OSCE
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
+            <Archive className="h-4 w-4 mr-1.5" /> Backup
           </TabsTrigger>
         </TabsList>
 
@@ -743,6 +747,11 @@ export default function Admin() {
         {/* OSCE CERTIFICATION TAB */}
         <TabsContent value="osce" className="space-y-4">
           <OsceCertificationPanel />
+        </TabsContent>
+
+        {/* BACKUP TAB */}
+        <TabsContent value="backup" className="space-y-4">
+          <AgentBackupPanel scope="native" />
         </TabsContent>
       </Tabs>
 
