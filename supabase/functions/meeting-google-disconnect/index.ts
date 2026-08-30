@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { syncMeetingsForUser } from "../_shared/meetingSyncCore.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,8 +7,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Called by the frontend poller (every 15s while /reunioes is open) for the logged-in user only.
-// Background progress for closed tabs is handled by meeting-sync-cron.
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -28,14 +25,15 @@ serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { synced, total } = await syncMeetingsForUser(supabaseAdmin, authUser.id);
+    const { error } = await supabaseAdmin.from("google_connections").delete().eq("user_id", authUser.id);
+    if (error) throw error;
 
-    return new Response(JSON.stringify({ ok: true, synced, total }), {
+    return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("[meeting-sync] error:", e);
+    console.error("meeting-google-disconnect error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

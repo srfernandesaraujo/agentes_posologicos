@@ -481,15 +481,15 @@ export const docSections: DocSection[] = [
     content: (
       <div className="space-y-4">
         <p className="text-white/70 leading-relaxed">
-          Em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/reunioes</code>, cole o link de uma reunião do <strong className="text-white">Google Meet</strong> — o sistema envia um bot (via Recall.ai) que entra na sala, grava, transcreve e gera ata automaticamente com IA.
+          Em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/reunioes</code>, conecte sua conta do <strong className="text-white">Google</strong> (com o Gemini ativado no Meet) e cole o link de uma reunião — o sistema busca automaticamente na sua Google Drive a ata/transcrição que o Gemini gera nativamente ao fim da chamada, e gera uma ata estruturada com IA a partir dela. Não depende mais de nenhum bot de terceiros entrando na reunião.
         </p>
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
           <h4 className="text-sm font-semibold text-white mb-3">O que você recebe</h4>
           <ul className="space-y-2 text-sm text-white/60">
-            <li><strong className="text-white/80">Transcrição completa</strong> com identificação dos falantes.</li>
+            <li><strong className="text-white/80">Transcrição completa</strong> extraída do documento gerado pelo Gemini no Meet.</li>
             <li><strong className="text-white/80">Ata estruturada</strong> com tópicos discutidos, decisões e ações.</li>
             <li><strong className="text-white/80">Regenerar com prompt customizado</strong> para diferentes formatos (ata formal, resumo executivo, plano de aula).</li>
-            <li><strong className="text-white/80">Status em tempo real</strong>: pending → recording → transcribing → summarizing → done.</li>
+            <li><strong className="text-white/80">Status em tempo real</strong>: pending → matched → transcribing → summarizing → done.</li>
           </ul>
         </div>
       </div>
@@ -686,7 +686,7 @@ export const technicalDocSections: DocSection[] = [
             <div><strong className="text-white/80">Pagamentos:</strong> Stripe (Checkout + Webhooks)</div>
             <div><strong className="text-white/80">Modelos de IA:</strong> OpenAI, Google Gemini, Anthropic Claude, Groq, NVIDIA, GitHub Models e OpenRouter — chamados diretamente pela Edge Function com a chave de API do usuário/agente, sem gateway intermediário</div>
             <div><strong className="text-white/80">Voz:</strong> ElevenLabs (texto-para-voz) + provedores de transcrição com fallback</div>
-            <div><strong className="text-white/80">Reuniões:</strong> Recall.ai (transcrição Meet)</div>
+            <div><strong className="text-white/80">Reuniões:</strong> transcrição nativa do Google Meet (Gemini), lida via OAuth + Google Drive API</div>
             <div><strong className="text-white/80">Exportação:</strong> jsPDF + html2canvas</div>
           </div>
         </div>
@@ -757,8 +757,8 @@ export const technicalDocSections: DocSection[] = [
               <p className="text-white/50 text-xs mt-1">Módulo OSCE: estações clínicas, provas e tentativas de alunos (respostas, avaliação, nota e status da sessão ao vivo).</p>
             </div>
             <div className="border-b border-white/5 pb-2">
-              <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meetings</code>
-              <p className="text-white/50 text-xs mt-1">Reuniões do Google Meet. Armazena meet_link, bot_id (Recall.ai), transcript, summary e status (pending→recording→transcribing→summarizing→done).</p>
+              <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meetings</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">google_connections</code>
+              <p className="text-white/50 text-xs mt-1">Reuniões do Google Meet. `meetings` armazena meet_link, drive_file_id, transcript, summary e status (pending→matched→transcribing→summarizing→done); `google_connections` guarda o OAuth (tokens criptografados) de cada usuário conectado.</p>
             </div>
             <div className="border-b border-white/5 pb-2">
               <code className="text-[hsl(174,62%,47%)] font-mono text-xs">projects</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">project_items</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">project_collaborators</code>
@@ -871,8 +871,8 @@ export const technicalDocSections: DocSection[] = [
               <p className="text-white/50 text-xs mt-1">Converte texto em áudio narrado (ElevenLabs, voz pt-BR) e transcreve áudio do usuário em texto, com fallback entre provedores.</p>
             </div>
             <div className="border-b border-white/5 pb-2">
-              <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-bot</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-webhook</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-summary</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-sync</code>
-              <p className="text-white/50 text-xs mt-1">Envia o bot do Recall.ai à reunião, recebe callbacks de status/transcrição, gera/regenera a ata com IA e sincroniza periodicamente o status de reuniões em andamento.</p>
+              <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-register</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-google-oauth-start</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-google-oauth-callback</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-sync</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-sync-cron</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-summary</code>
+              <p className="text-white/50 text-xs mt-1">Conecta a conta Google do usuário via OAuth, registra a reunião, casa o registro com o documento de anotações que o Gemini gera na Drive do organizador, extrai a transcrição, gera/regenera a ata com IA e sincroniza periodicamente (via polling e via cron) o status de reuniões em andamento.</p>
             </div>
             <div>
               <code className="text-[hsl(174,62%,47%)] font-mono text-xs">osce-patient</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">osce-evaluate</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">osce-session-control</code>
@@ -982,9 +982,9 @@ export const technicalDocSections: DocSection[] = [
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <div className="h-2 w-2 rounded-full bg-red-400" />
-                <strong className="text-white">Recall.ai</strong>
+                <strong className="text-white">Google Drive API (OAuth por usuário)</strong>
               </div>
-              <p className="text-white/50 text-xs ml-4">API: <code className="bg-white/10 px-1 py-0.5 rounded">https://us-west-2.recall.ai/api/v1/bot</code><br/>Cria bots que entram em reuniões do Google Meet, gravam áudio, transcrevem e enviam webhooks. Autenticação: Token header.</p>
+              <p className="text-white/50 text-xs ml-4">API: <code className="bg-white/10 px-1 py-0.5 rounded">https://www.googleapis.com/drive/v3</code><br/>Cada usuário conecta sua própria conta Google; o sistema lê a pasta "Meet Recordings" da Drive dele para localizar e exportar o documento de anotações/transcrição que o Gemini gera nativamente no Meet. Autenticação: OAuth 2.0 (access/refresh token criptografados por usuário).</p>
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -1042,7 +1042,11 @@ export const technicalDocSections: DocSection[] = [
             <span>STRIPE_SECRET_KEY</span>
             <span>STRIPE_WEBHOOK_SECRET</span>
             <span>API_ENCRYPTION_KEY</span>
-            <span>RECALL_API_KEY</span>
+            <span>GOOGLE_CLIENT_ID</span>
+            <span>GOOGLE_CLIENT_SECRET</span>
+            <span>GOOGLE_OAUTH_REDIRECT_URI</span>
+            <span>GOOGLE_OAUTH_STATE_SECRET</span>
+            <span>CRON_SECRET</span>
             <span>ELEVENLABS_API_KEY</span>
             <span>RESEND_API_KEY</span>
             <span>EVOLUTION_WEBHOOK_SECRET</span>
@@ -1079,7 +1083,7 @@ export const technicalDocSections: DocSection[] = [
             <li><strong className="text-white/80">CORS headers padrão</strong> — Todas as Edge Functions incluem headers CORS para compatibilidade com web apps.</li>
             <li><strong className="text-white/80">verify_jwt = false</strong> — JWT validado em código (não no gateway) usando getClaims() para compatibilidade com signing-keys.</li>
             <li><strong className="text-white/80">Graceful error handling</strong> — Retorna status 200 com dados padrão em vez de 500 para manter estabilidade do frontend.</li>
-            <li><strong className="text-white/80">Service role para webhooks</strong> — Webhooks externos (Stripe, Recall.ai, WhatsApp) usam SUPABASE_SERVICE_ROLE_KEY para acessar dados sem JWT de usuário.</li>
+            <li><strong className="text-white/80">Service role para webhooks</strong> — Webhooks externos (Stripe, Google OAuth callback, WhatsApp) usam SUPABASE_SERVICE_ROLE_KEY para acessar dados sem JWT de usuário.</li>
             <li><strong className="text-white/80">Append-only ledger</strong> — Credits nunca são editados/deletados — apenas novas entradas são inseridas.</li>
           </ul>
         </div>
@@ -1098,9 +1102,10 @@ export const technicalDocSections: DocSection[] = [
 supabase/
 └── functions/      # Edge Functions (Deno runtime)
     ├── agent-chat/
-    ├── meeting-bot/
-    ├── meeting-webhook/
-    └── ...41 funções ao total`}</pre>
+    ├── meeting-register/
+    ├── meeting-google-oauth-start/
+    ├── meeting-google-oauth-callback/
+    └── ...45 funções ao total`}</pre>
         </div>
       </div>
     ),

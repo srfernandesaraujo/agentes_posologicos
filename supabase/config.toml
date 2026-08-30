@@ -48,16 +48,28 @@ verify_jwt = false
 [functions.agent-flow-plan-complex]
 verify_jwt = false
 
-[functions.meeting-bot]
-verify_jwt = false
-
-[functions.meeting-webhook]
-verify_jwt = false
-
 [functions.meeting-summary]
 verify_jwt = false
 
 [functions.meeting-sync]
+verify_jwt = false
+
+[functions.meeting-sync-cron]
+verify_jwt = false
+
+[functions.meeting-register]
+verify_jwt = false
+
+[functions.meeting-google-oauth-start]
+verify_jwt = false
+
+[functions.meeting-google-oauth-callback]
+verify_jwt = false
+
+[functions.meeting-google-status]
+verify_jwt = false
+
+[functions.meeting-google-disconnect]
 verify_jwt = false
 
 [functions.whatsapp-webhook]

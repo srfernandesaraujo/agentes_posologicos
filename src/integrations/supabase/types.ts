@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   graphql_public: {
     Tables: {
@@ -407,13 +407,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "agent_knowledge_bases_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "custom_agents"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "agent_knowledge_bases_knowledge_base_id_fkey"
             columns: ["knowledge_base_id"]
@@ -1094,6 +1087,48 @@ export type Database = {
           },
         ]
       }
+      google_connections: {
+        Row: {
+          access_token_encrypted: string | null
+          access_token_expires_at: string | null
+          created_at: string
+          drive_meet_recordings_folder_id: string | null
+          google_email: string | null
+          id: string
+          last_error: string | null
+          refresh_token_encrypted: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          access_token_expires_at?: string | null
+          created_at?: string
+          drive_meet_recordings_folder_id?: string | null
+          google_email?: string | null
+          id?: string
+          last_error?: string | null
+          refresh_token_encrypted: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          access_token_expires_at?: string | null
+          created_at?: string
+          drive_meet_recordings_folder_id?: string | null
+          google_email?: string | null
+          id?: string
+          last_error?: string | null
+          refresh_token_encrypted?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       institution_members: {
         Row: {
           created_at: string
@@ -1234,8 +1269,11 @@ export type Database = {
         Row: {
           bot_id: string | null
           created_at: string
+          drive_file_id: string | null
           error_message: string | null
+          expected_start_at: string | null
           id: string
+          matched_at: string | null
           meet_link: string
           status: string
           summary: string | null
@@ -1247,8 +1285,11 @@ export type Database = {
         Insert: {
           bot_id?: string | null
           created_at?: string
+          drive_file_id?: string | null
           error_message?: string | null
+          expected_start_at?: string | null
           id?: string
+          matched_at?: string | null
           meet_link: string
           status?: string
           summary?: string | null
@@ -1260,8 +1301,11 @@ export type Database = {
         Update: {
           bot_id?: string | null
           created_at?: string
+          drive_file_id?: string | null
           error_message?: string | null
+          expected_start_at?: string | null
           id?: string
+          matched_at?: string | null
           meet_link?: string
           status?: string
           summary?: string | null
