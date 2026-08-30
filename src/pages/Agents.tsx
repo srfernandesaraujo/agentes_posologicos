@@ -3,7 +3,7 @@ import { useAgents, CATEGORIES, CATEGORY_COLORS } from "@/hooks/useAgents";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { usePurchasedAgents, useMarketplaceAgents } from "@/hooks/useMarketplace";
 import { getIcon } from "@/lib/icons";
-import { Bot, Search, ArrowRight, ShoppingBag, Sparkles, Coins } from "lucide-react";
+import { Bot, Search, ArrowRight, ShoppingBag, Sparkles, Coins, Zap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -16,6 +16,15 @@ const CATEGORY_ICONS: Record<string, string> = {
   "Pesquisa Acadêmica e Dados": "🔬",
   "Produção de Conteúdo e Nicho Tech": "📱",
 };
+
+const CATEGORY_VAR: Record<string, string> = {
+  "Prática Clínica e Farmácia": "clinica",
+  "EdTech e Professores 4.0": "edtech",
+  "Pesquisa Acadêmica e Dados": "pesquisa",
+  "Produção de Conteúdo e Nicho Tech": "conteudo",
+};
+
+const FEATURED_NEW_COUNT = 4;
 
 export default function Agents() {
   const { data: agents = [], isLoading } = useAgents();
@@ -58,6 +67,17 @@ export default function Agents() {
       if (catAgents.length > 0) map[cat] = catAgents;
     }
     return map;
+  }, [agents, search, lowerSearch]);
+
+  const newestAgents = useMemo(() => {
+    return [...agents]
+      .filter((a) => a.slug !== "super-agente")
+      .filter(
+        (a) =>
+          !search || a.name.toLowerCase().includes(lowerSearch) || a.description.toLowerCase().includes(lowerSearch)
+      )
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, FEATURED_NEW_COUNT);
   }, [agents, search, lowerSearch]);
 
   const hasMyAgents = publishedCustom.length > 0 || purchasedAgents.length > 0;
@@ -112,6 +132,55 @@ export default function Agents() {
           <ArrowRight className="h-5 w-5 text-white/40 group-hover:translate-x-1 group-hover:text-white transition-all" />
         </div>
       </button>
+
+      {/* Novidades — agentes recém-adicionados */}
+      {newestAgents.length > 0 && activeCategory === null && !search && (
+        <section className="mb-6 animate-slide-up">
+          <div className="mb-3 flex items-center gap-2">
+            <Zap className="h-4 w-4 text-[hsl(14,90%,58%)]" />
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-white">Novidades</h2>
+            <span className="text-xs text-muted-foreground">Acabaram de chegar</span>
+          </div>
+
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 scrollbar-hide">
+            {newestAgents.map((agent) => {
+              const Icon = getIcon(agent.icon);
+              const catVar = CATEGORY_VAR[agent.category] || "clinica";
+
+              return (
+                <div
+                  key={agent.id}
+                  onClick={() => navigate(`/chat/${agent.id}`)}
+                  className="group relative w-[260px] shrink-0 cursor-pointer rounded-xl border bg-white/[0.03] p-4 transition-all hover:-translate-y-0.5 hover:border-white/30"
+                  style={{ borderColor: `hsl(var(--cat-${catVar}) / 0.35)` }}
+                >
+                  <span className="absolute -top-2 right-3 rounded-full bg-[hsl(14,90%,58%)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                    Novo
+                  </span>
+                  <div
+                    className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg"
+                    style={{
+                      background: `hsl(var(--cat-${catVar}) / 0.15)`,
+                      color: `hsl(var(--cat-${catVar}))`,
+                    }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="truncate text-sm font-semibold text-white">{agent.name}</h3>
+                  <p className="mt-1 line-clamp-2 text-xs text-white/50">{agent.description}</p>
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-[10px] text-white/30">
+                      <Coins className="h-3 w-3" />
+                      {agent.credit_cost}
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-white/30 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="flex gap-6">
         {/* Sidebar */}
@@ -289,7 +358,7 @@ export default function Agents() {
             return (
               <section key={cat} id={`cat-${cat}`} className="mb-8 scroll-mt-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-1 h-5 rounded-full" style={{ background: `hsl(var(--cat-${cat === CATEGORIES[0] ? "clinica" : cat === CATEGORIES[1] ? "edtech" : cat === CATEGORIES[2] ? "pesquisa" : "conteudo"}))` }} />
+                  <div className="w-1 h-5 rounded-full" style={{ background: `hsl(var(--cat-${CATEGORY_VAR[cat] || "clinica"}))` }} />
                   <h2 className="font-display text-sm font-bold uppercase tracking-wider text-white">
                     {cat}
                   </h2>
@@ -299,7 +368,7 @@ export default function Agents() {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {catAgents.map((agent) => {
                     const Icon = getIcon(agent.icon);
-                    const catVar = cat === CATEGORIES[0] ? "clinica" : cat === CATEGORIES[1] ? "edtech" : cat === CATEGORIES[2] ? "pesquisa" : "conteudo";
+                    const catVar = CATEGORY_VAR[cat] || "clinica";
 
                     return (
                       <div

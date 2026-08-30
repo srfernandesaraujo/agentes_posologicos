@@ -10,6 +10,7 @@ export interface Agent {
   icon: string;
   credit_cost: number;
   active: boolean;
+  created_at: string;
 }
 
 export const CATEGORIES = [
