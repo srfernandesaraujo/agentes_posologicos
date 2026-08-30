@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Video, Send, RefreshCw, FileText, Copy, Clock, CheckCircle2, AlertCircle, Loader2, Trash2, Link2, Unlink, FileSearch } from "lucide-react";
+import { Video, Send, RefreshCw, FileText, Copy, Clock, CheckCircle2, AlertCircle, Loader2, Trash2, Link2, Unlink, FileSearch, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -213,6 +214,23 @@ export default function Meetings() {
           <p className="text-sm text-muted-foreground">Grave, transcreva e gere atas automáticas de reuniões do Google Meet</p>
         </div>
       </div>
+
+      {/* Requirements notice */}
+      <Alert className="border-white/10 bg-white/5">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Requisitos para gerar atas automaticamente</AlertTitle>
+        <AlertDescription className="text-muted-foreground space-y-1">
+          <p>
+            Sua conta Google precisa ter o plano <strong className="text-foreground">Google AI Pro</strong> (ou Google Workspace com Gemini) —
+            o plano <strong className="text-foreground">Google One</strong> comum (só armazenamento) não inclui o Gemini no Meet e não vai funcionar.
+          </p>
+          <p>
+            Em cada reunião, você (como organizador) precisa ativar manualmente <strong className="text-foreground">"Fazer anotações com o Gemini"</strong> e{" "}
+            <strong className="text-foreground">"Transcrever a reunião"</strong> pelo menu de atividades do Google Meet — nós não entramos na chamada, só lemos
+            o documento que o Gemini gera na sua Google Drive depois que a reunião termina.
+          </p>
+        </AlertDescription>
+      </Alert>
 
       {/* Google connection status */}
       <Card className="border-white/10 bg-white/5">

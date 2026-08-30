@@ -481,8 +481,16 @@ export const docSections: DocSection[] = [
     content: (
       <div className="space-y-4">
         <p className="text-white/70 leading-relaxed">
-          Em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/reunioes</code>, conecte sua conta do <strong className="text-white">Google</strong> (com o Gemini ativado no Meet) e cole o link de uma reunião — o sistema busca automaticamente na sua Google Drive a ata/transcrição que o Gemini gera nativamente ao fim da chamada, e gera uma ata estruturada com IA a partir dela. Não depende mais de nenhum bot de terceiros entrando na reunião.
+          Em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/reunioes</code>, conecte sua conta do <strong className="text-white">Google</strong> e cole o link de uma reunião — o sistema busca automaticamente na sua Google Drive a ata/transcrição que o Gemini gera nativamente ao fim da chamada, e gera uma ata estruturada com IA a partir dela. Não depende de nenhum bot de terceiros entrando na reunião.
         </p>
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-5">
+          <h4 className="text-sm font-semibold text-white mb-3">Requisitos (leia antes de conectar)</h4>
+          <ul className="space-y-2 text-sm text-white/60">
+            <li><strong className="text-white/80">Plano Google AI Pro</strong> (ou Google Workspace com Gemini) na sua conta Google — o plano <strong className="text-white/80">Google One</strong> comum (só armazenamento) não inclui o Gemini no Meet e a funcionalidade não vai funcionar.</li>
+            <li>Você precisa ser o <strong className="text-white/80">organizador</strong> da reunião (quem cria o link), não apenas um convidado.</li>
+            <li>Em cada reunião, ative manualmente <strong className="text-white/80">"Fazer anotações com o Gemini"</strong> e <strong className="text-white/80">"Transcrever a reunião"</strong> pelo menu de atividades do Google Meet — o sistema só lê o documento gerado depois, não entra na chamada.</li>
+          </ul>
+        </div>
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
           <h4 className="text-sm font-semibold text-white mb-3">O que você recebe</h4>
           <ul className="space-y-2 text-sm text-white/60">
