@@ -142,7 +142,7 @@ export default function Agents() {
             <span className="text-xs text-muted-foreground">Acabaram de chegar</span>
           </div>
 
-          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 scrollbar-hide">
+          <div className="-mx-1 -mt-2 flex gap-3 overflow-x-auto px-1 pb-2 pt-2 scrollbar-hide">
             {newestAgents.map((agent) => {
               const Icon = getIcon(agent.icon);
               const catVar = CATEGORY_VAR[agent.category] || "clinica";
