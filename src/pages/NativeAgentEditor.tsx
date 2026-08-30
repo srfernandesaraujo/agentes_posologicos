@@ -39,6 +39,7 @@ export default function NativeAgentEditor() {
   const [simplePrompt, setSimplePrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [loadingDefault, setLoadingDefault] = useState(false);
+  const [usingHardcodedDefault, setUsingHardcodedDefault] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Fetch the native agent
@@ -72,6 +73,14 @@ export default function NativeAgentEditor() {
     enabled: !!agentId && !!user && isAdmin,
   });
 
+  const fetchDefaultPrompt = async (): Promise<string> => {
+    const { data, error } = await supabase.functions.invoke("agent-chat", {
+      body: { agentId, getDefaultPrompt: true },
+    });
+    if (error) throw error;
+    return data.prompt || "";
+  };
+
   // Init from agent data
   useEffect(() => {
     if (agent && !initialized) {
@@ -81,9 +90,25 @@ export default function NativeAgentEditor() {
       setCategory(agent.category);
       setIcon(agent.icon);
       setVoiceId((agent as any).voice_id || DEFAULT_VOICE_ID);
-      setSystemPrompt((agent as any).system_prompt || "");
       setTemperature(Number((agent as any).temperature) || 0.5);
       setInitialized(true);
+
+      const dbPrompt = (agent as any).system_prompt || "";
+      if (dbPrompt) {
+        setSystemPrompt(dbPrompt);
+        return;
+      }
+      // No customized prompt saved for this agent — auto-load the effective
+      // hardcoded default so the admin sees the real prompt immediately
+      // instead of an empty field that looks like the agent has none.
+      setLoadingDefault(true);
+      fetchDefaultPrompt()
+        .then((prompt) => {
+          setSystemPrompt(prompt);
+          setUsingHardcodedDefault(true);
+        })
+        .catch(() => toast.error("Erro ao carregar prompt padrão"))
+        .finally(() => setLoadingDefault(false));
     }
   }, [agent, initialized]);
 
@@ -113,6 +138,7 @@ export default function NativeAgentEditor() {
   const handleSavePrompt = async () => {
     try {
       await updateMutation.mutateAsync({ system_prompt: systemPrompt, temperature });
+      setUsingHardcodedDefault(false);
       toast.success("Prompt salvo!");
     } catch {
       toast.error("Erro ao salvar");
@@ -300,11 +326,9 @@ export default function NativeAgentEditor() {
                         onClick={async () => {
                           setLoadingDefault(true);
                           try {
-                            const { data, error } = await supabase.functions.invoke("agent-chat", {
-                              body: { agentId, getDefaultPrompt: true },
-                            });
-                            if (error) throw error;
-                            setSystemPrompt(data.prompt || "");
+                            const prompt = await fetchDefaultPrompt();
+                            setSystemPrompt(prompt);
+                            setUsingHardcodedDefault(true);
                             toast.success("Prompt padrão carregado. Edite e salve para sobrescrever.");
                           } catch {
                             toast.error("Erro ao carregar prompt padrão");
@@ -320,7 +344,11 @@ export default function NativeAgentEditor() {
                       </Button>
                     </div>
                     <p className="mb-2 text-xs text-white/30">
-                      {systemPrompt ? "Prompt customizado ativo. Deixe vazio para usar o prompt padrão do sistema." : "Usando prompt padrão hardcoded. Clique em 'Carregar prompt padrão' para visualizar e editar."}
+                      {loadingDefault
+                        ? "Carregando o prompt padrão deste agente..."
+                        : usingHardcodedDefault
+                        ? "Este é o prompt padrão hardcoded do agente (ainda não customizado no banco). Edite e clique em Salvar para sobrescrevê-lo."
+                        : "Prompt customizado salvo no banco. Deixe vazio e salve para voltar a usar o prompt padrão do sistema."}
                     </p>
                     <Textarea
                       value={systemPrompt}

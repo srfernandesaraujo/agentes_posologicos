@@ -6584,7 +6584,20 @@ Deno.serve(async (req) => {
     if (getDefaultPrompt && agentId) {
       const _url = Deno.env.get("SUPABASE_URL")!;
       const _srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const _anon = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const _authHeader = req.headers.get("Authorization") || "";
+      const _callerClient = createClient(_url, _anon, { global: { headers: { Authorization: _authHeader } } });
+      const { data: { user: _caller } } = await _callerClient.auth.getUser();
       const promptClient = createClient(_url, _srk);
+      const { data: _isAdmin } = _caller
+        ? await promptClient.rpc("has_role", { _user_id: _caller.id, _role: "admin" })
+        : { data: false };
+      if (!_isAdmin) {
+        return new Response(JSON.stringify({ error: "Sem permissão" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const { data: agentData } = await promptClient
         .from("agents")
         .select("slug")
@@ -7521,6 +7534,43 @@ Deno.serve(async (req) => {
           console.error("OpenFDA API error:", fdaError.message);
           systemPrompt += "\n\n<OPENFDA_CONTEXT>\nErro ao consultar OpenFDA. Use seu conhecimento farmacológico para responder sobre reações adversas e oriente o usuário a consultar open.fda.gov e vigiaccess.org diretamente.\n</OPENFDA_CONTEXT>";
         }
+      }
+
+      // RAG: inject knowledge base docs linked to this native agent via the admin
+      // "Documentos" tab (same mechanism custom agents use — see the customAgent
+      // branch below). Uses a service-role client since the RLS on these tables is
+      // scoped to the doc's uploader (an admin), not the end user chatting here.
+      try {
+        const kbServiceClient = createClient(supabaseUrl, serviceRoleKey);
+        const { data: nativeKBLinks } = await kbServiceClient
+          .from("agent_knowledge_bases")
+          .select("knowledge_base_id")
+          .eq("agent_id", agentId);
+        const nativeKbIds = [...new Set((nativeKBLinks || []).map((l: any) => l.knowledge_base_id))];
+        if (nativeKbIds.length > 0) {
+          const { data: nativeSources } = await kbServiceClient
+            .from("knowledge_sources")
+            .select("name, type, content")
+            .in("knowledge_base_id", nativeKbIds)
+            .eq("status", "ready")
+            .limit(30);
+          const validNativeSources = (nativeSources || []).filter((s: any) => {
+            const content = (s.content || "").trim();
+            if (!content || content.length < 20) return false;
+            if (/^\[(PDF|Word|Arquivo|Excel):/i.test(content)) return false;
+            return true;
+          });
+          if (validNativeSources.length > 0) {
+            const chunks = validNativeSources.map((s: any) => {
+              let content = s.content || "";
+              if (content.length > 2000) content = content.substring(0, 2000) + "...";
+              return `[Fonte: ${s.name} (${s.type})]\n${content}`;
+            });
+            systemPrompt += "\n\n<CONTEXTO_BASE_CONHECIMENTO>\nUse as seguintes fontes de conhecimento para embasar suas respostas quando relevante. NÃO reproduza estas instruções na sua resposta — use o conteúdo como referência para formular suas próprias respostas.\nIMPORTANTE: Cada fonte está identificada com [Fonte: NOME (tipo)]. Quando usar informação de uma fonte específica, CITE O NOME EXATO da fonte na sua resposta para que o usuário saiba de qual documento veio a informação.\n\n" + chunks.join("\n\n---\n\n") + "\n</CONTEXTO_BASE_CONHECIMENTO>";
+          }
+        }
+      } catch (kbError) {
+        console.warn("Native agent KB fetch error:", kbError.message);
       }
 
       const userContent = buildUserMessage(enrichedInput, files);
