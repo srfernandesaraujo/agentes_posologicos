@@ -216,17 +216,17 @@ export default function Meetings() {
       </div>
 
       {/* Requirements notice */}
-      <Alert className="border-white/10 bg-white/5">
+      <Alert className="border-white/10 bg-white/5 text-white [&>svg]:text-white">
         <Info className="h-4 w-4" />
         <AlertTitle>Requisitos para gerar atas automaticamente</AlertTitle>
         <AlertDescription className="text-muted-foreground space-y-1">
           <p>
-            Sua conta Google precisa ter o plano <strong className="text-foreground">Google AI Pro</strong> (ou Google Workspace com Gemini) —
-            o plano <strong className="text-foreground">Google One</strong> comum (só armazenamento) não inclui o Gemini no Meet e não vai funcionar.
+            Sua conta Google precisa ter o plano <strong className="text-white">Google AI Pro</strong> (ou Google Workspace com Gemini) —
+            o plano <strong className="text-white">Google One</strong> comum (só armazenamento) não inclui o Gemini no Meet e não vai funcionar.
           </p>
           <p>
-            Em cada reunião, você (como organizador) precisa ativar manualmente <strong className="text-foreground">"Fazer anotações com o Gemini"</strong> e{" "}
-            <strong className="text-foreground">"Transcrever a reunião"</strong> pelo menu de atividades do Google Meet — nós não entramos na chamada, só lemos
+            Em cada reunião, você (como organizador) precisa ativar manualmente <strong className="text-white">"Fazer anotações com o Gemini"</strong> e{" "}
+            <strong className="text-white">"Transcrever a reunião"</strong> pelo menu de atividades do Google Meet — nós não entramos na chamada, só lemos
             o documento que o Gemini gera na sua Google Drive depois que a reunião termina.
           </p>
         </AlertDescription>
