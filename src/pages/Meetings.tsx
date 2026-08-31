@@ -236,7 +236,7 @@ export default function Meetings() {
       <div className="flex items-center gap-3">
         <Video className="h-7 w-7 text-[hsl(174,62%,47%)]" />
         <div>
-          <h1 className="text-2xl font-bold">Reuniões</h1>
+          <h1 className="text-2xl font-bold text-white">Reuniões</h1>
           <p className="text-sm text-muted-foreground">Grave, transcreva e gere atas automáticas de reuniões do Google Meet</p>
         </div>
       </div>
@@ -306,7 +306,7 @@ export default function Meetings() {
       {/* Register Meeting Card */}
       <Card className="border-white/10 bg-white/5">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Registrar Reunião</CardTitle>
+          <CardTitle className="text-base text-white">Registrar Reunião</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-2">
@@ -362,7 +362,7 @@ export default function Meetings() {
                 >
                   <CardContent className="p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium truncate flex-1">{m.title || "Sem título"}</span>
+                      <span className="text-sm font-medium truncate flex-1 text-white">{m.title || "Sem título"}</span>
                       <Badge className={`${cfg.color} text-[10px] shrink-0`}>
                         <StatusIcon className={`h-3 w-3 mr-1 ${(m.status === "transcribing" || m.status === "summarizing") ? "animate-spin" : ""}`} />
                         {cfg.label}
@@ -385,7 +385,7 @@ export default function Meetings() {
             <Card className="border-white/10 bg-white/5">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{selectedMeeting.title || "Reunião"}</CardTitle>
+                  <CardTitle className="text-base text-white">{selectedMeeting.title || "Reunião"}</CardTitle>
                   <div className="flex items-center gap-2">
                     <AddToProjectMenu itemType="meeting" itemId={selectedMeeting.id} size="icon" />
                     {selectedMeeting.status === "done" && selectedMeeting.transcript && (
