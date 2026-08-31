@@ -5,6 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 // restricted to the Picker API + this app's domain. Safe to ship in the bundle — same
 // trust model as e.g. a Google Maps JS key. Override via VITE_GOOGLE_PICKER_API_KEY if set.
 const PICKER_API_KEY = import.meta.env.VITE_GOOGLE_PICKER_API_KEY || "AIzaSyC2WySptSWIsvCDAg0kAEqhMLWyymOlfHc";
+// Google Cloud project number (not project id) — required by PickerBuilder.setAppId() for
+// the picker to actually register a drive.file grant for the picked file. Without it, later
+// Drive API calls to the picked file fail with "appNotAuthorizedToFile" even though Picker's
+// own callback reports success.
+const PICKER_APP_ID = import.meta.env.VITE_GOOGLE_PICKER_APP_ID || "367453704158";
 
 declare global {
   interface Window {
@@ -80,6 +85,7 @@ export function useGooglePicker() {
             .addView(docsView)
             .setOAuthToken(accessToken)
             .setDeveloperKey(PICKER_API_KEY)
+            .setAppId(PICKER_APP_ID)
             .setTitle("Selecione o documento de anotações do Gemini")
             .setLocale("pt-BR")
             .setCallback((pickerData: any) => {
