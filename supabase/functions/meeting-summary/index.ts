@@ -58,7 +58,10 @@ serve(async (req) => {
     await supabaseAdmin.from("meetings").update({ status: "summarizing" }).eq("id", meeting_id);
 
     const systemPrompt = custom_prompt || `Você é um assistente especializado em criar atas de reunião profissionais.
-Analise a transcrição fornecida e gere uma ata estruturada com:
+Antes de tudo, na PRIMEIRA linha da resposta, escreva um título curto (máximo 8 palavras) que identifique o assunto principal desta reunião, exatamente neste formato:
+TÍTULO: <título aqui>
+
+Deixe uma linha em branco depois do título. Em seguida, analise a transcrição fornecida e gere uma ata estruturada com:
 
 ## Ata da Reunião
 
@@ -84,7 +87,18 @@ Use formatação Markdown. Seja conciso mas completo.`;
       return new Response(JSON.stringify({ error: "Failed to generate summary" }), { status: 500, headers: corsHeaders });
     }
 
-    const summary = result.output || "Não foi possível gerar a ata.";
+    const rawOutput = result.output || "Não foi possível gerar a ata.";
+
+    // Extrai a linha "TÍTULO: ..." (se presente) e remove ela do corpo da ata —
+    // só usada para atualizar meetings.title, não faz sentido repetida no texto.
+    let summary = rawOutput;
+    let extractedTitle: string | null = null;
+    const titleMatch = rawOutput.match(/^\s*T[ÍI]TULO:\s*(.+?)\s*$/im);
+    if (titleMatch && titleMatch.index !== undefined) {
+      extractedTitle = titleMatch[1].trim().replace(/^["'*]+|["'*]+$/g, "");
+      summary = (rawOutput.slice(0, titleMatch.index) + rawOutput.slice(titleMatch.index + titleMatch[0].length)).replace(/^\s+/, "");
+    }
+
     await logAiUsage(supabaseAdmin, {
       userId,
       provider: result.provider!,
@@ -94,9 +108,14 @@ Use formatação Markdown. Seja conciso mas completo.`;
       promptType: "meeting-summary",
     });
 
-    await supabaseAdmin.from("meetings").update({ status: "done", summary }).eq("id", meeting_id);
+    const updates: Record<string, unknown> = { status: "done", summary };
+    // Só substitui o título se o usuário nunca escolheu um por conta própria.
+    if (extractedTitle && !meeting.title_is_custom) {
+      updates.title = extractedTitle.slice(0, 120);
+    }
+    await supabaseAdmin.from("meetings").update(updates).eq("id", meeting_id);
 
-    return new Response(JSON.stringify({ summary }), {
+    return new Response(JSON.stringify({ summary, title: updates.title || meeting.title }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -11,7 +11,7 @@ interface TableData {
   rows: string[][];
 }
 
-function parseMarkdownTables(text: string): Array<{ type: "text"; content: string } | { type: "table"; table: TableData }> {
+export function parseMarkdownTables(text: string): Array<{ type: "text"; content: string } | { type: "table"; table: TableData }> {
   const parts: Array<{ type: "text"; content: string } | { type: "table"; table: TableData }> = [];
   const lines = text.split("\n");
   let i = 0;
@@ -48,7 +48,7 @@ function parseMarkdownTables(text: string): Array<{ type: "text"; content: strin
   return parts;
 }
 
-function cleanMarkdown(text: string): string {
+export function cleanMarkdown(text: string): string {
   return text
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
@@ -172,7 +172,7 @@ export function exportConversationPdf(agentName: string, messages: Message[]) {
   doc.save(`${agentName.replace(/\s+/g, "_")}_conversa_${Date.now()}.pdf`);
 }
 
-function renderTextBlock(
+export function renderTextBlock(
   doc: jsPDF, text: string, margin: number, contentWidth: number,
   getY: () => number, setY: (v: number) => void, bottomLimit: number, newPage: () => void
 ) {
@@ -243,7 +243,7 @@ function renderTextBlock(
   setY(y + 2);
 }
 
-function renderTable(
+export function renderTable(
   doc: jsPDF, table: { headers: string[]; rows: string[][] },
   margin: number, contentWidth: number,
   getY: () => number, setY: (v: number) => void, bottomLimit: number, newPage: () => void

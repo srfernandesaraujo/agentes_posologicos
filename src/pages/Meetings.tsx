@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Video, RefreshCw, FileText, Copy, Clock, CheckCircle2, AlertCircle, Loader2, Trash2, Link2, Unlink, FileSearch, Info } from "lucide-react";
+import { Video, RefreshCw, FileText, FileDown, Copy, Clock, CheckCircle2, AlertCircle, Loader2, Trash2, Link2, Unlink, FileSearch, Info } from "lucide-react";
+import { exportMeetingMinutesPdf } from "@/lib/exportMeetingMinutesPdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -455,7 +456,21 @@ export default function Meetings() {
                       <TabsTrigger value="transcript">Transcrição</TabsTrigger>
                     </TabsList>
                     <TabsContent value="summary" className="mt-4">
-                      <div className="flex justify-end mb-2">
+                      <div className="flex justify-end gap-2 mb-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => exportMeetingMinutesPdf({
+                            title: selectedMeeting.title || "Reunião",
+                            summary: selectedMeeting.summary,
+                            meetingDate: selectedMeeting.matched_at || selectedMeeting.created_at,
+                            meetLink: selectedMeeting.meet_link,
+                          })}
+                          disabled={!selectedMeeting.summary}
+                          className="text-xs"
+                        >
+                          <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => copyToClipboard(selectedMeeting.summary)} className="text-xs">
                           <Copy className="h-3 w-3 mr-1" /> Copiar
                         </Button>

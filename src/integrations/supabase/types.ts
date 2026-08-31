@@ -1288,6 +1288,7 @@ export type Database = {
           status: string
           summary: string | null
           title: string | null
+          title_is_custom: boolean
           transcript: string | null
           updated_at: string
           user_id: string
@@ -1304,6 +1305,7 @@ export type Database = {
           status?: string
           summary?: string | null
           title?: string | null
+          title_is_custom?: boolean
           transcript?: string | null
           updated_at?: string
           user_id: string
@@ -1320,6 +1322,7 @@ export type Database = {
           status?: string
           summary?: string | null
           title?: string | null
+          title_is_custom?: boolean
           transcript?: string | null
           updated_at?: string
           user_id?: string

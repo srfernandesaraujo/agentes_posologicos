@@ -52,12 +52,17 @@ serve(async (req) => {
     }
 
     const now = new Date().toISOString();
+    const hasCustomTitle = !!(title && String(title).trim());
     const { data: meeting, error: insertError } = await supabaseAdmin
       .from("meetings")
       .insert({
         user_id: userId,
         meet_link: meet_link ? String(meet_link).trim() : null,
         title: title || drive_file_name || `Reunião ${new Date().toLocaleDateString("pt-BR")}`,
+        // Só um título digitado pelo usuário é "definitivo" — o fallback (nome do
+        // arquivo do Drive ou "Reunião DD/MM/AAAA") pode ser substituído por um
+        // título melhor gerado pela IA assim que a ata for criada.
+        title_is_custom: hasCustomTitle,
         status: "matched",
         drive_file_id,
         matched_at: now,
