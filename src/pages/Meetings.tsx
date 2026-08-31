@@ -394,7 +394,7 @@ export default function Meetings() {
                         variant="outline"
                         onClick={() => regenerateMutation.mutate(selectedMeeting.id)}
                         disabled={regenerateMutation.isPending}
-                        className="border-white/10 text-xs"
+                        className="border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white text-xs"
                       >
                         <RefreshCw className={`h-3 w-3 mr-1 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
                         Regenerar Ata
@@ -467,11 +467,11 @@ export default function Meetings() {
                             meetLink: selectedMeeting.meet_link,
                           })}
                           disabled={!selectedMeeting.summary}
-                          className="text-xs"
+                          className="text-white/70 hover:text-white hover:bg-white/10 text-xs"
                         >
                           <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(selectedMeeting.summary)} className="text-xs">
+                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(selectedMeeting.summary)} className="text-white/70 hover:text-white hover:bg-white/10 text-xs">
                           <Copy className="h-3 w-3 mr-1" /> Copiar
                         </Button>
                       </div>
@@ -483,7 +483,7 @@ export default function Meetings() {
                     </TabsContent>
                     <TabsContent value="transcript" className="mt-4">
                       <div className="flex justify-end mb-2">
-                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(selectedMeeting.transcript)} className="text-xs">
+                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(selectedMeeting.transcript)} className="text-white/70 hover:text-white hover:bg-white/10 text-xs">
                           <Copy className="h-3 w-3 mr-1" /> Copiar
                         </Button>
                       </div>
