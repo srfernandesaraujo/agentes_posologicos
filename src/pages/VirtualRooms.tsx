@@ -27,12 +27,13 @@ interface VirtualRoom {
   user_id: string;
   name: string;
   description: string;
-  pin: string;
+  pin: string | null;
   agent_id: string | null;
   is_active: boolean;
   created_at: string;
   agent_expires_at: string | null;
   room_expires_at: string | null;
+  room_type: "pin" | "personal";
 }
 
 interface AgentOption {
@@ -179,6 +180,9 @@ export default function VirtualRooms() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<VirtualRoom | null>(null);
   const [viewingRoom, setViewingRoom] = useState<VirtualRoom | null>(null);
+  const [activeTab, setActiveTab] = useState<"personal" | "pin">("personal");
+  const [newChatDialogOpen, setNewChatDialogOpen] = useState(false);
+  const [newChatAgentId, setNewChatAgentId] = useState<string>("none");
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -198,6 +202,28 @@ export default function VirtualRooms() {
       return data as unknown as VirtualRoom[];
     },
     enabled: !!user,
+  });
+
+  const personalRooms = rooms.filter((r) => r.room_type === "personal");
+  const pinRooms = rooms.filter((r) => r.room_type !== "personal");
+
+  // Salas pessoais navegam para a experiência rica do Chat (anexos, markdown,
+  // certificação, etc.) em vez do fluxo público/anônimo de sala por PIN.
+  const getChatPath = (targetAgentId: string) => {
+    const isCustomTarget = customAgents.some((a: any) => a.id === targetAgentId);
+    return `/chat/${isCustomTarget ? `custom-${targetAgentId}` : targetAgentId}`;
+  };
+
+  const deletePersonalRoom = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("virtual_rooms" as any).delete().eq("id", id).eq("user_id", user!.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["virtual-rooms"] });
+      toast.success("Conversa excluída!");
+    },
+    onError: () => toast.error("Erro ao excluir conversa"),
   });
 
   const createRoom = useMutation({
@@ -331,28 +357,90 @@ export default function VirtualRooms() {
 
   return (
     <div className="container max-w-4xl py-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-display text-2xl font-bold text-white">Salas Virtuais</h1>
-          <p className="text-sm text-white/40">Gerencie salas para pacientes virtuais acessarem via PIN</p>
+          <p className="text-sm text-white/40">
+            {activeTab === "personal" ? "Suas conversas persistentes com os agentes" : "Gerencie salas para pacientes virtuais acessarem via PIN"}
+          </p>
         </div>
-        <Button onClick={openCreate} className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white gap-2">
-          <Plus className="h-4 w-4" /> Nova Sala
+        <Button
+          onClick={() => (activeTab === "personal" ? setNewChatDialogOpen(true) : openCreate())}
+          className="bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white gap-2"
+        >
+          <Plus className="h-4 w-4" /> {activeTab === "personal" ? "Nova Conversa" : "Nova Sala"}
         </Button>
+      </div>
+
+      <div className="mb-6 flex gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1 w-fit">
+        <button
+          onClick={() => setActiveTab("personal")}
+          className={cn(
+            "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+            activeTab === "personal" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"
+          )}
+        >
+          Minhas Conversas
+        </button>
+        <button
+          onClick={() => setActiveTab("pin")}
+          className={cn(
+            "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+            activeTab === "pin" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70"
+          )}
+        >
+          Salas por PIN
+        </button>
       </div>
 
       {isLoading ? (
         <div className="flex justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(174,62%,47%)] border-t-transparent" />
         </div>
-      ) : rooms.length === 0 ? (
+      ) : activeTab === "personal" ? (
+        personalRooms.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-white/40">
+            <MessageSquare className="mb-4 h-12 w-12" />
+            <p>Nenhuma conversa ainda</p>
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {personalRooms.map((room) => {
+              const agentName = findAgentName(room.agent_id);
+              return (
+                <div
+                  key={room.id}
+                  className="rounded-xl border border-white/10 bg-white/[0.03] p-4 flex items-center justify-between gap-4 cursor-pointer hover:bg-white/[0.05] transition-colors"
+                  onClick={() => room.agent_id && navigate(`${getChatPath(room.agent_id)}?room=${room.id}`)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-white truncate">{room.name}</h3>
+                    <p className="text-xs text-white/40 mt-0.5">Agente: {agentName || "—"}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm("Excluir esta conversa?")) deletePersonalRoom.mutate(room.id);
+                    }}
+                    className="text-red-400/60 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : pinRooms.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-white/40">
           <DoorOpen className="mb-4 h-12 w-12" />
           <p>Nenhuma sala virtual criada</p>
         </div>
       ) : (
         <div className="grid gap-4">
-          {rooms.map((room) => {
+          {pinRooms.map((room) => {
             const agentName = findAgentName(room.agent_id);
             const expired = isAgentExpired(room);
             return (
@@ -368,7 +456,7 @@ export default function VirtualRooms() {
                   <div className="flex items-center gap-4 text-xs text-white/40 flex-wrap">
                     <span className="flex items-center gap-1">
                       PIN: <span className="font-mono font-bold text-[hsl(14,90%,58%)]">{room.pin}</span>
-                      <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(room.pin); toast.success("PIN copiado!"); }}>
+                      <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(room.pin || ""); toast.success("PIN copiado!"); }}>
                         <Copy className="h-3 w-3" />
                       </button>
                     </span>
@@ -492,6 +580,32 @@ export default function VirtualRooms() {
           onOpenChange={(open) => { if (!open) setViewingRoom(null); }}
         />
       )}
+
+      <Dialog open={newChatDialogOpen} onOpenChange={(open) => { setNewChatDialogOpen(open); if (!open) setNewChatAgentId("none"); }}>
+        <DialogContent className="border-white/10 bg-[hsl(220,25%,8%)] text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova Conversa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-white/70">Agente</label>
+              <AgentPicker value={newChatAgentId} onChange={setNewChatAgentId} />
+            </div>
+            <Button
+              onClick={() => {
+                if (newChatAgentId === "none") return;
+                setNewChatDialogOpen(false);
+                navigate(getChatPath(newChatAgentId));
+                setNewChatAgentId("none");
+              }}
+              disabled={newChatAgentId === "none"}
+              className="w-full bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white"
+            >
+              Iniciar Conversa
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

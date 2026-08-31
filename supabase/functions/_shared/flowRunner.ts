@@ -132,3 +132,48 @@ export async function runFlowHeadless(
 
   return { execution_id: execution.id, node_results: nodeResults, final_output: currentInput };
 }
+
+// Posts a completed flow run's output into a room's timeline (the "activity feed"
+// integration) and notifies the owner. Called by the cron/webhook trigger functions
+// when a trigger has an optional room_id configured.
+//
+// Re-validates room ownership itself — agent_flow_triggers.room_id is only scoped by
+// the *flow's* RLS (owner of the flow), not the referenced room, so a tampered request
+// could otherwise point a trigger at a room the caller doesn't own.
+export async function postFlowResultToRoom(
+  supabase: SupabaseClient,
+  params: { roomId: string; ownerId: string; flowName: string; executionId: string; output: string },
+): Promise<void> {
+  const { data: room } = await supabase
+    .from("virtual_rooms")
+    .select("id, user_id, is_active, agent_id, room_type")
+    .eq("id", params.roomId)
+    .maybeSingle();
+  if (!room || room.user_id !== params.ownerId || !room.is_active) return;
+
+  await supabase.from("room_messages").insert({
+    room_id: room.id,
+    role: "assistant",
+    sender_name: `Automação: ${params.flowName}`,
+    content: params.output,
+    source: "flow_automation",
+    flow_execution_id: params.executionId,
+    is_broadcast: false,
+    is_question: false,
+    is_anonymous: false,
+  });
+
+  let link = "/salas-virtuais";
+  if (room.room_type === "personal" && room.agent_id) {
+    const { data: nativeAgent } = await supabase.from("agents").select("id").eq("id", room.agent_id).maybeSingle();
+    link = nativeAgent ? `/chat/${room.agent_id}` : `/chat/custom-${room.agent_id}`;
+  }
+
+  await supabase.from("notifications").insert({
+    user_id: params.ownerId,
+    type: "info",
+    title: "Fluxo executado",
+    message: `O fluxo "${params.flowName}" gerou um novo resultado na sala.`,
+    link,
+  });
+}

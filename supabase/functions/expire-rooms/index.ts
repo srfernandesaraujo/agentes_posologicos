@@ -19,10 +19,13 @@ Deno.serve(async (req) => {
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     // 1. Deactivate rooms past their expiration date
+    // room_type='pin' guard: personal rooms are persistent and never carry a
+    // room_expires_at, but the filter is kept explicit rather than relying on that.
     const { data: expiredByDate, error: err1 } = await supabase
       .from("virtual_rooms")
       .update({ is_active: false })
       .eq("is_active", true)
+      .eq("room_type", "pin")
       .not("room_expires_at", "is", null)
       .lt("room_expires_at", now)
       .select("id");
@@ -30,11 +33,14 @@ Deno.serve(async (req) => {
     if (err1) console.error("Error expiring rooms by date:", err1);
 
     // 2. Deactivate rooms with no activity for 7 days
-    // Get all active rooms
+    // Get all active PIN rooms only — this sweep doesn't check room_expires_at at
+    // all, so a quiet personal room would otherwise get swept after a week of no
+    // messages even though it's meant to be persistent.
     const { data: activeRooms, error: err2 } = await supabase
       .from("virtual_rooms")
       .select("id, updated_at")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("room_type", "pin");
 
     if (err2) {
       console.error("Error fetching active rooms:", err2);

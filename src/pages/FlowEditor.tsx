@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   useAgentFlow,
@@ -428,6 +429,25 @@ export default function FlowEditor() {
   const [webhookDefaultInput, setWebhookDefaultInput] = useState("");
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [regeneratingToken, setRegeneratingToken] = useState(false);
+  const [cronRoomId, setCronRoomId] = useState<string>("");
+  const [webhookRoomId, setWebhookRoomId] = useState<string>("");
+
+  // Rooms the flow owner can target with "post result to room" — used to feed
+  // automated flow output into a room's activity timeline.
+  const { data: myRooms = [] } = useQuery({
+    queryKey: ["my-rooms-for-triggers", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("virtual_rooms" as any)
+        .select("id, name, room_type")
+        .eq("user_id", user!.id)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data as unknown as { id: string; name: string; room_type: string }[];
+    },
+    enabled: triggersOpen && !!user,
+  });
 
   useEffect(() => {
     if (!triggersOpen) return;
@@ -436,8 +456,10 @@ export default function FlowEditor() {
     setCronHour(cronTrigger?.run_hour ?? 8);
     setCronDayOfWeek(cronTrigger?.run_day_of_week ?? 1);
     setCronDefaultInput(cronTrigger?.default_input ?? "");
+    setCronRoomId(cronTrigger?.room_id ?? "");
     setWebhookEnabled(webhookTrigger?.enabled ?? false);
     setWebhookDefaultInput(webhookTrigger?.default_input ?? "");
+    setWebhookRoomId(webhookTrigger?.room_id ?? "");
   }, [triggersOpen, cronTrigger, webhookTrigger]);
 
   const handleSaveCron = async () => {
@@ -452,6 +474,7 @@ export default function FlowEditor() {
         frequency: cronFrequency,
         run_hour: cronFrequency === "hourly" ? null : cronHour,
         run_day_of_week: cronFrequency === "weekly" ? cronDayOfWeek : null,
+        room_id: cronRoomId || null,
       });
       toast.success("Agendamento salvo.");
     } catch (e: any) {
@@ -470,6 +493,7 @@ export default function FlowEditor() {
         trigger_type: "webhook",
         enabled: webhookEnabled,
         default_input: webhookDefaultInput,
+        room_id: webhookRoomId || null,
       });
       toast.success("Webhook salvo.");
     } catch (e: any) {
@@ -1788,6 +1812,22 @@ export default function FlowEditor() {
                   disabled={!cronEnabled}
                 />
               </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Postar resultado em uma sala (opcional)</label>
+                <select
+                  value={cronRoomId}
+                  onChange={(e) => setCronRoomId(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  disabled={!cronEnabled}
+                >
+                  <option value="">Nenhuma — não postar em sala</option>
+                  {myRooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} {r.room_type === "pin" ? "(sala por PIN)" : "(conversa pessoal)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <Button onClick={handleSaveCron} disabled={savingCron} size="sm" className="w-full gap-2">
                 {savingCron ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />}
                 Salvar agendamento
@@ -1829,6 +1869,22 @@ export default function FlowEditor() {
                   className="min-h-[70px] text-sm"
                   disabled={!webhookEnabled}
                 />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Postar resultado em uma sala (opcional)</label>
+                <select
+                  value={webhookRoomId}
+                  onChange={(e) => setWebhookRoomId(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  disabled={!webhookEnabled}
+                >
+                  <option value="">Nenhuma — não postar em sala</option>
+                  {myRooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} {r.room_type === "pin" ? "(sala por PIN)" : "(conversa pessoal)"}
+                    </option>
+                  ))}
+                </select>
               </div>
               <Button onClick={handleSaveWebhook} disabled={savingWebhook} size="sm" className="w-full gap-2">
                 {savingWebhook ? <Loader2 className="h-4 w-4 animate-spin" /> : <Webhook className="h-4 w-4" />}

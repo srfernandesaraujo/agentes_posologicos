@@ -39,7 +39,10 @@ import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsM
 import { VoiceInput } from "@/components/chat/VoiceInput";
 
 
-const CUSTOM_AGENT_INTERACTION_COST = 0.5;
+// Alinhado com o custo real cobrado pelo servidor (agent-chat/index.ts deductCredits,
+// isCustomAgent → serverCost = 1) — antes desalinhado em 0.5, o que nunca era cobrado
+// de fato porque o Chat não enviava isCustomAgent ao backend (bug corrigido nesta sala).
+const CUSTOM_AGENT_INTERACTION_COST = 1;
 
 // Sanitize malformed markdown tables — handles concatenated rows, inline separators, missing spacing
 function sanitizeMarkdownTables(content: string): string {
@@ -271,7 +274,10 @@ export default function Chat() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  // Evita que o auto-select da sala mais recente sobrescreva uma escolha explícita
+  // (deep-link por ?room=, ou "Nova conversa" pedindo explicitamente uma sala em branco).
+  const roomInitializedRef = useRef(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [attachedConversations, setAttachedConversations] = useState<{ title: string; content: string }[]>([]);
   const [showConversationPicker, setShowConversationPicker] = useState(false);
@@ -319,41 +325,87 @@ export default function Chat() {
     }
   }, [builtInAgent, balance, agentLoading, hasFreeAccess, isCustom]);
 
-  const createNewSession = async () => {
-    if (!user || !actualAgentId) return null;
-    const { data: newSession } = await supabase
-      .from("chat_sessions")
-      .insert({ user_id: user.id, agent_id: actualAgentId })
+  // Cria uma nova sala pessoal com este agente (virtual_rooms room_type='personal').
+  // Persistente por padrão: sem pin, sem room_expires_at (nunca expira sozinha).
+  const createNewRoom = async () => {
+    if (!user || !actualAgentId || !agent) return null;
+    const { data: newRoom } = await supabase
+      .from("virtual_rooms" as any)
+      .insert({
+        user_id: user.id,
+        agent_id: actualAgentId,
+        room_type: "personal",
+        name: agent.name,
+        description: "",
+        pin: null,
+        is_active: true,
+      })
       .select("id")
       .single();
-    if (newSession) {
-      setSessionId(newSession.id);
-      queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
+    const newRoomId = (newRoom as any)?.id || null;
+    if (newRoomId) {
+      setRoomId(newRoomId);
+      roomInitializedRef.current = true;
+      queryClient.invalidateQueries({ queryKey: ["personal-rooms", actualAgentId, user.id] });
     }
-    return newSession?.id || null;
+    return newRoomId;
   };
 
+  // Lista das salas pessoais deste usuário com este agente — a mesma consulta que
+  // alimenta o ChatSidebar, usada aqui só para descobrir a sala "atual" por padrão
+  // (a mais recente), continuando a conversa como numa sala do WhatsApp.
+  const { data: personalRooms = [] } = useQuery({
+    queryKey: ["personal-rooms", actualAgentId, user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("virtual_rooms" as any)
+        .select("id, created_at")
+        .eq("user_id", user!.id)
+        .eq("agent_id", actualAgentId!)
+        .eq("room_type", "personal")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as unknown as { id: string; created_at: string }[];
+    },
+    enabled: !!user && !!actualAgentId,
+  });
+
+  // Troca de agente (ou deep-link ?room=) reseta a resolução da sala atual.
   useEffect(() => {
     if (!user || !actualAgentId) return;
-    const sessionFromUrl = searchParams.get("session");
-    if (sessionFromUrl) {
-      setSessionId(sessionFromUrl);
+    roomInitializedRef.current = false;
+    const roomFromUrl = searchParams.get("room");
+    if (roomFromUrl) {
+      setRoomId(roomFromUrl);
+      roomInitializedRef.current = true;
       setSearchParams({}, { replace: true });
+    } else {
+      setRoomId(null);
     }
   }, [user, actualAgentId, isCustom]);
 
+  // Auto-seleciona a sala mais recente assim que a lista carrega, a menos que a
+  // sala já tenha sido resolvida (via URL ou "Nova conversa" explícita).
+  useEffect(() => {
+    if (roomInitializedRef.current) return;
+    if (personalRooms.length > 0) {
+      setRoomId(personalRooms[0].id);
+      roomInitializedRef.current = true;
+    }
+  }, [personalRooms]);
+
   const { data: messages = [] } = useQuery({
-    queryKey: ["messages", sessionId],
+    queryKey: ["room-messages", roomId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("session_id", sessionId!)
+        .from("room_messages" as any)
+        .select("id, role, content, created_at")
+        .eq("room_id", roomId!)
         .order("created_at");
       if (error) throw error;
-      return data as Message[];
+      return data as unknown as Message[];
     },
-    enabled: !!sessionId,
+    enabled: !!roomId,
     refetchInterval: false,
   });
 
@@ -490,11 +542,11 @@ export default function Chat() {
         content: m.content,
       }));
 
-      // Create session if needed (both built-in and custom agents)
-      let sid = sessionId;
-      if (!sid) {
-        sid = await createNewSession();
-        if (!sid) throw new Error("Erro ao criar sessão");
+      // Cria a sala pessoal se ainda não existir (tanto para agente nativo quanto personalizado)
+      let rid = roomId;
+      if (!rid) {
+        rid = await createNewRoom();
+        if (!rid) throw new Error("Erro ao criar sala");
       }
 
       if (isCustom && !hasFreeAccess && balance < CUSTOM_AGENT_INTERACTION_COST) {
@@ -508,13 +560,20 @@ export default function Chat() {
       const userContent = text + (attachmentLabels.length > 0 ? `\n\n${attachmentLabels.join(", ")}` : "");
 
       await supabase
-        .from("messages")
-        .insert({ session_id: sid, role: "user", content: userContent });
+        .from("room_messages" as any)
+        .insert({
+          room_id: rid, role: "user", content: userContent,
+          sender_name: user.email || "Você", sender_email: user.email,
+          source: "chat", is_broadcast: false, is_question: false, is_anonymous: false,
+        });
 
       const cost = isCustom ? CUSTOM_AGENT_INTERACTION_COST : (builtInAgent?.credit_cost || 1);
-      
+
       // Call the edge function via direct fetch so we can read the real
       // error body (supabase.functions.invoke swallows non-2xx response bodies).
+      // Autenticado, sem isVirtualRoom/roomId — isVirtualRoom pula a cobrança
+      // server-side (é o comportamento certo só para salas por PIN); sala pessoal
+      // cobra por mensagem como o Chat sempre cobrou.
       const { data: { session: _sess } } = await supabase.auth.getSession();
       const token = _sess?.access_token;
       const fnUrl = `${SUPABASE_URL}/functions/v1/agent-chat`;
@@ -529,6 +588,7 @@ export default function Chat() {
           agentId: actualAgentId,
           input: fullInput,
           conversationHistory,
+          isCustomAgent: !!isCustom,
           creditCost: hasFreeAccess ? 0 : cost,
           ...(filesPayload.length > 0 ? { files: filesPayload } : {}),
         }),
@@ -547,13 +607,17 @@ export default function Chat() {
       const assistantContent = data?.output || "Sem resposta do agente.";
 
       await supabase
-        .from("messages")
-        .insert({ session_id: sid, role: "assistant", content: assistantContent });
+        .from("room_messages" as any)
+        .insert({
+          room_id: rid, role: "assistant", content: assistantContent,
+          sender_name: "Assistente",
+          source: "chat", is_broadcast: false, is_question: false, is_anonymous: false,
+        });
 
       // Fire-and-forget: extract durable user facts (silent personalization)
       try {
         supabase.functions
-          .invoke("extract-user-facts", { body: { userMessage: text, sessionId: sid } })
+          .invoke("extract-user-facts", { body: { userMessage: text } })
           .catch(() => { /* silent */ });
       } catch { /* silent */ }
     },
@@ -561,8 +625,8 @@ export default function Chat() {
       setInput("");
       setAttachedFiles([]);
       setAttachedConversations([]);
-      queryClient.invalidateQueries({ queryKey: ["messages", sessionId] });
-      queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
+      queryClient.invalidateQueries({ queryKey: ["room-messages", roomId] });
+      queryClient.invalidateQueries({ queryKey: ["personal-rooms", actualAgentId, user?.id] });
       refetchCredits();
     },
     onError: (err: any) => {
@@ -585,28 +649,30 @@ export default function Chat() {
   };
 
   const handleNewConversation = () => {
-    setSessionId(null);
+    roomInitializedRef.current = true; // impede o auto-select de reabrir a sala anterior
+    setRoomId(null);
     setInput("");
     setAttachedFiles([]);
     setAttachedConversations([]);
   };
 
-  const handleSelectSession = (sid: string) => {
-    setSessionId(sid);
+  const handleSelectRoom = (rid: string) => {
+    roomInitializedRef.current = true;
+    setRoomId(rid);
   };
 
   const handleDeleteSession = async () => {
-    if (!sessionId) return;
-    await supabase.from("messages").delete().eq("session_id", sessionId);
-    await supabase.from("chat_sessions").delete().eq("id", sessionId);
+    if (!roomId) return;
+    // room_messages tem ON DELETE CASCADE em room_id, não precisa apagar à parte.
+    await supabase.from("virtual_rooms" as any).delete().eq("id", roomId);
     setShowDeleteDialog(false);
     handleNewConversation();
-    queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
+    queryClient.invalidateQueries({ queryKey: ["personal-rooms", actualAgentId, user?.id] });
     toast.success("Conversa excluída com sucesso");
   };
 
   const handleExportPdf = () => {
-    if (!sessionId || displayMessages.length === 0) {
+    if (!roomId || displayMessages.length === 0) {
       toast.error("Nenhuma mensagem para exportar");
       return;
     }
@@ -615,10 +681,10 @@ export default function Chat() {
   };
 
   const handleRenameSession = async () => {
-    if (!sessionId || !renameValue.trim()) return;
-    await supabase.from("chat_sessions").update({ title: renameValue.trim() }).eq("id", sessionId);
+    if (!roomId || !renameValue.trim()) return;
+    await supabase.from("virtual_rooms" as any).update({ name: renameValue.trim() }).eq("id", roomId);
     setShowRenameDialog(false);
-    queryClient.invalidateQueries({ queryKey: ["chat-sessions", actualAgentId] });
+    queryClient.invalidateQueries({ queryKey: ["personal-rooms", actualAgentId, user?.id] });
     toast.success("Título atualizado");
   };
 
@@ -725,8 +791,8 @@ export default function Chat() {
         agentId={actualAgentId!}
         agentName={agent?.name || "Agente"}
         isCustom={!!isCustom}
-        currentSessionId={sessionId}
-        onSelectSession={handleSelectSession}
+        currentRoomId={roomId}
+        onSelectRoom={handleSelectRoom}
         onNewConversation={handleNewConversation}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -770,7 +836,7 @@ export default function Chat() {
                 <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
                 {isCustom ? `${CUSTOM_AGENT_INTERACTION_COST}` : agent.credit_cost} crédito/uso
               </div>
-              {sessionId && (
+              {roomId && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" aria-label="Mais opções da conversa" className="text-white/60 hover:bg-white/10 hover:text-white">
@@ -831,7 +897,7 @@ export default function Chat() {
                   )}
                   <div className={`relative group ${msg.role === "assistant" ? "max-w-[85%]" : ""}`}>
                     {msg.role === "assistant" && (
-                      <MessageActions content={msg.content} agentName={agent?.name || "Agente"} messageRef={contentRef} sessionId={sessionId} messageId={msg.id} voiceId={(agent as any)?.voice_id} />
+                      <MessageActions content={msg.content} agentName={agent?.name || "Agente"} messageRef={contentRef} messageId={msg.id} voiceId={(agent as any)?.voice_id} />
                     )}
                     <div
                       ref={msg.role === "assistant" ? contentRef : undefined}
@@ -848,7 +914,7 @@ export default function Chat() {
                           <ResponseFeedback
                             messageId={msg.id}
                             agentId={rawAgentId || ""}
-                            sessionId={sessionId}
+                            roomId={roomId}
                           />
                         </>
                       ) : (

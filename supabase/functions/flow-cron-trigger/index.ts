@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { runFlowHeadless } from "../_shared/flowRunner.ts";
+import { runFlowHeadless, postFlowResultToRoom } from "../_shared/flowRunner.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
     const { data: triggers, error } = await supabase
       .from("agent_flow_triggers")
-      .select("id, flow_id, frequency, run_hour, run_day_of_week, last_run_at, default_input, agent_flows!inner(user_id)")
+      .select("id, flow_id, frequency, run_hour, run_day_of_week, last_run_at, default_input, room_id, agent_flows!inner(user_id, name)")
       .eq("trigger_type", "cron")
       .eq("enabled", true);
 
@@ -54,10 +54,16 @@ Deno.serve(async (req) => {
       if (t.frequency === "weekly" && t.run_day_of_week != null && now.getUTCDay() !== t.run_day_of_week) continue;
 
       const ownerId = (t as any).agent_flows?.user_id;
+      const flowName = (t as any).agent_flows?.name || "Fluxo";
       try {
         if (!ownerId) throw new Error("Fluxo sem dono resolvido");
         const run = await runFlowHeadless(supabase, supabaseUrl, serviceKey, t.flow_id, ownerId, t.default_input || "");
         results.push({ trigger_id: t.id, flow_id: t.flow_id, status: run.error ? "error" : "completed" });
+        if (!run.error && t.room_id) {
+          await postFlowResultToRoom(supabase, {
+            roomId: t.room_id, ownerId, flowName, executionId: run.execution_id, output: run.final_output,
+          });
+        }
       } catch (e: any) {
         console.error("[flow-cron-trigger] flow", t.flow_id, "failed:", e.message);
         results.push({ trigger_id: t.id, flow_id: t.flow_id, status: "error", error: e.message });

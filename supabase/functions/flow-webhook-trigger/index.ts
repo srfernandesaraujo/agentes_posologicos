@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { runFlowHeadless } from "../_shared/flowRunner.ts";
+import { runFlowHeadless, postFlowResultToRoom } from "../_shared/flowRunner.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
 
     const { data: trigger, error } = await supabase
       .from("agent_flow_triggers")
-      .select("id, flow_id, default_input, agent_flows!inner(user_id)")
+      .select("id, flow_id, default_input, room_id, agent_flows!inner(user_id, name)")
       .eq("trigger_type", "webhook")
       .eq("enabled", true)
       .eq("webhook_token", token)
@@ -58,9 +58,16 @@ Deno.serve(async (req) => {
     }
 
     const ownerId = (trigger as any).agent_flows?.user_id;
+    const flowName = (trigger as any).agent_flows?.name || "Fluxo";
     if (!ownerId) throw new Error("Fluxo sem dono resolvido");
 
     const result = await runFlowHeadless(supabase, supabaseUrl, serviceKey, trigger.flow_id, ownerId, initialInput);
+
+    if (!result.error && trigger.room_id) {
+      await postFlowResultToRoom(supabase, {
+        roomId: trigger.room_id, ownerId, flowName, executionId: result.execution_id, output: result.final_output,
+      });
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

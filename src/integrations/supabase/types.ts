@@ -281,6 +281,7 @@ export type Database = {
           frequency: string | null
           id: string
           last_run_at: string | null
+          room_id: string | null
           run_day_of_week: number | null
           run_hour: number | null
           trigger_type: string
@@ -295,6 +296,7 @@ export type Database = {
           frequency?: string | null
           id?: string
           last_run_at?: string | null
+          room_id?: string | null
           run_day_of_week?: number | null
           run_hour?: number | null
           trigger_type: string
@@ -309,6 +311,7 @@ export type Database = {
           frequency?: string | null
           id?: string
           last_run_at?: string | null
+          room_id?: string | null
           run_day_of_week?: number | null
           run_hour?: number | null
           trigger_type?: string
@@ -321,6 +324,13 @@ export type Database = {
             columns: ["flow_id"]
             isOneToOne: false
             referencedRelation: "agent_flows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_flow_triggers_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_rooms"
             referencedColumns: ["id"]
           },
         ]
@@ -1274,7 +1284,7 @@ export type Database = {
           expected_start_at: string | null
           id: string
           matched_at: string | null
-          meet_link: string
+          meet_link: string | null
           status: string
           summary: string | null
           title: string | null
@@ -1290,7 +1300,7 @@ export type Database = {
           expected_start_at?: string | null
           id?: string
           matched_at?: string | null
-          meet_link: string
+          meet_link?: string | null
           status?: string
           summary?: string | null
           title?: string | null
@@ -1306,7 +1316,7 @@ export type Database = {
           expected_start_at?: string | null
           id?: string
           matched_at?: string | null
-          meet_link?: string
+          meet_link?: string | null
           status?: string
           summary?: string | null
           title?: string | null
@@ -2036,6 +2046,7 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          flow_execution_id: string | null
           id: string
           is_anonymous: boolean
           is_broadcast: boolean
@@ -2045,10 +2056,12 @@ export type Database = {
           room_id: string
           sender_email: string | null
           sender_name: string
+          source: string
         }
         Insert: {
           content: string
           created_at?: string
+          flow_execution_id?: string | null
           id?: string
           is_anonymous?: boolean
           is_broadcast?: boolean
@@ -2058,10 +2071,12 @@ export type Database = {
           room_id: string
           sender_email?: string | null
           sender_name?: string
+          source?: string
         }
         Update: {
           content?: string
           created_at?: string
+          flow_execution_id?: string | null
           id?: string
           is_anonymous?: boolean
           is_broadcast?: boolean
@@ -2071,8 +2086,16 @@ export type Database = {
           room_id?: string
           sender_email?: string | null
           sender_name?: string
+          source?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "room_messages_flow_execution_id_fkey"
+            columns: ["flow_execution_id"]
+            isOneToOne: false
+            referencedRelation: "agent_flow_executions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "room_messages_room_id_fkey"
             columns: ["room_id"]
@@ -2504,8 +2527,9 @@ export type Database = {
           is_active: boolean
           live_mode: boolean
           name: string
-          pin: string
+          pin: string | null
           room_expires_at: string | null
+          room_type: string
           updated_at: string
           user_id: string
         }
@@ -2519,8 +2543,9 @@ export type Database = {
           is_active?: boolean
           live_mode?: boolean
           name: string
-          pin: string
+          pin?: string | null
           room_expires_at?: string | null
+          room_type?: string
           updated_at?: string
           user_id: string
         }
@@ -2534,8 +2559,9 @@ export type Database = {
           is_active?: boolean
           live_mode?: boolean
           name?: string
-          pin?: string
+          pin?: string | null
           room_expires_at?: string | null
+          room_type?: string
           updated_at?: string
           user_id?: string
         }

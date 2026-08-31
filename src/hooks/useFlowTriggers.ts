@@ -15,6 +15,7 @@ export interface AgentFlowTrigger {
   run_day_of_week: number | null;
   last_run_at: string | null;
   webhook_token: string | null;
+  room_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -45,6 +46,7 @@ export function useUpsertFlowTrigger() {
       frequency?: FlowTriggerFrequency | null;
       run_hour?: number | null;
       run_day_of_week?: number | null;
+      room_id?: string | null;
     }) => {
       const { data, error } = await supabase
         .from("agent_flow_triggers")

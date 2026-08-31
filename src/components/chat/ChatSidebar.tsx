@@ -16,8 +16,8 @@ interface ChatSidebarProps {
   agentId: string;
   agentName?: string;
   isCustom: boolean;
-  currentSessionId: string | null;
-  onSelectSession: (sessionId: string) => void;
+  currentRoomId: string | null;
+  onSelectRoom: (roomId: string) => void;
   onNewConversation: () => void;
   collapsed: boolean;
   onToggle: () => void;
@@ -27,8 +27,8 @@ export function ChatSidebar({
   agentId,
   agentName = "Agente",
   isCustom,
-  currentSessionId,
-  onSelectSession,
+  currentRoomId,
+  onSelectRoom,
   onNewConversation,
   collapsed,
   onToggle,
@@ -39,20 +39,22 @@ export function ChatSidebar({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
 
+  // "Salas pessoais" — conversas persistentes com este agente (virtual_rooms
+  // room_type='personal'), a mesma tabela usada pelas salas por PIN.
   const { data: sessions = [] } = useQuery({
-    queryKey: ["chat-sessions", agentId, user?.id],
+    queryKey: ["personal-rooms", agentId, user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("chat_sessions")
+      const { data, error } = await (supabase as any)
+        .from("virtual_rooms")
         .select(`
           id,
           created_at,
-          status,
-          title,
-          messages(content, role, created_at)
+          name,
+          room_messages(content, role, created_at)
         `)
         .eq("user_id", user!.id)
         .eq("agent_id", agentId)
+        .eq("room_type", "personal")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -61,8 +63,8 @@ export function ChatSidebar({
   });
 
   const getSessionTitle = (session: any) => {
-    if (session.title) return session.title;
-    const firstUserMsg = session.messages?.find((m: any) => m.role === "user");
+    if (session.name) return session.name;
+    const firstUserMsg = session.room_messages?.find((m: any) => m.role === "user");
     if (firstUserMsg) {
       return firstUserMsg.content.length > 40
         ? firstUserMsg.content.substring(0, 40) + "..."
@@ -73,10 +75,10 @@ export function ChatSidebar({
 
   const handleDelete = async (sessionId: string) => {
     try {
-      await supabase.from("messages").delete().eq("session_id", sessionId);
-      await supabase.from("chat_sessions").delete().eq("id", sessionId);
-      queryClient.invalidateQueries({ queryKey: ["chat-sessions", agentId, user?.id] });
-      if (currentSessionId === sessionId) {
+      // room_messages tem ON DELETE CASCADE em room_id, não precisa apagar à parte.
+      await supabase.from("virtual_rooms").delete().eq("id", sessionId);
+      queryClient.invalidateQueries({ queryKey: ["personal-rooms", agentId, user?.id] });
+      if (currentRoomId === sessionId) {
         onNewConversation();
       }
       toast.success("Conversa excluída");
@@ -87,11 +89,11 @@ export function ChatSidebar({
   };
 
   const handleExport = (session: any) => {
-    if (!session.messages || session.messages.length === 0) {
+    if (!session.room_messages || session.room_messages.length === 0) {
       toast.error("Conversa sem mensagens");
       return;
     }
-    const sorted = [...session.messages].sort(
+    const sorted = [...session.room_messages].sort(
       (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
     exportConversationPdf(agentName, sorted);
@@ -110,10 +112,10 @@ export function ChatSidebar({
     }
     try {
       await supabase
-        .from("chat_sessions")
-        .update({ title: editTitle.trim() } as any)
+        .from("virtual_rooms")
+        .update({ name: editTitle.trim() } as any)
         .eq("id", editingId);
-      queryClient.invalidateQueries({ queryKey: ["chat-sessions", agentId, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["personal-rooms", agentId, user?.id] });
       toast.success("Título atualizado");
     } catch {
       toast.error("Erro ao atualizar título");
@@ -164,7 +166,7 @@ export function ChatSidebar({
                   key={session.id}
                   className={cn(
                     "group flex items-center rounded-lg transition-colors",
-                    session.id === currentSessionId
+                    session.id === currentRoomId
                       ? "bg-white/10"
                       : "hover:bg-white/[0.05]"
                   )}
@@ -191,17 +193,17 @@ export function ChatSidebar({
                   ) : (
                     <>
                       <button
-                        onClick={() => onSelectSession(session.id)}
+                        onClick={() => onSelectRoom(session.id)}
                         className={cn(
                           "flex-1 text-left px-3 py-2.5 text-xs min-w-0",
-                          session.id === currentSessionId
+                          session.id === currentRoomId
                             ? "text-white"
                             : "text-white/50 hover:text-white/70"
                         )}
                       >
                         <p className="truncate font-medium">{getSessionTitle(session)}</p>
                         <p className="mt-0.5 text-[10px] text-white/30">
-                          {new Date(session.created_at).toLocaleDateString("pt-BR")} · {session.messages?.length || 0} msgs
+                          {new Date(session.created_at).toLocaleDateString("pt-BR")} · {session.room_messages?.length || 0} msgs
                         </p>
                       </button>
                       <DropdownMenu>
