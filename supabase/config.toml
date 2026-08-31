@@ -72,6 +72,9 @@ verify_jwt = false
 [functions.meeting-google-disconnect]
 verify_jwt = false
 
+[functions.meeting-google-picker-token]
+verify_jwt = false
+
 [functions.whatsapp-webhook]
 verify_jwt = false
 

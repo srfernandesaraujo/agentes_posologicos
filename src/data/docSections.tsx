@@ -481,14 +481,14 @@ export const docSections: DocSection[] = [
     content: (
       <div className="space-y-4">
         <p className="text-white/70 leading-relaxed">
-          Em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/reunioes</code>, conecte sua conta do <strong className="text-white">Google</strong> e cole o link de uma reunião — o sistema busca automaticamente na sua Google Drive a ata/transcrição que o Gemini gera nativamente ao fim da chamada, e gera uma ata estruturada com IA a partir dela. Não depende de nenhum bot de terceiros entrando na reunião.
+          Em <code className="bg-white/10 px-1.5 py-0.5 rounded text-xs">/reunioes</code>, conecte sua conta do <strong className="text-white">Google</strong> e, depois da reunião, selecione na sua Google Drive (via Google Picker) o documento de anotações que o Gemini gera nativamente ao fim da chamada — o sistema gera uma ata estruturada com IA a partir dele. Não depende de nenhum bot de terceiros entrando na reunião.
         </p>
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-5">
           <h4 className="text-sm font-semibold text-white mb-3">Requisitos (leia antes de conectar)</h4>
           <ul className="space-y-2 text-sm text-white/60">
             <li><strong className="text-white/80">Plano Google AI Pro</strong> (ou Google Workspace com Gemini) na sua conta Google — o plano <strong className="text-white/80">Google One</strong> comum (só armazenamento) não inclui o Gemini no Meet e a funcionalidade não vai funcionar.</li>
             <li>Você precisa ser o <strong className="text-white/80">organizador</strong> da reunião (quem cria o link), não apenas um convidado.</li>
-            <li>Em cada reunião, ative manualmente <strong className="text-white/80">"Fazer anotações com o Gemini"</strong> e <strong className="text-white/80">"Transcrever a reunião"</strong> pelo menu de atividades do Google Meet — o sistema só lê o documento gerado depois, não entra na chamada.</li>
+            <li>Em cada reunião, ative manualmente <strong className="text-white/80">"Fazer anotações com o Gemini"</strong> e <strong className="text-white/80">"Transcrever a reunião"</strong> pelo menu de atividades do Google Meet — depois, volte em `/reunioes` e selecione o documento gerado; o sistema não entra na chamada nem busca sozinho na sua Drive.</li>
           </ul>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
@@ -497,7 +497,7 @@ export const docSections: DocSection[] = [
             <li><strong className="text-white/80">Transcrição completa</strong> extraída do documento gerado pelo Gemini no Meet.</li>
             <li><strong className="text-white/80">Ata estruturada</strong> com tópicos discutidos, decisões e ações.</li>
             <li><strong className="text-white/80">Regenerar com prompt customizado</strong> para diferentes formatos (ata formal, resumo executivo, plano de aula).</li>
-            <li><strong className="text-white/80">Status em tempo real</strong>: pending → matched → transcribing → summarizing → done.</li>
+            <li><strong className="text-white/80">Status em tempo real</strong>: matched → transcribing → summarizing → done.</li>
           </ul>
         </div>
       </div>
@@ -766,7 +766,7 @@ export const technicalDocSections: DocSection[] = [
             </div>
             <div className="border-b border-white/5 pb-2">
               <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meetings</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">google_connections</code>
-              <p className="text-white/50 text-xs mt-1">Reuniões do Google Meet. `meetings` armazena meet_link, drive_file_id, transcript, summary e status (pending→matched→transcribing→summarizing→done); `google_connections` guarda o OAuth (tokens criptografados) de cada usuário conectado.</p>
+              <p className="text-white/50 text-xs mt-1">Reuniões do Google Meet. `meetings` armazena drive_file_id, meet_link (opcional), transcript, summary e status (matched→transcribing→summarizing→done); `google_connections` guarda o OAuth (tokens criptografados) de cada usuário conectado.</p>
             </div>
             <div className="border-b border-white/5 pb-2">
               <code className="text-[hsl(174,62%,47%)] font-mono text-xs">projects</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">project_items</code> + <code className="text-[hsl(174,62%,47%)] font-mono text-xs">project_collaborators</code>
@@ -880,7 +880,7 @@ export const technicalDocSections: DocSection[] = [
             </div>
             <div className="border-b border-white/5 pb-2">
               <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-register</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-google-oauth-start</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-google-oauth-callback</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-sync</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-sync-cron</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">meeting-summary</code>
-              <p className="text-white/50 text-xs mt-1">Conecta a conta Google do usuário via OAuth, registra a reunião, casa o registro com o documento de anotações que o Gemini gera na Drive do organizador, extrai a transcrição, gera/regenera a ata com IA e sincroniza periodicamente (via polling e via cron) o status de reuniões em andamento.</p>
+              <p className="text-white/50 text-xs mt-1">Conecta a conta Google do usuário via OAuth, registra a reunião com o documento de anotações que o usuário seleciona via Google Picker, extrai a transcrição, gera/regenera a ata com IA e sincroniza periodicamente (via polling e via cron) o status de reuniões em andamento.</p>
             </div>
             <div>
               <code className="text-[hsl(174,62%,47%)] font-mono text-xs">osce-patient</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">osce-evaluate</code> / <code className="text-[hsl(174,62%,47%)] font-mono text-xs">osce-session-control</code>
@@ -992,7 +992,7 @@ export const technicalDocSections: DocSection[] = [
                 <div className="h-2 w-2 rounded-full bg-red-400" />
                 <strong className="text-white">Google Drive API (OAuth por usuário)</strong>
               </div>
-              <p className="text-white/50 text-xs ml-4">API: <code className="bg-white/10 px-1 py-0.5 rounded">https://www.googleapis.com/drive/v3</code><br/>Cada usuário conecta sua própria conta Google; o sistema lê a pasta "Meet Recordings" da Drive dele para localizar e exportar o documento de anotações/transcrição que o Gemini gera nativamente no Meet. Autenticação: OAuth 2.0 (access/refresh token criptografados por usuário).</p>
+              <p className="text-white/50 text-xs ml-4">API: <code className="bg-white/10 px-1 py-0.5 rounded">https://www.googleapis.com/drive/v3</code><br/>Cada usuário conecta sua própria conta Google (escopo `drive.file`) e seleciona o documento de anotações via Google Picker; o sistema apenas exporta o conteúdo do arquivo selecionado. Autenticação: OAuth 2.0 (access/refresh token criptografados por usuário).</p>
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">

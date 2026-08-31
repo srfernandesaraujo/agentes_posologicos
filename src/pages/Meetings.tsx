@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Video, Send, RefreshCw, FileText, Copy, Clock, CheckCircle2, AlertCircle, Loader2, Trash2, Link2, Unlink, FileSearch, Info } from "lucide-react";
+import { Video, RefreshCw, FileText, Copy, Clock, CheckCircle2, AlertCircle, Loader2, Trash2, Link2, Unlink, FileSearch, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AddToProjectMenu } from "@/components/projects/AddToProjectMenu";
+import { useGooglePicker } from "@/hooks/useGooglePicker";
 
 const GOOGLE_OAUTH_ERROR_MESSAGES: Record<string, string> = {
   access_denied: "Você cancelou a conexão com o Google.",
@@ -25,10 +26,13 @@ const GOOGLE_OAUTH_ERROR_MESSAGES: Record<string, string> = {
 
 type Meeting = {
   id: string;
-  meet_link: string;
+  meet_link: string | null;
   title: string;
   status: string;
   bot_id: string | null;
+  drive_file_id: string | null;
+  expected_start_at: string | null;
+  matched_at: string | null;
   transcript: string;
   summary: string;
   error_message: string | null;
@@ -52,6 +56,7 @@ export default function Meetings() {
   const [meetLink, setMeetLink] = useState("");
   const [meetTitle, setMeetTitle] = useState("");
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const { openPicker } = useGooglePicker();
 
   const { data: googleConnection, isLoading: isLoadingConnection } = useQuery({
     queryKey: ["google-connection", user?.id],
@@ -136,9 +141,14 @@ export default function Meetings() {
   }, [meetings]);
 
   const registerMeetingMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (picked: { id: string; name: string }) => {
       const { data, error } = await supabase.functions.invoke("meeting-register", {
-        body: { meet_link: meetLink.trim(), title: meetTitle || undefined },
+        body: {
+          drive_file_id: picked.id,
+          drive_file_name: picked.name,
+          title: meetTitle || undefined,
+          meet_link: meetLink.trim() || undefined,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -147,7 +157,7 @@ export default function Meetings() {
     onSuccess: (data) => {
       toast({
         title: "Reunião registrada!",
-        description: "A ata será gerada automaticamente assim que o Gemini terminar de processar a reunião no Meet.",
+        description: "A ata será gerada automaticamente a partir do documento selecionado.",
       });
       setMeetLink("");
       setMeetTitle("");
@@ -166,6 +176,24 @@ export default function Meetings() {
       toast({ title: "Erro ao registrar reunião", description: e.message, variant: "destructive" });
     },
   });
+
+  const handleSelectDocument = async () => {
+    try {
+      const picked = await openPicker();
+      if (!picked) return; // user cancelled
+      registerMeetingMutation.mutate(picked);
+    } catch (e: any) {
+      if (e.message === "google_not_connected") {
+        toast({
+          title: "Conecte sua conta do Google",
+          description: "Você precisa conectar sua conta do Google antes de selecionar um documento.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Erro ao abrir o seletor do Google", description: e.message, variant: "destructive" });
+    }
+  };
 
   const regenerateMutation = useMutation({
     mutationFn: async (meetingId: string) => {
@@ -202,9 +230,6 @@ export default function Meetings() {
     toast({ title: "Copiado para a área de transferência!" });
   };
 
-  const meetRegex = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/i;
-  const isValidLink = meetRegex.test(meetLink.trim());
-
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-3">
@@ -226,8 +251,9 @@ export default function Meetings() {
           </p>
           <p>
             Em cada reunião, você (como organizador) precisa ativar manualmente <strong className="text-white">"Fazer anotações com o Gemini"</strong> e{" "}
-            <strong className="text-white">"Transcrever a reunião"</strong> pelo menu de atividades do Google Meet — nós não entramos na chamada, só lemos
-            o documento que o Gemini gera na sua Google Drive depois que a reunião termina.
+            <strong className="text-white">"Transcrever a reunião"</strong> pelo menu de atividades do Google Meet. Depois que a reunião terminar, volte
+            aqui e clique em <strong className="text-white">Selecionar documento da ata</strong> para escolher, na sua Google Drive, o arquivo que o
+            Gemini gerou — nós não buscamos automaticamente na sua Drive, você escolhe o arquivo.
           </p>
         </AlertDescription>
       </Alert>
@@ -284,28 +310,28 @@ export default function Meetings() {
         <CardContent className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-2">
             <Input
-              placeholder="https://meet.google.com/abc-defg-hij"
-              value={meetLink}
-              onChange={(e) => setMeetLink(e.target.value)}
-              className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
-            />
-            <Input
               placeholder="Título da reunião (opcional)"
               value={meetTitle}
               onChange={(e) => setMeetTitle(e.target.value)}
+              className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+            />
+            <Input
+              placeholder="Link da reunião (opcional)"
+              value={meetLink}
+              onChange={(e) => setMeetLink(e.target.value)}
               className="sm:w-64 bg-white/10 border-white/20 text-white placeholder:text-white/40"
             />
             <Button
-              onClick={() => registerMeetingMutation.mutate()}
-              disabled={!isValidLink || !googleConnection?.connected || registerMeetingMutation.isPending}
+              onClick={handleSelectDocument}
+              disabled={!googleConnection?.connected || registerMeetingMutation.isPending}
               className="bg-[hsl(174,62%,47%)] hover:bg-[hsl(174,62%,40%)] text-black font-medium"
             >
-              {registerMeetingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-              Registrar
+              {registerMeetingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileSearch className="h-4 w-4 mr-2" />}
+              Selecionar documento da ata
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Ative "Fazer anotações com o Gemini" e "Transcrever a reunião" no Google Meet. Cole aqui o link antes de começar (você precisa ser o organizador) — buscaremos a ata automaticamente no seu Google Drive assim que a reunião terminar.
+            Depois que a reunião terminar, clique em "Selecionar documento da ata" e escolha, na sua Google Drive, o documento de anotações que o Gemini gerou — nós não buscamos automaticamente, você escolhe o arquivo.
           </p>
         </CardContent>
       </Card>
@@ -341,7 +367,7 @@ export default function Meetings() {
                         {cfg.label}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">{m.meet_link}</p>
+                    {m.meet_link && <p className="text-xs text-muted-foreground truncate">{m.meet_link}</p>}
                     <p className="text-[10px] text-muted-foreground">
                       {new Date(m.created_at).toLocaleString("pt-BR")}
                     </p>

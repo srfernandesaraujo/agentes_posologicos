@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const meetRegex = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/i;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -25,13 +27,15 @@ serve(async (req) => {
     }
     const userId = authUser.id;
 
-    const { meet_link, title } = await req.json();
-    if (!meet_link) {
-      return new Response(JSON.stringify({ error: "meet_link is required" }), { status: 400, headers: corsHeaders });
+    // Registration is now driven by the user picking the Gemini notes doc directly via
+    // Google Picker (drive_file_id) instead of pasting a Meet link for a background matcher
+    // to find later — meet_link is now just optional metadata for the user's own reference.
+    const { drive_file_id, drive_file_name, title, meet_link } = await req.json();
+    if (!drive_file_id) {
+      return new Response(JSON.stringify({ error: "drive_file_id is required" }), { status: 400, headers: corsHeaders });
     }
 
-    const meetRegex = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/i;
-    if (!meetRegex.test(meet_link.trim())) {
+    if (meet_link && !meetRegex.test(String(meet_link).trim())) {
       return new Response(JSON.stringify({ error: "Invalid Google Meet link format" }), { status: 400, headers: corsHeaders });
     }
 
@@ -52,9 +56,11 @@ serve(async (req) => {
       .from("meetings")
       .insert({
         user_id: userId,
-        meet_link: meet_link.trim(),
-        title: title || `Reunião ${new Date().toLocaleDateString("pt-BR")}`,
-        status: "pending",
+        meet_link: meet_link ? String(meet_link).trim() : null,
+        title: title || drive_file_name || `Reunião ${new Date().toLocaleDateString("pt-BR")}`,
+        status: "matched",
+        drive_file_id,
+        matched_at: now,
         expected_start_at: now,
       })
       .select()

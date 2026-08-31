@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { signOAuthState } from "../_shared/googleOAuth.ts";
+import { getValidAccessToken, GoogleNotConnectedError, GoogleReauthRequiredError } from "../_shared/googleOAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,13 +8,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const SCOPES = [
-  "https://www.googleapis.com/auth/drive.file",
-  "https://www.googleapis.com/auth/userinfo.email",
-  "openid",
-].join(" ");
-
+// Hands the frontend a short-lived Google access token (scoped to drive.file) so the
+// Google Picker widget — which runs entirely client-side against Google's own APIs — can
+// let the user pick a file. The token itself never leaves the user's own browser session.
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -32,32 +28,22 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
-    const redirectUri = Deno.env.get("GOOGLE_OAUTH_REDIRECT_URI");
-    const stateSecret = Deno.env.get("GOOGLE_OAUTH_STATE_SECRET");
-    if (!clientId || !redirectUri || !stateSecret) {
-      return new Response(JSON.stringify({ error: "Google OAuth não configurado" }), { status: 500, headers: corsHeaders });
+    const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    try {
+      const accessToken = await getValidAccessToken(supabaseAdmin, authUser.id);
+      return new Response(JSON.stringify({ accessToken }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      if (e instanceof GoogleNotConnectedError || e instanceof GoogleReauthRequiredError) {
+        return new Response(JSON.stringify({ error: "google_not_connected" }), { status: 409, headers: corsHeaders });
+      }
+      throw e;
     }
-
-    const state = await signOAuthState(authUser.id, stateSecret);
-
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      access_type: "offline",
-      prompt: "consent",
-      include_granted_scopes: "true",
-      scope: SCOPES,
-      state,
-    });
-
-    return new Response(JSON.stringify({ authUrl: `${GOOGLE_AUTH_URL}?${params.toString()}` }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   } catch (e) {
-    console.error("meeting-google-oauth-start error:", e);
+    console.error("meeting-google-picker-token error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
