@@ -7,6 +7,11 @@ Este arquivo é o histórico bruto das mudanças. A documentação voltada ao us
 <!-- Novas entradas são inseridas abaixo desta linha pelo workflow automático. Não edite manualmente o marcador. -->
 <!-- ENTRADAS_AUTOMATICAS -->
 
+## 2026-09-01
+
+- **Remoção do Provedor de IA GitHub:** O provedor de modelos de IA
+
+
 ## 2026-07-26 — Início do changelog automático
 
 - Criado o changelog automático e o workflow `doc-oracle-sync`, que passa a documentar toda mudança relevante enviada para `main` e a manter o prompt do Oráculo (agente de suporte) sincronizado com o estado real do sistema.
