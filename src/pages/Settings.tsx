@@ -18,10 +18,8 @@ export default function Settings() {
 
   const handleSave = async (provider: string) => {
     if (!inputValue.trim()) return;
-    const providerDef = LLM_PROVIDERS.find((p) => p.id === provider);
-    const expiresInDays = providerDef && "expiresInDays" in providerDef ? providerDef.expiresInDays : undefined;
     try {
-      await upsertKey.mutateAsync({ provider, apiKey: inputValue.trim(), expiresInDays });
+      await upsertKey.mutateAsync({ provider, apiKey: inputValue.trim() });
       toast.success("Chave API salva com sucesso!");
       setEditing(null);
       setInputValue("");

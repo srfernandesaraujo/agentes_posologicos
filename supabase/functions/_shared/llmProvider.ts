@@ -1,6 +1,10 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Provider API endpoints — all OpenAI-compatible except anthropic (native Messages API)
+// NOTE: "github" (GitHub Models, models.inference.ai.azure.com) was removed 2026-09-01 —
+// GitHub retired the product outright (API now returns "github_models_retirement_brownout"
+// on every call, confirmed live), not just a URL change. Existing user_api_keys rows with
+// provider='github' are simply never tried anymore; no migration needed.
 export const PROVIDER_ENDPOINTS: Record<string, string> = {
   groq: "https://api.groq.com/openai/v1/chat/completions",
   openai: "https://api.openai.com/v1/chat/completions",
@@ -9,20 +13,21 @@ export const PROVIDER_ENDPOINTS: Record<string, string> = {
   google: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
   "nvidia-gptos": "https://integrate.api.nvidia.com/v1/chat/completions",
   "nvidia-deepseek": "https://integrate.api.nvidia.com/v1/chat/completions",
-  github: "https://models.inference.ai.azure.com/chat/completions",
 };
 
 // Priority order for trying user API keys (no more Lovable AI Gateway fallback)
-export const PROVIDER_PRIORITY_ORDER = ["google", "openai", "anthropic", "groq", "nvidia-gptos", "nvidia-deepseek", "github", "openrouter"];
+export const PROVIDER_PRIORITY_ORDER = ["google", "openai", "anthropic", "groq", "nvidia-gptos", "nvidia-deepseek", "openrouter"];
 
 export const DEFAULT_MODELS_PER_PROVIDER: Record<string, string> = {
   google: "gemini-2.5-flash",
   openai: "gpt-4o",
   anthropic: "claude-sonnet-4-20250514",
-  groq: "llama-3.3-70b-versatile",
+  // llama-3.3-70b-versatile was retired by Groq (confirmed live 2026-09-01: 404
+  // model_not_found) — llama-3.1-8b-instant was already this app's own documented
+  // safe fallback for groq (see PROVIDER_SUPPORTED_MODELS below).
+  groq: "llama-3.1-8b-instant",
   "nvidia-gptos": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
   "nvidia-deepseek": "deepseek-ai/deepseek-v3.2",
-  github: "gpt-4o",
   openrouter: "google/gemini-2.5-flash",
 };
 
@@ -31,8 +36,15 @@ export const TEXT_ONLY_PROVIDERS = ["groq"];
 
 // Remap unsupported model ids to a safe default per provider
 export const PROVIDER_SUPPORTED_MODELS: Record<string, string[]> = {
-  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
+  groq: ["llama-3.1-8b-instant", "gemma2-9b-it"],
 };
+
+// OpenAI-compatible providers don't get a sane default max_tokens from every backend —
+// OpenRouter in particular defaults to the model's full context window, which fails with
+// a 402 "insufficient credits" on any account without a large balance (confirmed live
+// 2026-09-01: requested 65535, account could only afford 16000). Capping this explicitly
+// avoids that failure mode and bounds cost for every OpenAI-compatible provider.
+const DEFAULT_MAX_TOKENS = 8192;
 
 // Cost estimation per 1M tokens (input/output) in USD, keyed by model id
 export const COST_PER_MILLION: Record<string, { input: number; output: number }> = {
@@ -227,6 +239,7 @@ export async function callProvider(params: CallProviderParams): Promise<CallProv
   const body: Record<string, any> = {
     model: effectiveModel,
     temperature: temperature ?? 0.7,
+    max_tokens: DEFAULT_MAX_TOKENS,
     messages: [...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []), ...messages],
   };
   if (mode === "tools" && tools) {

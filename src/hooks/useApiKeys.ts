@@ -17,7 +17,7 @@ export const LLM_PROVIDERS = [
     id: "groq",
     name: "Groq",
     url: "https://console.groq.com/keys",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama-3.2-3b-preview"],
+    models: ["llama-3.1-8b-instant", "gemma2-9b-it"],
   },
   {
     id: "openai",
@@ -54,13 +54,6 @@ export const LLM_PROVIDERS = [
     name: "NVIDIA DeepSeek",
     url: "https://build.nvidia.com/deepseek-ai/deepseek-v3_2",
     models: ["deepseek-ai/deepseek-v3.2"],
-  },
-  {
-    id: "github",
-    name: "GitHub Models",
-    url: "https://github.com/marketplace/models",
-    models: ["gpt-4o", "gpt-4o-mini", "Meta-Llama-3.1-405B-Instruct", "Mistral-Large-2"],
-    expiresInDays: 30,
   },
 ] as const;
 
