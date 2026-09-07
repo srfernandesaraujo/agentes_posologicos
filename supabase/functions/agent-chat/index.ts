@@ -7547,6 +7547,82 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Dynamic format-guide loading for roteirista-ganchos-virais: this agent's
+      // 10 script formats (Tela Dividida, Tela Verde, Palestrinha, ...) used to be
+      // inlined in system_prompt, which grew past 50k chars with all 10 formats
+      // calibrated. They now live one-per-row in agent_format_guides — detect
+      // which format this conversation picked (from the conversation so far) and
+      // inject only that one guide as <GUIA_DO_FORMATO>, per the contract set up
+      // in the agent's (now much shorter) base system_prompt.
+      if (builtInAgent.slug === "roteirista-ganchos-virais") {
+        try {
+          const VIRAL_FORMATS: { key: string; label: string }[] = [
+            { key: "tela_dividida", label: "Tela Dividida" },
+            { key: "tela_verde", label: "Tela Verde" },
+            { key: "palestrinha", label: "Palestrinha" },
+            { key: "narrado", label: "Narrado" },
+            { key: "cine", label: "Cine" },
+            { key: "storytelling_visual", label: "Storytelling Visual" },
+            { key: "dinamismo", label: "Dinamismo" },
+            { key: "trivial", label: "Trivial" },
+            { key: "dialogo", label: "Diálogo" },
+            { key: "caixinha_polemica", label: "Caixinha Polêmica" },
+          ];
+          const stripAccents = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+          const labelRegex = (label: string) => new RegExp(`\\b${stripAccents(label).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+          const allMsgs = [...(conversationHistory || []), { role: "user", content: input }];
+
+          let detectedKey: string | null = null;
+
+          // Numeric shorthand: user replied with a bare "3" right after the
+          // assistant's numbered format menu (which mentions ~all 10 labels).
+          const lastMsg = allMsgs[allMsgs.length - 1];
+          const prevMsg = allMsgs[allMsgs.length - 2];
+          const bareNumberMatch = lastMsg && lastMsg.role === "user" && typeof lastMsg.content === "string"
+            ? lastMsg.content.trim().match(/^(\d{1,2})[.):]?$/)
+            : null;
+          if (bareNumberMatch && prevMsg && prevMsg.role === "assistant" && typeof prevMsg.content === "string") {
+            const prevNorm = stripAccents(prevMsg.content);
+            const mentionsCount = VIRAL_FORMATS.filter((f) => labelRegex(f.label).test(prevNorm)).length;
+            if (mentionsCount >= 5) {
+              const idx = parseInt(bareNumberMatch[1], 10) - 1;
+              if (idx >= 0 && idx < VIRAL_FORMATS.length) detectedKey = VIRAL_FORMATS[idx].key;
+            }
+          }
+
+          // Otherwise scan messages newest-first for a format name mentioned on
+          // its own (skip messages mentioning 4+ formats at once — that's the menu).
+          if (!detectedKey) {
+            for (let i = allMsgs.length - 1; i >= 0; i--) {
+              const msg = allMsgs[i];
+              if (!msg || typeof msg.content !== "string") continue;
+              const norm = stripAccents(msg.content);
+              const mentioned = VIRAL_FORMATS.filter((f) => labelRegex(f.label).test(norm));
+              if (mentioned.length >= 1 && mentioned.length <= 3) {
+                mentioned.sort((a, b) => b.label.length - a.label.length);
+                detectedKey = mentioned[0].key;
+                break;
+              }
+            }
+          }
+
+          if (detectedKey) {
+            const { data: guideRow } = await supabase
+              .from("agent_format_guides")
+              .select("format_label, guide_markdown")
+              .eq("agent_slug", "roteirista-ganchos-virais")
+              .eq("format_key", detectedKey)
+              .maybeSingle();
+            if (guideRow) {
+              systemPrompt += `\n\n<GUIA_DO_FORMATO nome="${(guideRow as any).format_label}">\n${(guideRow as any).guide_markdown}\n</GUIA_DO_FORMATO>`;
+              console.log(`roteirista-ganchos-virais: loaded format guide "${detectedKey}"`);
+            }
+          }
+        } catch (formatGuideError) {
+          console.warn("roteirista-ganchos-virais format guide error:", formatGuideError.message);
+        }
+      }
+
       // RAG: inject knowledge base docs linked to this native agent via the admin
       // "Documentos" tab (same mechanism custom agents use — see the customAgent
       // branch below). Uses a service-role client since the RLS on these tables is
