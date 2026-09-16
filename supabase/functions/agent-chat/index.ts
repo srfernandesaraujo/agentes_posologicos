@@ -7623,6 +7623,75 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Dynamic review-guide loading for revisor-banca: which academic-work type
+      // (TCC/mestrado/doutorado/projeto de qualificação) drives very different
+      // review criteria, so instead of inlining all four in system_prompt (same
+      // trap the roteirista agent fell into before being split), they live
+      // one-per-row in agent_review_guides. Detect which type this conversation
+      // picked (from the Fase 0 menu reply) and inject only that guide as
+      // <GUIA_TIPO_TRABALHO>, mirroring the roteirista-ganchos-virais pattern above.
+      if (builtInAgent.slug === "revisor-banca") {
+        try {
+          const WORK_TYPES: { key: string; labels: string[] }[] = [
+            { key: "tcc", labels: ["TCC", "Trabalho de Conclusão de Curso"] },
+            { key: "mestrado", labels: ["Mestrado", "Dissertação"] },
+            { key: "doutorado", labels: ["Doutorado", "Tese"] },
+            { key: "projeto_qualificacao", labels: ["Projeto de Pesquisa", "Qualificação", "Projeto"] },
+          ];
+          const stripAccents = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+          const labelRegex = (label: string) => new RegExp(`\\b${stripAccents(label).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+          const allMsgs = [...(conversationHistory || []), { role: "user", content: input }];
+
+          let detectedKey: string | null = null;
+
+          // Numeric shorthand: user replied with a bare "2" right after the
+          // assistant's Fase 0 numbered menu (which mentions all 4 work types).
+          const lastMsg = allMsgs[allMsgs.length - 1];
+          const prevMsg = allMsgs[allMsgs.length - 2];
+          const bareNumberMatch = lastMsg && lastMsg.role === "user" && typeof lastMsg.content === "string"
+            ? lastMsg.content.trim().match(/^(\d{1,2})[.):]?$/)
+            : null;
+          if (bareNumberMatch && prevMsg && prevMsg.role === "assistant" && typeof prevMsg.content === "string") {
+            const prevNorm = stripAccents(prevMsg.content);
+            const mentionsCount = WORK_TYPES.filter((t) => t.labels.some((l) => labelRegex(l).test(prevNorm))).length;
+            if (mentionsCount >= 3) {
+              const idx = parseInt(bareNumberMatch[1], 10) - 1;
+              if (idx >= 0 && idx < WORK_TYPES.length) detectedKey = WORK_TYPES[idx].key;
+            }
+          }
+
+          // Otherwise scan messages newest-first for a work-type label mentioned
+          // on its own (skip messages mentioning 3+ types at once — that's the menu).
+          if (!detectedKey) {
+            for (let i = allMsgs.length - 1; i >= 0; i--) {
+              const msg = allMsgs[i];
+              if (!msg || typeof msg.content !== "string") continue;
+              const norm = stripAccents(msg.content);
+              const mentioned = WORK_TYPES.filter((t) => t.labels.some((l) => labelRegex(l).test(norm)));
+              if (mentioned.length >= 1 && mentioned.length <= 2) {
+                detectedKey = mentioned[0].key;
+                break;
+              }
+            }
+          }
+
+          if (detectedKey) {
+            const { data: guideRow } = await supabase
+              .from("agent_review_guides")
+              .select("format_label, guide_markdown")
+              .eq("agent_slug", "revisor-banca")
+              .eq("format_key", detectedKey)
+              .maybeSingle();
+            if (guideRow) {
+              systemPrompt += `\n\n<GUIA_TIPO_TRABALHO nome="${(guideRow as any).format_label}">\n${(guideRow as any).guide_markdown}\n</GUIA_TIPO_TRABALHO>`;
+              console.log(`revisor-banca: loaded review guide "${detectedKey}"`);
+            }
+          }
+        } catch (reviewGuideError) {
+          console.warn("revisor-banca review guide error:", reviewGuideError.message);
+        }
+      }
+
       // RAG: inject knowledge base docs linked to this native agent via the admin
       // "Documentos" tab (same mechanism custom agents use — see the customAgent
       // branch below). Uses a service-role client since the RLS on these tables is
