@@ -189,6 +189,19 @@ export default function VirtualRoomChat() {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Realtime respeita a policy de SELECT (anon só vê is_broadcast=true), então mensagens
+  // de chat nunca chegam por lá para o participante: mostramos localmente após gravar.
+  // O id vem do cliente para o dedupe do handler de Realtime evitar duplicatas.
+  const postChatMessage = async (msg: { sender_name: string; role: "user" | "assistant"; content: string }) => {
+    const id = crypto.randomUUID();
+    const row = { id, room_id: room!.id, participant_token: participantToken, ...msg };
+    const { error } = await roomMessagesRest("POST", undefined, row);
+    if (!error) {
+      setMessages((prev) => (prev.some((m) => m.id === id) ? prev : [...prev, { ...row, created_at: new Date().toISOString() }]));
+    }
+    return { error };
+  };
+
   const handleSend = async () => {
     if (!input.trim() || loading) return;
     if (!liveMode && !room?.agent_id) return;
@@ -228,12 +241,10 @@ export default function VirtualRoomChat() {
 
     try {
       // Insert user message to DB (will be broadcast via Realtime)
-      const { error: insertError } = await roomMessagesRest("POST", undefined, {
-        room_id: room.id,
+      const { error: insertError } = await postChatMessage({
         sender_name: participantName || "Anônimo",
         role: "user",
         content: text,
-        participant_token: participantToken,
       });
       console.log("[VirtualRoom] User message insert result:", { insertError });
 
@@ -274,12 +285,10 @@ export default function VirtualRoomChat() {
       if (!response.ok) throw new Error(data?.error || "Agent error");
 
       // Insert assistant response to DB (tagged with same participant token)
-      const { error: assistantInsertError } = await roomMessagesRest("POST", undefined, {
-        room_id: room.id,
+      const { error: assistantInsertError } = await postChatMessage({
         sender_name: "Assistente",
         role: "assistant",
         content: data?.output || "Sem resposta.",
-        participant_token: participantToken,
       });
       console.log("[VirtualRoom] Assistant message insert result:", { assistantInsertError });
     } catch (err: any) {
