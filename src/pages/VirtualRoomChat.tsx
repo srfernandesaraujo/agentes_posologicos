@@ -24,7 +24,9 @@ async function roomMessagesRest(method: "GET" | "POST", params?: Record<string, 
     "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
     "Content-Type": "application/json",
   };
-  if (method === "POST") headers["Prefer"] = "return=representation";
+  // return=minimal: com representation o Postgres exige que a linha inserida também passe
+  // na policy de SELECT, e anon só enxerga is_broadcast=true → 42501 em toda mensagem de chat.
+  if (method === "POST") headers["Prefer"] = "return=minimal";
   if (method === "GET") url.searchParams.set("order", "created_at.asc");
 
   const resp = await fetch(url.toString(), { method, headers, body: body ? JSON.stringify(body) : undefined });
@@ -32,8 +34,8 @@ async function roomMessagesRest(method: "GET" | "POST", params?: Record<string, 
     console.error("[VirtualRoom] REST error:", resp.status, await resp.text());
     return { data: null, error: { message: `REST ${resp.status}` } };
   }
-  const data = await resp.json();
-  return { data, error: null };
+  const text = await resp.text();
+  return { data: text ? JSON.parse(text) : null, error: null };
 }
 
 interface RoomMessage {
