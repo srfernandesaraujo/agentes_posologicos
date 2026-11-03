@@ -2387,6 +2387,7 @@ export type Database = {
         Row: {
           briefing: string
           completed_at: string | null
+          context: string
           cost_cap_usd: number
           cost_usd: number
           created_at: string
@@ -2398,11 +2399,13 @@ export type Database = {
           status: string
           tokens_input: number
           tokens_output: number
+          trigger: string
           warned_80: boolean
         }
         Insert: {
           briefing: string
           completed_at?: string | null
+          context?: string
           cost_cap_usd: number
           cost_usd?: number
           created_at?: string
@@ -2414,11 +2417,13 @@ export type Database = {
           status?: string
           tokens_input?: number
           tokens_output?: number
+          trigger?: string
           warned_80?: boolean
         }
         Update: {
           briefing?: string
           completed_at?: string | null
+          context?: string
           cost_cap_usd?: number
           cost_usd?: number
           created_at?: string
@@ -2430,6 +2435,7 @@ export type Database = {
           status?: string
           tokens_input?: number
           tokens_output?: number
+          trigger?: string
           warned_80?: boolean
         }
         Relationships: [
@@ -2437,6 +2443,59 @@ export type Database = {
             foreignKeyName: "squad_missions_squad_id_fkey"
             columns: ["squad_id"]
             isOneToOne: false
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squad_schedules: {
+        Row: {
+          cost_cap_usd: number
+          created_at: string
+          enabled: boolean
+          form_data: Json
+          frequency: string
+          id: string
+          last_run_at: string | null
+          monthly_cap_usd: number
+          owner_id: string
+          run_day_of_week: number | null
+          run_hour: number
+          squad_id: string
+        }
+        Insert: {
+          cost_cap_usd?: number
+          created_at?: string
+          enabled?: boolean
+          form_data?: Json
+          frequency?: string
+          id?: string
+          last_run_at?: string | null
+          monthly_cap_usd?: number
+          owner_id: string
+          run_day_of_week?: number | null
+          run_hour?: number
+          squad_id: string
+        }
+        Update: {
+          cost_cap_usd?: number
+          created_at?: string
+          enabled?: boolean
+          form_data?: Json
+          frequency?: string
+          id?: string
+          last_run_at?: string | null
+          monthly_cap_usd?: number
+          owner_id?: string
+          run_day_of_week?: number | null
+          run_hour?: number
+          squad_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_schedules_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: true
             referencedRelation: "squads"
             referencedColumns: ["id"]
           },
@@ -2515,6 +2574,7 @@ export type Database = {
           environment: string
           id: string
           kind: string
+          memory: string
           name: string
           owner_id: string
           sensitivity: string
@@ -2526,6 +2586,7 @@ export type Database = {
           environment: string
           id?: string
           kind?: string
+          memory?: string
           name: string
           owner_id: string
           sensitivity?: string
@@ -2537,6 +2598,7 @@ export type Database = {
           environment?: string
           id?: string
           kind?: string
+          memory?: string
           name?: string
           owner_id?: string
           sensitivity?: string
