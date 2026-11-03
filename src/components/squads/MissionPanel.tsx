@@ -117,7 +117,11 @@ export function MissionPanel({
           <div className="flex justify-between text-xs text-white/50">
             <span>Custo estimado {fmtUsd(cost)}</span><span>Teto {fmtUsd(cap)}</span>
           </div>
-          <Progress value={pct} className={pct >= 80 ? "[&>div]:bg-amber-400" : ""} />
+          <Progress
+            value={pct}
+            aria-label="Custo usado do teto"
+            className={`h-2 bg-white/10 ${pct >= 80 ? "[&>div]:bg-amber-400" : "[&>div]:bg-sky-400"}`}
+          />
         </div>
         {mission.error && (
           <div className="flex items-start gap-2 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">
