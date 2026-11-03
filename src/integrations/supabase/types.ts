@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.1"
   }
   graphql_public: {
     Tables: {
@@ -394,6 +394,36 @@ export type Database = {
           },
         ]
       }
+      agent_format_guides: {
+        Row: {
+          agent_slug: string
+          created_at: string
+          format_key: string
+          format_label: string
+          guide_markdown: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          agent_slug: string
+          created_at?: string
+          format_key: string
+          format_label: string
+          guide_markdown: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          agent_slug?: string
+          created_at?: string
+          format_key?: string
+          format_label?: string
+          guide_markdown?: string
+          id?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       agent_knowledge_bases: {
         Row: {
           agent_id: string
@@ -587,6 +617,36 @@ export type Database = {
           status?: string
           system_prompt?: string
           version?: number
+        }
+        Relationships: []
+      }
+      agent_review_guides: {
+        Row: {
+          agent_slug: string
+          created_at: string
+          format_key: string
+          format_label: string
+          guide_markdown: string
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          agent_slug: string
+          created_at?: string
+          format_key: string
+          format_label: string
+          guide_markdown: string
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          agent_slug?: string
+          created_at?: string
+          format_key?: string
+          format_label?: string
+          guide_markdown?: string
+          id?: string
+          sort_order?: number
         }
         Relationships: []
       }
@@ -2138,6 +2198,352 @@ export type Database = {
         }
         Relationships: []
       }
+      squad_agents: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          role: string
+          room: string
+          slug: string
+          sort_order: number
+          squad_id: string
+          system_prompt: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          role: string
+          room: string
+          slug: string
+          sort_order?: number
+          squad_id: string
+          system_prompt: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          role?: string
+          room?: string
+          slug?: string
+          sort_order?: number
+          squad_id?: string
+          system_prompt?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_agents_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: false
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squad_deliverables: {
+        Row: {
+          agent_id: string | null
+          content: string
+          created_at: string
+          id: string
+          kind: string
+          mission_id: string
+          owner_id: string
+          sources: Json
+          squad_id: string
+          status: string
+          task_id: string | null
+          title: string
+          version: number
+        }
+        Insert: {
+          agent_id?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          kind: string
+          mission_id: string
+          owner_id: string
+          sources?: Json
+          squad_id: string
+          status?: string
+          task_id?: string | null
+          title: string
+          version?: number
+        }
+        Update: {
+          agent_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          mission_id?: string
+          owner_id?: string
+          sources?: Json
+          squad_id?: string
+          status?: string
+          task_id?: string | null
+          title?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_deliverables_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "squad_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_deliverables_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "squad_missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_deliverables_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: false
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_deliverables_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "squad_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squad_events: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          id: number
+          mission_id: string
+          owner_id: string
+          payload: Json
+          room: string | null
+          squad_id: string
+          text: string | null
+          type: string
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          id?: never
+          mission_id: string
+          owner_id: string
+          payload?: Json
+          room?: string | null
+          squad_id: string
+          text?: string | null
+          type: string
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          id?: never
+          mission_id?: string
+          owner_id?: string
+          payload?: Json
+          room?: string | null
+          squad_id?: string
+          text?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_events_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "squad_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_events_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "squad_missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_events_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: false
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squad_missions: {
+        Row: {
+          briefing: string
+          completed_at: string | null
+          cost_cap_usd: number
+          cost_usd: number
+          created_at: string
+          error: string | null
+          form_data: Json
+          id: string
+          owner_id: string
+          squad_id: string
+          status: string
+          tokens_input: number
+          tokens_output: number
+          warned_80: boolean
+        }
+        Insert: {
+          briefing: string
+          completed_at?: string | null
+          cost_cap_usd: number
+          cost_usd?: number
+          created_at?: string
+          error?: string | null
+          form_data?: Json
+          id?: string
+          owner_id: string
+          squad_id: string
+          status?: string
+          tokens_input?: number
+          tokens_output?: number
+          warned_80?: boolean
+        }
+        Update: {
+          briefing?: string
+          completed_at?: string | null
+          cost_cap_usd?: number
+          cost_usd?: number
+          created_at?: string
+          error?: string | null
+          form_data?: Json
+          id?: string
+          owner_id?: string
+          squad_id?: string
+          status?: string
+          tokens_input?: number
+          tokens_output?: number
+          warned_80?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_missions_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: false
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squad_tasks: {
+        Row: {
+          agent_id: string
+          completed_at: string | null
+          deliverable_spec: Json | null
+          depends_on_position: number | null
+          error: string | null
+          id: string
+          instructions: string
+          mission_id: string
+          output: string | null
+          owner_id: string
+          position: number
+          started_at: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          agent_id: string
+          completed_at?: string | null
+          deliverable_spec?: Json | null
+          depends_on_position?: number | null
+          error?: string | null
+          id?: string
+          instructions: string
+          mission_id: string
+          output?: string | null
+          owner_id: string
+          position: number
+          started_at?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          agent_id?: string
+          completed_at?: string | null
+          deliverable_spec?: Json | null
+          depends_on_position?: number | null
+          error?: string | null
+          id?: string
+          instructions?: string
+          mission_id?: string
+          output?: string | null
+          owner_id?: string
+          position?: number
+          started_at?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_tasks_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "squad_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_tasks_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "squad_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squads: {
+        Row: {
+          created_at: string
+          default_cost_cap_usd: number
+          environment: string
+          id: string
+          kind: string
+          name: string
+          owner_id: string
+          sensitivity: string
+          template_slug: string
+        }
+        Insert: {
+          created_at?: string
+          default_cost_cap_usd?: number
+          environment: string
+          id?: string
+          kind?: string
+          name: string
+          owner_id: string
+          sensitivity?: string
+          template_slug: string
+        }
+        Update: {
+          created_at?: string
+          default_cost_cap_usd?: number
+          environment?: string
+          id?: string
+          kind?: string
+          name?: string
+          owner_id?: string
+          sensitivity?: string
+          template_slug?: string
+        }
+        Relationships: []
+      }
       support_ticket_messages: {
         Row: {
           created_at: string
@@ -2854,12 +3260,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2883,11 +3289,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2908,11 +3314,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2933,11 +3339,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2950,11 +3356,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
