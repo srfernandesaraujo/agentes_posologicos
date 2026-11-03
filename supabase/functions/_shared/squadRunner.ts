@@ -5,7 +5,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } from "./llmProvider.ts";
 import {
   planTasks, pickNextTask, budgetState, buildTaskUserMessage, formDisplay, buildRevisionInstructions,
-  measureScript, parseDurationLimitSeconds, durationNote, reviewRequestsAdjustments,
+  measureScript, parseDurationRange, durationNote, reviewRequestsAdjustments,
   type PreviousOutput, type SquadTemplate, type StepChecks,
 } from "./squadCore.ts";
 import { getTemplate } from "./squadTemplates.ts";
@@ -15,6 +15,8 @@ export class HttpError extends Error {
 }
 
 const STALE_TASK_MS = 5 * 60 * 1000;
+const SQUAD_MAX_TOKENS = 16000;
+const MAX_CONTINUATIONS = 2;
 const PREVIOUS_RUN_CHARS = 4000;
 
 export async function emit(
@@ -179,7 +181,7 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
   const notes: string[] = [];
   if (checks.measureDuration) {
     const src = [...(doneTasks || [])].reverse().find((t: any) => checks.measureDuration!.sourceTitles.includes(t.title) && !/^Não necessário/.test(t.output || ""));
-    const limit = parseDurationLimitSeconds((mission.form_data || {})[checks.measureDuration.formKey]);
+    const limit = parseDurationRange((mission.form_data || {})[checks.measureDuration.formKey]);
     if (src && limit) notes.push(durationNote(measureScript(src.output || ""), limit, src.title));
   }
 
@@ -189,12 +191,35 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
     team: (allAgents || []).map((a: any) => ({ name: a.name, role: a.role })), notes,
   });
 
-  const result = await callWithFallback(admin, keys, {
-    systemPrompt: agent.system_prompt, messages: [{ role: "user", content: userMessage }], temperature: 0.6, mode: "text",
+  // Teto alto de tokens: modelos com raciocínio gastam parte do teto "pensando" e cortavam a resposta no meio.
+  const baseMessages = [{ role: "user", content: userMessage }];
+  const first = await callWithFallback(admin, keys, {
+    systemPrompt: agent.system_prompt, messages: baseMessages, temperature: 0.6, mode: "text", maxTokens: SQUAD_MAX_TOKENS,
   });
-  if (!result || !result.ok || !result.output) return await failTask("Nenhum provedor de IA respondeu. Tente novamente em instantes.");
+  if (!first || !first.ok || !first.output) return await failTask("Nenhum provedor de IA respondeu. Tente novamente em instantes.");
 
-  const cost = estimateCost(result.model!, result.tokensInput, result.tokensOutput);
+  // Resposta cortada por tamanho: pede continuação em vez de entregar texto pela metade.
+  let output = first.output;
+  let finish = first.finishReason;
+  let tokensIn = first.tokensInput;
+  let tokensOut = first.tokensOutput;
+  let cost = estimateCost(first.model!, first.tokensInput, first.tokensOutput);
+  for (let i = 0; i < MAX_CONTINUATIONS && finish === "length"; i++) {
+    const more = await callWithFallback(admin, keys, {
+      systemPrompt: agent.system_prompt, temperature: 0.6, mode: "text", maxTokens: SQUAD_MAX_TOKENS,
+      messages: [...baseMessages, { role: "assistant", content: output }, { role: "user", content: "Sua resposta foi cortada. Continue EXATAMENTE de onde parou, sem repetir nada e sem comentários." }],
+    });
+    if (!more || !more.ok || !more.output) break;
+    output += more.output;
+    finish = more.finishReason;
+    tokensIn += more.tokensInput;
+    tokensOut += more.tokensOutput;
+    cost += estimateCost(more.model!, more.tokensInput, more.tokensOutput);
+  }
+  if (finish === "length") {
+    return await failTask("A resposta do modelo ficou grande demais e foi cortada. Tente de novo com um escopo menor.");
+  }
+  const result = { ...first, output, tokensInput: tokensIn, tokensOutput: tokensOut };
   await admin.from("squad_tasks").update({ status: "done", output: result.output, completed_at: new Date().toISOString() }).eq("id", claimed.id);
   await logAiUsage(admin, { userId, provider: result.provider!, model: result.model!, tokensInput: result.tokensInput, tokensOutput: result.tokensOutput, promptType: "squad" });
 

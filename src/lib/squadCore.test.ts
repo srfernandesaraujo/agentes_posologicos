@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   planTasks, pickNextTask, budgetState, clampCap, maskPii, screenInput, buildTaskUserMessage,
   checkForm, formDisplay, isScheduleDue, monthStartIso, buildRevisionInstructions,
-  measureScript, parseDurationLimitSeconds, durationNote, reviewRequestsAdjustments,
+  measureScript, parseDurationLimitSeconds, parseDurationRange, durationNote, reviewRequestsAdjustments,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
 import { TEMPLATE_CONTEUDO_YOUTUBE, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
@@ -110,9 +110,9 @@ describe("buildTaskUserMessage", () => {
   it("corta saídas anteriores muito longas", () => {
     const msg = buildTaskUserMessage({
       briefing: "x", formData: {}, step: { title: "t", instructions: "i" },
-      previous: [{ agentName: "A", title: "T", output: "a".repeat(20000) }],
+      previous: [{ agentName: "A", title: "T", output: "a".repeat(50000) }],
     });
-    expect(msg.length).toBeLessThan(8000);
+    expect(msg.length).toBeLessThan(35000);
     expect(msg).toContain("trecho cortado");
   });
 });
@@ -278,5 +278,48 @@ describe("template de Conteúdo: verificações", () => {
   });
   it("todo prompt de agente proíbe inventar colegas", () => {
     for (const a of TEMPLATE_CONTEUDO_YOUTUBE.agents) expect(a.systemPrompt).toContain("Seu time");
+  });
+});
+
+describe("contexto entre agentes não corta roteiro longo", () => {
+  it("mantém inteiro um roteiro de ~12 mil caracteres", () => {
+    const longo = "palavra ".repeat(1500);
+    const msg = buildTaskUserMessage({
+      briefing: "x", formData: {}, step: { title: "t", instructions: "i" },
+      previous: [{ agentName: "Bia", title: "Roteiro", output: longo }],
+    });
+    expect(msg).not.toContain("trecho cortado");
+    expect(msg.split("palavra").length - 1).toBe(1500);
+  });
+});
+
+describe("faixa de duração e roteiro curto demais", () => {
+  it("interpreta mínimo e máximo", () => {
+    expect(parseDurationRange("8 a 12 min")).toEqual({ min: 480, max: 720 });
+    expect(parseDurationRange("Short (até 60 s)")).toEqual({ min: null, max: 60 });
+    expect(parseDurationRange("Aula longa (20 min ou mais)")).toBeNull();
+  });
+  it("avisa quando o roteiro está muito abaixo do mínimo (provável corte)", () => {
+    const curto = measureScript("NARRADOR: " + Array(159).fill("p").join(" "));
+    expect(durationNote(curto, { min: 480, max: 720 }, "Ajustes do roteiro")).toContain("ABAIXO do mínimo");
+  });
+  it("aceita roteiro dentro da faixa de 8 a 12 min", () => {
+    const ok = measureScript("NARRADOR: " + Array(1500).fill("p").join(" "));
+    expect(durationNote(ok, { min: 480, max: 720 }, "R")).toContain("dentro do limite");
+  });
+  it("sem NARRADOR, usa as falas entre aspas e ignora o resto", () => {
+    const t = [
+      '(BIA, sorrindo) "Você toma anticoagulante e morre de medo de comer um brócolis ou uma couve? Calma!" (Sugestão Caio: animação leve)',
+      '(BIA) "Seja bem-vindo(a)! Anticoagulantes são medicamentos essenciais para muitas pessoas hoje."',
+      '(BIA) "Vamos começar com a varfarina, um dos anticoagulantes mais conhecidos e antigos que existem."',
+    ].join("\n\n");
+    const m = measureScript(t);
+    expect(m.precise).toBe(false);
+    expect(m.words).toBeGreaterThan(30);
+    expect(m.words).toBeLessThan(45);
+  });
+  it("a fala termina antes de uma sugestão do diretor de arte", () => {
+    const t = "NARRADOR: Olá pessoal, hoje vamos falar de anticoagulantes. (Sugestão Caio: animação com uma balança e muitas outras palavras que não são faladas)";
+    expect(measureScript(t).words).toBe(7);
   });
 });

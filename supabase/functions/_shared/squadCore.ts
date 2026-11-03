@@ -202,7 +202,9 @@ export interface PreviousOutput {
   output: string;
 }
 
-const MAX_PREV_CHARS = 6000;
+// Contexto entre agentes: o limite precisa caber um roteiro longo inteiro (vídeo de 12 min tem ~10 mil caracteres).
+// Um limite baixo aqui fez revisora e designer enxergarem só metade do roteiro (bug corrigido em 2026-11-04).
+const MAX_PREV_CHARS = 30000;
 
 function clip(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max) + "\n[... trecho cortado por tamanho ...]";
@@ -277,11 +279,21 @@ function countWords(s: string): number {
 export function measureScript(text: string): ScriptMeasure {
   const cut = text.split(/\[\s*Afirma[çc][õo]es/i)[0];
   const spoken: string[] = [];
-  const re = /NARRADOR[^:\n]*:\s*([\s\S]*?)(?=\n\s*\n|\(\s*(?:CENA|TEMPO|PONTO)|NARRADOR[^:\n]*:|$)/gi;
+  const re = /NARRADOR[^:\n]*:\s*([\s\S]*?)(?=\n\s*\n|\(\s*(?:CENA|TEMPO|PONTO|Sugest[aã]o|HIP[OÓ]TESE|VISUAL)|NARRADOR[^:\n]*:|$)/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(cut))) spoken.push(m[1]);
   const precise = spoken.length > 0;
-  const words = precise ? countWords(spoken.join(" ")) : countWords(cut);
+  let words: number;
+  if (precise) {
+    words = countWords(spoken.join(" "));
+  } else {
+    // Sem marcação de narrador: tenta as falas entre aspas; sem aspas, conta o texto todo (superestima).
+    const quoted: string[] = [];
+    const qre = /["\u201C]([^"\u201D]{25,})["\u201D]/g;
+    let q: RegExpExecArray | null;
+    while ((q = qre.exec(cut))) quoted.push(q[1]);
+    words = quoted.length >= 3 ? countWords(quoted.join(" ")) : countWords(cut);
+  }
   return {
     words,
     secondsNormal: Math.round((words / WPM_NORMAL) * 60),
@@ -300,7 +312,23 @@ export function parseDurationLimitSeconds(label: unknown): number | null {
   return null;
 }
 
-export function durationNote(m: ScriptMeasure, limitSeconds: number, sourceTitle: string): string {
+/** "Short (até 60 s)" → {max:60}; "8 a 12 min" → {min:480, max:720}; sem limite claro → null. */
+export function parseDurationRange(label: unknown): { min: number | null; max: number } | null {
+  const s = String(label ?? "");
+  const sec = s.match(/(\d+)\s*s\b/i);
+  if (sec) return { min: null, max: Number(sec[1]) };
+  const range = s.match(/(\d+)\s*a\s*(\d+)\s*min/i);
+  if (range) return { min: Number(range[1]) * 60, max: Number(range[2]) * 60 };
+  return null;
+}
+
+export function durationNote(m: ScriptMeasure, limit: number | { min: number | null; max: number }, sourceTitle: string): string {
+  const limitSeconds = typeof limit === "number" ? limit : limit.max;
+  const minSeconds = typeof limit === "number" ? null : limit.min;
+  if (minSeconds && m.secondsNormal < minSeconds * 0.8) {
+    return `Roteiro "${sourceTitle}": ${m.words} palavras narradas, cerca de ${m.secondsNormal} s em ritmo normal. Duração pedida: ${minSeconds} a ${limitSeconds} s. ` +
+      `RESULTADO: ABAIXO do mínimo pedido. O roteiro está curto demais ou foi cortado/incompleto; é preciso conferir se o texto está inteiro.`;
+  }
   const base = `Roteiro "${sourceTitle}": ${m.words} palavras narradas${m.precise ? "" : " (contagem aproximada do texto todo)"}, ` +
     `cerca de ${m.secondsNormal} s em ritmo normal (${WPM_NORMAL} palavras/min) e ${m.secondsFast} s em ritmo rápido (${WPM_FAST}/min). Limite pedido: ${limitSeconds} s.`;
   if (m.secondsFast > limitSeconds) return `${base} RESULTADO: ACIMA do limite, mesmo em ritmo rápido. É preciso cortar.`;

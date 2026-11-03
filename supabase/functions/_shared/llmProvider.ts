@@ -176,10 +176,14 @@ export interface CallProviderParams {
   mode?: CallMode;
   tools?: any[];
   toolChoice?: any;
+  /** Teto de tokens da resposta (padrão 8192; modelos com raciocínio gastam parte dele "pensando"). */
+  maxTokens?: number;
 }
 
 export interface CallProviderResult {
   ok: boolean;
+  /** "length" quando a resposta foi cortada por atingir o teto de tokens. */
+  finishReason?: string;
   output?: string;
   toolCallArgs?: any;
   tokensInput: number;
@@ -192,7 +196,7 @@ export interface CallProviderResult {
 // callers using getOrderedKeys*/callWithFallback with mode "tools"/"stream" should exclude it up front;
 // callProvider still guards here as a defensive fallback.
 export async function callProvider(params: CallProviderParams): Promise<CallProviderResult> {
-  const { provider, apiKey, model, systemPrompt, messages, temperature, mode = "text", tools, toolChoice } = params;
+  const { provider, apiKey, model, systemPrompt, messages, temperature, mode = "text", tools, toolChoice, maxTokens } = params;
   const endpoint = PROVIDER_ENDPOINTS[provider];
   if (!endpoint) return { ok: false, tokensInput: 0, tokensOutput: 0, errorText: `Unknown provider: ${provider}` };
 
@@ -210,7 +214,7 @@ export async function callProvider(params: CallProviderParams): Promise<CallProv
         },
         body: JSON.stringify({
           model,
-          max_tokens: 4096,
+          max_tokens: maxTokens ?? 4096,
           temperature: temperature ?? 0.7,
           system: systemPrompt || undefined,
           messages: messages.filter((m) => m.role !== "system"),
@@ -223,7 +227,7 @@ export async function callProvider(params: CallProviderParams): Promise<CallProv
       const data = await resp.json();
       const output = data.content?.[0]?.text || "";
       if (!output.trim()) return { ok: false, tokensInput: 0, tokensOutput: 0, errorText: "empty content" };
-      return { ok: true, output, ...extractAnthropicUsage(data) };
+      return { ok: true, output, finishReason: data.stop_reason === "max_tokens" ? "length" : data.stop_reason, ...extractAnthropicUsage(data) };
     } catch (e) {
       return { ok: false, tokensInput: 0, tokensOutput: 0, errorText: (e as Error).message };
     }
@@ -239,7 +243,7 @@ export async function callProvider(params: CallProviderParams): Promise<CallProv
   const body: Record<string, any> = {
     model: effectiveModel,
     temperature: temperature ?? 0.7,
-    max_tokens: DEFAULT_MAX_TOKENS,
+    max_tokens: maxTokens ?? DEFAULT_MAX_TOKENS,
     messages: [...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []), ...messages],
   };
   if (mode === "tools" && tools) {
@@ -288,7 +292,7 @@ export async function callProvider(params: CallProviderParams): Promise<CallProv
 
     const output = data.choices?.[0]?.message?.content || "";
     if (!output.trim()) return { ok: false, tokensInput: 0, tokensOutput: 0, errorText: "empty content" };
-    return { ok: true, output, ...extractUsage(data) };
+    return { ok: true, output, finishReason: data.choices?.[0]?.finish_reason, ...extractUsage(data) };
   } catch (e) {
     return { ok: false, tokensInput: 0, tokensOutput: 0, errorText: (e as Error).message };
   }
