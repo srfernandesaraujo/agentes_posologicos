@@ -6,7 +6,7 @@ import { OfflineBanner } from "./OfflineBanner";
 import { OraculoWidget } from "@/components/oraculo/OraculoWidget";
 import { CommandPaletteProvider } from "@/components/command/CommandPalette";
 import { DebugOverlay } from "./DebugOverlay";
-import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3, Mail, BookOpen, Workflow, Video, LifeBuoy, Building2, Calculator } from "lucide-react";
+import { Bot, MessageSquare, Settings, CreditCard, User, LayoutGrid, Database, DoorOpen, Store, BarChart3, Mail, BookOpen, Workflow, Video, LifeBuoy, Building2, Calculator, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -90,6 +90,7 @@ export function AppLayout() {
             <SidebarLink to="/conversas" icon={MessageSquare} label={t("nav.conversations")} count={conversationCount} />
             <SidebarLink to="/salas-virtuais" icon={DoorOpen} label={t("nav.virtualRooms")} />
             <SidebarLink to="/fluxos" icon={Workflow} label="Fluxos" />
+            <SidebarLink to="/squads" icon={Users} label="Squads" />
             <SidebarLink to="/reunioes" icon={Video} label="Reuniões" />
             <SidebarLink to="/marketplace" icon={Store} label="Marketplace" />
           </nav>

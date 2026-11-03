@@ -31,6 +31,8 @@ import MarketplaceFlows from "./pages/MarketplaceFlows";
 import Orchestrator from "./pages/Orchestrator";
 import NotFound from "./pages/NotFound";
 import Flows from "./pages/Flows";
+import Squads from "./pages/Squads";
+import SquadDetail from "./pages/SquadDetail";
 import Meetings from "./pages/Meetings";
 import FlowEditor from "./pages/FlowEditor";
 import Projects from "./pages/Projects";
@@ -120,6 +122,8 @@ const App = () => (
               <Route path="/suporte" element={<Support />} />
               <Route path="/documentacao" element={<Documentation />} />
               <Route path="/fluxos" element={<Flows />} />
+              <Route path="/squads" element={<Squads />} />
+              <Route path="/squads/:squadId" element={<SquadDetail />} />
               <Route path="/fluxos/:flowId" element={<FlowEditor />} />
               <Route path="/reunioes" element={<Meetings />} />
               <Route path="/projetos" element={<Projects />} />

@@ -139,3 +139,6 @@ verify_jwt = false
 verify_jwt = false
 [functions.squad-engine]
 verify_jwt = false
+
+[functions.squad-cron-tick]
+verify_jwt = false

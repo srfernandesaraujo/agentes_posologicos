@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   planTasks, pickNextTask, budgetState, clampCap, maskPii, screenInput, buildTaskUserMessage,
+  checkForm, formDisplay, isScheduleDue, monthStartIso, buildRevisionInstructions,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
-import { TEMPLATE_CONTEUDO_YOUTUBE, getTemplate } from "../../supabase/functions/_shared/squadTemplates";
+import { TEMPLATE_CONTEUDO_YOUTUBE, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
 
 describe("planTasks", () => {
   it("gera um pipeline sequencial a partir do template de Conteúdo", () => {
@@ -112,5 +113,86 @@ describe("buildTaskUserMessage", () => {
     });
     expect(msg.length).toBeLessThan(8000);
     expect(msg).toContain("trecho cortado");
+  });
+});
+
+describe("templates registrados", () => {
+  it.each(listTemplates().map((t) => [t.slug, t] as const))("%s tem formulário, pipeline e entrega final consistentes", (_slug, t) => {
+    expect(t.formFields.filter((f) => f.isBriefing)).toHaveLength(1);
+    expect(t.formFields.find((f) => f.isBriefing)!.required).toBe(true);
+    for (const f of t.formFields) if (f.type === "select") expect(f.options?.length).toBeGreaterThan(1);
+    const tasks = planTasks(t);
+    expect(tasks.filter((x) => x.deliverable?.final)).toHaveLength(1);
+    expect(tasks[tasks.length - 1].deliverable?.final).toBe(true);
+    expect(t.agents.some((a) => a.slug === "revisora")).toBe(true);
+  });
+  it("a Mentoria é contínua e os de missão não", () => {
+    expect(getTemplate("mentoria-academica")!.kind).toBe("continuous");
+    expect(getTemplate("conteudo-youtube")!.kind).toBe("mission");
+  });
+});
+
+describe("checkForm / formDisplay", () => {
+  const t = TEMPLATE_CONTEUDO_YOUTUBE;
+  it("aponta campos obrigatórios que faltam", () => {
+    const r = checkForm(t.formFields, { tema: "  ", publico: "Estudantes" });
+    expect(r.ok).toBe(false);
+    expect(r.missing).toEqual(["Tema do vídeo", "Duração"]);
+  });
+  it("aceita formulário completo, descarta chaves desconhecidas e opções inválidas", () => {
+    const r = checkForm(t.formFields, { tema: "Varfarina", publico: "Estudantes", duracao: "8 a 12 min", hack: "x" });
+    expect(r.ok).toBe(true);
+    expect(r.briefing).toBe("Varfarina");
+    expect(r.clean).not.toHaveProperty("hack");
+    const bad = checkForm(t.formFields, { tema: "x", publico: "Qualquer coisa", duracao: "8 a 12 min" });
+    expect(bad.ok).toBe(false);
+    expect(bad.missing).toEqual(["Público"]);
+  });
+  it("formDisplay usa rótulos e omite o campo-título e os vazios", () => {
+    const d = formDisplay(t.formFields, { tema: "Varfarina", publico: "Estudantes", tom: "" });
+    expect(d).toEqual({ "Público": "Estudantes" });
+  });
+});
+
+describe("agendamento", () => {
+  // Brasília = UTC-3. 10:00 UTC = 07:00 em Brasília. 2026-11-02 é segunda-feira.
+  const mon7 = new Date("2026-11-02T10:05:00Z");
+  it("dispara na hora e dia certos (horário de Brasília)", () => {
+    expect(isScheduleDue({ frequency: "weekly", run_hour: 7, run_day_of_week: 1, last_run_at: null }, mon7)).toBe(true);
+    expect(isScheduleDue({ frequency: "weekly", run_hour: 7, run_day_of_week: 2, last_run_at: null }, mon7)).toBe(false);
+    expect(isScheduleDue({ frequency: "daily", run_hour: 8, run_day_of_week: null, last_run_at: null }, mon7)).toBe(false);
+  });
+  it("considera o dia local: 01:00 UTC de terça ainda é segunda à noite em Brasília", () => {
+    const monNight = new Date("2026-11-03T01:30:00Z"); // 22:30 de segunda em Brasília
+    expect(isScheduleDue({ frequency: "weekly", run_hour: 22, run_day_of_week: 1, last_run_at: null }, monNight)).toBe(true);
+  });
+  it("não repete dentro do intervalo mínimo", () => {
+    const recent = new Date("2026-11-02T09:55:00Z").toISOString();
+    expect(isScheduleDue({ frequency: "daily", run_hour: 7, run_day_of_week: null, last_run_at: recent }, mon7)).toBe(false);
+    const lastWeek = new Date("2026-10-26T10:00:00Z").toISOString();
+    expect(isScheduleDue({ frequency: "weekly", run_hour: 7, run_day_of_week: 1, last_run_at: lastWeek }, mon7)).toBe(true);
+  });
+  it("início do mês em Brasília", () => {
+    expect(monthStartIso(new Date("2026-11-15T12:00:00Z"))).toBe("2026-11-01T03:00:00.000Z");
+    // 01:00 UTC do dia 1 ainda é o último dia do mês anterior em Brasília
+    expect(monthStartIso(new Date("2026-11-01T01:00:00Z"))).toBe("2026-10-01T03:00:00.000Z");
+  });
+});
+
+describe("revisão pedida pelo dono", () => {
+  it("inclui o pedido e a entrega anterior", () => {
+    const s = buildRevisionInstructions("Deixe mais curto", "TEXTO ANTIGO");
+    expect(s).toContain("Deixe mais curto");
+    expect(s).toContain("TEXTO ANTIGO");
+  });
+});
+
+describe("contexto na mensagem da tarefa", () => {
+  it("coloca a memória do squad antes da missão", () => {
+    const msg = buildTaskUserMessage({
+      briefing: "Tema X", formData: {}, context: "Prefiro tom formal", step: { title: "t", instructions: "i" }, previous: [],
+    });
+    expect(msg.indexOf("Prefiro tom formal")).toBeGreaterThanOrEqual(0);
+    expect(msg.indexOf("Prefiro tom formal")).toBeLessThan(msg.indexOf("Tema X"));
   });
 });

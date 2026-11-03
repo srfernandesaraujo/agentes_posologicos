@@ -29,6 +29,18 @@ export interface TemplateStep {
   deliverable?: DeliverableSpec;
 }
 
+export interface FormField {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "select";
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+  help?: string;
+  /** O valor deste campo é o título/resumo da missão. Exatamente um campo por template. */
+  isBriefing?: boolean;
+}
+
 export interface SquadTemplate {
   slug: string;
   name: string;
@@ -38,6 +50,7 @@ export interface SquadTemplate {
   defaultCapUsd: number;
   maxCapUsd: number;
   estimatedCostUsd: { min: number; max: number };
+  formFields: FormField[];
   agents: TemplateAgent[];
   steps: TemplateStep[];
 }
@@ -189,8 +202,13 @@ export function buildTaskUserMessage(p: {
   formData: Record<string, unknown>;
   step: { title: string; instructions: string };
   previous: PreviousOutput[];
+  /** Memória do squad + resultado da execução anterior (squads contínuos). */
+  context?: string;
 }): string {
   const parts: string[] = [];
+  if (p.context && p.context.trim()) {
+    parts.push(`# Memória do squad (preferências e contexto do dono)\n${clip(p.context.trim(), MAX_PREV_CHARS)}`);
+  }
   parts.push(`# Missão\n${p.briefing.trim()}`);
   const fields = Object.entries(p.formData || {}).filter(([, v]) => v !== "" && v != null);
   if (fields.length) {
@@ -204,4 +222,86 @@ export function buildTaskUserMessage(p: {
   }
   parts.push(`# Sua tarefa agora: ${p.step.title}\n${p.step.instructions.trim()}`);
   return parts.join("\n\n");
+}
+
+// ---------- Formulário do template ----------
+
+/** Rótulos legíveis no lugar das chaves, para o prompt dos agentes. */
+export function formDisplay(fields: FormField[], formData: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const f of fields) {
+    if (f.isBriefing) continue;
+    const v = formData?.[f.key];
+    if (v !== undefined && v !== null && String(v).trim() !== "") out[f.label] = v;
+  }
+  return out;
+}
+
+export interface FormCheck {
+  ok: boolean;
+  missing: string[];
+  briefing: string;
+  clean: Record<string, string>;
+}
+
+/** Valida o formulário contra o template; só aceita chaves conhecidas, textos limitados e opções válidas. */
+export function checkForm(fields: FormField[], raw: Record<string, unknown>, maxChars = 8000): FormCheck {
+  const missing: string[] = [];
+  const clean: Record<string, string> = {};
+  for (const f of fields) {
+    let v = typeof raw?.[f.key] === "string" ? (raw[f.key] as string).trim() : "";
+    if (v.length > maxChars) v = v.slice(0, maxChars);
+    if (f.type === "select" && v && f.options && !f.options.includes(v)) v = "";
+    if (f.required && !v) missing.push(f.label);
+    if (v) clean[f.key] = v;
+  }
+  const briefingField = fields.find((f) => f.isBriefing);
+  const briefing = briefingField ? clean[briefingField.key] || "" : "";
+  return { ok: missing.length === 0, missing, briefing, clean };
+}
+
+// ---------- Revisão pedida pelo dono ----------
+
+export function buildRevisionInstructions(comment: string, previousFinal: string): string {
+  return (
+    `O dono da missão leu a entrega final e pediu ajustes. Reescreva a entrega final incorporando o pedido, ` +
+    `mantendo o que já estava bom e sem inventar informações novas.\n\n` +
+    `## Pedido do dono\n${comment.trim()}\n\n## Entrega anterior\n${clip(previousFinal, MAX_PREV_CHARS)}`
+  );
+}
+
+// ---------- Agendamento (squads contínuos) ----------
+
+export type Frequency = "daily" | "weekly";
+export interface ScheduleLite {
+  frequency: Frequency;
+  run_hour: number; // hora de Brasília (UTC-3, sem horário de verão desde 2019)
+  run_day_of_week: number | null; // 0=domingo, em horário de Brasília
+  last_run_at: string | null;
+}
+
+const BRT_OFFSET_MS = -3 * 3600 * 1000;
+const MIN_INTERVAL_MS: Record<Frequency, number> = {
+  daily: 20 * 3600 * 1000,
+  weekly: 6 * 24 * 3600 * 1000,
+};
+
+function brt(now: Date): { hour: number; dow: number } {
+  const shifted = new Date(now.getTime() + BRT_OFFSET_MS);
+  return { hour: shifted.getUTCHours(), dow: shifted.getUTCDay() };
+}
+
+export function isScheduleDue(s: ScheduleLite, now: Date): boolean {
+  if (s.last_run_at && now.getTime() - new Date(s.last_run_at).getTime() < MIN_INTERVAL_MS[s.frequency]) return false;
+  const t = brt(now);
+  if (t.hour !== s.run_hour) return false;
+  if (s.frequency === "weekly" && s.run_day_of_week != null && t.dow !== s.run_day_of_week) return false;
+  return true;
+}
+
+/** Início do mês corrente em horário de Brasília, como ISO UTC (para somar o gasto mensal). */
+export function monthStartIso(now: Date): string {
+  const shifted = new Date(now.getTime() + BRT_OFFSET_MS);
+  const startShifted = Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), 1);
+  return new Date(startShifted - BRT_OFFSET_MS).toISOString();
 }
