@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   planTasks, pickNextTask, budgetState, clampCap, maskPii, screenInput, buildTaskUserMessage,
   checkForm, formDisplay, isScheduleDue, monthStartIso, buildRevisionInstructions,
+  measureScript, parseDurationLimitSeconds, durationNote, reviewRequestsAdjustments,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
 import { TEMPLATE_CONTEUDO_YOUTUBE, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
@@ -9,7 +10,7 @@ import { TEMPLATE_CONTEUDO_YOUTUBE, getTemplate, listTemplates } from "../../sup
 describe("planTasks", () => {
   it("gera um pipeline sequencial a partir do template de Conteúdo", () => {
     const tasks = planTasks(TEMPLATE_CONTEUDO_YOUTUBE);
-    expect(tasks).toHaveLength(6);
+    expect(tasks).toHaveLength(7);
     expect(tasks[0].dependsOnPosition).toBeNull();
     expect(tasks.slice(1).every((t, i) => t.dependsOnPosition === i)).toBe(true);
     expect(tasks.filter((t) => t.deliverable?.final)).toHaveLength(1);
@@ -194,5 +195,88 @@ describe("contexto na mensagem da tarefa", () => {
     });
     expect(msg.indexOf("Prefiro tom formal")).toBeGreaterThanOrEqual(0);
     expect(msg.indexOf("Prefiro tom formal")).toBeLessThan(msg.indexOf("Tema X"));
+  });
+});
+
+describe("medição de duração do roteiro", () => {
+  const roteiro = `Ganchos
+(CENA: Estudante olhando para um prato de couve refogada que ganha uma aura vilã.) NARRADOR (Bia): Imagina essa cena: você, estudioso, lendo sobre coagulação, e de repente, sua couve refogada vira a vilã! Drama? Talvez.
+
+(TEMPO: 10-25 segundos) (CENA: Animação com a varfarina (a clássica) bloqueando a vitamina K.) NARRADOR (Bia): A varfarina é a rival da vitamina K. Ela altera o INR.
+
+[Afirmações que precisam de checagem em fonte:]
+A varfarina atua inibindo a recuperação da vitamina K. Muitas outras palavras aqui que não são faladas no vídeo.`;
+
+  it("conta só as falas do narrador, sem cenas nem a seção de afirmações", () => {
+    const m = measureScript(roteiro);
+    expect(m.precise).toBe(true);
+    // fala 1: 19 palavras; fala 2: 12 palavras
+    expect(m.words).toBe(31);
+  });
+  it("cai para contagem aproximada quando não há marcação de narrador", () => {
+    const m = measureScript("um texto simples sem marcadores com dez palavras no total ok");
+    expect(m.precise).toBe(false);
+    expect(m.words).toBe(11);
+  });
+  it("converte palavras em segundos nos dois ritmos", () => {
+    const m = measureScript("NARRADOR: " + Array(150).fill("palavra").join(" "));
+    expect(m.secondsNormal).toBe(60);
+    expect(m.secondsFast).toBe(53);
+  });
+  it("interpreta o limite de duração do formulário", () => {
+    expect(parseDurationLimitSeconds("Short (até 60 s)")).toBe(60);
+    expect(parseDurationLimitSeconds("8 a 12 min")).toBe(720);
+    expect(parseDurationLimitSeconds("Aula longa (20 min ou mais)")).toBeNull();
+    expect(parseDurationLimitSeconds(undefined)).toBeNull();
+  });
+  it("classifica dentro, no limite e acima", () => {
+    const mk = (words: number) => measureScript("NARRADOR: " + Array(words).fill("p").join(" "));
+    expect(durationNote(mk(120), 60, "R")).toContain("dentro do limite");
+    expect(durationNote(mk(160), 60, "R")).toContain("NO LIMITE");
+    expect(durationNote(mk(200), 60, "R")).toContain("ACIMA do limite");
+  });
+});
+
+describe("parecer pede ajustes?", () => {
+  it("reconhece o veredito de ajustes em variações de formatação", () => {
+    expect(reviewRequestsAdjustments("VEREDITO: AJUSTES NECESSÁRIOS\n1. ...")).toBe(true);
+    expect(reviewRequestsAdjustments("**VEREDITO: AJUSTES NECESSÁRIOS**")).toBe(true);
+    expect(reviewRequestsAdjustments("Veredito: **Ajustes** necessários")).toBe(true);
+    expect(reviewRequestsAdjustments("VEREDITO: APROVADO")).toBe(false);
+    expect(reviewRequestsAdjustments("")).toBe(false);
+  });
+});
+
+describe("time e medições na mensagem da tarefa", () => {
+  it("inclui a lista do time e as medições antes da tarefa", () => {
+    const msg = buildTaskUserMessage({
+      briefing: "x", formData: {}, step: { title: "t", instructions: "i" }, previous: [],
+      team: [{ name: "Bia", role: "Roteirista" }], notes: ["Roteiro: 100 palavras"],
+    });
+    expect(msg).toContain("ÚNICAS pessoas");
+    expect(msg).toContain("- Bia: Roteirista");
+    expect(msg.indexOf("Roteiro: 100 palavras")).toBeLessThan(msg.indexOf("Sua tarefa agora"));
+  });
+});
+
+describe("template de Conteúdo: verificações", () => {
+  const tasks = planTasks(TEMPLATE_CONTEUDO_YOUTUBE);
+  it("a revisora e a diretora recebem a medição de duração", () => {
+    const review = tasks.find((t) => t.title === "Parecer de revisão")!;
+    const final = tasks.find((t) => t.deliverable?.final)!;
+    expect(review.checks?.measureDuration?.formKey).toBe("duracao");
+    expect(final.checks?.measureDuration?.sourceTitles).toContain("Ajustes do roteiro");
+  });
+  it("a etapa de ajustes é condicional, vem depois do parecer e antes da entrega final", () => {
+    const iReview = tasks.findIndex((t) => t.title === "Parecer de revisão");
+    const iFix = tasks.findIndex((t) => t.title === "Ajustes do roteiro");
+    const iFinal = tasks.findIndex((t) => t.deliverable?.final);
+    expect(tasks[iFix].checks?.onlyIfAdjusts).toBe(true);
+    expect(tasks[iFix].agentSlug).toBe("roteirista");
+    expect(iReview).toBeLessThan(iFix);
+    expect(iFix).toBeLessThan(iFinal);
+  });
+  it("todo prompt de agente proíbe inventar colegas", () => {
+    for (const a of TEMPLATE_CONTEUDO_YOUTUBE.agents) expect(a.systemPrompt).toContain("Seu time");
   });
 });

@@ -2253,7 +2253,9 @@ export type Database = {
           id: string
           kind: string
           mission_id: string
+          model: string | null
           owner_id: string
+          provider: string | null
           sources: Json
           squad_id: string
           status: string
@@ -2268,7 +2270,9 @@ export type Database = {
           id?: string
           kind: string
           mission_id: string
+          model?: string | null
           owner_id: string
+          provider?: string | null
           sources?: Json
           squad_id: string
           status?: string
@@ -2283,7 +2287,9 @@ export type Database = {
           id?: string
           kind?: string
           mission_id?: string
+          model?: string | null
           owner_id?: string
+          provider?: string | null
           sources?: Json
           squad_id?: string
           status?: string
@@ -2504,6 +2510,7 @@ export type Database = {
       squad_tasks: {
         Row: {
           agent_id: string
+          checks: Json | null
           completed_at: string | null
           deliverable_spec: Json | null
           depends_on_position: number | null
@@ -2520,6 +2527,7 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          checks?: Json | null
           completed_at?: string | null
           deliverable_spec?: Json | null
           depends_on_position?: number | null
@@ -2536,6 +2544,7 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          checks?: Json | null
           completed_at?: string | null
           deliverable_spec?: Json | null
           depends_on_position?: number | null

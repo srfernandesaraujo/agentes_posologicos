@@ -22,11 +22,20 @@ export interface DeliverableSpec {
   final?: boolean;
 }
 
+/** Verificações feitas pelo sistema (código), não pelo modelo. */
+export interface StepChecks {
+  /** Mede a duração de um roteiro e entrega o número ao agente, junto com o limite pedido no formulário. */
+  measureDuration?: { sourceTitles: string[]; formKey: string };
+  /** Etapa de correção: só roda se o parecer da revisora pediu ajustes. Senão, é pulada. */
+  onlyIfAdjusts?: boolean;
+}
+
 export interface TemplateStep {
   agent: string;
   title: string;
   instructions: string;
   deliverable?: DeliverableSpec;
+  checks?: StepChecks;
 }
 
 export interface FormField {
@@ -63,6 +72,7 @@ export interface PlannedTask {
   /** Posição da tarefa de que esta depende (null na primeira). Pipeline sequencial na Fase 0. */
   dependsOnPosition: number | null;
   deliverable: DeliverableSpec | null;
+  checks: StepChecks | null;
 }
 
 export function planTasks(template: SquadTemplate): PlannedTask[] {
@@ -78,6 +88,7 @@ export function planTasks(template: SquadTemplate): PlannedTask[] {
       instructions: s.instructions,
       dependsOnPosition: i === 0 ? null : i - 1,
       deliverable: s.deliverable ?? null,
+      checks: s.checks ?? null,
     };
   });
 }
@@ -204,8 +215,13 @@ export function buildTaskUserMessage(p: {
   previous: PreviousOutput[];
   /** Memória do squad + resultado da execução anterior (squads contínuos). */
   context?: string;
+  /** Quem realmente existe no squad: impede que os agentes inventem colegas. */
+  team?: { name: string; role: string }[];
+  /** Medições feitas pelo sistema (ex.: duração do roteiro). */
+  notes?: string[];
 }): string {
   const parts: string[] = [];
+  if (p.team && p.team.length) parts.push(buildTeamRoster(p.team));
   if (p.context && p.context.trim()) {
     parts.push(`# Memória do squad (preferências e contexto do dono)\n${clip(p.context.trim(), MAX_PREV_CHARS)}`);
   }
@@ -220,8 +236,81 @@ export function buildTaskUserMessage(p: {
         p.previous.map((o) => `## ${o.title} (por ${o.agentName})\n${clip(o.output, MAX_PREV_CHARS)}`).join("\n\n"),
     );
   }
+  if (p.notes && p.notes.length) {
+    parts.push(`# Medições automáticas (feitas pelo sistema por código, não por estimativa; use estes números)\n${p.notes.join("\n")}`);
+  }
   parts.push(`# Sua tarefa agora: ${p.step.title}\n${p.step.instructions.trim()}`);
   return parts.join("\n\n");
+}
+
+export function buildTeamRoster(team: { name: string; role: string }[]): string {
+  return (
+    `# Seu time (são as ÚNICAS pessoas que existem neste squad)\n` +
+    team.map((t) => `- ${t.name}: ${t.role}`).join("\n") +
+    `\nNunca atribua trabalho a papéis que não estão nesta lista e nunca fale de "editor", "designer" ou "revisor" que não esteja aqui. ` +
+    `O dono do squad é quem lerá a entrega final e decide.`
+  );
+}
+
+// ---------- Medições feitas por código ----------
+
+export interface ScriptMeasure {
+  words: number;
+  /** Segundos em ritmo normal (150 palavras/min) e rápido (170 palavras/min). */
+  secondsNormal: number;
+  secondsFast: number;
+  /** false quando não achou falas marcadas como NARRADOR e contou o texto todo (superestima). */
+  precise: boolean;
+}
+
+const WPM_NORMAL = 150;
+const WPM_FAST = 170;
+
+function countWords(s: string): number {
+  return s.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
+
+/**
+ * Conta as palavras FALADAS de um roteiro: as falas marcadas "NARRADOR ...:" até o próximo marcador
+ * de cena, tempo ou seção. A seção "[Afirmações ...]" e as marcações de cena não contam.
+ */
+export function measureScript(text: string): ScriptMeasure {
+  const cut = text.split(/\[\s*Afirma[çc][õo]es/i)[0];
+  const spoken: string[] = [];
+  const re = /NARRADOR[^:\n]*:\s*([\s\S]*?)(?=\n\s*\n|\(\s*(?:CENA|TEMPO|PONTO)|NARRADOR[^:\n]*:|$)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(cut))) spoken.push(m[1]);
+  const precise = spoken.length > 0;
+  const words = precise ? countWords(spoken.join(" ")) : countWords(cut);
+  return {
+    words,
+    secondsNormal: Math.round((words / WPM_NORMAL) * 60),
+    secondsFast: Math.round((words / WPM_FAST) * 60),
+    precise,
+  };
+}
+
+/** "Short (até 60 s)" → 60; "8 a 12 min" → 720 (o teto da faixa); sem limite claro → null. */
+export function parseDurationLimitSeconds(label: unknown): number | null {
+  const s = String(label ?? "");
+  const sec = s.match(/(\d+)\s*s\b/i);
+  if (sec) return Number(sec[1]);
+  const range = s.match(/(\d+)\s*a\s*(\d+)\s*min/i);
+  if (range) return Number(range[2]) * 60;
+  return null;
+}
+
+export function durationNote(m: ScriptMeasure, limitSeconds: number, sourceTitle: string): string {
+  const base = `Roteiro "${sourceTitle}": ${m.words} palavras narradas${m.precise ? "" : " (contagem aproximada do texto todo)"}, ` +
+    `cerca de ${m.secondsNormal} s em ritmo normal (${WPM_NORMAL} palavras/min) e ${m.secondsFast} s em ritmo rápido (${WPM_FAST}/min). Limite pedido: ${limitSeconds} s.`;
+  if (m.secondsFast > limitSeconds) return `${base} RESULTADO: ACIMA do limite, mesmo em ritmo rápido. É preciso cortar.`;
+  if (m.secondsNormal > limitSeconds) return `${base} RESULTADO: NO LIMITE, só cabe em ritmo rápido. Recomenda-se cortar.`;
+  return `${base} RESULTADO: dentro do limite.`;
+}
+
+/** O parecer da revisora pediu ajustes? (convenção "VEREDITO: AJUSTES NECESSÁRIOS") */
+export function reviewRequestsAdjustments(reviewText: string): boolean {
+  return /VEREDITO\s*:?\s*\**\s*AJUSTES/i.test(reviewText);
 }
 
 // ---------- Formulário do template ----------

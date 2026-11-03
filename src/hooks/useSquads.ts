@@ -100,6 +100,8 @@ export interface SquadDeliverable {
   version: number;
   status: "done" | "in_review" | "approved" | "changes_requested";
   content: string;
+  provider: string | null;
+  model: string | null;
   created_at: string;
 }
 

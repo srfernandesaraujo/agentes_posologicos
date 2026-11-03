@@ -5,7 +5,8 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } from "./llmProvider.ts";
 import {
   planTasks, pickNextTask, budgetState, buildTaskUserMessage, formDisplay, buildRevisionInstructions,
-  type PreviousOutput, type SquadTemplate,
+  measureScript, parseDurationLimitSeconds, durationNote, reviewRequestsAdjustments,
+  type PreviousOutput, type SquadTemplate, type StepChecks,
 } from "./squadCore.ts";
 import { getTemplate } from "./squadTemplates.ts";
 
@@ -74,6 +75,7 @@ export async function createMission(
     planned.map((t) => ({
       mission_id: mission.id, owner_id: p.userId, agent_id: idBySlug.get(t.agentSlug), position: t.position,
       depends_on_position: t.dependsOnPosition, title: t.title, instructions: t.instructions, deliverable_spec: t.deliverable,
+      checks: t.checks,
     })),
   );
   if (tErr) { await admin.from("squad_missions").delete().eq("id", mission.id); throw tErr; }
@@ -146,7 +148,21 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
   const { data: doneTasks } = await admin
     .from("squad_tasks").select("title, output, agent_id, position")
     .eq("mission_id", mission.id).eq("status", "done").order("position");
-  const { data: allAgents } = await admin.from("squad_agents").select("id, name").eq("squad_id", mission.squad_id);
+  const checks = (claimed.checks || {}) as StepChecks;
+
+  // Etapa de correção condicional: só roda se o parecer da revisora pediu ajustes.
+  if (checks.onlyIfAdjusts) {
+    const review = [...(doneTasks || [])].reverse().find((t: any) => /parecer/i.test(t.title));
+    if (!review || !reviewRequestsAdjustments(review.output || "")) {
+      await admin.from("squad_tasks").update({
+        status: "done", output: "Não necessário: o parecer não pediu ajustes.", completed_at: new Date().toISOString(),
+      }).eq("id", claimed.id);
+      await emit(admin, mission, { type: "task_skipped", agentId: agent.id, room: agent.room, text: claimed.title });
+      return { state: "task_done", taskId: claimed.id };
+    }
+  }
+
+  const { data: allAgents } = await admin.from("squad_agents").select("id, name, role").eq("squad_id", mission.squad_id).order("sort_order");
   const nameById = new Map((allAgents || []).map((a: any) => [a.id, a.name]));
   const previous: PreviousOutput[] = (doneTasks || []).map((t: any) => ({
     agentName: nameById.get(t.agent_id) || "Colega", title: t.title, output: t.output || "",
@@ -159,9 +175,18 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
   const keys = await getOrderedKeysForUser(admin, userId);
   if (!keys.length) return await failTask("Nenhuma chave de API configurada. Adicione uma em Configurações para o squad trabalhar.");
 
+  // Medição de duração por código: o modelo recebe o número, não precisa estimar.
+  const notes: string[] = [];
+  if (checks.measureDuration) {
+    const src = [...(doneTasks || [])].reverse().find((t: any) => checks.measureDuration!.sourceTitles.includes(t.title) && !/^Não necessário/.test(t.output || ""));
+    const limit = parseDurationLimitSeconds((mission.form_data || {})[checks.measureDuration.formKey]);
+    if (src && limit) notes.push(durationNote(measureScript(src.output || ""), limit, src.title));
+  }
+
   const userMessage = buildTaskUserMessage({
     briefing: mission.briefing, formData: formForPrompt, context: mission.context,
     step: { title: claimed.title, instructions: claimed.instructions }, previous,
+    team: (allAgents || []).map((a: any) => ({ name: a.name, role: a.role })), notes,
   });
 
   const result = await callWithFallback(admin, keys, {
@@ -179,7 +204,7 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
     await admin.from("squad_deliverables").insert({
       mission_id: mission.id, squad_id: mission.squad_id, owner_id: mission.owner_id,
       agent_id: agent.id, task_id: claimed.id, title: spec.title, kind: spec.kind, version: (count || 0) + 1,
-      status: spec.final ? "in_review" : "done", content: result.output,
+      status: spec.final ? "in_review" : "done", content: result.output, provider: result.provider, model: result.model,
     });
     await emit(admin, mission, { type: "deliverable_created", agentId: agent.id, room: agent.room, text: spec.title, payload: { kind: spec.kind, final: !!spec.final } });
   }

@@ -200,7 +200,7 @@ export function MissionPanel({
                     className="flex w-full items-center gap-3 p-3 text-left" aria-expanded={open}>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{d.title}{d.version > 1 && <span className="text-white/40"> · v{d.version}</span>}</div>
-                      <div className="text-xs text-white/40">{agentById.get(d.agent_id || "")?.name || "Agente"} · {d.kind}</div>
+                      <div className="text-xs text-white/40">{agentById.get(d.agent_id || "")?.name || "Agente"} · {d.kind}{d.model ? ` · ${d.model}` : ""}</div>
                     </div>
                     <Badge variant="outline" className={ds.className}>{ds.label}</Badge>
                   </button>
