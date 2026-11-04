@@ -3,6 +3,7 @@ import {
   planTasks, pickNextTask, budgetState, clampCap, maskPii, screenInput, buildTaskUserMessage,
   checkForm, formDisplay, isScheduleDue, monthStartIso, buildRevisionInstructions,
   measureScript, parseDurationLimitSeconds, parseDurationRange, durationNote, reviewRequestsAdjustments,
+  extractOwnerQuestion, buildOwnerRules,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
 import { TEMPLATE_CONTEUDO_YOUTUBE, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
@@ -321,5 +322,59 @@ describe("faixa de duração e roteiro curto demais", () => {
   it("a fala termina antes de uma sugestão do diretor de arte", () => {
     const t = "NARRADOR: Olá pessoal, hoje vamos falar de anticoagulantes. (Sugestão Caio: animação com uma balança e muitas outras palavras que não são faladas)";
     expect(measureScript(t).words).toBe(7);
+  });
+});
+
+describe("perguntas ao dono", () => {
+  const bloco = `[[PERGUNTA_AO_DONO]]
+Pergunta: O material diz para manter a vitamina K constante e também para evitar vegetais verdes. Qual vale?
+Opções: Manter constante, sem eliminar | Evitar vegetais verdes | Deixar a decisão para o médico
+Por quê: Muda a mensagem principal do vídeo.
+[[/PERGUNTA_AO_DONO]]`;
+
+  it("extrai pergunta, opções e motivo", () => {
+    const q = extractOwnerQuestion(bloco)!;
+    expect(q.question).toContain("Qual vale?");
+    expect(q.options).toEqual(["Manter constante, sem eliminar", "Evitar vegetais verdes", "Deixar a decisão para o médico"]);
+    expect(q.why).toContain("mensagem principal");
+    expect(q.cleaned).toBe("");
+  });
+  it("aceita bloco sem fechamento, opções em lista e sem rótulo de pergunta", () => {
+    const q = extractOwnerQuestion("[[PERGUNTA_AO_DONO]]\nQual público devo considerar?\nOpções:\n- Pacientes\n- Estudantes");
+    expect(q!.question).toBe("Qual público devo considerar?");
+    expect(q!.options).toEqual(["Pacientes", "Estudantes"]);
+  });
+  it("devolve o texto restante quando a pergunta vem junto de conteúdo", () => {
+    const q = extractOwnerQuestion("Segue o plano.\n\n" + bloco)!;
+    expect(q.cleaned).toBe("Segue o plano.");
+  });
+  it("não vê pergunta onde não há bloco", () => {
+    expect(extractOwnerQuestion("Plano normal sem dúvidas.")).toBeNull();
+    expect(extractOwnerQuestion("[[PERGUNTA_AO_DONO]]\n\n[[/PERGUNTA_AO_DONO]]")).toBeNull();
+  });
+  it("limita a 4 opções", () => {
+    const q = extractOwnerQuestion("[[PERGUNTA_AO_DONO]]\nPergunta: x?\nOpções: a | b | c | d | e | f\n[[/PERGUNTA_AO_DONO]]")!;
+    expect(q.options).toHaveLength(4);
+  });
+  it("as regras mudam conforme possa ou não perguntar, e trazem as respostas anteriores", () => {
+    const pode = buildOwnerRules({ canAsk: true, remaining: 2, qa: [] });
+    expect(pode).toContain("PERGUNTA_AO_DONO");
+    expect(pode).toContain("até 2 pergunta");
+    const nao = buildOwnerRules({ canAsk: false, remaining: 0, qa: [{ question: "Q1?", answer: "Manter constante" }] });
+    expect(nao).toContain("Não faça perguntas");
+    expect(nao).toContain("Resposta do dono: Manter constante");
+  });
+  it("a mensagem da tarefa inclui as regras de perguntas antes da tarefa", () => {
+    const msg = buildTaskUserMessage({
+      briefing: "x", formData: {}, step: { title: "Plano", instructions: "i" }, previous: [],
+      owner: { canAsk: true, remaining: 2, qa: [] },
+    });
+    expect(msg.indexOf("Perguntas ao dono")).toBeLessThan(msg.indexOf("Sua tarefa agora"));
+  });
+  it("todos os planos dos templates orientam a perguntar em caso de contradição", () => {
+    for (const t of listTemplates()) {
+      const plan = planTasks(t)[0];
+      expect(plan.instructions, t.slug).toContain("pergunte ao dono");
+    }
   });
 });

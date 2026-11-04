@@ -6,13 +6,14 @@
 //   run_all        { missionId }                     → encadeia tarefas até o limite de tempo; devolve hasMore
 //   raise_cap      { missionId, costCapUsd }         → aumenta o teto e retoma uma missão pausada
 //   decide         { missionId, decision, comment? } → "approve" ou "changes" na entrega final
+//   answer_question{ questionId, answer }            → responde uma pergunta do squad e retoma a missão
 //   update_memory  { squadId, memory }               → memória/preferências do squad
 //   set_schedule   { squadId, ... }                  → agendamento de squads contínuos
 // Cada passo grava eventos em squad_events; o escritório visual só lê esses eventos.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkForm, clampCap, screenInput } from "../_shared/squadCore.ts";
 import { getTemplate, listTemplates } from "../_shared/squadTemplates.ts";
-import { HttpError, createMission, decideMission, emit, loadOwnedMission, runNext } from "../_shared/squadRunner.ts";
+import { HttpError, answerQuestion, createMission, decideMission, emit, loadOwnedMission, runNext } from "../_shared/squadRunner.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -137,6 +138,10 @@ Deno.serve(async (req) => {
       const decision = body?.decision === "approve" ? "approve" : body?.decision === "changes" ? "changes" : null;
       if (!decision) throw new HttpError(400, "Decisão inválida");
       return json(await decideMission(admin, String(body?.missionId || ""), user.id, decision, String(body?.comment || "")));
+    }
+
+    if (action === "answer_question") {
+      return json(await answerQuestion(admin, String(body?.questionId || ""), user.id, String(body?.answer || "")));
     }
 
     if (action === "update_memory") {

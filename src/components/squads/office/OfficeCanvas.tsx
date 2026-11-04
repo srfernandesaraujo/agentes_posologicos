@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { eventToCommands, themeForEnvironment, type OfficeAgent, type RoomId, type Tone } from "@/lib/squadOffice";
 import { applyCommand, makeSim, step, type Sim, type SimAgent } from "@/lib/squadOfficeSim";
 import { drawAnimated, getStaticLayer } from "./officeScenes";
+import { drawAgentSprite } from "./officeSprites";
 import type { SquadAgent, SquadEvent } from "@/hooks/useSquads";
 
 const TONES: Record<Tone, { bg: string; fg: string }> = {
@@ -10,32 +11,6 @@ const TONES: Record<Tone, { bg: string; fg: string }> = {
   warn: { bg: "#fff1cf", fg: "#713f12" },
   bad: { bg: "#ffe1de", fg: "#7f1d1d" },
 };
-
-function drawAgent(ctx: CanvasRenderingContext2D, a: SimAgent, t: number, coat: boolean) {
-  const px = Math.round(a.x) * 2;
-  let py = Math.round(a.y) * 2;
-  if (now() < a.hopUntil) py -= Math.abs(Math.sin(t * 9)) * 8;
-  py = Math.round(py);
-  const walking = a.moving;
-  const sw = walking ? Math.floor(t * 8) % 2 : 0;
-  const bob = walking ? (Math.floor(t * 8) % 2) * 2 : a.state === "work" ? Math.floor(t * 3) % 2 : 0;
-  const rect = (x: number, y: number, w: number, h: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
-  rect(px - 9, Math.round(a.y) * 2 - 2, 18, 4, "rgba(0,0,0,.3)");
-  rect(px - 6, py - 10 + (sw ? 0 : 2), 4, 10 - (sw ? 0 : 2), "#252a3d");
-  rect(px + 2, py - 10 + (sw ? 2 : 0), 4, 10 - (sw ? 2 : 0), "#252a3d");
-  rect(px - 8, py - 24 - bob, 16, 14, a.look.shirt);
-  rect(px - 10, py - 22 - bob, 3, 9, a.look.shirt); rect(px + 7, py - 22 - bob, 3, 9, a.look.shirt);
-  if (coat) {
-    rect(px - 8, py - 24 - bob, 6, 14, "#f4f6f8"); rect(px + 2, py - 24 - bob, 6, 14, "#f4f6f8");
-    rect(px - 10, py - 22 - bob, 3, 9, "#f4f6f8"); rect(px + 7, py - 22 - bob, 3, 9, "#f4f6f8");
-  }
-  rect(px - 8, py - 24 - bob, 16, 3, "rgba(255,255,255,.22)");
-  rect(px - 6, py - 36 - bob, 12, 12, a.look.skin);
-  rect(px - 7, py - 38 - bob, 14, 6, a.look.hair); rect(px - 7, py - 34 - bob, 2, 6, a.look.hair);
-  rect(a.dir > 0 ? px + 1 : px - 4, py - 31 - bob, 3, 3, "#1b1b24");
-  const sc = a.state === "work" || a.state === "meet" ? "#6ee7b7" : a.state === "walk" ? "#ffd166" : a.state === "wait" ? "#93c5fd" : "#8b93a8";
-  rect(px - 3, py - 46 - bob, 6, 6, sc);
-}
 
 const now = () => performance.now() / 1000;
 
@@ -82,7 +57,7 @@ export function OfficeCanvas({ agents, events, environment }: Props) {
   const [activity, setActivity] = useState<string>("");
 
   const officeAgents = useMemo<OfficeAgent[]>(
-    () => agents.map((a) => ({ id: a.id, name: a.name, role: a.role, room: a.room as RoomId, sort_order: a.sort_order })),
+    () => agents.map((a) => ({ id: a.id, name: a.name, role: a.role, room: a.room as RoomId, sort_order: a.sort_order, slug: a.slug })),
     [agents],
   );
   const reduced = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
@@ -137,7 +112,15 @@ export function OfficeCanvas({ agents, events, environment }: Props) {
           ctx.fillStyle = "#9ca3af"; ctx.fillRect(x - 3, y - 1, 6, 1);
         });
         const order = [...sim.agents].sort((a, b) => a.y - b.y);
-        order.forEach((a) => drawAgent(ctx, a, t, theme === "university"));
+        // luz de mesa acesa para quem está trabalhando
+        order.forEach((a) => {
+          if (a.state !== "work" || a.moving) return;
+          const gx = Math.round(a.x) * 2, gy = Math.round(a.y) * 2 - 6;
+          const g = ctx.createRadialGradient(gx, gy, 2, gx, gy, 44);
+          g.addColorStop(0, "rgba(255,226,150,.26)"); g.addColorStop(1, "rgba(255,226,150,0)");
+          ctx.fillStyle = g; ctx.fillRect(gx - 44, gy - 44, 88, 88);
+        });
+        order.forEach((a) => drawAgentSprite(ctx, a, t, theme === "university", nowS));
         drawNames(ctx, sim);
         order.forEach((a) => drawBubble(ctx, a));
       }

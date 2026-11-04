@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  assignDesks, meetSeats, routePoints, eventToCommands, agentLook, themeForEnvironment, resolvePlace,
+  assignDesks, meetSeats, routePoints, eventToCommands, agentLook, themeForEnvironment, resolvePlace, accessoryFor, hairStyleFor,
   ROOMS, DOORS, DESK_SPOTS, type OfficeAgent, type EventLite,
 } from "./squadOffice";
 import { listTemplates } from "../../supabase/functions/_shared/squadTemplates";
@@ -131,5 +131,33 @@ describe("lugares e aparência", () => {
     expect(themeForEnvironment("estudio-video")).toBe("studio");
     expect(themeForEnvironment("hospital-futuro")).toBe("studio");
     expect(themeForEnvironment(null)).toBe("studio");
+  });
+});
+
+describe("perguntas ao dono no escritório", () => {
+  it("quem perguntou espera na mesa com balão de alerta", () => {
+    const cmds = eventToCommands(ev("question_asked", "b", "ops", "Qual orientação vale: manter constante ou evitar?"), team);
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0]).toMatchObject({ kind: "goto", agentId: "b", place: "desk", then: "wait", tone: "warn" });
+  });
+  it("ao responder, o agente volta ao normal e a diretora avisa", () => {
+    const cmds = eventToCommands(ev("question_answered", "b", null, "Manter constante"), team);
+    expect(cmds[0]).toMatchObject({ kind: "goto", agentId: "b", then: "idle" });
+    expect(cmds[1]).toMatchObject({ kind: "bubble", agentId: "h", tone: "ok" });
+  });
+});
+
+describe("aparência por função", () => {
+  it("cada função de template tem acessório definido ou nenhum, nunca erro", () => {
+    for (const t of listTemplates()) {
+      for (const a of t.agents) expect(["blazer", "glasses", "headphones", "beret", "headset", "none"]).toContain(accessoryFor(a.slug));
+    }
+    expect(accessoryFor("diretora")).toBe("blazer");
+    expect(accessoryFor("revisora")).toBe("glasses");
+    expect(accessoryFor(undefined)).toBe("none");
+  });
+  it("o penteado é estável e fica entre 0 e 3", () => {
+    expect(hairStyleFor("Bia")).toBe(hairStyleFor("Bia"));
+    ["Helena", "Bia", "Caio", "Íris", "Nina", "Theo"].forEach((n) => expect([0, 1, 2, 3]).toContain(hairStyleFor(n)));
   });
 });

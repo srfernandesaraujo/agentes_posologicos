@@ -53,7 +53,7 @@ export interface SquadAgent {
   sort_order: number;
 }
 
-export type MissionStatus = "running" | "paused" | "awaiting_approval" | "completed" | "failed" | "cancelled";
+export type MissionStatus = "running" | "paused" | "awaiting_owner" | "awaiting_approval" | "completed" | "failed" | "cancelled";
 
 export interface SquadMission {
   id: string;
@@ -78,6 +78,24 @@ export interface SquadTask {
   position: number;
   title: string;
   status: "pending" | "running" | "done" | "failed";
+  cost_usd: number;
+  tokens_input: number;
+  tokens_output: number;
+  provider: string | null;
+  model: string | null;
+  duration_ms: number | null;
+}
+
+export interface SquadQuestion {
+  id: string;
+  mission_id: string;
+  agent_id: string | null;
+  question: string;
+  options: string[];
+  why: string | null;
+  status: "open" | "answered";
+  answer: string | null;
+  created_at: string;
 }
 
 export interface SquadEvent {
@@ -186,15 +204,17 @@ export function useMissionDetail(missionId?: string) {
     queryKey: ["squad-mission", missionId],
     enabled: !!missionId,
     queryFn: async () => {
-      const [m, t, d, e] = await Promise.all([
+      const [m, t, d, e, q] = await Promise.all([
         db.from("squad_missions").select("*").eq("id", missionId).maybeSingle(),
-        db.from("squad_tasks").select("id, mission_id, agent_id, position, title, status").eq("mission_id", missionId).order("position"),
+        db.from("squad_tasks").select("id, mission_id, agent_id, position, title, status, cost_usd, tokens_input, tokens_output, provider, model, duration_ms").eq("mission_id", missionId).order("position"),
         db.from("squad_deliverables").select("*").eq("mission_id", missionId).order("created_at"),
         db.from("squad_events").select("*").eq("mission_id", missionId).order("id", { ascending: false }).limit(300),
+        db.from("squad_questions").select("*").eq("mission_id", missionId).order("created_at"),
       ]);
       if (m.error) throw m.error;
       return {
         mission: m.data as SquadMission | null,
+        questions: (q.data || []) as SquadQuestion[],
         tasks: (t.data || []) as SquadTask[],
         deliverables: (d.data || []) as SquadDeliverable[],
         events: (e.data || []) as SquadEvent[],
@@ -258,6 +278,11 @@ export function useSquadActions() {
     decide: useMutation({
       mutationFn: (v: { missionId: string; squadId: string; decision: "approve" | "changes"; comment?: string }) =>
         call<{ status: string }>({ action: "decide", missionId: v.missionId, decision: v.decision, comment: v.comment }),
+      onSuccess: (_d, v) => { invalidate(v.squadId); qc.invalidateQueries({ queryKey: ["squad-mission", v.missionId] }); },
+    }),
+    answerQuestion: useMutation({
+      mutationFn: (v: { questionId: string; missionId: string; squadId: string; answer: string }) =>
+        call({ action: "answer_question", questionId: v.questionId, answer: v.answer }),
       onSuccess: (_d, v) => { invalidate(v.squadId); qc.invalidateQueries({ queryKey: ["squad-mission", v.missionId] }); },
     }),
     raiseCap: useMutation({

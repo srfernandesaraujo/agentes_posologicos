@@ -5,7 +5,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } from "./llmProvider.ts";
 import {
   planTasks, pickNextTask, budgetState, buildTaskUserMessage, formDisplay, buildRevisionInstructions,
-  measureScript, parseDurationRange, durationNote, reviewRequestsAdjustments,
+  measureScript, parseDurationRange, durationNote, reviewRequestsAdjustments, extractOwnerQuestion, MAX_OWNER_QUESTIONS,
   type PreviousOutput, type SquadTemplate, type StepChecks,
 } from "./squadCore.ts";
 import { getTemplate } from "./squadTemplates.ts";
@@ -91,11 +91,12 @@ export async function createMission(
 
 // ---------- Executar UMA tarefa ----------
 
-export type StepState = "task_done" | "awaiting_approval" | "paused" | "failed" | "busy" | "closed";
+export type StepState = "task_done" | "awaiting_approval" | "awaiting_owner" | "paused" | "failed" | "busy" | "closed";
 
 export async function runNext(admin: SupabaseClient, missionId: string, userId: string): Promise<{ state: StepState; taskId?: string; message?: string }> {
   const mission = await loadOwnedMission(admin, missionId, userId);
   if (mission.status === "paused") return { state: "paused" };
+  if (mission.status === "awaiting_owner") return { state: "awaiting_owner" };
   if (mission.status !== "running") return { state: mission.status === "awaiting_approval" ? "awaiting_approval" : "closed" };
 
   // Teto de custo: checado ANTES de gastar mais.
@@ -174,6 +175,14 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
   const template = squad ? getTemplate(squad.template_slug) : null;
   const formForPrompt = template ? formDisplay(template.formFields, mission.form_data || {}) : (mission.form_data || {});
 
+  const { data: askedRows } = await admin.from("squad_questions").select("question, answer, status").eq("mission_id", mission.id).order("created_at");
+  const asked = askedRows || [];
+  const ownerCtx = {
+    canAsk: mission.trigger !== "schedule" && asked.length < MAX_OWNER_QUESTIONS,
+    remaining: Math.max(0, MAX_OWNER_QUESTIONS - asked.length),
+    qa: asked.filter((q: any) => q.status === "answered" && q.answer).map((q: any) => ({ question: q.question, answer: q.answer })),
+  };
+
   const keys = await getOrderedKeysForUser(admin, userId);
   if (!keys.length) return await failTask("Nenhuma chave de API configurada. Adicione uma em Configurações para o squad trabalhar.");
 
@@ -188,8 +197,9 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
   const userMessage = buildTaskUserMessage({
     briefing: mission.briefing, formData: formForPrompt, context: mission.context,
     step: { title: claimed.title, instructions: claimed.instructions }, previous,
-    team: (allAgents || []).map((a: any) => ({ name: a.name, role: a.role })), notes,
+    team: (allAgents || []).map((a: any) => ({ name: a.name, role: a.role })), notes, owner: ownerCtx,
   });
+  const startedMs = Date.now();
 
   // Teto alto de tokens: modelos com raciocínio gastam parte do teto "pensando" e cortavam a resposta no meio.
   const baseMessages = [{ role: "user", content: userMessage }];
@@ -219,8 +229,46 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
   if (finish === "length") {
     return await failTask("A resposta do modelo ficou grande demais e foi cortada. Tente de novo com um escopo menor.");
   }
+  // Custo desta etapa (acumula chamadas anteriores se a tarefa foi interrompida por uma pergunta ao dono)
+  const taskCost = Number(claimed.cost_usd || 0) + cost;
+  const taskIn = Number(claimed.tokens_input || 0) + tokensIn;
+  const taskOut = Number(claimed.tokens_output || 0) + tokensOut;
+
+  // O agente respondeu com uma pergunta ao dono em vez de entregar?
+  const oq = extractOwnerQuestion(output);
+  if (oq && ownerCtx.canAsk) {
+    await logAiUsage(admin, { userId, provider: first.provider!, model: first.model!, tokensInput: tokensIn, tokensOutput: tokensOut, promptType: "squad" });
+    const { data: qrow } = await admin.from("squad_questions").insert({
+      mission_id: mission.id, squad_id: mission.squad_id, owner_id: mission.owner_id, task_id: claimed.id, agent_id: agent.id,
+      question: oq.question, options: oq.options, why: oq.why || null,
+    }).select("id").single();
+    // A tarefa volta a "pending": roda de novo, já com a resposta do dono no contexto.
+    await admin.from("squad_tasks").update({
+      status: "pending", started_at: null, output: null, cost_usd: taskCost, tokens_input: taskIn, tokens_output: taskOut,
+    }).eq("id", claimed.id);
+    await admin.from("squad_missions").update({
+      status: "awaiting_owner", cost_usd: Number(mission.cost_usd) + cost,
+      tokens_input: Number(mission.tokens_input) + tokensIn, tokens_output: Number(mission.tokens_output) + tokensOut,
+    }).eq("id", mission.id);
+    await emit(admin, mission, { type: "question_asked", agentId: agent.id, room: agent.room, text: oq.question, payload: { question_id: qrow?.id, options: oq.options } });
+    await admin.from("notifications").insert({
+      user_id: mission.owner_id, type: "info", title: "Seu squad tem uma pergunta",
+      message: `${agent.name} precisa de uma decisão sua: ${oq.question.slice(0, 140)}`, link: `/squads/${mission.squad_id}`,
+    });
+    return { state: "awaiting_owner", taskId: claimed.id };
+  }
+  if (oq) {
+    // Pergunta fora de hora (execução agendada ou limite atingido): descarta o bloco; sem conteúdo, falha com clareza.
+    output = oq.cleaned;
+    if (output.length < 200) return await failTask("O agente tentou perguntar ao dono quando não podia e não entregou o conteúdo. Tente de novo.");
+  }
+
   const result = { ...first, output, tokensInput: tokensIn, tokensOutput: tokensOut };
-  await admin.from("squad_tasks").update({ status: "done", output: result.output, completed_at: new Date().toISOString() }).eq("id", claimed.id);
+  await admin.from("squad_tasks").update({
+    status: "done", output: result.output, completed_at: new Date().toISOString(),
+    cost_usd: taskCost, tokens_input: taskIn, tokens_output: taskOut, provider: result.provider, model: result.model,
+    duration_ms: Date.now() - startedMs,
+  }).eq("id", claimed.id);
   await logAiUsage(admin, { userId, provider: result.provider!, model: result.model!, tokensInput: result.tokensInput, tokensOutput: result.tokensOutput, promptType: "squad" });
 
   const spec = claimed.deliverable_spec as { title: string; kind: string; final?: boolean } | null;
@@ -285,5 +333,24 @@ export async function decideMission(
   });
   await admin.from("squad_missions").update({ status: "running" }).eq("id", mission.id);
   await emit(admin, mission, { type: "changes_requested", text: "Você pediu ajustes na entrega final.", payload: { comment: text } });
+  return { status: "running" };
+}
+
+// ---------- Responder uma pergunta do squad ----------
+
+export async function answerQuestion(admin: SupabaseClient, questionId: string, userId: string, answer: string) {
+  const text = answer.trim();
+  if (!text) throw new HttpError(400, "Escreva a sua resposta");
+  if (text.length > 2000) throw new HttpError(400, "Resposta acima de 2000 caracteres");
+  const { data: q } = await admin.from("squad_questions").select("*").eq("id", questionId).maybeSingle();
+  if (!q || q.owner_id !== userId) throw new HttpError(404, "Pergunta não encontrada");
+  if (q.status !== "open") throw new HttpError(409, "Esta pergunta já foi respondida");
+  const mission = await loadOwnedMission(admin, q.mission_id, userId);
+  await admin.from("squad_questions").update({ status: "answered", answer: text, answered_at: new Date().toISOString() }).eq("id", q.id);
+  if (mission.status === "awaiting_owner") {
+    const { count } = await admin.from("squad_questions").select("id", { count: "exact", head: true }).eq("mission_id", mission.id).eq("status", "open");
+    if (!count) await admin.from("squad_missions").update({ status: "running" }).eq("id", mission.id);
+  }
+  await emit(admin, mission, { type: "question_answered", agentId: q.agent_id, text: text.slice(0, 120), payload: { question_id: q.id } });
   return { status: "running" };
 }

@@ -54,6 +54,8 @@ export interface OfficeAgent {
   role: string;
   room: RoomId;
   sort_order: number;
+  /** Identifica a função (ex.: "diretora", "revisora"); define o acessório do personagem. */
+  slug?: string;
 }
 
 export type Place = "desk" | "meet" | "copa";
@@ -111,6 +113,20 @@ export function agentLook(name: string): { shirt: string; hair: string; skin: st
   return { shirt: SHIRTS[h % SHIRTS.length], hair: HAIRS[(h >> 4) % HAIRS.length], skin: SKINS[(h >> 8) % SKINS.length] };
 }
 
+export type Accessory = "blazer" | "glasses" | "headphones" | "beret" | "headset" | "none";
+const ACCESSORIES: Record<string, Accessory> = {
+  diretora: "blazer", revisora: "glasses", roteirista: "headphones", "diretor-arte": "beret", seo: "headset",
+  casos: "glasses", avaliacao: "none", trilha: "headset", referencias: "glasses", corretor: "glasses", prazos: "headphones",
+};
+/** Cada função tem um traço visual próprio, para reconhecer quem é quem de relance. */
+export function accessoryFor(slug?: string): Accessory {
+  return (slug && ACCESSORIES[slug]) || "none";
+}
+/** 0 curto, 1 comprido, 2 coque, 3 franja. Estável para o mesmo nome. */
+export function hairStyleFor(name: string): 0 | 1 | 2 | 3 {
+  return ((hash(name + "-hair") >>> 5) % 4) as 0 | 1 | 2 | 3;
+}
+
 // ---------- Eventos reais → comandos ----------
 
 export interface EventLite {
@@ -126,7 +142,7 @@ export type AfterArrive = "work" | "idle" | "meet" | "wait";
 
 export type Command =
   | { kind: "reset" }
-  | { kind: "goto"; agentId: string; place: Place; then: AfterArrive; bubble?: string }
+  | { kind: "goto"; agentId: string; place: Place; then: AfterArrive; bubble?: string; tone?: Tone }
   | { kind: "goto_all"; place: Place; then: AfterArrive; exceptId?: string }
   | { kind: "bubble"; agentId: string; text: string; ms: number; tone: Tone }
   | { kind: "paper"; fromAgentId: string }
@@ -168,6 +184,12 @@ export function eventToCommands(ev: EventLite, agents: OfficeAgent[]): Command[]
         { kind: "deliverable_count", delta: 1 },
         { kind: "bubble", agentId: agent.id, text: `Entregou: ${short(ev.text, 30)}`, ms: 3500, tone: "ok" },
       ];
+    case "question_asked":
+      // O agente que perguntou espera na mesa com um balão de alerta até o dono responder.
+      if (!agent) return [];
+      return [{ kind: "goto", agentId: agent.id, place: "desk", then: "wait", bubble: `Preciso de você: ${short(ev.text, 26)}`, tone: "warn" }];
+    case "question_answered":
+      return [...(agent ? [{ kind: "goto", agentId: agent.id, place: "desk", then: "idle" } as Command] : []), ...dirBubble("Resposta recebida, seguindo", "ok", 3500)];
     case "budget_warning":
       return dirBubble("80% do teto de custo", "warn");
     case "budget_paused":

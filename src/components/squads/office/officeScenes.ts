@@ -56,7 +56,11 @@ function floor(g: G, room: RoomId, p: Palette) {
   const f = p.floors[room];
   R(g, rm.x, rm.y, rm.w, rm.h, f.base);
   if (f.mode === "wood") {
-    for (let y = rm.y; y < rm.y + rm.h; y += 4) R(g, rm.x, y, rm.w, 1, f.alt);
+    for (let y = rm.y; y < rm.y + rm.h; y += 4) {
+      R(g, rm.x, y, rm.w, 1, f.alt);
+      // emendas das tábuas, deslocadas a cada fileira
+      for (let x = rm.x + ((y * 7) % 31); x < rm.x + rm.w; x += 31) R(g, x, y + 1, 1, 3, f.alt);
+    }
   } else {
     for (let y = rm.y; y < rm.y + rm.h; y += 8) {
       for (let x = rm.x + (((y - rm.y) / 8) % 2 ? 0 : 8); x < rm.x + rm.w; x += 16) {
@@ -65,6 +69,26 @@ function floor(g: G, room: RoomId, p: Palette) {
       }
     }
   }
+}
+
+/** Textura sutil e estável (mesma em todo quadro): pontinhos claros e escuros espalhados pelo piso. */
+function grain(g: G, x0: number, y0: number, w: number, h: number) {
+  for (let y = y0; y < y0 + h; y++) {
+    for (let x = x0; x < x0 + w; x++) {
+      const n = Math.imul(x * 73856093 ^ y * 19349663, 2654435761) >>> 24;
+      if (n < 9) R(g, x, y, 1, 1, "rgba(255,255,255,.07)");
+      else if (n > 246) R(g, x, y, 1, 1, "rgba(0,0,0,.09)");
+    }
+  }
+}
+
+/** Sombra interna junto às paredes (dá profundidade) e rodapé. */
+function wallShade(g: G, rm: { x: number; y: number; w: number; h: number }) {
+  R(g, rm.x + 2, rm.y + 2, rm.w - 4, 4, "rgba(0,0,0,.22)");
+  R(g, rm.x + 2, rm.y + 6, rm.w - 4, 2, "rgba(0,0,0,.10)");
+  R(g, rm.x + 2, rm.y + 2, 3, rm.h - 4, "rgba(0,0,0,.12)");
+  R(g, rm.x + rm.w - 5, rm.y + 2, 3, rm.h - 4, "rgba(0,0,0,.12)");
+  R(g, rm.x + 2, rm.y + rm.h - 5, rm.w - 4, 3, "rgba(0,0,0,.14)");
 }
 
 function walls(g: G, rm: { x: number; y: number; w: number; h: number }) {
@@ -80,6 +104,10 @@ const monitor = (g: G, x: number, y: number, c = "#4db3ff") => { R(g, x, y, 8, 6
 
 /** Móveis comuns: ficam nos pontos de DESK_SPOTS e dos assentos, iguais em todos os temas (mudam só as cores). */
 function furniture(g: G, p: Palette) {
+  // Sombras projetadas no chão (desenhadas antes dos móveis)
+  R(g, 178, 40, 76, 3, "rgba(0,0,0,.22)"); R(g, 226, 110, 60, 3, "rgba(0,0,0,.22)"); R(g, 226, 154, 60, 3, "rgba(0,0,0,.22)");
+  R(g, 66, 74, 44, 3, "rgba(0,0,0,.22)"); R(g, 40, 178, 40, 3, "rgba(0,0,0,.2)"); R(g, 24, 214, 70, 3, "rgba(0,0,0,.22)");
+  R(g, 20, 296, 70, 3, "rgba(0,0,0,.18)");
   // Direção
   R(g, 40, 48, 76, 52, "#2b3a5e"); R(g, 43, 51, 70, 46, "#34476f");
   R(g, 64, 58, 44, 16, "#6b4a2e"); R(g, 66, 60, 40, 12, "#2f6b4a"); R(g, 84, 62, 4, 4, "#e9c46a");
@@ -112,6 +140,25 @@ function furniture(g: G, p: Palette) {
   g.fillStyle = "#1d2a4a"; g.beginPath(); g.ellipse(244, 248, 22, 19, 0, 0, Math.PI * 2); g.fill();
   g.fillStyle = "#2b3b66"; g.beginPath(); g.ellipse(244, 247, 19, 16, 0, 0, Math.PI * 2); g.fill();
   R(g, 238, 243, 12, 8, "#6a7fb5");
+}
+
+/** Pequenos objetos que fazem a mesa parecer usada: teclados, canecas, papéis, tapete com padrão, relógio. */
+function details(g: G, p: Palette) {
+  // teclados e canecas nas mesas de operações
+  [[184, 33], [220, 33], [228, 100], [260, 100], [234, 144], [262, 144]].forEach(([x, y]) => {
+    R(g, x, y, 12, 3, "#2a2d38"); R(g, x + 1, y, 10, 1, "#4b5563");
+  });
+  [[246, 31], [276, 99], [276, 143]].forEach(([x, y]) => { R(g, x, y, 3, 3, "#f3f0e6"); R(g, x + 3, y + 1, 1, 1, "#f3f0e6"); });
+  [[206, 32], [248, 100], [250, 144]].forEach(([x, y]) => { R(g, x, y, 6, 4, "#fffdf3"); R(g, x + 1, y + 1, 4, 1, "#9ca3af"); });
+  // direção: luminária e tapete com padrão
+  R(g, 70, 59, 2, 6, "#2a2d38"); R(g, 68, 58, 6, 2, p.accent);
+  for (let i = 0; i < 70; i += 6) { R(g, 43 + i, 51, 3, 1, "#4c5f8a"); R(g, 43 + i, 96, 3, 1, "#4c5f8a"); }
+  // relógio de parede na direção (os ponteiros são animados na camada dinâmica)
+  R(g, 134, 17, 12, 12, "#2a2d38"); R(g, 135, 18, 10, 10, "#f3f0e6");
+  // biblioteca: tapete com franjas
+  for (let i = 0; i < 40; i += 4) { R(g, 38 + i, 153, 2, 1, "#e9e5da"); R(g, 38 + i, 178, 2, 1, "#e9e5da"); }
+  // copa: frutas na mesa
+  R(g, 44, 238, 4, 4, "#ef4444"); R(g, 52, 238, 4, 4, "#f59e0b"); R(g, 58, 239, 4, 3, "#84cc16");
 }
 
 // ---------- Decoração temática ----------
@@ -188,8 +235,14 @@ export function getStaticLayer(theme: SceneTheme): HTMLCanvasElement {
   ([[106, 128, 62, 62], [106, 190, 80, 113], [152, 14, 16, 114]] as const).forEach(([x, y, w, h]) => {
     for (let yy = y; yy < y + h; yy += 8) for (let xx = x; xx < x + w; xx += 8) R(g, xx, yy, 8, 8, ((xx + yy) / 8) % 2 ? p.hall[0] : p.hall[1]);
   });
-  (Object.keys(ROOMS) as RoomId[]).forEach((r) => floor(g, r, p));
+  (Object.keys(ROOMS) as RoomId[]).forEach((r) => { floor(g, r, p); grain(g, ROOMS[r].x, ROOMS[r].y, ROOMS[r].w, ROOMS[r].h); wallShade(g, ROOMS[r]); });
+  // brilho do mármore no corredor
+  ([[106, 128, 62, 62], [106, 190, 80, 113]] as const).forEach(([x, y, w, h]) => {
+    grain(g, x, y, w, h);
+    for (let i = 0; i < w + h; i += 24) R(g, x + ((i * 3) % w), y + ((i * 5) % h), 10, 1, "rgba(255,255,255,.04)");
+  });
   furniture(g, p);
+  details(g, p);
   DECOR[theme](g);
   (Object.keys(ROOMS) as RoomId[]).forEach((r) => walls(g, ROOMS[r]));
   // Portas
@@ -250,5 +303,34 @@ export function drawAnimated(ctx: G, theme: SceneTheme, info: AnimInfo) {
   // Pilha de entregas na mesa da diretora
   const n = Math.min(info.deliverables, 8);
   for (let i = 0; i < n; i++) R(ctx, 98, 69 - i * 2, 9, 2, i % 2 ? "#f8f6ee" : "#fef3c7");
+
+  // Relógio da parede da direção, com a hora real do navegador
+  const d = new Date();
+  const mAng = ((d.getMinutes() + d.getSeconds() / 60) / 60) * Math.PI * 2 - Math.PI / 2;
+  const hAng = (((d.getHours() % 12) + d.getMinutes() / 60) / 12) * Math.PI * 2 - Math.PI / 2;
+  ctx.strokeStyle = "#1b2030"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(140, 23); ctx.lineTo(140 + Math.cos(mAng) * 4, 23 + Math.sin(mAng) * 4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(140, 23); ctx.lineTo(140 + Math.cos(hAng) * 2.5, 23 + Math.sin(hAng) * 2.5); ctx.stroke();
+
+  // Feixe de luz da janela da direção, com leve oscilação
+  const sway = Math.sin(info.t * 0.4) * 0.015;
+  ctx.fillStyle = `rgba(255,240,190,${0.07 + sway})`;
+  ctx.beginPath(); ctx.moveTo(70, 26); ctx.lineTo(100, 26); ctx.lineTo(84, 78); ctx.lineTo(44, 78); ctx.closePath(); ctx.fill();
+
+  // Vapor da cafeteira na copa
+  for (let i = 0; i < 3; i++) {
+    const k = ((info.t * 0.9 + i * 0.33) % 1);
+    R(ctx, 30 + i * 2 + Math.round(Math.sin((info.t + i) * 2)), 198 - Math.round(k * 9), 1, 2, `rgba(255,255,255,${0.5 * (1 - k)})`);
+  }
+
+  // Hora do dia: noite azulada, entardecer quente
+  const hour = d.getHours() + d.getMinutes() / 60;
+  if (hour < 6 || hour >= 20) R(ctx, 0, 0, 320, 320, "rgba(20,30,80,.13)");
+  else if (hour < 8 || hour >= 17) R(ctx, 0, 0, 320, 320, "rgba(255,160,70,.07)");
+
+  // Vinheta: escurece as bordas para concentrar o olhar no meio
+  const vg = ctx.createRadialGradient(160, 160, 100, 160, 160, 235);
+  vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.32)");
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, 320, 320);
   ctx.restore();
 }

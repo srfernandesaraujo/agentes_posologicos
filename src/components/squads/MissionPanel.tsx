@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, Circle, Loader2, PauseCircle, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, HelpCircle, Loader2, PauseCircle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import {
   driveMission, useMissionDetail, useMissionRealtime, useSquadActions,
-  type MissionStatus, type SquadAgent, type SquadDeliverable, type SquadEvent, type SquadTemplateInfo,
+  type MissionStatus, type SquadAgent, type SquadDeliverable, type SquadEvent, type SquadQuestion, type SquadTemplateInfo,
 } from "@/hooks/useSquads";
 import { CostCapField, fmtUsd } from "./CostCapField";
 import { OfficeSection } from "./office/OfficeSection";
@@ -17,6 +17,7 @@ import { OfficeSection } from "./office/OfficeSection";
 export const MISSION_STATUS: Record<MissionStatus, { label: string; className: string }> = {
   running: { label: "Trabalhando", className: "border-sky-400/40 text-sky-300" },
   paused: { label: "Pausada (teto de custo)", className: "border-amber-400/40 text-amber-300" },
+  awaiting_owner: { label: "Pergunta para você", className: "border-amber-400/60 text-amber-300" },
   awaiting_approval: { label: "Aguardando você", className: "border-[hsl(var(--accent))] text-[hsl(var(--accent))]" },
   completed: { label: "Concluída", className: "border-emerald-400/40 text-emerald-300" },
   failed: { label: "Falhou", className: "border-red-400/40 text-red-300" },
@@ -44,7 +45,48 @@ const EVENT_LABEL: Record<string, string> = {
   changes_requested: "Ajustes pedidos",
   mission_failed: "Missão falhou",
   pii_masked: "Dados mascarados",
+  question_asked: "Perguntou a você",
+  question_answered: "Resposta recebida",
+  task_skipped: "Etapa dispensada",
 };
+
+const SAFE_ANSWER = "Decida você: siga a opção mais segura e deixe a suposição registrada na entrega para eu conferir.";
+
+/** Valores pequenos (frações de centavo) precisam de mais casas para não aparecerem como zero. */
+function fmtUsdSmall(n: number): string {
+  return n > 0 && n < 0.01 ? `US$ ${n.toFixed(4).replace(".", ",")}` : fmtUsd(n);
+}
+
+function fmtDuration(ms: number | null): string {
+  if (!ms) return "";
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;
+}
+
+function QuestionCard({ q, agentName, busy, onAnswer }: { q: SquadQuestion; agentName: string; busy: boolean; onAnswer: (answer: string) => void }) {
+  const [text, setText] = useState("");
+  return (
+    <div className="space-y-3 rounded-lg border border-amber-400/40 bg-amber-400/5 p-4">
+      <div className="flex items-center gap-2 text-amber-200"><HelpCircle className="h-4 w-4" /> {agentName} precisa de uma decisão sua para continuar</div>
+      <p className="text-sm font-medium">{q.question}</p>
+      {q.why && <p className="text-xs text-white/50">Por que isso importa: {q.why}</p>}
+      {q.options.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {q.options.map((o) => (
+            <Button key={o} variant="outline" disabled={busy} onClick={() => onAnswer(o)} className="h-auto whitespace-normal border-white/20 bg-transparent py-2 text-left">{o}</Button>
+          ))}
+        </div>
+      )}
+      <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Ou escreva a sua resposta" aria-label="Sua resposta" className="min-h-[70px] bg-white/5 border-white/10" />
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={busy || !text.trim()} onClick={() => onAnswer(text)} className="gap-2">
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />} Enviar resposta
+        </Button>
+        <Button variant="ghost" disabled={busy} onClick={() => onAnswer(SAFE_ANSWER)} className="text-white/60">Decida você (opção mais segura)</Button>
+      </div>
+    </div>
+  );
+}
 
 function Markdown({ children }: { children: string }) {
   return (
@@ -59,7 +101,7 @@ export function MissionPanel({
 }: { missionId: string; squadId: string; agents: SquadAgent[]; template: SquadTemplateInfo; environment: string }) {
   const { data, isLoading } = useMissionDetail(missionId);
   useMissionRealtime(missionId, squadId);
-  const { decide, raiseCap } = useSquadActions();
+  const { decide, raiseCap, answerQuestion } = useSquadActions();
   const [changeText, setChangeText] = useState("");
   const [asking, setAsking] = useState(false);
   const [newCap, setNewCap] = useState(0);
@@ -100,6 +142,12 @@ export function MissionPanel({
       toast.success("Pedido de ajustes enviado ao squad");
     } catch (e: any) { toast.error(e.message); }
   };
+  const onAnswer = async (questionId: string, answer: string) => {
+    try { await answerQuestion.mutateAsync({ questionId, missionId, squadId, answer }); toast.success("Resposta enviada, o squad vai continuar"); }
+    catch (e: any) { toast.error(e.message); }
+  };
+  const openQuestions = data!.questions.filter((q) => q.status === "open");
+  const answeredQuestions = data!.questions.filter((q) => q.status === "answered");
   const onRaise = async () => {
     try { await raiseCap.mutateAsync({ missionId, squadId, costCapUsd: newCap }); toast.success("Teto aumentado, o squad vai continuar"); }
     catch (e: any) { toast.error(e.message); }
@@ -117,7 +165,7 @@ export function MissionPanel({
         <h3 className="text-lg font-semibold">{mission.briefing}</h3>
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-white/50">
-            <span>Custo estimado {fmtUsd(cost)}</span><span>Teto {fmtUsd(cap)}</span>
+            <span>Custo estimado {fmtUsdSmall(cost)} · {(Number(mission.tokens_input) + Number(mission.tokens_output)).toLocaleString("pt-BR")} tokens</span><span>Teto {fmtUsd(cap)}</span>
           </div>
           <Progress
             value={pct}
@@ -141,6 +189,10 @@ export function MissionPanel({
           </Button>
         </div>
       )}
+
+      {mission.status === "awaiting_owner" && openQuestions.map((q) => (
+        <QuestionCard key={q.id} q={q} agentName={agentById.get(q.agent_id || "")?.name || "O squad"} busy={answerQuestion.isPending} onAnswer={(a) => onAnswer(q.id, a)} />
+      ))}
 
       {mission.status === "awaiting_approval" && finalDeliv && (
         <div className="space-y-3 rounded-lg border border-[hsl(var(--accent))]/40 bg-[hsl(var(--accent))]/5 p-4">
@@ -173,19 +225,38 @@ export function MissionPanel({
           {data!.tasks.map((t) => {
             const a = agentById.get(t.agent_id);
             return (
-              <li key={t.id} className="flex items-center gap-2 text-sm">
-                {t.status === "done" ? <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                  : t.status === "running" ? <Loader2 className="h-4 w-4 animate-spin text-sky-300" />
-                  : t.status === "failed" ? <AlertTriangle className="h-4 w-4 text-red-300" />
-                  : <Circle className="h-4 w-4 text-white/20" />}
+              <li key={t.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+                {t.status === "done" ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                  : t.status === "running" ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-sky-300" />
+                  : t.status === "failed" ? <AlertTriangle className="h-4 w-4 shrink-0 text-red-300" />
+                  : <Circle className="h-4 w-4 shrink-0 text-white/20" />}
                 <span className="font-medium">{a?.name || "Agente"}</span>
                 <span className="text-white/40">{a?.role}</span>
                 <span className="text-white/60">· {t.title}</span>
+                {t.status === "done" && Number(t.cost_usd) > 0 && (
+                  <span className="ml-auto font-mono text-xs text-white/40" title={`${t.tokens_input} tokens de entrada, ${t.tokens_output} de saída`}>
+                    {t.model || "modelo"} · {fmtUsdSmall(Number(t.cost_usd))}{t.duration_ms ? ` · ${fmtDuration(t.duration_ms)}` : ""}
+                  </span>
+                )}
               </li>
             );
           })}
         </ul>
       </div>
+
+      {answeredQuestions.length > 0 && (
+        <div>
+          <h4 className="mb-2 text-sm font-semibold text-white/70">Perguntas e respostas</h4>
+          <ul className="space-y-2 text-sm">
+            {answeredQuestions.map((q) => (
+              <li key={q.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="text-white/70">{agentById.get(q.agent_id || "")?.name || "Squad"}: {q.question}</div>
+                <div className="mt-1 text-white">Você: {q.answer}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div>
         <h4 className="mb-2 text-sm font-semibold text-white/70">Entregas ({data!.deliverables.length})</h4>

@@ -221,6 +221,8 @@ export function buildTaskUserMessage(p: {
   team?: { name: string; role: string }[];
   /** Medições feitas pelo sistema (ex.: duração do roteiro). */
   notes?: string[];
+  /** Perguntas já respondidas pelo dono e se este agente ainda pode perguntar. */
+  owner?: OwnerQaContext;
 }): string {
   const parts: string[] = [];
   if (p.team && p.team.length) parts.push(buildTeamRoster(p.team));
@@ -241,6 +243,7 @@ export function buildTaskUserMessage(p: {
   if (p.notes && p.notes.length) {
     parts.push(`# Medições automáticas (feitas pelo sistema por código, não por estimativa; use estes números)\n${p.notes.join("\n")}`);
   }
+  if (p.owner) parts.push(buildOwnerRules(p.owner));
   parts.push(`# Sua tarefa agora: ${p.step.title}\n${p.step.instructions.trim()}`);
   return parts.join("\n\n");
 }
@@ -421,4 +424,70 @@ export function monthStartIso(now: Date): string {
   const shifted = new Date(now.getTime() + BRT_OFFSET_MS);
   const startShifted = Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), 1);
   return new Date(startShifted - BRT_OFFSET_MS).toISOString();
+}
+
+// ---------- Perguntas ao dono (bloqueantes) ----------
+
+export const MAX_OWNER_QUESTIONS = 2;
+
+export interface OwnerQuestion {
+  question: string;
+  options: string[];
+  why: string;
+  /** O texto sem o bloco de pergunta (útil quando a pergunta não era permitida). */
+  cleaned: string;
+}
+
+/**
+ * Procura o bloco [[PERGUNTA_AO_DONO]] ... [[/PERGUNTA_AO_DONO]] na resposta de um agente.
+ * Campos: "Pergunta:", "Opções: a | b | c", "Por quê:". Tolerante a variações e a bloco sem fechamento.
+ */
+export function extractOwnerQuestion(text: string): OwnerQuestion | null {
+  const m = text.match(/\[\[\s*PERGUNTA_AO_DONO\s*\]\]([\s\S]*?)(?:\[\[\s*\/\s*PERGUNTA_AO_DONO\s*\]\]|$)/i);
+  if (!m) return null;
+  const body = m[1].trim();
+  const field = (re: RegExp): string => {
+    const f = body.match(re);
+    return f ? f[1].trim() : "";
+  };
+  const question = field(/^\s*Pergunta\s*:\s*([\s\S]*?)(?=^\s*(?:Op[çc][õo]es|Por\s*qu[êe])\s*:|(?![\s\S]))/im) ||
+    body.split("\n").map((l) => l.trim()).find((l) => l.length > 0) || "";
+  if (!question) return null;
+  const optionsRaw = field(/^\s*Op[çc][õo]es\s*:\s*([\s\S]*?)(?=^\s*(?:Pergunta|Por\s*qu[êe])\s*:|(?![\s\S]))/im);
+  const options = optionsRaw
+    .split(/\||\n/)
+    .map((o) => o.replace(/^[-*•\d.)\s]+/, "").trim())
+    .filter((o) => o.length > 0 && o.length <= 160)
+    .slice(0, 4);
+  const why = field(/^\s*Por\s*qu[êe]\s*:\s*([\s\S]*?)(?=^\s*(?:Pergunta|Op[çc][õo]es)\s*:|(?![\s\S]))/im);
+  const cleaned = text.replace(/\[\[\s*PERGUNTA_AO_DONO\s*\]\][\s\S]*?(?:\[\[\s*\/\s*PERGUNTA_AO_DONO\s*\]\]|$)/i, "").trim();
+  return { question: question.slice(0, 600), options, why: why.slice(0, 600), cleaned };
+}
+
+export interface OwnerQaContext {
+  /** O agente pode perguntar agora? (não em execução agendada e dentro do limite) */
+  canAsk: boolean;
+  remaining: number;
+  qa: { question: string; answer: string }[];
+}
+
+export function buildOwnerRules(o: OwnerQaContext): string {
+  const parts: string[] = [];
+  if (o.qa.length) {
+    parts.push(
+      `# Respostas do dono às perguntas desta missão (valem como verdade, acima de qualquer suposição)\n` +
+        o.qa.map((x, i) => `${i + 1}. Pergunta: ${x.question}\n   Resposta do dono: ${x.answer}`).join("\n"),
+    );
+  }
+  if (o.canAsk) {
+    parts.push(
+      `# Perguntas ao dono\nVocê pode fazer até ${o.remaining} pergunta(s) ao dono nesta missão, SÓ quando houver contradição no material ou uma lacuna ` +
+        `essencial que você não pode assumir com segurança (ex.: duas orientações clínicas conflitantes). Dúvidas pequenas: assuma a opção mais segura e registre como suposição. ` +
+        `Para perguntar, responda APENAS com este bloco, sem mais nada:\n[[PERGUNTA_AO_DONO]]\nPergunta: <uma pergunta objetiva>\nOpções: <opção 1> | <opção 2> | <opção 3>\n` +
+        `Por quê: <por que isso muda o resultado>\n[[/PERGUNTA_AO_DONO]]`,
+    );
+  } else {
+    parts.push(`# Perguntas ao dono\nNão faça perguntas ao dono nesta tarefa (execução agendada ou limite de perguntas atingido). Assuma a opção mais segura e registre a suposição na entrega.`);
+  }
+  return parts.join("\n\n");
 }

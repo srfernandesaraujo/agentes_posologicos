@@ -87,7 +87,7 @@ export const TEMPLATE_CONTEUDO_YOUTUBE: SquadTemplate = {
       agent: "diretora",
       title: "Plano da missão",
       instructions:
-        "Leia o pedido e escreva um plano curto: objetivo do vídeo, público, tom, duração alvo, o que cada colega vai entregar (use SOMENTE os colegas da lista 'Seu time', com os nomes deles) e um checklist de qualidade de 5 itens. Se faltar informação importante, liste as suposições que você está fazendo.",
+        "Leia o pedido e escreva um plano curto: objetivo do vídeo, público, tom, duração alvo, o que cada colega vai entregar (use SOMENTE os colegas da lista 'Seu time', com os nomes deles) e um checklist de qualidade de 5 itens. Se o material de apoio se contradiz ou falta algo essencial que você não pode assumir com segurança, pergunte ao dono antes de fazer o plano (veja as regras de perguntas); para dúvidas pequenas, liste as suposições que você está fazendo.",
       deliverable: { title: "Plano de trabalho", kind: "Plano" },
     },
     {
@@ -194,7 +194,7 @@ export const TEMPLATE_EDTECH: SquadTemplate = {
     {
       agent: "diretora",
       title: "Plano da atividade",
-      instructions: "Leia o pedido e escreva o plano: objetivos de aprendizagem reformulados de forma mensurável, método escolhido e por quê, o que cada colega vai entregar e um checklist de qualidade de 5 itens. Liste as suposições que você está fazendo.",
+      instructions: "Leia o pedido e escreva o plano: objetivos de aprendizagem reformulados de forma mensurável, método escolhido e por quê, o que cada colega vai entregar e um checklist de qualidade de 5 itens. Se o material se contradiz ou falta algo essencial que você não pode assumir com segurança, pergunte ao dono antes de fazer o plano (veja as regras de perguntas); para dúvidas pequenas, liste as suposições que você está fazendo.",
       deliverable: { title: "Plano da atividade", kind: "Plano" },
     },
     {
@@ -283,7 +283,7 @@ export const TEMPLATE_MENTORIA: SquadTemplate = {
     {
       agent: "diretora",
       title: "Plano da semana",
-      instructions: "Leia o foco, a lista de orientandos e a memória do squad (inclusive o resultado da execução anterior, se houver). Escreva o que mudou desde a última vez, o que merece atenção primeiro e o que cada colega vai fazer.",
+      instructions: "Leia o foco, a lista de orientandos e a memória do squad (inclusive o resultado da execução anterior, se houver). Escreva o que mudou desde a última vez, o que merece atenção primeiro e o que cada colega vai fazer. Em execução manual, se os dados se contradizem ou falta algo essencial, pergunte ao dono antes de fazer o plano (veja as regras de perguntas); em execução agendada, assuma o mais seguro e registre a suposição.",
       deliverable: { title: "Plano da semana", kind: "Plano" },
     },
     {

@@ -78,7 +78,7 @@ export function applyCommand(sim: Sim, cmd: Command, now: number, instant: boole
       if (!a) break;
       moveTo(sim, a, cmd.place, cmd.then, instant);
       if (cmd.then === "idle") a.bubble = null;
-      else if (cmd.bubble) a.bubble = { text: cmd.bubble, until: Infinity, tone: "info" };
+      else if (cmd.bubble) a.bubble = { text: cmd.bubble, until: Infinity, tone: cmd.tone ?? "info" };
       break;
     }
     case "goto_all":
