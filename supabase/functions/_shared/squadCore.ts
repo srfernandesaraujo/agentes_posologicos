@@ -36,6 +36,8 @@ export interface TemplateStep {
   instructions: string;
   deliverable?: DeliverableSpec;
   checks?: StepChecks;
+  /** Roda ao mesmo tempo que a etapa anterior (mesma dependência). A etapa seguinte ao grupo espera todas. */
+  parallelWithPrevious?: boolean;
 }
 
 export interface FormField {
@@ -71,26 +73,45 @@ export interface PlannedTask {
   instructions: string;
   /** Posição da tarefa de que esta depende (null na primeira). Pipeline sequencial na Fase 0. */
   dependsOnPosition: number | null;
+  /** Todas as posições de que esta tarefa depende (vazio na primeira). Permite etapas em paralelo. */
+  dependsOnPositions: number[];
   deliverable: DeliverableSpec | null;
   checks: StepChecks | null;
 }
 
 export function planTasks(template: SquadTemplate): PlannedTask[] {
   const slugs = new Set(template.agents.map((a) => a.slug));
+  // Grupos paralelos: [start..end]. Cada membro depende do que o primeiro do grupo dependia;
+  // a etapa seguinte ao grupo depende de todos os membros.
+  const groupStart: number[] = [];
+  template.steps.forEach((st, i) => {
+    groupStart[i] = st.parallelWithPrevious && i > 0 ? groupStart[i - 1] : i;
+  });
   return template.steps.map((s, i) => {
     if (!slugs.has(s.agent)) {
       throw new Error(`Template ${template.slug}: etapa "${s.title}" usa agente inexistente "${s.agent}"`);
     }
+    const start = groupStart[i];
+    const deps = start === 0 ? [] : prevGroupPositions(groupStart, start);
     return {
       position: i,
       agentSlug: s.agent,
       title: s.title,
       instructions: s.instructions,
-      dependsOnPosition: i === 0 ? null : i - 1,
+      dependsOnPosition: deps.length ? deps[0] : null,
+      dependsOnPositions: deps,
       deliverable: s.deliverable ?? null,
       checks: s.checks ?? null,
     };
   });
+}
+
+/** Posições do grupo que termina logo antes de `before` (um grupo de 1 = a etapa anterior). */
+function prevGroupPositions(groupStart: number[], before: number): number[] {
+  const start = groupStart[before - 1];
+  const out: number[] = [];
+  for (let p = start; p < before; p++) out.push(p);
+  return out;
 }
 
 // ---------- Escolha da próxima tarefa ----------
@@ -100,6 +121,8 @@ export interface TaskLite {
   position: number;
   status: "pending" | "running" | "done" | "failed";
   depends_on_position: number | null;
+  /** Todas as dependências (opcional; sem ela vale depends_on_position). */
+  depends_on_positions?: number[] | null;
 }
 
 export type NextTask =
@@ -108,18 +131,38 @@ export type NextTask =
   | { kind: "failed" }
   | { kind: "finished" };
 
+function depsOf(t: TaskLite): number[] {
+  if (t.depends_on_positions && t.depends_on_positions.length) return t.depends_on_positions;
+  return t.depends_on_position == null ? [] : [t.depends_on_position];
+}
+
+export type ReadyTasks =
+  | { kind: "tasks"; tasks: TaskLite[] }
+  | { kind: "busy" }
+  | { kind: "failed" }
+  | { kind: "finished" };
+
+/**
+ * Todas as tarefas prontas para rodar agora (dependências concluídas). Em paralelo, várias podem estar
+ * prontas ao mesmo tempo; tarefas já em execução não impedem iniciar outras prontas.
+ */
+export function pickReadyTasks(tasks: TaskLite[]): ReadyTasks {
+  if (tasks.some((t) => t.status === "failed")) return { kind: "failed" };
+  if (tasks.length > 0 && tasks.every((t) => t.status === "done")) return { kind: "finished" };
+  const byPos = new Map(tasks.map((t) => [t.position, t]));
+  const ready = [...tasks]
+    .sort((a, b) => a.position - b.position)
+    .filter((t) => t.status === "pending" && depsOf(t).every((p) => byPos.get(p)?.status === "done"));
+  return ready.length ? { kind: "tasks", tasks: ready } : { kind: "busy" };
+}
+
+/** Compatível com o uso sequencial: só a primeira pronta, e nada se algo já roda. */
 export function pickNextTask(tasks: TaskLite[]): NextTask {
   if (tasks.some((t) => t.status === "failed")) return { kind: "failed" };
   if (tasks.some((t) => t.status === "running")) return { kind: "busy" };
-  if (tasks.length > 0 && tasks.every((t) => t.status === "done")) return { kind: "finished" };
-  const byPos = new Map(tasks.map((t) => [t.position, t]));
-  const ordered = [...tasks].sort((a, b) => a.position - b.position);
-  for (const t of ordered) {
-    if (t.status !== "pending") continue;
-    const dep = t.depends_on_position;
-    if (dep == null || byPos.get(dep)?.status === "done") return { kind: "task", task: t };
-  }
-  return { kind: "busy" };
+  const r = pickReadyTasks(tasks);
+  if (r.kind === "tasks") return { kind: "task", task: r.tasks[0] };
+  return r;
 }
 
 // ---------- Teto de custo ----------

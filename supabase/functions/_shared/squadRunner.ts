@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } from "./llmProvider.ts";
 import {
-  planTasks, pickNextTask, budgetState, buildTaskUserMessage, formDisplay, buildRevisionInstructions,
+  planTasks, pickReadyTasks, budgetState, buildTaskUserMessage, formDisplay, buildRevisionInstructions,
   measureScript, parseDurationRange, durationNote, reviewRequestsAdjustments, extractOwnerQuestion, MAX_OWNER_QUESTIONS,
   type PreviousOutput, type SquadTemplate, type StepChecks,
 } from "./squadCore.ts";
@@ -38,8 +38,11 @@ export async function loadOwnedMission(admin: SupabaseClient, missionId: string,
 }
 
 async function failMission(admin: SupabaseClient, mission: any, message: string) {
-  await admin.from("squad_missions").update({ status: "failed", error: message, completed_at: new Date().toISOString() }).eq("id", mission.id);
-  await emit(admin, mission, { type: "mission_failed", text: message });
+  // Com tarefas em paralelo, mais de uma pode falhar: registra a falha da missão só uma vez.
+  const { data: changed } = await admin.from("squad_missions")
+    .update({ status: "failed", error: message, completed_at: new Date().toISOString() })
+    .eq("id", mission.id).neq("status", "failed").select("id");
+  if (changed && changed.length) await emit(admin, mission, { type: "mission_failed", text: message });
 }
 
 // ---------- Criar missão ----------
@@ -76,7 +79,7 @@ export async function createMission(
   const { error: tErr } = await admin.from("squad_tasks").insert(
     planned.map((t) => ({
       mission_id: mission.id, owner_id: p.userId, agent_id: idBySlug.get(t.agentSlug), position: t.position,
-      depends_on_position: t.dependsOnPosition, title: t.title, instructions: t.instructions, deliverable_spec: t.deliverable,
+      depends_on_position: t.dependsOnPosition, depends_on_positions: t.dependsOnPositions, title: t.title, instructions: t.instructions, deliverable_spec: t.deliverable,
       checks: t.checks,
     })),
   );
@@ -111,9 +114,9 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
   }
 
   const { data: tasks } = await admin
-    .from("squad_tasks").select("id, position, status, depends_on_position, started_at")
+    .from("squad_tasks").select("id, position, status, depends_on_position, depends_on_positions, started_at")
     .eq("mission_id", mission.id).order("position");
-  const next = pickNextTask((tasks || []) as any[]);
+  const next = pickReadyTasks((tasks || []) as any[]);
 
   if (next.kind === "failed") { await failMission(admin, mission, "Uma tarefa falhou."); return { state: "failed" }; }
   if (next.kind === "busy") {
@@ -132,12 +135,33 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
     return { state: "awaiting_approval" };
   }
 
-  // Reserva a tarefa (só uma chamada concorrente consegue virar pending → running).
-  const { data: claimed } = await admin
-    .from("squad_tasks").update({ status: "running", started_at: new Date().toISOString() })
-    .eq("id", next.task.id).eq("status", "pending").select("*").maybeSingle();
-  if (!claimed) return { state: "busy" };
+  // Reserva todas as tarefas prontas (só uma chamada concorrente consegue virar pending → running)
+  // e roda em paralelo. Tarefas de um mesmo grupo terminam independentemente.
+  const claimedRows: any[] = [];
+  for (const t of next.tasks) {
+    const { data: claimed } = await admin
+      .from("squad_tasks").update({ status: "running", started_at: new Date().toISOString() })
+      .eq("id", t.id).eq("status", "pending").select("*").maybeSingle();
+    if (claimed) claimedRows.push(claimed);
+  }
+  if (!claimedRows.length) return { state: "busy" };
 
+  const results = await Promise.all(claimedRows.map((claimed) =>
+    runTask(admin, mission, claimed, userId).catch(async (e) => {
+      // Erro inesperado numa tarefa não pode deixá-la "running" para sempre nem derrubar as irmãs.
+      const msg = e instanceof Error ? e.message : "Erro inesperado";
+      await admin.from("squad_tasks").update({ status: "failed", error: msg, completed_at: new Date().toISOString() }).eq("id", claimed.id);
+      await failMission(admin, mission, msg);
+      return { state: "failed" as StepState, taskId: claimed.id, message: msg };
+    })
+  ));
+  const pick = (st: StepState) => results.find((r) => r.state === st);
+  return pick("failed") || pick("awaiting_owner") || pick("paused") || results[0];
+}
+
+// ---------- Executar UMA tarefa já reservada ----------
+
+async function runTask(admin: SupabaseClient, mission: any, claimed: any, userId: string): Promise<{ state: StepState; taskId?: string; message?: string }> {
   const { data: agent } = await admin.from("squad_agents").select("*").eq("id", claimed.agent_id).single();
   await emit(admin, mission, { type: "task_started", agentId: agent.id, room: agent.room, text: claimed.title, payload: { task_id: claimed.id, position: claimed.position } });
 
@@ -236,7 +260,13 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
 
   // O agente respondeu com uma pergunta ao dono em vez de entregar?
   const oq = extractOwnerQuestion(output);
-  if (oq && ownerCtx.canAsk) {
+  // Tarefas irmãs rodam ao mesmo tempo: reconfere o limite de perguntas na hora de gravar.
+  let canAskNow = ownerCtx.canAsk;
+  if (oq && canAskNow) {
+    const { count: askedNow } = await admin.from("squad_questions").select("id", { count: "exact", head: true }).eq("mission_id", mission.id);
+    canAskNow = (askedNow || 0) < MAX_OWNER_QUESTIONS;
+  }
+  if (oq && canAskNow) {
     await logAiUsage(admin, { userId, provider: first.provider!, model: first.model!, tokensInput: tokensIn, tokensOutput: tokensOut, promptType: "squad" });
     const { data: qrow } = await admin.from("squad_questions").insert({
       mission_id: mission.id, squad_id: mission.squad_id, owner_id: mission.owner_id, task_id: claimed.id, agent_id: agent.id,
@@ -246,10 +276,9 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
     await admin.from("squad_tasks").update({
       status: "pending", started_at: null, output: null, cost_usd: taskCost, tokens_input: taskIn, tokens_output: taskOut,
     }).eq("id", claimed.id);
-    await admin.from("squad_missions").update({
-      status: "awaiting_owner", cost_usd: Number(mission.cost_usd) + cost,
-      tokens_input: Number(mission.tokens_input) + tokensIn, tokens_output: Number(mission.tokens_output) + tokensOut,
-    }).eq("id", mission.id);
+    await admin.rpc("squad_add_mission_cost", { p_mission: mission.id, p_cost: cost, p_in: tokensIn, p_out: tokensOut });
+    // Só "running" vira "awaiting_owner": não ressuscita uma missão que já falhou por causa de uma irmã.
+    await admin.from("squad_missions").update({ status: "awaiting_owner" }).eq("id", mission.id).eq("status", "running");
     await emit(admin, mission, { type: "question_asked", agentId: agent.id, room: agent.room, text: oq.question, payload: { question_id: qrow?.id, options: oq.options } });
     await admin.from("notifications").insert({
       user_id: mission.owner_id, type: "info", title: "Seu squad tem uma pergunta",
@@ -282,16 +311,17 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
     await emit(admin, mission, { type: "deliverable_created", agentId: agent.id, room: agent.room, text: spec.title, payload: { kind: spec.kind, final: !!spec.final } });
   }
 
-  // Custos (tarefas rodam em sequência, então ler-e-somar é seguro).
-  const newCost = Number(mission.cost_usd) + cost;
-  const cap = Number(mission.cost_cap_usd);
-  const crossedWarn = !mission.warned_80 && budgetState(newCost, cap) === "warn";
-  await admin.from("squad_missions").update({
-    cost_usd: newCost,
-    tokens_input: Number(mission.tokens_input) + result.tokensInput,
-    tokens_output: Number(mission.tokens_output) + result.tokensOutput,
-    ...(crossedWarn ? { warned_80: true } : {}),
-  }).eq("id", mission.id);
+  // Custos: soma atômica no banco (tarefas em paralelo terminam ao mesmo tempo).
+  const { data: sum } = await admin.rpc("squad_add_mission_cost", { p_mission: mission.id, p_cost: cost, p_in: result.tokensInput, p_out: result.tokensOutput });
+  const row = Array.isArray(sum) ? sum[0] : sum;
+  const newCost = Number(row?.cost_usd ?? Number(mission.cost_usd) + cost);
+  const cap = Number(row?.cost_cap_usd ?? mission.cost_cap_usd);
+  let crossedWarn = false;
+  if (budgetState(newCost, cap) === "warn") {
+    // Só uma das tarefas simultâneas consegue virar o aviso de 80% (false → true).
+    const { data: flipped } = await admin.from("squad_missions").update({ warned_80: true }).eq("id", mission.id).eq("warned_80", false).select("id");
+    crossedWarn = !!(flipped && flipped.length);
+  }
   if (crossedWarn) {
     await emit(admin, mission, { type: "budget_warning", text: `80% do teto (US$ ${cap.toFixed(2)}) usado.`, payload: { cost_usd: newCost, cap_usd: cap } });
   }

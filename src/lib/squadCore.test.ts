@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  planTasks, pickNextTask, budgetState, clampCap, maskPii, screenInput, buildTaskUserMessage,
+  planTasks, pickNextTask, pickReadyTasks, budgetState, clampCap, maskPii, screenInput, buildTaskUserMessage,
   checkForm, formDisplay, isScheduleDue, monthStartIso, buildRevisionInstructions,
   measureScript, parseDurationLimitSeconds, parseDurationRange, durationNote, reviewRequestsAdjustments,
   extractOwnerQuestion, buildOwnerRules,
@@ -13,7 +13,8 @@ describe("planTasks", () => {
     const tasks = planTasks(TEMPLATE_CONTEUDO_YOUTUBE);
     expect(tasks).toHaveLength(7);
     expect(tasks[0].dependsOnPosition).toBeNull();
-    expect(tasks.slice(1).every((t, i) => t.dependsOnPosition === i)).toBe(true);
+    // Caio (2) e Íris (3) rodam em paralelo, ambos depois do roteiro (1); o parecer (4) espera os dois.
+    expect(tasks.map((t) => t.dependsOnPositions)).toEqual([[], [0], [1], [1], [2, 3], [4], [5]]);
     expect(tasks.filter((t) => t.deliverable?.final)).toHaveLength(1);
     expect(tasks[tasks.length - 1].deliverable?.final).toBe(true);
   });
@@ -49,6 +50,50 @@ describe("pickNextTask", () => {
   it("sinaliza falha e conclusão", () => {
     expect(pickNextTask([t(0, "done"), t(1, "failed")]).kind).toBe("failed");
     expect(pickNextTask([t(0, "done"), t(1, "done")]).kind).toBe("finished");
+  });
+});
+
+describe("paralelismo", () => {
+  const mk = (position: number, status: TaskLite["status"], deps: number[]): TaskLite => ({
+    id: `t${position}`, position, status, depends_on_position: deps[0] ?? null, depends_on_positions: deps,
+  });
+  const graph = (st: TaskLite["status"][]) => [mk(0, st[0], []), mk(1, st[1], [0]), mk(2, st[2], [0]), mk(3, st[3], [1, 2])];
+
+  it("libera as duas irmãs ao mesmo tempo quando a dependência comum termina", () => {
+    const r = pickReadyTasks(graph(["done", "pending", "pending", "pending"]));
+    expect(r.kind).toBe("tasks");
+    expect(r.kind === "tasks" && r.tasks.map((t) => t.id)).toEqual(["t1", "t2"]);
+  });
+  it("uma irmã rodando não impede de iniciar a outra", () => {
+    const r = pickReadyTasks(graph(["done", "running", "pending", "pending"]));
+    expect(r.kind === "tasks" && r.tasks.map((t) => t.id)).toEqual(["t2"]);
+  });
+  it("a etapa seguinte só sai quando TODAS as irmãs terminaram", () => {
+    expect(pickReadyTasks(graph(["done", "done", "running", "pending"])).kind).toBe("busy");
+    const r = pickReadyTasks(graph(["done", "done", "done", "pending"]));
+    expect(r.kind === "tasks" && r.tasks.map((t) => t.id)).toEqual(["t3"]);
+  });
+  it("falha em uma irmã sinaliza falha", () => {
+    expect(pickReadyTasks(graph(["done", "failed", "running", "pending"])).kind).toBe("failed");
+  });
+  it("sem dependências múltiplas, vale a dependência única (tarefas antigas)", () => {
+    const old: TaskLite[] = [
+      { id: "a", position: 0, status: "done", depends_on_position: null },
+      { id: "b", position: 1, status: "pending", depends_on_position: 0, depends_on_positions: [] },
+    ];
+    const r = pickReadyTasks(old);
+    expect(r.kind === "tasks" && r.tasks[0].id).toBe("b");
+  });
+  it("os três templates têm grupos paralelos válidos e a revisora espera o grupo", () => {
+    for (const slug of ["conteudo-youtube", "edtech-metodologias-ativas", "mentoria-academica"]) {
+      const tasks = planTasks(getTemplate(slug)!);
+      expect(tasks.some((t) => t.dependsOnPositions.length === 1 && tasks.some((o) => o !== t && o.dependsOnPositions[0] === t.dependsOnPositions[0])), slug).toBe(true);
+      const review = tasks.find((t) => t.title === "Parecer de revisão")!;
+      expect(review.dependsOnPositions.length, slug).toBeGreaterThanOrEqual(1);
+      for (const t of tasks) for (const d of t.dependsOnPositions) expect(d, slug).toBeLessThan(t.position);
+    }
+    const m = planTasks(getTemplate("mentoria-academica")!);
+    expect(m.map((t) => t.dependsOnPositions)).toEqual([[], [0], [0], [0], [1, 2, 3], [4]]);
   });
 });
 

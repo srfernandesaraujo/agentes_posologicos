@@ -107,6 +107,7 @@ export const TEMPLATE_CONTEUDO_YOUTUBE: SquadTemplate = {
     {
       agent: "seo",
       title: "Títulos, thumbnail e descrição",
+      parallelWithPrevious: true,
       instructions:
         "Entregue: 5 opções de título (até 70 caracteres, com a recomendada marcada), 3 ideias de thumbnail (texto curto + descrição visual), descrição com os primeiros 150 caracteres otimizados e 10 tags. Diga explicitamente o que é hipótese de palavra-chave e como validar.",
       deliverable: { title: "Títulos, thumbnails e descrição", kind: "SEO" },
@@ -212,7 +213,8 @@ export const TEMPLATE_EDTECH: SquadTemplate = {
     {
       agent: "trilha",
       title: "Trilha de aprendizagem",
-      instructions: "Monte a trilha: o que o aluno faz antes da aula, durante (com tempos) e depois, o que é entregue e avaliado em cada etapa, e os materiais necessários. Use o caso e as avaliações já produzidos e cite onde cada um entra.",
+      parallelWithPrevious: true,
+      instructions: "Monte a trilha: o que o aluno faz antes da aula, durante (com tempos) e depois, o que é entregue e avaliado em cada etapa, e os materiais necessários. Use o caso clínico já produzido. A rubrica e as questões estão sendo feitas em paralelo pela colega de avaliação: não dependa delas, apenas diga em que momento da trilha entram a rubrica e o teste.",
       deliverable: { title: "Trilha de aprendizagem", kind: "Trilha" },
     },
     {
@@ -295,12 +297,14 @@ export const TEMPLATE_MENTORIA: SquadTemplate = {
     {
       agent: "referencias",
       title: "Referências e lacunas",
+      parallelWithPrevious: true,
       instructions: "Com base na bibliografia e nos temas dos orientandos, sugira estratégias de busca (termos, bases, filtros) e o tipo de obra a procurar, e aponte lacunas aparentes. Não cite artigos específicos que não tenham sido informados. Se não houver bibliografia, diga o que falta.",
       deliverable: { title: "Referências e lacunas", kind: "Pesquisa" },
     },
     {
       agent: "corretor",
       title: "Revisão preliminar de trechos",
+      parallelWithPrevious: true,
       instructions: "Se houver trechos enviados, revise formatação acadêmica, clareza da metodologia e coesão, comentando item por item com o trecho citado e uma sugestão, sem reescrever. Se não houver trechos, responda apenas 'Sem trechos para revisar nesta execução.'",
       deliverable: { title: "Revisão preliminar de trechos", kind: "Revisão de texto" },
     },

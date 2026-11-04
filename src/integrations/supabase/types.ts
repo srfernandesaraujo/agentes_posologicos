@@ -2592,6 +2592,7 @@ export type Database = {
           cost_usd: number
           deliverable_spec: Json | null
           depends_on_position: number | null
+          depends_on_positions: number[]
           duration_ms: number | null
           error: string | null
           id: string
@@ -2615,6 +2616,7 @@ export type Database = {
           cost_usd?: number
           deliverable_spec?: Json | null
           depends_on_position?: number | null
+          depends_on_positions?: number[]
           duration_ms?: number | null
           error?: string | null
           id?: string
@@ -2638,6 +2640,7 @@ export type Database = {
           cost_usd?: number
           deliverable_spec?: Json | null
           depends_on_position?: number | null
+          depends_on_positions?: number[]
           duration_ms?: number | null
           error?: string | null
           id?: string
@@ -3402,6 +3405,14 @@ export type Database = {
           p_user_id: string
         }
         Returns: number
+      }
+      squad_add_mission_cost: {
+        Args: { p_cost: number; p_in: number; p_mission: string; p_out: number }
+        Returns: {
+          cost_cap_usd: number
+          cost_usd: number
+          warned_80: boolean
+        }[]
       }
       submit_station_for_certification: {
         Args: { p_station_id: string }
