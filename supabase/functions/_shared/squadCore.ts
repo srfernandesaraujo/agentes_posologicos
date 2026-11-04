@@ -481,8 +481,10 @@ export function buildOwnerRules(o: OwnerQaContext): string {
   }
   if (o.canAsk) {
     parts.push(
-      `# Perguntas ao dono\nVocê pode fazer até ${o.remaining} pergunta(s) ao dono nesta missão, SÓ quando houver contradição no material ou uma lacuna ` +
-        `essencial que você não pode assumir com segurança (ex.: duas orientações clínicas conflitantes). Dúvidas pequenas: assuma a opção mais segura e registre como suposição. ` +
+      `# Perguntas ao dono\nVocê pode fazer até ${o.remaining} pergunta(s) ao dono nesta missão, SÓ quando houver contradição ou uma lacuna ` +
+        `essencial que você não pode assumir com segurança. Conta como contradição: duas orientações clínicas conflitantes no material; OU o pedido/objetivo do dono ` +
+        `pedir algo que o material de apoio (ou o conhecimento clínico estabelecido) desmente, sobretudo se puder causar dano ao público final. ` +
+        `Nesse caso NÃO corrija sozinho nem "assuma a opção mais segura": pergunte, pois decidir isso é do dono. Dúvidas pequenas e sem risco: assuma a opção mais segura e registre como suposição. ` +
         `Para perguntar, responda APENAS com este bloco, sem mais nada:\n[[PERGUNTA_AO_DONO]]\nPergunta: <uma pergunta objetiva>\nOpções: <opção 1> | <opção 2> | <opção 3>\n` +
         `Por quê: <por que isso muda o resultado>\n[[/PERGUNTA_AO_DONO]]`,
     );
