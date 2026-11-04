@@ -2454,6 +2454,83 @@ export type Database = {
           },
         ]
       }
+      squad_questions: {
+        Row: {
+          agent_id: string | null
+          answer: string | null
+          answered_at: string | null
+          created_at: string
+          id: string
+          mission_id: string
+          options: Json
+          owner_id: string
+          question: string
+          squad_id: string
+          status: string
+          task_id: string | null
+          why: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          answer?: string | null
+          answered_at?: string | null
+          created_at?: string
+          id?: string
+          mission_id: string
+          options?: Json
+          owner_id: string
+          question: string
+          squad_id: string
+          status?: string
+          task_id?: string | null
+          why?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          answer?: string | null
+          answered_at?: string | null
+          created_at?: string
+          id?: string
+          mission_id?: string
+          options?: Json
+          owner_id?: string
+          question?: string
+          squad_id?: string
+          status?: string
+          task_id?: string | null
+          why?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_questions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "squad_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_questions_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "squad_missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_questions_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: false
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_questions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "squad_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       squad_schedules: {
         Row: {
           cost_cap_usd: number
@@ -2512,52 +2589,70 @@ export type Database = {
           agent_id: string
           checks: Json | null
           completed_at: string | null
+          cost_usd: number
           deliverable_spec: Json | null
           depends_on_position: number | null
+          duration_ms: number | null
           error: string | null
           id: string
           instructions: string
           mission_id: string
+          model: string | null
           output: string | null
           owner_id: string
           position: number
+          provider: string | null
           started_at: string | null
           status: string
           title: string
+          tokens_input: number
+          tokens_output: number
         }
         Insert: {
           agent_id: string
           checks?: Json | null
           completed_at?: string | null
+          cost_usd?: number
           deliverable_spec?: Json | null
           depends_on_position?: number | null
+          duration_ms?: number | null
           error?: string | null
           id?: string
           instructions: string
           mission_id: string
+          model?: string | null
           output?: string | null
           owner_id: string
           position: number
+          provider?: string | null
           started_at?: string | null
           status?: string
           title: string
+          tokens_input?: number
+          tokens_output?: number
         }
         Update: {
           agent_id?: string
           checks?: Json | null
           completed_at?: string | null
+          cost_usd?: number
           deliverable_spec?: Json | null
           depends_on_position?: number | null
+          duration_ms?: number | null
           error?: string | null
           id?: string
           instructions?: string
           mission_id?: string
+          model?: string | null
           output?: string | null
           owner_id?: string
           position?: number
+          provider?: string | null
           started_at?: string | null
           status?: string
           title?: string
+          tokens_input?: number
+          tokens_output?: number
         }
         Relationships: [
           {
