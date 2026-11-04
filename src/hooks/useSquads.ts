@@ -190,7 +190,7 @@ export function useMissionDetail(missionId?: string) {
         db.from("squad_missions").select("*").eq("id", missionId).maybeSingle(),
         db.from("squad_tasks").select("id, mission_id, agent_id, position, title, status").eq("mission_id", missionId).order("position"),
         db.from("squad_deliverables").select("*").eq("mission_id", missionId).order("created_at"),
-        db.from("squad_events").select("*").eq("mission_id", missionId).order("id", { ascending: false }).limit(60),
+        db.from("squad_events").select("*").eq("mission_id", missionId).order("id", { ascending: false }).limit(300),
       ]);
       if (m.error) throw m.error;
       return {

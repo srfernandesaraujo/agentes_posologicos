@@ -12,6 +12,7 @@ import {
   type MissionStatus, type SquadAgent, type SquadDeliverable, type SquadEvent, type SquadTemplateInfo,
 } from "@/hooks/useSquads";
 import { CostCapField, fmtUsd } from "./CostCapField";
+import { OfficeSection } from "./office/OfficeSection";
 
 export const MISSION_STATUS: Record<MissionStatus, { label: string; className: string }> = {
   running: { label: "Trabalhando", className: "border-sky-400/40 text-sky-300" },
@@ -54,8 +55,8 @@ function Markdown({ children }: { children: string }) {
 }
 
 export function MissionPanel({
-  missionId, squadId, agents, template,
-}: { missionId: string; squadId: string; agents: SquadAgent[]; template: SquadTemplateInfo }) {
+  missionId, squadId, agents, template, environment,
+}: { missionId: string; squadId: string; agents: SquadAgent[]; template: SquadTemplateInfo; environment: string }) {
   const { data, isLoading } = useMissionDetail(missionId);
   useMissionRealtime(missionId, squadId);
   const { decide, raiseCap } = useSquadActions();
@@ -106,6 +107,7 @@ export function MissionPanel({
 
   return (
     <div className="space-y-6">
+      <OfficeSection agents={agents} events={[...data!.events].reverse()} environment={environment} />
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className={status.className}>{status.label}</Badge>

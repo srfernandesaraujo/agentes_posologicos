@@ -141,7 +141,7 @@ export default function SquadDetail() {
                 ))}
               </ul>
               <div className="min-w-0">
-                {selected && <MissionPanel key={selected} missionId={selected} squadId={squad.id} agents={agents} template={template} />}
+                {selected && <MissionPanel key={selected} missionId={selected} squadId={squad.id} agents={agents} template={template} environment={squad.environment} />}
               </div>
             </div>
           )}
