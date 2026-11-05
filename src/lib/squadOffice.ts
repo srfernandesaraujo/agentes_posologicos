@@ -119,6 +119,7 @@ const ACCESSORIES: Record<string, Accessory> = {
   casos: "glasses", avaliacao: "none", trilha: "headset", referencias: "glasses", corretor: "glasses", prazos: "headphones",
   estrutura: "glasses", redatora: "headphones", nicho: "headset",
   correspondencia: "headset", atas: "glasses", tendencias: "headphones",
+  fullstack: "headphones", devops: "headset", "qa-seguranca": "glasses",
 };
 /** Cada função tem um traço visual próprio, para reconhecer quem é quem de relance. */
 export function accessoryFor(slug?: string): Accessory {
@@ -200,6 +201,8 @@ export function eventToCommands(ev: EventLite, agents: OfficeAgent[]): Command[]
       return [{ kind: "goto_all", place: "desk", then: "idle" }, ...dirBubble("Pausado: teto atingido", "warn", 8000)];
     case "budget_raised":
       return dirBubble("Teto ajustado, vamos!", "ok", 3500);
+    case "secrets_masked":
+      return dirBubble("Segredos mascarados", "warn", 5000);
     case "pii_masked":
       return dirBubble("Dados pessoais mascarados", "info", 4000);
     case "mission_ready":
@@ -222,12 +225,13 @@ export function eventToCommands(ev: EventLite, agents: OfficeAgent[]): Command[]
 }
 
 /** Qual ambiente temático desenhar para o `environment` salvo no squad (cai no estúdio se desconhecido). */
-export type SceneTheme = "studio" | "university" | "campus" | "editora" | "executivo";
+export type SceneTheme = "studio" | "university" | "campus" | "editora" | "executivo" | "loft";
 export function themeForEnvironment(env: string | null | undefined): SceneTheme {
   if (env === "faculdade") return "university";
   if (env === "campus") return "campus";
   if (env === "editora") return "editora";
   if (env === "escritorio-executivo") return "executivo";
+  if (env === "loft-startup") return "loft";
   return "studio";
 }
 
@@ -236,5 +240,6 @@ export const ROOM_LABELS: Record<SceneTheme, Record<RoomId, string>> = {
   university: { dir: "COORDENAÇÃO", ops: "SALA DE AULA E LAB", lib: "BIBLIOTECA", copa: "COPA", meet: "SALA DE TBL" },
   campus: { dir: "GABINETE", ops: "ORIENTANDOS", lib: "BIBLIOTECA", copa: "COPA", meet: "SALA DE BANCA" },
   editora: { dir: "DIREÇÃO EDITORIAL", ops: "REDAÇÃO E CAPA", lib: "ACERVO", copa: "COPA", meet: "REVISÃO" },
+  loft: { dir: "LIDERANÇA TÉCNICA", ops: "BANCADA DE DEV", lib: "SERVIDORES", copa: "COPA", meet: "QUADRO DE ARQUITETURA" },
   executivo: { dir: "GABINETE", ops: "RECEPÇÃO E CORRESPONDÊNCIA", lib: "CLIPPING", copa: "COPA", meet: "SALA DE REUNIÕES" },
 };

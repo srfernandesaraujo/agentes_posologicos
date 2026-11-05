@@ -6,10 +6,10 @@ import {
   extractOwnerQuestion, buildOwnerRules,
   selectMemoriesForContext, buildMemoryContext, isDuplicateMemory, buildMemoryExtractionPrompt, parseMemoryExtraction,
   MEMORY_CONTEXT_LIMIT, MEMORY_MAX_CHARS,
-  countTextWords, parseWordRange, wordsNote,
+  countTextWords, parseWordRange, wordsNote, maskSecrets,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
-import { TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, TEMPLATE_SECRETARIADO, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
+import { TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, TEMPLATE_SECRETARIADO, TEMPLATE_VIBE_CODING, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
 
 describe("planTasks", () => {
   it("gera um pipeline sequencial a partir do template de Conteúdo", () => {
@@ -608,5 +608,82 @@ describe("template de Secretariado", () => {
   it("os campos de e-mail, reunião e temas são opcionais e só o foco é obrigatório", () => {
     const req = TEMPLATE_SECRETARIADO.formFields.filter((f) => f.required).map((f) => f.key);
     expect(req).toEqual(["foco"]);
+  });
+});
+
+describe("filtro de segredos", () => {
+  const fake = {
+    openai: "sk-proj-" + "a1B2c3D4e5F6g7H8i9J0",
+    supabase: "sbp_" + "0123456789abcdef0123456789abcdef01234567",
+    github: "ghp_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8",
+    aws: "AKIA" + "ABCDEFGHIJKLMNOP",
+    jwt: "eyJhbGciOiJIUzI1NiJ9" + "." + "eyJzdWIiOiIxMjM0NTY3ODkwIn0" + "." + "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV",
+  };
+  it("mascara chaves conhecidas e nunca repete o segredo nos achados", () => {
+    const src = [fake.openai, fake.supabase, fake.github, fake.aws, fake.jwt].join(" | ");
+    const r = maskSecrets(src);
+    for (const v of Object.values(fake)) expect(r.text).not.toContain(v);
+    expect(r.text.match(/\[SEGREDO REMOVIDO/g)).toHaveLength(5);
+    expect(JSON.stringify(r.findings)).not.toContain("sk-proj");
+    expect(r.findings.map((f) => f.type)).toEqual(expect.arrayContaining(["token Supabase", "token JWT", "chave AWS", "token GitHub", "chave de API (sk-)"]));
+  });
+  it("mascara o valor de atribuições, mantendo o nome da variável", () => {
+    const r = maskSecrets('const config = { apiKey: "abcd1234efgh5678", password: "minhaSenhaForte1" };\nDATABASE_SECRET=zzzz9999yyyy');
+    expect(r.text).toContain("apiKey: \"[SEGREDO REMOVIDO]");
+    expect(r.text).toContain("password: \"[SEGREDO REMOVIDO]");
+    expect(r.text).toContain("DATABASE_SECRET=[SEGREDO REMOVIDO]");
+    expect(r.text).not.toContain("abcd1234efgh5678");
+  });
+  it("não mascara referências a variáveis de ambiente nem placeholders", () => {
+    const code = 'const key = process.env.SUPABASE_KEY;\napi_key = os.environ["API_KEY"]\nTOKEN=your-token-here\nSECRET=<coloque-aqui>\nconst token = import.meta.env.VITE_TOKEN';
+    const r = maskSecrets(code);
+    expect(r.text).toBe(code);
+    expect(r.findings).toEqual([]);
+  });
+  it("remove blocos de chave privada inteiros", () => {
+    const pk = "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA1234\nabcdEFGH\n-----END RSA PRIVATE KEY-----";
+    const r = maskSecrets("antes\n" + pk + "\ndepois");
+    expect(r.text).toBe("antes\n[SEGREDO REMOVIDO: chave privada]\ndepois");
+  });
+  it("texto comum e código sem segredo passam intactos", () => {
+    const s = "Crie uma tela de login com e-mail e senha usando Supabase Auth. A senha tem 8 caracteres.";
+    expect(maskSecrets(s).text).toBe(s);
+  });
+});
+
+describe("template de Vibe Coding", () => {
+  const tasks = planTasks(TEMPLATE_VIBE_CODING);
+  it("é missão de código sem dados pessoais, com filtro de segredos, no loft de startup", () => {
+    expect(TEMPLATE_VIBE_CODING.kind).toBe("mission");
+    expect(TEMPLATE_VIBE_CODING.sensitivity).toBe("normal");
+    expect(TEMPLATE_VIBE_CODING.maskSecrets).toBe(true);
+    expect(TEMPLATE_VIBE_CODING.environment).toBe("loft-startup");
+    expect(getTemplate("vibe-coding")).toBe(TEMPLATE_VIBE_CODING);
+  });
+  it("deploy e testes rodam juntos depois do código; a Nina espera os dois; os ajustes são paralelos", () => {
+    expect(tasks.map((x) => x.title)).toEqual([
+      "Plano técnico", "Arquitetura e código", "Plano de deploy e scripts", "Testes e segurança", "Parecer de revisão",
+      "Ajustes do código", "Ajustes do deploy", "Ajustes dos testes", "Entrega final",
+    ]);
+    expect(tasks.map((x) => x.dependsOnPositions)).toEqual([[], [0], [1], [1], [2, 3], [4], [4], [4], [5, 6, 7]]);
+  });
+  it("nenhum agente executa nada: todos os prompts proíbem executar e pedem NÃO EXECUTADO", () => {
+    for (const a of TEMPLATE_VIBE_CODING.agents) {
+      expect(a.systemPrompt, a.name).toContain("NÃO executa nada");
+      expect(a.systemPrompt, a.name).toContain("NÃO EXECUTADO");
+      expect(a.systemPrompt, a.name).toContain("Nunca peça nem escreva chaves");
+    }
+    const rafa = TEMPLATE_VIBE_CODING.agents.find((a) => a.slug === "devops")!;
+    expect(rafa.systemPrompt).toContain("NUNCA executa nada");
+    expect(tasks[8].instructions).toContain("NADA DO QUE ESTÁ AQUI FOI EXECUTADO");
+  });
+  it("o deploy passa por ambiente de teste e rollback, e a revisora confere isso", () => {
+    expect(tasks[2].instructions).toContain("ambiente de TESTE");
+    expect(tasks[2].instructions).toContain("rollback");
+    const nina = TEMPLATE_VIBE_CODING.agents.find((a) => a.slug === "revisora")!;
+    expect(nina.systemPrompt).toContain("executado, testado, compilado ou publicado");
+  });
+  it("só os campos essenciais são obrigatórios", () => {
+    expect(TEMPLATE_VIBE_CODING.formFields.filter((f) => f.required).map((f) => f.key)).toEqual(["projeto", "tipo", "stack", "alvo", "requisitos"]);
   });
 });

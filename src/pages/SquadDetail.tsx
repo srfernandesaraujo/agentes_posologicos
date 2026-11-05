@@ -52,8 +52,9 @@ export default function SquadDetail() {
   const start = async () => {
     if (missing.length) { toast.error(`Preencha: ${missing.join(", ")}`); return; }
     try {
-      const { mission, piiFindings } = await startMission.mutateAsync({ squadId: squad.id, formData: values, costCapUsd: cap });
+      const { mission, piiFindings, secretFindings } = await startMission.mutateAsync({ squadId: squad.id, formData: values, costCapUsd: cap });
       if (piiFindings.length) toast.warning("Identificadores pessoais foram mascarados antes do envio ao modelo.");
+      if (secretFindings?.length) toast.warning("Chaves, tokens ou senhas foram mascarados. Se eram reais, troque-os: eles já estiveram na área de transferência e no formulário.");
       setValues({});
       setSelected(mission.id);
       setTab("missoes");

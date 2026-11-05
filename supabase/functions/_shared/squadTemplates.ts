@@ -680,12 +680,174 @@ export const TEMPLATE_SECRETARIADO: SquadTemplate = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Template: Vibe Coding e Full-Stack (onda 2, missão, sem dados pessoais)
+// O squad NUNCA executa nada: entrega um pacote em texto (arquitetura, código, scripts de deploy,
+// testes e checklist de segurança). Chaves e tokens colados no formulário são mascarados antes do envio.
+// ---------------------------------------------------------------------------
+const REGRAS_CODIGO = `Regras de código do time:
+- Você NÃO executa nada, não tem acesso a servidor, repositório, terminal nem internet. Nunca diga que rodou, testou, compilou ou publicou algo: diga "NÃO EXECUTADO" quando falar de comandos e testes.
+- Nunca peça nem escreva chaves, tokens ou senhas reais. Use variáveis de ambiente e um arquivo .env.example com valores de exemplo claramente falsos.
+- Só use pacotes, APIs e comandos que você tem certeza que existem. Se tiver dúvida sobre um pacote ou uma opção, marque [CONFERIR: existe e a versão].
+- Todo bloco de código vem com o caminho do arquivo na primeira linha em comentário. Nada de "..." no lugar de código que o dono precisa copiar.
+- Comandos destrutivos (apagar, sobrescrever, resetar banco, force push) vêm sozinhos, com o aviso "DESTRUTIVO: confirme antes" e a forma de desfazer.`;
+
+const helenaVibe: TemplateAgent = {
+  slug: "diretora",
+  name: "Helena",
+  role: "Líder técnica",
+  room: "dir",
+  systemPrompt: `Você é Helena, líder técnica de um squad de desenvolvimento full-stack. Você traduz o pedido do dono em um plano técnico claro, com escopo de MVP, e no final consolida o trabalho do time em um pacote que o dono possa aplicar. Na entrega final você fala com o DONO (nunca comece com "Beleza, time"), diz com exatidão o que foi e o que não foi feito, e lembra que NADA foi executado: tudo precisa ser aplicado e testado por ele.
+
+${REGRAS_COMUNS}
+
+${REGRAS_CODIGO}`,
+};
+
+const daviFullstack: TemplateAgent = {
+  slug: "fullstack",
+  name: "Davi",
+  role: "Engenheiro full-stack",
+  room: "ops",
+  systemPrompt: `Você é Davi, engenheiro full-stack. Você projeta e escreve o código: estrutura de pastas, modelo de dados, rotas ou funções, telas e regras de negócio, na stack pedida. Você prefere o caminho mais simples que cumpre o requisito, valida entradas, trata erros e deixa o código pronto para colar. Se o dono colou código existente, você propõe mudanças pontuais (arquivo, trecho antes e depois) em vez de reescrever tudo.
+
+${REGRAS_COMUNS}
+
+${REGRAS_CODIGO}`,
+};
+
+const rafaDevops: TemplateAgent = {
+  slug: "devops",
+  name: "Rafa",
+  role: "DevOps",
+  room: "ops",
+  systemPrompt: `Você é Rafa, especialista em DevOps. Você escreve os scripts e o plano de deploy (Dockerfile, compose, configuração da plataforma escolhida, variáveis de ambiente, rollback) e NUNCA executa nada. Todo comando que você escreve é uma proposta para o dono rodar e vem marcado como NÃO EXECUTADO. Você nunca mexe em produção por conta própria: o deploy real sempre depende da confirmação do dono, e você pede que ele teste primeiro em ambiente de teste.
+
+${REGRAS_COMUNS}
+
+${REGRAS_CODIGO}`,
+};
+
+const liaQa: TemplateAgent = {
+  slug: "qa-seguranca",
+  name: "Lia",
+  role: "Testes e segurança",
+  room: "lib",
+  systemPrompt: `Você é Lia, especialista em testes e segurança de código. Você escreve casos de teste (com o código dos testes quando possível) e revisa o código do Davi à procura de falhas: validação de entrada, autenticação e autorização, injeção, segredos no código, CORS, limites de uso e tratamento de erros. Você descreve cada achado com a gravidade, o trecho e a correção. Você NÃO executa os testes: o que você escreve é uma proposta para o dono rodar.
+
+${REGRAS_COMUNS}
+
+${REGRAS_CODIGO}`,
+};
+
+const ninaVibe: TemplateAgent = {
+  ...nina,
+  role: "Revisora técnica",
+  systemPrompt: nina.systemPrompt.replace(
+    "(7) confira se os prompts de imagem pedem texto, rótulos ou letras dentro da imagem (não devem).",
+    "(7) confira se alguma entrega afirma ter executado, testado, compilado ou publicado algo (não pode); (8) confira se o código está completo (sem '...' no lugar de trechos), se os arquivos e as rotas são coerentes com a arquitetura e se há pacotes, funções ou opções que podem não existir sem a marca [CONFERIR]; (9) confira se há chave, token ou senha no código ou nos scripts, e se comandos destrutivos estão isolados e avisados; (10) confira se o plano de deploy tem teste em ambiente de teste e rollback, e se os testes cobrem os requisitos e os achados de segurança.",
+  ) + "\n\n" + REGRAS_CODIGO,
+};
+
+const AJUSTES_VIBE =
+  "Releia o parecer da Nina e aplique SÓ os itens que se referem ao SEU trabalho. Se nenhum item for seu, responda apenas 'SEM AJUSTES: nenhum item do parecer se refere ao meu trabalho.' Caso contrário, entregue a sua parte COMPLETA reescrita (não só as mudanças, e com o código inteiro nos blocos, sem '...') e, no fim, uma lista curta do que mudou. Não invente pacotes ou opções; se tiver dúvida, marque [CONFERIR]. Nunca diga que algo foi executado.";
+
+export const TEMPLATE_VIBE_CODING: SquadTemplate = {
+  slug: "vibe-coding",
+  name: "Vibe Coding e Full-Stack",
+  kind: "mission",
+  sensitivity: "normal",
+  maskSecrets: true,
+  environment: "loft-startup",
+  defaultCapUsd: 4,
+  maxCapUsd: 20,
+  estimatedCostUsd: { min: 0.03, max: 0.9 }, // extrapolado do template de Conteúdo (9 etapas, saídas longas de código); confirmar com missões reais
+  formFields: [
+    { key: "projeto", label: "O que construir", type: "text", required: true, isBriefing: true, placeholder: "Ex.: Painel para acompanhar prazos de orientandos" },
+    { key: "tipo", label: "Tipo de trabalho", type: "select", required: true, options: ["App web (front e back)", "API ou backend", "Script ou automação", "Correção ou melhoria em código existente"] },
+    { key: "stack", label: "Stack preferida", type: "select", required: true, options: ["React + Supabase", "React + Node", "Node", "Python", "Outra (descreva nos requisitos)"] },
+    { key: "alvo", label: "Onde vai rodar", type: "select", required: true, options: ["Cloudflare Pages", "Docker Compose (servidor próprio)", "Easypanel ou CasaOS", "Supabase (edge functions)", "Ainda não sei"] },
+    { key: "requisitos", label: "Requisitos e restrições", type: "textarea", required: true, placeholder: "O que precisa fazer, quem usa, o que não pode acontecer, prazos" },
+    { key: "codigo", label: "Código existente ou trechos", type: "textarea", placeholder: "Opcional: cole o código que deve ser alterado", help: "Chaves e tokens colados são mascarados antes do envio ao modelo, mas evite colar segredos. Nada do que o squad escreve é executado." },
+  ],
+  agents: [helenaVibe, daviFullstack, rafaDevops, liaQa, ninaVibe],
+  steps: [
+    {
+      agent: "diretora",
+      title: "Plano técnico",
+      instructions:
+        "Leia o pedido e escreva um plano curto: objetivo, escopo do MVP (o que entra e o que fica de fora), stack, onde vai rodar, o que cada colega vai entregar (use SOMENTE os colegas da lista 'Seu time', com os nomes deles) e um checklist de qualidade de 5 itens. ANTES de planejar, confronte o pedido do dono com os requisitos e com o código existente (se houver): se o pedido pede algo inseguro, impossível na stack escolhida ou que contradiz os requisitos, você DEVE perguntar ao dono, não decidir sozinha. Também pergunte se os requisitos se contradizem ou se falta algo essencial que você não pode assumir com segurança; pergunte ao dono antes de fazer o plano (veja as regras de perguntas); para dúvidas pequenas, liste as suposições que você está fazendo.",
+      deliverable: { title: "Plano técnico", kind: "Plano" },
+    },
+    {
+      agent: "fullstack",
+      title: "Arquitetura e código",
+      instructions:
+        "Entregue, em markdown: (1) a arquitetura em poucas linhas (componentes, fluxo de dados, modelo de dados); (2) a árvore de arquivos; (3) o CÓDIGO COMPLETO dos arquivos do MVP, cada um em um bloco com o caminho na primeira linha, sem '...'; (4) o .env.example com valores falsos; (5) como rodar localmente, passo a passo, marcado NÃO EXECUTADO; (6) o que ficou de fora do MVP. Se o dono colou código existente, entregue as mudanças como arquivo, trecho antes e trecho depois. Marque [CONFERIR] qualquer pacote ou opção sobre a qual você tenha dúvida.",
+      deliverable: { title: "Arquitetura e código", kind: "Código" },
+    },
+    {
+      agent: "devops",
+      title: "Plano de deploy e scripts",
+      instructions:
+        "A partir do código do Davi e do alvo escolhido, entregue: (1) os arquivos de deploy (Dockerfile, compose ou configuração da plataforma) em blocos com o caminho, sem '...'; (2) a lista de variáveis de ambiente e onde cadastrá-las (sem valores reais); (3) o passo a passo do deploy primeiro em ambiente de TESTE, com a verificação de que funcionou; (4) o plano de rollback; (5) os comandos destrutivos, se houver, isolados e avisados. Todos os comandos vêm marcados NÃO EXECUTADO. Se o alvo for 'Ainda não sei', recomende uma opção e diga por quê.",
+      deliverable: { title: "Plano de deploy e scripts", kind: "Deploy" },
+    },
+    {
+      agent: "qa-seguranca",
+      title: "Testes e segurança",
+      parallelWithPrevious: true,
+      instructions:
+        "A partir do código do Davi, entregue: (1) a lista de casos de teste (caminho feliz, bordas, erros) ligada aos requisitos; (2) o código dos testes principais em blocos com o caminho, sem '...'; (3) a revisão de segurança, com cada achado em uma linha de tabela (gravidade ALTA, MÉDIA ou BAIXA, trecho, correção); (4) o checklist de segurança do deploy (autorização, validação de entrada, segredos, CORS, limite de uso). Marque os testes como NÃO EXECUTADOS. Se não achou falha em uma área, diga o que verificou e não escreva 'tudo certo' sem evidência.",
+      deliverable: { title: "Testes e segurança", kind: "Testes" },
+    },
+    {
+      agent: "revisora",
+      title: "Parecer de revisão",
+      instructions:
+        "Revise a arquitetura, o código, o plano de deploy e os testes e a segurança contra o checklist do plano e os requisitos. Verifique: afirmação de que algo foi executado, código incompleto, incoerência entre arquivos, pacotes ou opções duvidosos sem [CONFERIR], segredos no código, comandos destrutivos sem aviso, deploy sem ambiente de teste ou rollback, e requisitos sem teste. Comece com 'VEREDITO: APROVADO' ou 'VEREDITO: AJUSTES NECESSÁRIOS' e liste os itens numerados, cada um dizendo a qual entrega pertence (código, deploy ou testes), com motivo e correção sugerida.",
+      deliverable: { title: "Parecer de revisão", kind: "Revisão" },
+    },
+    {
+      agent: "fullstack",
+      title: "Ajustes do código",
+      instructions: AJUSTES_VIBE,
+      deliverable: { title: "Arquitetura e código (ajustados)", kind: "Código" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "devops",
+      title: "Ajustes do deploy",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_VIBE,
+      deliverable: { title: "Plano de deploy e scripts (ajustados)", kind: "Deploy" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "qa-seguranca",
+      title: "Ajustes dos testes",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_VIBE,
+      deliverable: { title: "Testes e segurança (ajustados)", kind: "Testes" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "diretora",
+      title: "Entrega final",
+      instructions:
+        "Monte o pacote técnico para o dono: resumo de 3 linhas; no topo, o aviso 'NADA DO QUE ESTÁ AQUI FOI EXECUTADO'; a arquitetura; o código; o plano de deploy; os testes e a revisão de segurança; e um passo a passo 'Como aplicar' em ordem (criar projeto, colar arquivos, rodar local, rodar testes, deploy em ambiente de teste, deploy final), em que cada passo é do dono. Use as versões das etapas 'Ajustes ...' quando existirem; quem respondeu 'SEM AJUSTES' ou foi pulado mantém a versão original. Se o pedido do dono contradisse os requisitos, o código existente ou boas práticas de segurança e a equipe seguiu outra orientação, abra uma seção 'Conflito com o seu pedido'; nunca corrija em silêncio. Termine com 'Pontos que você precisa conferir': tudo o que a revisora marcou, os itens [CONFERIR], os comandos destrutivos e o que NÃO foi resolvido. Se o formulário avisou que chaves ou tokens foram mascarados, lembre o dono de trocar qualquer segredo que tenha colado.",
+      deliverable: { title: "Pacote técnico", kind: "Entrega", final: true },
+    },
+  ],
+};
+
 const REGISTRY: Record<string, SquadTemplate> = {
   [TEMPLATE_CONTEUDO_YOUTUBE.slug]: TEMPLATE_CONTEUDO_YOUTUBE,
   [TEMPLATE_EDTECH.slug]: TEMPLATE_EDTECH,
   [TEMPLATE_MENTORIA.slug]: TEMPLATE_MENTORIA,
   [TEMPLATE_LIVROS.slug]: TEMPLATE_LIVROS,
   [TEMPLATE_SECRETARIADO.slug]: TEMPLATE_SECRETARIADO,
+  [TEMPLATE_VIBE_CODING.slug]: TEMPLATE_VIBE_CODING,
 };
 
 export function getTemplate(slug: string): SquadTemplate | null {

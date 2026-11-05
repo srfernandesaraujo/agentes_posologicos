@@ -1,5 +1,5 @@
 // Desenho do escritório em pixel art, 100% por código (sem imagens): kit base compartilhado
-// (piso, paredes, portas, móveis) + um tema por ambiente (estúdio, faculdade, campus, editora, escritório executivo).
+// (piso, paredes, portas, móveis) + um tema por ambiente (estúdio, faculdade, campus, editora, escritório executivo, loft de startup).
 // Coordenadas lógicas 320x320, desenhadas em 2x num canvas de 640x640 (pixel art nítida).
 // Trocar por tiles desenhados à mão no futuro só exige mudar este arquivo.
 import { ROOMS, ROOM_LABELS, type RoomId, type SceneTheme } from "@/lib/squadOffice";
@@ -70,6 +70,17 @@ const PALETTES: Record<SceneTheme, Palette> = {
       meet: { base: "#2c3e5c", alt: "#263752", mode: "wood" },
     },
     desk: "#d7cdb8", deskEdge: "#a39879", accent: "#2b6cb0",
+  },
+  loft: {
+    hall: ["#3a3d44", "#41444c"],
+    floors: {
+      dir: { base: "#6a6e78", alt: "#62666f", mode: "tile" },
+      ops: { base: "#35404f", alt: "#3d4959", mode: "tile" },
+      lib: { base: "#262d3b", alt: "#2e3646", mode: "tile" },
+      copa: { base: "#c4a47a", alt: "#b69669", mode: "wood" },
+      meet: { base: "#5b4a3a", alt: "#503f31", mode: "wood" },
+    },
+    desk: "#aab3c2", deskEdge: "#7d8798", accent: "#34d399",
   },
 };
 
@@ -286,7 +297,27 @@ function decorExecutivo(g: G) {
   R(g, 256, 200, 12, 9, "#ffffff"); R(g, 256, 200, 12, 2, "#2b6cb0"); R(g, 259, 204, 2, 2, "#d6475f");
 }
 
-const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora, executivo: decorExecutivo };
+function decorLoft(g: G) {
+  // Liderança técnica: lousa de arquitetura, placa de néon e painel de deploy (as luzes são animadas)
+  R(g, 22, 28, 42, 12, "#e9e5da"); R(g, 23, 29, 40, 10, "#f4f6f8");
+  R(g, 26, 31, 9, 5, "#2b6cb0"); R(g, 42, 31, 9, 5, "#34d399"); R(g, 35, 33, 7, 1, "#6b7280"); R(g, 51, 33, 8, 1, "#6b7280");
+  R(g, 72, 17, 30, 10, "#1c2030");
+  g.strokeStyle = "#34d399"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(80, 19); g.lineTo(76, 22); g.lineTo(80, 25); g.moveTo(94, 19); g.lineTo(98, 22); g.lineTo(94, 25); g.moveTo(89, 18); g.lineTo(85, 26); g.stroke();
+  R(g, 106, 32, 28, 12, "#2a2d38"); R(g, 108, 34, 24, 8, "#1c2030");
+  // Bancada de dev: quadro de tarefas e pufe
+  R(g, 280, 34, 20, 34, "#2a2d38"); R(g, 282, 36, 16, 30, "#e9e5da");
+  [284, 289, 294].forEach((x) => R(g, x, 36, 1, 30, "#c9c3b3"));
+  R(g, 284, 41, 4, 3, "#fde68a"); R(g, 284, 46, 4, 3, "#bfdbfe"); R(g, 289, 41, 4, 3, "#fbcfe8");
+  // Servidores: cinco racks (os LEDs piscam na camada animada)
+  for (let i = 0; i < 5; i++) { R(g, 22 + i * 15, 134, 14, 13, "#1c2030"); R(g, 23 + i * 15, 135, 12, 11, "#2a3140"); [137, 140, 143].forEach((y) => R(g, 24 + i * 15, y, 10, 2, "#3c4352")); }
+  // Quadro de arquitetura na reunião: caixas e setas
+  R(g, 214, 196, 60, 18, "#1c2030"); R(g, 216, 198, 56, 14, "#f4f6f8");
+  R(g, 220, 201, 12, 7, "#2b6cb0"); R(g, 240, 201, 12, 7, "#34d399"); R(g, 258, 201, 10, 7, "#e5b83a");
+  R(g, 232, 204, 8, 1, "#6b7280"); R(g, 252, 204, 6, 1, "#6b7280"); R(g, 244, 208, 1, 3, "#6b7280");
+}
+
+const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora, executivo: decorExecutivo, loft: decorLoft };
 
 const layerCache = new Map<SceneTheme, HTMLCanvasElement>();
 
@@ -388,6 +419,27 @@ export function drawAnimated(ctx: G, theme: SceneTheme, info: AnimInfo) {
       const k = (info.t * 0.8) % 1;
       R(ctx, 281, 54, 10, Math.round(2 + k * 7), "#fffdf3");
     }
+  }
+
+  // Loft: terminal rolando nas telas, LEDs dos racks e luzes de deploy que sobem a cada entrega
+  if (theme === "loft") {
+    if (info.working.has("ops")) {
+      [[186, 26], [198, 26], [222, 26], [234, 26], [230, 90], [262, 90], [236, 134], [264, 134]].forEach(([x, y], i) => {
+        R(ctx, x + 1, y + 1, 6, 4, "#0b1220");
+        for (let l = 0; l < 3; l++) {
+          const w = 2 + ((Math.floor(info.t * 4) + i * 3 + l * 5) % 4);
+          R(ctx, x + 1, y + 1 + l + (l > 0 ? 0 : 0), w, 1, l === 2 ? "#34d399" : "#86efac");
+        }
+      });
+    }
+    for (let i = 0; i < 5; i++) {
+      [137, 140, 143].forEach((y, k) => {
+        const on = ((Math.floor(info.t * 3) + i * 2 + k) % 3) !== 0;
+        R(ctx, 33 + i * 15 - 1, y, 1, 2, on ? (k === 1 ? "#34d399" : "#60a5fa") : "#1c2030");
+      });
+    }
+    const lit = Math.min(info.deliverables, 6);
+    for (let i = 0; i < 6; i++) R(ctx, 109 + i * 4, 36, 3, 4, i < lit ? "#34d399" : "#3c4352");
   }
 
   // Pilha de entregas na mesa da diretora

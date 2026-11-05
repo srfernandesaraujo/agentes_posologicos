@@ -68,6 +68,8 @@ export interface SquadTemplate {
   steps: TemplateStep[];
   /** Squad persistente de missão: a última versão desta entrega entra como contexto nas missões seguintes (ex.: bíblia do livro). */
   carryDeliverable?: { title: string; heading: string; maxChars?: number };
+  /** Mascara chaves, tokens e senhas colados no formulário antes de qualquer envio ao modelo (squads de código). */
+  maskSecrets?: boolean;
 }
 
 export interface PlannedTask {
@@ -693,4 +695,42 @@ export function wordsNote(count: number, range: WordRange, sourceTitle: string):
   if (count > range.max * 1.1) return `${base} RESULTADO: ACIMA da faixa. É preciso cortar.`;
   if (count > range.max) return `${base} RESULTADO: um pouco acima da faixa.`;
   return `${base} RESULTADO: dentro da faixa.`;
+}
+
+// ---------- Filtro de segredos (squads de código) ----------
+
+const NOT_A_SECRET = /^(process\.|import\.meta|os\.environ|os\.getenv|env\.|\$\{|\$[A-Z_]|<|\[|your[-_]|seu[-_]|sua[-_]|xxx|\*{3,}|example|exemplo|changeme|placeholder|null|undefined|true|false)/i;
+
+const SECRET_RULES: Array<{ type: string; re: RegExp }> = [
+  { type: "chave privada", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g },
+  { type: "token JWT", re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g },
+  { type: "chave de API (sk-)", re: /\bsk-[A-Za-z0-9_-]{16,}/g },
+  { type: "chave Stripe", re: /\b(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{16,}/g },
+  { type: "token Supabase", re: /\bsbp_[A-Za-z0-9]{20,}/g },
+  { type: "token GitHub", re: /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})/g },
+  { type: "chave AWS", re: /\bAKIA[0-9A-Z]{16}\b/g },
+  { type: "chave Google", re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+  { type: "token Slack", re: /\bxox[abprs]-[A-Za-z0-9-]{10,}/g },
+];
+
+// Atribuições como API_KEY=valor, "password": "valor", token: valor (o valor é mascarado, o nome fica).
+const SECRET_ASSIGN = /((?:api[_-]?key|secret(?:[_-]?key)?|access[_-]?token|auth[_-]?token|token|password|passwd|senha|private[_-]?key|client[_-]?secret)["']?\s*[:=]\s*["']?)([^\s"'`,;)}\]]{8,})/gi;
+
+/** Mascara chaves, tokens e senhas. Devolve o texto e o que foi encontrado (por tipo), sem nunca repetir o segredo. */
+export function maskSecrets(input: string): PiiResult {
+  let text = input;
+  const findings: PiiFinding[] = [];
+  const add = (type: string) => {
+    const f = findings.find((x) => x.type === type);
+    if (f) f.count++; else findings.push({ type, count: 1 });
+  };
+  for (const rule of SECRET_RULES) {
+    text = text.replace(rule.re, () => { add(rule.type); return `[SEGREDO REMOVIDO: ${rule.type}]`; });
+  }
+  text = text.replace(SECRET_ASSIGN, (m, head: string, value: string) => {
+    if (NOT_A_SECRET.test(value) || value.startsWith("[SEGREDO REMOVIDO")) return m;
+    add("valor de chave, token ou senha");
+    return `${head}[SEGREDO REMOVIDO]`;
+  });
+  return { text, findings };
 }

@@ -130,6 +130,7 @@ describe("lugares e aparência", () => {
     expect(themeForEnvironment("campus")).toBe("campus");
     expect(themeForEnvironment("editora")).toBe("editora");
     expect(themeForEnvironment("escritorio-executivo")).toBe("executivo");
+    expect(themeForEnvironment("loft-startup")).toBe("loft");
     expect(themeForEnvironment("estudio-video")).toBe("studio");
     expect(themeForEnvironment("hospital-futuro")).toBe("studio");
     expect(themeForEnvironment(null)).toBe("studio");
@@ -146,6 +147,11 @@ describe("perguntas ao dono no escritório", () => {
     const cmds = eventToCommands(ev("memory_saved", null, null, "Anotado na memória"), team);
     expect(cmds).toHaveLength(1);
     expect(cmds[0]).toMatchObject({ kind: "bubble", text: "Anotei na memória", tone: "ok" });
+  });
+  it("segredos mascarados geram balão de aviso na diretora", () => {
+    const cmds = eventToCommands(ev("secrets_masked", null, null, "Chaves mascaradas"), team);
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0]).toMatchObject({ kind: "bubble", text: "Segredos mascarados", tone: "warn" });
   });
   it("ao responder, o agente volta ao normal e a diretora avisa", () => {
     const cmds = eventToCommands(ev("question_answered", "b", null, "Manter constante"), team);

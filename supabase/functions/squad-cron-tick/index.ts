@@ -4,7 +4,7 @@
 //   2. Avança missões "running" (agendadas ou abandonadas com a página fechada), uma tarefa por vez.
 // Nunca aprova nada: as entregas finais ficam aguardando a decisão do dono.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkForm, clampCap, isScheduleDue, monthStartIso, screenInput } from "../_shared/squadCore.ts";
+import { checkForm, clampCap, isScheduleDue, monthStartIso, screenInput, maskSecrets } from "../_shared/squadCore.ts";
 import { getTemplate } from "../_shared/squadTemplates.ts";
 import { createMission, runNext } from "../_shared/squadRunner.ts";
 
@@ -48,9 +48,10 @@ Deno.serve(async (req) => {
 
         const form = checkForm(template.formFields, s.form_data || {});
         if (!form.ok) { report.skipped.push({ schedule: s.id, reason: "formulário incompleto" }); continue; }
-        const brief = screenInput(form.briefing, squad.sensitivity);
+        const screen = (v: string) => { const t = screenInput(v, squad.sensitivity).text; return template.maskSecrets ? maskSecrets(t).text : t; };
+        const brief = { text: screen(form.briefing) };
         const formData: Record<string, string> = {};
-        for (const [k, v] of Object.entries(form.clean)) formData[k] = screenInput(v, squad.sensitivity).text;
+        for (const [k, v] of Object.entries(form.clean)) formData[k] = screen(v);
 
         const mission = await createMission(admin, {
           squad, template, userId: squad.owner_id, briefing: brief.text, formData,

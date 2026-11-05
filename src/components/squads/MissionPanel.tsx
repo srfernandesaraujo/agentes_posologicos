@@ -45,6 +45,7 @@ const EVENT_LABEL: Record<string, string> = {
   changes_requested: "Ajustes pedidos",
   mission_failed: "Missão falhou",
   pii_masked: "Dados mascarados",
+  secrets_masked: "Segredos mascarados",
   question_asked: "Perguntou a você",
   question_answered: "Resposta recebida",
   task_skipped: "Etapa dispensada",

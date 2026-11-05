@@ -13,7 +13,7 @@
 //   set_schedule   { squadId, ... }                  → agendamento de squads contínuos
 // Cada passo grava eventos em squad_events; o escritório visual só lê esses eventos.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkForm, clampCap, screenInput, maskPii, isDuplicateMemory, MEMORY_KINDS, MEMORY_MAX_CHARS, type MemoryKind } from "../_shared/squadCore.ts";
+import { checkForm, clampCap, screenInput, maskPii, maskSecrets, isDuplicateMemory, MEMORY_KINDS, MEMORY_MAX_CHARS, type MemoryKind } from "../_shared/squadCore.ts";
 import { getTemplate, listTemplates } from "../_shared/squadTemplates.ts";
 import { HttpError, answerQuestion, createMission, decideMission, emit, loadOwnedMission, runNext } from "../_shared/squadRunner.ts";
 
@@ -91,13 +91,23 @@ Deno.serve(async (req) => {
 
       // Squads de saúde: mascara identificadores antes de qualquer envio a modelo.
       const piiFindings: { type: string; count: number }[] = [];
-      const maskedBrief = screenInput(form.briefing, squad.sensitivity);
-      piiFindings.push(...maskedBrief.findings);
+      const secretFindings: { type: string; count: number }[] = [];
+      // Squads de código: chaves, tokens e senhas colados também são mascarados antes de qualquer envio.
+      const screen = (v: string) => {
+        const pii = screenInput(v, squad.sensitivity);
+        if (!template.maskSecrets) return { text: pii.text, pii: pii.findings, secrets: [] as { type: string; count: number }[] };
+        const sec = maskSecrets(pii.text);
+        return { text: sec.text, pii: pii.findings, secrets: sec.findings };
+      };
+      const briefScreen = screen(form.briefing);
+      const maskedBrief = { text: briefScreen.text };
+      piiFindings.push(...briefScreen.pii);
+      secretFindings.push(...briefScreen.secrets);
       const formData: Record<string, string> = {};
       for (const [k, v] of Object.entries(form.clean)) {
-        const m = screenInput(v, squad.sensitivity);
+        const m = screen(v);
         formData[k] = m.text;
-        if (!template.formFields.find((f) => f.key === k)?.isBriefing) piiFindings.push(...m.findings);
+        if (!template.formFields.find((f) => f.key === k)?.isBriefing) { piiFindings.push(...m.pii); secretFindings.push(...m.secrets); }
       }
 
       const cap = clampCap(body?.costCapUsd ?? squad.default_cost_cap_usd, template);
@@ -105,7 +115,10 @@ Deno.serve(async (req) => {
       if (piiFindings.length) {
         await emit(admin, mission, { type: "pii_masked", text: "Dados pessoais foram mascarados antes do envio ao modelo.", payload: { findings: piiFindings } });
       }
-      return json({ mission, piiFindings });
+      if (secretFindings.length) {
+        await emit(admin, mission, { type: "secrets_masked", text: "Chaves, tokens ou senhas foram mascarados antes do envio ao modelo.", payload: { findings: secretFindings } });
+      }
+      return json({ mission, piiFindings, secretFindings });
     }
 
     if (action === "run_next") {
@@ -154,7 +167,7 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
-    const cleanMemory = (v: unknown): string => maskPii(String(v ?? "")).text.replace(/\s+/g, " ").trim().slice(0, MEMORY_MAX_CHARS);
+    const cleanMemory = (v: unknown): string => maskSecrets(maskPii(String(v ?? "")).text).text.replace(/\s+/g, " ").trim().slice(0, MEMORY_MAX_CHARS);
     const cleanKind = (v: unknown): MemoryKind => ((MEMORY_KINDS as string[]).includes(String(v)) ? (String(v) as MemoryKind) : "preference");
 
     if (action === "memory_add") {

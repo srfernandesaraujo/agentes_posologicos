@@ -303,7 +303,7 @@ export function useSquadActions() {
     }),
     startMission: useMutation({
       mutationFn: (v: { squadId: string; formData: Record<string, string>; costCapUsd: number }) =>
-        call<{ mission: SquadMission; piiFindings: { type: string; count: number }[] }>({ action: "start_mission", ...v }),
+        call<{ mission: SquadMission; piiFindings: { type: string; count: number }[]; secretFindings?: { type: string; count: number }[] }>({ action: "start_mission", ...v }),
       onSuccess: (_d, v) => invalidate(v.squadId),
     }),
     decide: useMutation({
