@@ -1,5 +1,5 @@
 // Desenho do escritório em pixel art, 100% por código (sem imagens): kit base compartilhado
-// (piso, paredes, portas, móveis) + um tema por ambiente (estúdio, faculdade, campus).
+// (piso, paredes, portas, móveis) + um tema por ambiente (estúdio, faculdade, campus, editora).
 // Coordenadas lógicas 320x320, desenhadas em 2x num canvas de 640x640 (pixel art nítida).
 // Trocar por tiles desenhados à mão no futuro só exige mudar este arquivo.
 import { ROOMS, ROOM_LABELS, type RoomId, type SceneTheme } from "@/lib/squadOffice";
@@ -48,6 +48,17 @@ const PALETTES: Record<SceneTheme, Palette> = {
       meet: { base: "#6b4a3a", alt: "#5f4032", mode: "wood" },
     },
     desk: "#c99a62", deskEdge: "#9b7444", accent: "#8b5cf6",
+  },
+  editora: {
+    hall: ["#3d3a42", "#45424b"],
+    floors: {
+      dir: { base: "#35503f", alt: "#2d4536", mode: "tile" },
+      ops: { base: "#c9b79a", alt: "#bda98a", mode: "wood" },
+      lib: { base: "#8a6540", alt: "#7d5a39", mode: "wood" },
+      copa: { base: "#d8b78a", alt: "#caa97c", mode: "wood" },
+      meet: { base: "#4a2f3a", alt: "#412933", mode: "wood" },
+    },
+    desk: "#e6d6b3", deskEdge: "#b39e72", accent: "#b4532a",
   },
 };
 
@@ -216,7 +227,30 @@ function decorCampus(g: G) {
   R(g, 190, 196, 4, 16, "#8a5a3a"); R(g, 194, 196, 10, 7, "#3f9a55");
 }
 
-const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus };
+function decorEditora(g: G) {
+  // Direção editorial: estante de livros e três capas emolduradas
+  R(g, 22, 28, 44, 9, "#5a3d27");
+  for (let i = 0; i < 11; i++) R(g, 24 + i * 4, 29, 3, 7, ["#b4532a", "#1f3a5f", "#e0c36a", "#2f6b4a", "#7a2e3a"][i % 5]);
+  ["#b4532a", "#1f3a5f", "#e0c36a"].forEach((c, i) => { R(g, 72 + i * 11, 16, 9, 12, "#2a2d38"); R(g, 73 + i * 11, 17, 7, 10, c); R(g, 75 + i * 11, 20, 3, 1, "#f3f0e6"); });
+  // Redação e capa: quadro de capítulos (A fazer, escrevendo, pronto); os cartões prontos são animados
+  R(g, 280, 34, 20, 34, "#6b4a2e"); R(g, 282, 36, 16, 30, "#d9c9a8");
+  R(g, 282, 36, 16, 3, "#a8996f");
+  [284, 289, 294].forEach((x) => R(g, x, 36, 1, 30, "#bfae88"));
+  R(g, 284, 41, 4, 3, "#fef3c7"); R(g, 284, 46, 4, 3, "#bfdbfe"); R(g, 284, 51, 4, 3, "#fbcfe8"); R(g, 289, 41, 4, 3, "#bbf7d0");
+  // Mesa de capa: pranchetas de capas
+  R(g, 258, 166, 26, 14, "#2a2d38"); R(g, 260, 168, 22, 10, "#f4f1e6");
+  R(g, 262, 170, 7, 8, "#b4532a"); R(g, 271, 170, 7, 8, "#1f3a5f");
+  // Acervo: fichários e pilhas de originais
+  R(g, 22, 134, 76, 10, "#5a3d27");
+  for (let i = 0; i < 16; i++) R(g, 24 + i * 4.5, 136, 3.5, 6, ["#e8e0c8", "#1f3a5f", "#b4532a", "#2f6b4a", "#8a6a4a"][i % 5]);
+  R(g, 22, 176, 14, 8, "#f4f1e6"); R(g, 22, 174, 14, 2, "#e0d8c0"); R(g, 22, 172, 14, 2, "#f4f1e6");
+  // Revisão: tela com prova de capa e caneta vermelha na mesa
+  R(g, 214, 196, 60, 18, "#1c2030"); R(g, 216, 198, 56, 14, "#f4f1e6");
+  R(g, 220, 200, 12, 10, "#b4532a"); R(g, 222, 202, 8, 2, "#f3f0e6");
+  R(g, 236, 201, 30, 1, "#9ca3af"); R(g, 236, 204, 26, 1, "#9ca3af"); R(g, 236, 207, 30, 1, "#d6475f");
+}
+
+const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora };
 
 const layerCache = new Map<SceneTheme, HTMLCanvasElement>();
 
@@ -299,6 +333,12 @@ export function drawAnimated(ctx: G, theme: SceneTheme, info: AnimInfo) {
   if (theme === "studio" && info.working.has("ops") && Math.floor(info.t * 2) % 2 === 0) R(ctx, 296, 94, 3, 3, "#ff3b3b");
   // Relógio-sinal da sala de reunião quando o time está reunido
   if (info.working.has("meet")) R(ctx, 276, 196, 3, 3, Math.floor(info.t * 2) % 2 ? "#6ee7b7" : "#14532d");
+
+  // Editora: o quadro de capítulos ganha um cartão verde para cada entrega (até 6)
+  if (theme === "editora") {
+    const done = Math.min(info.deliverables, 6);
+    for (let i = 0; i < done; i++) R(ctx, 295, 41 + i * 4, 3, 3, i % 2 ? "#86efac" : "#bbf7d0");
+  }
 
   // Pilha de entregas na mesa da diretora
   const n = Math.min(info.deliverables, 8);

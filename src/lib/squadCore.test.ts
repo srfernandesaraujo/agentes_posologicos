@@ -6,9 +6,10 @@ import {
   extractOwnerQuestion, buildOwnerRules,
   selectMemoriesForContext, buildMemoryContext, isDuplicateMemory, buildMemoryExtractionPrompt, parseMemoryExtraction,
   MEMORY_CONTEXT_LIMIT, MEMORY_MAX_CHARS,
+  countTextWords, parseWordRange, wordsNote,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
-import { TEMPLATE_CONTEUDO_YOUTUBE, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
+import { TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
 
 describe("planTasks", () => {
   it("gera um pipeline sequencial a partir do template de Conteúdo", () => {
@@ -493,5 +494,64 @@ describe("memória compartilhada", () => {
     expect(parseMemoryExtraction("[{quebrado")).toEqual([]);
     expect(parseMemoryExtraction("[]")).toEqual([]);
     expect(parseMemoryExtraction('[{"kind":"preference","content":"Tom didático e direto"}]', [{ content: "tom didatico e direto" }])).toEqual([]);
+  });
+});
+
+describe("medição de palavras", () => {
+  it("conta palavras ignorando símbolos soltos, marcas de título e blocos de código", () => {
+    expect(countTextWords("# Título do capítulo\n\nUma frase com sete palavras aqui. --- ***")).toBe(9);
+    expect(countTextWords("antes ```js\nconst a = 1;\n``` depois")).toBe(2);
+    expect(countTextWords("")).toBe(0);
+  });
+  it("lê faixas com milhar em ponto e 'ou mais'", () => {
+    expect(parseWordRange("Médio (2.500 a 3.500 palavras)")).toEqual({ min: 2500, max: 3500 });
+    expect(parseWordRange("Curto (1.000 a 1.500 palavras)")).toEqual({ min: 1000, max: 1500 });
+    expect(parseWordRange("Longo (5.000 palavras ou mais)")).toEqual({ min: 5000, max: Infinity });
+    expect(parseWordRange("800 a 1200")).toEqual({ min: 800, max: 1200 });
+    expect(parseWordRange("sem número")).toBeNull();
+    expect(parseWordRange(undefined)).toBeNull();
+  });
+  it("classifica dentro, um pouco fora e muito fora da faixa", () => {
+    const r = { min: 1000, max: 1500 };
+    expect(wordsNote(1200, r, "Capítulo")).toContain("dentro da faixa");
+    expect(wordsNote(950, r, "Capítulo")).toContain("um pouco abaixo");
+    expect(wordsNote(600, r, "Capítulo")).toContain("ABAIXO da faixa");
+    expect(wordsNote(1550, r, "Capítulo")).toContain("um pouco acima");
+    expect(wordsNote(2000, r, "Capítulo")).toContain("ACIMA da faixa");
+    expect(wordsNote(6000, { min: 5000, max: Infinity }, "Capítulo")).toContain("5000 ou mais");
+  });
+});
+
+describe("template de Livros", () => {
+  const tasks = planTasks(TEMPLATE_LIVROS);
+  it("capa e lançamento rodam em paralelo com a bíblia como base; a Nina espera o grupo; os ajustes são paralelos", () => {
+    expect(tasks.map((x) => x.title)).toEqual([
+      "Plano do livro", "Bíblia do livro", "Capítulo", "Capa e identidade visual", "Nicho, sinopse e lançamento",
+      "Parecer de revisão", "Ajustes do capítulo", "Ajustes da capa", "Ajustes do lançamento", "Entrega final",
+    ]);
+    expect(tasks.map((x) => x.dependsOnPositions)).toEqual([[], [0], [1], [1], [1], [2, 3, 4], [5], [5], [5], [6, 7, 8]]);
+  });
+  it("o parecer e a entrega final medem a extensão do capítulo", () => {
+    expect(tasks[5].checks?.measureWords).toEqual({ sourceTitles: ["Capítulo"], formKey: "extensao" });
+    expect(tasks[6].checks?.onlyIfAdjusts).toBe(true);
+    expect(tasks[9].checks?.measureWords?.sourceTitles).toEqual(["Ajustes do capítulo", "Capítulo"]);
+    const field = TEMPLATE_LIVROS.formFields.find((f) => f.key === "extensao")!;
+    for (const o of field.options!) expect(parseWordRange(o), o).not.toBeNull();
+  });
+  it("a bíblia segue como contexto nas missões seguintes e é uma entrega que existe", () => {
+    const cd = TEMPLATE_LIVROS.carryDeliverable!;
+    expect(tasks.some((x) => x.deliverable?.title === cd.title)).toBe(true);
+  });
+  it("é squad de missão sem dados pessoais, no ambiente da editora", () => {
+    expect(TEMPLATE_LIVROS.kind).toBe("mission");
+    expect(TEMPLATE_LIVROS.sensitivity).toBe("normal");
+    expect(TEMPLATE_LIVROS.environment).toBe("editora");
+    expect(getTemplate("livros")).toBe(TEMPLATE_LIVROS);
+  });
+  it("a Nina do template confere a bíblia, e a Helena não fala como se fosse de vídeo", () => {
+    const nina = TEMPLATE_LIVROS.agents.find((a) => a.slug === "revisora")!;
+    expect(nina.systemPrompt).toContain("bíblia do livro");
+    const helena = TEMPLATE_LIVROS.agents.find((a) => a.slug === "diretora")!;
+    expect(helena.systemPrompt).not.toContain("YouTube");
   });
 });

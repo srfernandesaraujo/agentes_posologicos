@@ -128,6 +128,7 @@ describe("lugares e aparência", () => {
   it("mapeia ambiente do squad para tema, com estúdio como padrão", () => {
     expect(themeForEnvironment("faculdade")).toBe("university");
     expect(themeForEnvironment("campus")).toBe("campus");
+    expect(themeForEnvironment("editora")).toBe("editora");
     expect(themeForEnvironment("estudio-video")).toBe("studio");
     expect(themeForEnvironment("hospital-futuro")).toBe("studio");
     expect(themeForEnvironment(null)).toBe("studio");

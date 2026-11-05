@@ -26,6 +26,8 @@ export interface DeliverableSpec {
 export interface StepChecks {
   /** Mede a duração de um roteiro e entrega o número ao agente, junto com o limite pedido no formulário. */
   measureDuration?: { sourceTitles: string[]; formKey: string };
+  /** Conta as palavras de um texto longo (capítulo, artigo) e entrega o número, junto com a faixa pedida no formulário. */
+  measureWords?: { sourceTitles: string[]; formKey: string };
   /** Etapa de correção: só roda se o parecer da revisora pediu ajustes. Senão, é pulada. */
   onlyIfAdjusts?: boolean;
 }
@@ -64,6 +66,8 @@ export interface SquadTemplate {
   formFields: FormField[];
   agents: TemplateAgent[];
   steps: TemplateStep[];
+  /** Squad persistente de missão: a última versão desta entrega entra como contexto nas missões seguintes (ex.: bíblia do livro). */
+  carryDeliverable?: { title: string; heading: string; maxChars?: number };
 }
 
 export interface PlannedTask {
@@ -646,4 +650,41 @@ export function parseMemoryExtraction(text: string, existing: { content: string 
     if (out.length >= MEMORY_PER_EXTRACTION) break;
   }
   return out;
+}
+
+// ---------- Medição de palavras (textos longos) ----------
+
+/** Conta palavras de um texto em markdown, ignorando marcas de formatação e linhas só de símbolos. */
+export function countTextWords(text: string): number {
+  return text
+    .replace(/```[\s\S]*?```/g, " ")
+    .split(/\s+/)
+    .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
+
+export interface WordRange { min: number; max: number }
+
+const num = (s: string) => Number(s.replace(/\./g, ""));
+
+/** Lê faixas como "Médio (2.500 a 3.500 palavras)" ou "Longo (5.000 palavras ou mais)". */
+export function parseWordRange(label: unknown): WordRange | null {
+  const s = String(label ?? "");
+  const between = s.match(/(\d{1,3}(?:\.\d{3})+|\d+)\s*(?:a|à|até|-|–)\s*(\d{1,3}(?:\.\d{3})+|\d+)/i);
+  if (between) {
+    const [a, b] = [num(between[1]), num(between[2])];
+    return a <= b ? { min: a, max: b } : null;
+  }
+  const more = s.match(/(\d{1,3}(?:\.\d{3})+|\d+)\s*(?:palavras\s*)?(?:ou mais|\+)/i);
+  if (more) return { min: num(more[1]), max: Infinity };
+  return null;
+}
+
+export function wordsNote(count: number, range: WordRange, sourceTitle: string): string {
+  const asked = range.max === Infinity ? `${range.min} ou mais` : `${range.min} a ${range.max}`;
+  const base = `Texto "${sourceTitle}": ${count} palavras (contagem do sistema). Extensão pedida: ${asked} palavras.`;
+  if (count < range.min * 0.9) return `${base} RESULTADO: ABAIXO da faixa. O texto está curto demais ou foi cortado; é preciso conferir se está inteiro.`;
+  if (count < range.min) return `${base} RESULTADO: um pouco abaixo da faixa.`;
+  if (count > range.max * 1.1) return `${base} RESULTADO: ACIMA da faixa. É preciso cortar.`;
+  if (count > range.max) return `${base} RESULTADO: um pouco acima da faixa.`;
+  return `${base} RESULTADO: dentro da faixa.`;
 }

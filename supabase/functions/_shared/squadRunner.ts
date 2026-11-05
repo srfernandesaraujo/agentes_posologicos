@@ -6,6 +6,7 @@ import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } fro
 import {
   planTasks, pickReadyTasks, budgetState, buildTaskUserMessage, formDisplay, buildRevisionInstructions,
   measureScript, parseDurationRange, durationNote, reviewRequestsAdjustments, extractOwnerQuestion, MAX_OWNER_QUESTIONS,
+  countTextWords, parseWordRange, wordsNote,
   buildMemoryContext, buildMemoryExtractionPrompt, parseMemoryExtraction, type MemoryItem,
   type PreviousOutput, type SquadTemplate, type StepChecks,
 } from "./squadCore.ts";
@@ -57,9 +58,23 @@ export async function createMission(
 ) {
   // Contexto: memória do squad + (squads contínuos) a entrega final da última execução.
   // Memória: notas livres do dono + itens aprendidos e confirmados (status ativo).
+  // Squad persistente de missão: a versão mais recente de uma entrega-chave (ex.: bíblia do livro) segue como contexto.
+  let carried = "";
+  if (p.template.carryDeliverable) {
+    const cd = p.template.carryDeliverable;
+    const { data: prevCarry } = await admin.from("squad_deliverables").select("content")
+      .eq("squad_id", p.squad.id).eq("owner_id", p.userId).eq("title", cd.title).in("status", ["done", "in_review", "approved"])
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (prevCarry?.content) {
+      const max = cd.maxChars ?? 10000;
+      const body = prevCarry.content.length > max ? prevCarry.content.slice(0, max) + "\n[... cortado ...]" : prevCarry.content;
+      carried = `## ${cd.heading}\n${body}`;
+    }
+  }
   const { data: memRows } = await admin.from("squad_memories").select("id, kind, content, pinned, status, created_at")
     .eq("squad_id", p.squad.id).eq("owner_id", p.userId).eq("status", "active");
   let context = buildMemoryContext(p.squad.memory || "", (memRows || []) as MemoryItem[]);
+  if (carried) context += `${context ? "\n\n" : ""}${carried}`;
   if (p.template.kind === "continuous") {
     const { data: prev } = await admin
       .from("squad_deliverables").select("title, content, created_at")
@@ -220,6 +235,12 @@ async function runTask(admin: SupabaseClient, mission: any, claimed: any, userId
     const src = [...(doneTasks || [])].reverse().find((t: any) => checks.measureDuration!.sourceTitles.includes(t.title) && !/^Não necessário/.test(t.output || ""));
     const limit = parseDurationRange((mission.form_data || {})[checks.measureDuration.formKey]);
     if (src && limit) notes.push(durationNote(measureScript(src.output || ""), limit, src.title));
+  }
+
+  if (checks.measureWords) {
+    const src = [...(doneTasks || [])].reverse().find((t: any) => checks.measureWords!.sourceTitles.includes(t.title) && !/^(Não necessário|SEM AJUSTES)/.test(t.output || ""));
+    const range = parseWordRange((mission.form_data || {})[checks.measureWords.formKey]);
+    if (src && range) notes.push(wordsNote(countTextWords(src.output || ""), range, src.title));
   }
 
   const userMessage = buildTaskUserMessage({

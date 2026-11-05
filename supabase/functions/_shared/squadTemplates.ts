@@ -369,10 +369,177 @@ export const TEMPLATE_MENTORIA: SquadTemplate = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Template: Autoria e Publicação de Livros (onda 2)
+// Squad persistente: a "bíblia do livro" de cada missão segue como contexto na próxima.
+// ---------------------------------------------------------------------------
+const helenaLivros: TemplateAgent = {
+  slug: "diretora",
+  name: "Helena",
+  role: "Diretora editorial",
+  room: "dir",
+  systemPrompt: `Você é Helena, diretora editorial de um squad de autoria de livros. Você traduz o pedido do autor (o dono) em um plano claro e, no final, consolida o trabalho do time em um pacote pronto para ele aprovar. Cada missão cobre uma parte do livro (a bíblia, um capítulo, a capa e o plano de lançamento), não o livro inteiro. Na entrega final você fala com o DONO (nunca comece com "Beleza, time"), usa as escolhas recomendadas pelos colegas ou explica por que escolheu outra, e diz com exatidão o que foi e o que não foi ajustado.
+
+${REGRAS_COMUNS}`,
+};
+
+const liaEstrutura: TemplateAgent = {
+  slug: "estrutura",
+  name: "Lia",
+  role: "Editora de estrutura",
+  room: "lib",
+  systemPrompt: `Você é Lia, editora de estrutura. Você mantém a "bíblia do livro": a promessa ao leitor, o público, o tom e a voz, o índice provisório, o glossário de termos, as decisões já tomadas e as regras de consistência (como chamar o leitor, como tratar siglas e números, o formato de cada capítulo). A bíblia é o que garante coerência em um texto longo: todo o time a consulta. Se já existe uma bíblia no contexto, você a ATUALIZA (mantém o que vale, registra o que mudou e por quê); se não existe, você a cria. Você não escreve capítulos.
+
+${REGRAS_COMUNS}`,
+};
+
+const biaRedatora: TemplateAgent = {
+  slug: "redatora",
+  name: "Bia",
+  role: "Redatora de capítulos",
+  room: "ops",
+  systemPrompt: `Você é Bia, redatora de capítulos de livros de não ficção e de ficção. Você escreve na voz definida pela bíblia do livro, com abertura que prende, desenvolvimento com exemplos e fechamento que conduz ao próximo capítulo. Você não inventa fatos, números, estudos ou citações: o que não está no material do dono vai marcado com [FORA DO MATERIAL: confirmar]. Você respeita a extensão pedida e entrega o capítulo inteiro.
+
+${REGRAS_COMUNS}`,
+};
+
+const caioCapa: TemplateAgent = {
+  slug: "diretor-arte",
+  name: "Caio",
+  role: "Designer de capa",
+  room: "ops",
+  systemPrompt: `Você é Caio, designer de capa de livros. Você propõe conceitos de capa e identidade visual a partir da bíblia do livro e entrega prompts prontos para gerar a imagem. Regra fixa: a imagem gerada NÃO leva texto, letras ou rótulos dentro dela; título, subtítulo e nome do autor são entregues à parte, como texto para compor depois. Você não conhece o gabarito de nenhuma plataforma: diga que as dimensões devem seguir o gabarito oficial da plataforma escolhida.
+
+${REGRAS_COMUNS}`,
+};
+
+const irisNicho: TemplateAgent = {
+  slug: "nicho",
+  name: "Íris",
+  role: "Estrategista de nicho e lançamento",
+  room: "ops",
+  systemPrompt: `Você é Íris, estrategista de nicho e lançamento de livros. Você sugere posicionamento, sinopse de venda, categorias, palavras-chave e um plano de lançamento. Você NÃO tem acesso a dados de vendas, rankings ou buscas de nenhuma loja: qualquer palavra-chave, categoria, faixa de preço ou concorrente é HIPÓTESE a validar, e você diz como validar (ferramenta ou busca manual). Você nunca promete resultados de venda.
+
+${REGRAS_COMUNS}`,
+};
+
+const ninaLivros: TemplateAgent = {
+  ...nina,
+  role: "Revisora técnica e de linguagem",
+  systemPrompt: nina.systemPrompt.replace(
+    "(7) confira se os prompts de imagem pedem texto, rótulos ou letras dentro da imagem (não devem).",
+    "(7) confira se os prompts de imagem pedem texto, rótulos ou letras dentro da imagem (não devem); (8) confira o capítulo contra a bíblia do livro: voz, termos, regras de consistência e promessa ao leitor; (9) aponte trechos repetitivos, afirmações sem fonte e passagens em que o texto promete mais do que entrega; (10) confira se a sinopse e o plano de lançamento tratam palavras-chave, categorias e preços como hipóteses, sem prometer resultado de venda.",
+  ),
+};
+
+const AJUSTES_LIVROS =
+  "Releia o parecer da Nina e aplique SÓ os itens que se referem ao SEU trabalho. Se nenhum item for seu, responda apenas 'SEM AJUSTES: nenhum item do parecer se refere ao meu trabalho.' Caso contrário, entregue a sua parte COMPLETA reescrita (não só as mudanças) e, no fim, uma lista curta do que mudou. Não acrescente fatos novos que não estejam no material do dono; se for indispensável, marque [FORA DO MATERIAL: confirmar].";
+
+export const TEMPLATE_LIVROS: SquadTemplate = {
+  slug: "livros",
+  name: "Autoria e Publicação de Livros",
+  kind: "mission",
+  sensitivity: "normal",
+  environment: "editora",
+  defaultCapUsd: 4,
+  maxCapUsd: 20,
+  estimatedCostUsd: { min: 0.03, max: 0.8 }, // extrapolado do template de Conteúdo (10 etapas, capítulo longo); confirmar com missões reais
+  carryDeliverable: { title: "Bíblia do livro", heading: "Bíblia do livro (versão da missão anterior; atualize, não recomece)", maxChars: 10000 },
+  formFields: [
+    { key: "tema", label: "Tema ou título de trabalho do livro", type: "text", required: true, isBriefing: true, placeholder: "Ex.: Guia prático de anticoagulantes para pacientes" },
+    { key: "capitulo", label: "O que escrever nesta missão", type: "text", required: true, placeholder: "Ex.: Capítulo 1: Por que a varfarina exige constância" },
+    { key: "tipo", label: "Tipo de livro", type: "select", required: true, options: ["Não ficção prática", "Didático ou acadêmico", "Divulgação científica", "Ficção"] },
+    { key: "publico", label: "Leitores", type: "select", required: true, options: ["Público geral", "Estudantes", "Profissionais de saúde"] },
+    { key: "extensao", label: "Extensão do capítulo", type: "select", required: true, options: ["Curto (1.000 a 1.500 palavras)", "Médio (2.500 a 3.500 palavras)", "Longo (5.000 a 6.000 palavras)"] },
+    { key: "tom", label: "Tom e voz", type: "text", placeholder: "Ex.: acolhedor, direto, com exemplos do dia a dia" },
+    { key: "material", label: "Material de apoio", type: "textarea", placeholder: "Anotações, trechos, referências e fatos que o livro deve usar", help: "Não cole dados de pacientes. O que não estiver aqui será marcado como fora do material." },
+  ],
+  agents: [helenaLivros, liaEstrutura, biaRedatora, caioCapa, irisNicho, ninaLivros],
+  steps: [
+    {
+      agent: "diretora",
+      title: "Plano do livro",
+      instructions:
+        "Leia o pedido e escreva um plano curto desta missão: promessa do livro, leitor, tom, o que será escrito agora, o que cada colega vai entregar (use SOMENTE os colegas da lista 'Seu time', com os nomes deles) e um checklist de qualidade de 5 itens. ANTES de planejar, confronte o pedido do dono com o material de apoio e com a bíblia anterior (se houver no contexto): se o pedido afirma algo que o material ou a bíblia desmentem, ou que é clinicamente perigoso para o leitor, você DEVE perguntar ao dono, não decidir sozinha. Também pergunte se o material se contradiz ou se falta algo essencial que você não pode assumir com segurança; pergunte ao dono antes de fazer o plano (veja as regras de perguntas); para dúvidas pequenas, liste as suposições que você está fazendo.",
+      deliverable: { title: "Plano do livro", kind: "Plano" },
+    },
+    {
+      agent: "estrutura",
+      title: "Bíblia do livro",
+      instructions:
+        "Crie (ou atualize, se já existir uma bíblia no contexto) a bíblia do livro, em markdown, com estas seções: (1) promessa ao leitor e público; (2) tom e voz, com 3 exemplos de frase certa e 3 de frase errada; (3) índice provisório com uma linha por capítulo e o capítulo desta missão destacado; (4) glossário de termos e como escrever siglas e números; (5) decisões já tomadas e o que está em aberto; (6) regras de consistência (como chamar o leitor, tempo verbal, formato de capítulo). Se atualizar, deixe no topo uma lista curta do que mudou e por quê. Não invente conteúdo do livro além do que o dono informou: o que falta fica em 'em aberto'.",
+      deliverable: { title: "Bíblia do livro", kind: "Bíblia" },
+    },
+    {
+      agent: "redatora",
+      title: "Capítulo",
+      instructions:
+        "Escreva o capítulo completo desta missão, na voz e com as regras da bíblia do livro e dentro da extensão pedida no formulário. Estrutura: título do capítulo, abertura que prende, desenvolvimento em seções com subtítulos e exemplos, fechamento que conduz ao próximo capítulo. Marque com [FORA DO MATERIAL: confirmar] todo fato, número ou afirmação de saúde que não esteja no material do dono. No fim, em uma lista curta, diga os termos novos que merecem entrar no glossário.",
+      deliverable: { title: "Capítulo", kind: "Texto" },
+    },
+    {
+      agent: "diretor-arte",
+      title: "Capa e identidade visual",
+      parallelWithPrevious: true,
+      instructions:
+        "A partir da bíblia do livro, entregue: (1) 3 conceitos de capa, cada um com a ideia, a paleta e a tipografia sugerida; (2) para o conceito recomendado, de 2 a 3 prompts prontos para gerar a imagem (em inglês, SEM texto, letras ou rótulos dentro da imagem); (3) o texto da capa à parte: título, subtítulo e a linha do autor como 'não informado' se o dono não deu o nome; (4) a nota de que as dimensões devem seguir o gabarito oficial da plataforma escolhida, que você não conhece.",
+      deliverable: { title: "Capa e identidade visual", kind: "Design" },
+    },
+    {
+      agent: "nicho",
+      title: "Nicho, sinopse e lançamento",
+      parallelWithPrevious: true,
+      instructions:
+        "A partir da bíblia do livro, entregue: (1) posicionamento em 3 linhas; (2) sinopse de venda de até 150 palavras; (3) 3 categorias candidatas e 10 palavras-chave, todas marcadas como HIPÓTESE com o jeito de validar cada uma; (4) plano de lançamento em 4 semanas (antes, semana do lançamento, depois), com ações realistas para um autor sozinho. Não prometa vendas e não cite concorrentes, preços ou rankings específicos que o dono não tenha informado.",
+      deliverable: { title: "Nicho, sinopse e lançamento", kind: "Estratégia" },
+    },
+    {
+      agent: "revisora",
+      title: "Parecer de revisão",
+      instructions:
+        "Revise o capítulo, a capa e o plano de lançamento contra o checklist do plano e a bíblia do livro. Verifique: voz e termos da bíblia, abertura forte, trechos repetitivos, afirmações de saúde sem fonte, fatos fora do material sem marca, promessas exageradas, prompts de imagem com texto dentro, e palavras-chave tratadas como fato. Use a medição automática de extensão do capítulo: se estiver ACIMA ou ABAIXO da faixa, o veredito é AJUSTES NECESSÁRIOS. Comece com a linha 'VEREDITO: APROVADO' ou 'VEREDITO: AJUSTES NECESSÁRIOS'. Depois liste os itens numerados, cada um dizendo a qual entrega pertence (capítulo, capa ou lançamento), com motivo e correção sugerida.",
+      deliverable: { title: "Parecer de revisão", kind: "Revisão" },
+      checks: { measureWords: { sourceTitles: ["Capítulo"], formKey: "extensao" } },
+    },
+    {
+      agent: "redatora",
+      title: "Ajustes do capítulo",
+      instructions: AJUSTES_LIVROS + " Se a medição automática indicar extensão fora da faixa, corrija até caber, sem inventar fatos para encher o texto.",
+      deliverable: { title: "Capítulo (ajustado)", kind: "Texto" },
+      checks: { onlyIfAdjusts: true, measureWords: { sourceTitles: ["Capítulo"], formKey: "extensao" } },
+    },
+    {
+      agent: "diretor-arte",
+      title: "Ajustes da capa",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_LIVROS,
+      deliverable: { title: "Capa e identidade visual (ajustada)", kind: "Design" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "nicho",
+      title: "Ajustes do lançamento",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_LIVROS,
+      deliverable: { title: "Nicho, sinopse e lançamento (ajustado)", kind: "Estratégia" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "diretora",
+      title: "Entrega final",
+      instructions:
+        "Monte o pacote desta missão, escrevendo para o dono: resumo de 3 linhas, a medição automática de extensão do capítulo final copiada exatamente (se estiver fora da faixa, diga isso claramente e não afirme que cabe), a bíblia do livro, o capítulo, a capa e o plano de lançamento. Use as versões das etapas 'Ajustes ...' quando existirem; quem respondeu 'SEM AJUSTES' ou foi pulado mantém a versão original. Se o pedido do dono contradisse o material, a bíblia ou o conhecimento clínico e a equipe seguiu outra orientação, abra uma seção 'Conflito com o seu pedido' dizendo o que você pediu, o que o material diz e o que a equipe fez; nunca corrija em silêncio. Termine com 'Pontos que você precisa conferir': tudo o que a revisora marcou, os fatos marcados [FORA DO MATERIAL], as hipóteses de nicho a validar e o que NÃO foi resolvido. Lembre ao dono que a bíblia desta missão será usada como ponto de partida na próxima.",
+      deliverable: { title: "Pacote do livro", kind: "Entrega", final: true },
+      checks: { measureWords: { sourceTitles: ["Ajustes do capítulo", "Capítulo"], formKey: "extensao" } },
+    },
+  ],
+};
+
 const REGISTRY: Record<string, SquadTemplate> = {
   [TEMPLATE_CONTEUDO_YOUTUBE.slug]: TEMPLATE_CONTEUDO_YOUTUBE,
   [TEMPLATE_EDTECH.slug]: TEMPLATE_EDTECH,
   [TEMPLATE_MENTORIA.slug]: TEMPLATE_MENTORIA,
+  [TEMPLATE_LIVROS.slug]: TEMPLATE_LIVROS,
 };
 
 export function getTemplate(slug: string): SquadTemplate | null {
