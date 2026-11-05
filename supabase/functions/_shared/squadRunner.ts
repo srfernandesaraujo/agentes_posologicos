@@ -301,7 +301,9 @@ async function runTask(admin: SupabaseClient, mission: any, claimed: any, userId
   await logAiUsage(admin, { userId, provider: result.provider!, model: result.model!, tokensInput: result.tokensInput, tokensOutput: result.tokensOutput, promptType: "squad" });
 
   const spec = claimed.deliverable_spec as { title: string; kind: string; final?: boolean } | null;
-  if (spec) {
+  // Etapa de ajustes em que o autor respondeu "SEM AJUSTES": não gera entrega nova.
+  const noChange = !!checks.onlyIfAdjusts && /^\W*SEM AJUSTES/i.test(result.output);
+  if (spec && !noChange) {
     const { count } = await admin.from("squad_deliverables").select("id", { count: "exact", head: true }).eq("mission_id", mission.id).eq("title", spec.title);
     await admin.from("squad_deliverables").insert({
       mission_id: mission.id, squad_id: mission.squad_id, owner_id: mission.owner_id,

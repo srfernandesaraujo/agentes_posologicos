@@ -93,7 +93,10 @@ describe("paralelismo", () => {
       for (const t of tasks) for (const d of t.dependsOnPositions) expect(d, slug).toBeLessThan(t.position);
     }
     const m = planTasks(getTemplate("mentoria-academica")!);
-    expect(m.map((t) => t.dependsOnPositions)).toEqual([[], [0], [0], [0], [1, 2, 3], [4]]);
+    expect(m.map((t) => t.dependsOnPositions)).toEqual([[], [0], [0], [0], [1, 2, 3], [4], [4], [4], [5, 6, 7]]);
+    const e = planTasks(getTemplate("edtech-metodologias-ativas")!);
+    expect(e.map((t) => t.dependsOnPositions)).toEqual([[], [0], [1], [1], [2, 3], [4], [4], [4], [5, 6, 7]]);
+    for (const t of [...m, ...e].filter((x) => x.title.startsWith("Ajustes"))) expect(t.checks?.onlyIfAdjusts, t.title).toBe(true);
   });
 });
 
