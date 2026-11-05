@@ -5749,34 +5749,34 @@ Se o usuário disser "quero simular um OSCE virtual", "como aplico um OSCE", "co
 <CONHECIMENTO_DO_SISTEMA>
 
 ## 🗺️ Mapa de Rotas (todas as páginas)
-- \`/\` — Landing/início
-- \`/login\` e \`/signup\` — autenticação (bônus de 15 créditos no cadastro)
-- \`/redefinir-senha\` — recuperação e primeiro acesso de senha
-- \`/agentes\` — biblioteca de agentes nativos
-- \`/vitrine\` — vitrine pública de agentes
-- \`/chat/:agentId\` — conversar com um agente (suporta \`?session=ID\` para retomar)
-- \`/meus-agentes\` — agentes personalizados do usuário
-- \`/meus-agentes/:id\` — editor de agente personalizado
-- \`/conteudos\` e \`/conteudos/:id\` — bases de conhecimento (RAG)
-- \`/fluxos\` e \`/fluxos/:id\` — Rede de Agentes (pipelines)
-- \`/marketplace\` e \`/marketplace/fluxos\` — agentes e fluxos publicados pela comunidade
-- \`/salas-virtuais\` e \`/sala/:pin\` — Salas Virtuais
-- \`/salas-virtuais/aula/:pin\` — modo Aula ao Vivo de uma sala virtual (broadcast + perguntas anônimas)
-- \`/reunioes\` — Reuniões com IA (Google Meet)
-- \`/osce\`, \`/osce/estacao/:id\`, \`/osce/prova/:id\`, \`/osce/entrar\`, \`/osce/sala/:sessionId\`, \`/osce/sessao/:sessionId\`, \`/osce/atendimento/:attemptId\`, \`/osce/resultado/:attemptId\` — módulo OSCE
-- \`/briefing/:id\` — página de um Briefing por Voz gerado (configurado em "Conta"; não há listagem própria no menu)
-- \`/projetos\` e \`/projetos/:id\` — projetos colaborativos
-- \`/orquestrador\` — orquestrador multi-agente
-- \`/conversas\` — histórico central de conversas
-- \`/creditos\` — comprar créditos / assinaturas
-- \`/conta\` — perfil, créditos, chaves de API, monitor PubMed, interesses, memória, Briefing por Voz
-- \`/dashboard\` — visão geral do usuário
-- \`/docs\` — documentação pública (sem login)
-- \`/documentacao\` — documentação completa dentro do app (logado; admins veem seções técnicas extras)
-- \`/configuracoes\` — configurações administrativas (apenas admins)
-- \`/precos\`, \`/fale-conosco\`, \`/contato\` — páginas públicas/institucionais
-- \`/verificar\` — verificar certificado de conteúdo (autenticidade SHA-256)
-- \`/admin\` e \`/admin/agente/:agentId\` — painel administrativo e editor de agentes nativos (apenas admins)
+- `/' — Landing/início
+- `/login` e `/signup` — autenticação (bônus de 15 créditos no cadastro)
+- `/redefinir-senha` — recuperação e primeiro acesso de senha
+- `/agentes` — biblioteca de agentes nativos
+- `/vitrine` — vitrine pública de agentes
+- `/chat/:agentId` — conversar com um agente (suporta `?session=ID` para retomar)
+- `/meus-agentes` — agentes personalizados do usuário
+- `/meus-agentes/:id` — editor de agente personalizado
+- `/conteudos` e `/conteudos/:id` — bases de conhecimento (RAG)
+- `/fluxos` e `/fluxos/:id` — Rede de Agentes (pipelines)
+- `/marketplace` e `/marketplace/fluxos` — agentes e fluxos publicados pela comunidade
+- `/salas-virtuais` e `/sala/:pin` — Salas Virtuais
+- `/salas-virtuais/aula/:pin` — modo Aula ao Vivo de uma sala virtual (broadcast + perguntas anônimas)
+- `/reunioes` — Reuniões com IA (Google Meet)
+- `/osce`, `/osce/estacao/:id`, `/osce/prova/:id`, `/osce/entrar`, `/osce/sala/:sessionId`, `/osce/sessao/:sessionId`, `/osce/atendimento/:attemptId`, `/osce/resultado/:attemptId` — módulo OSCE
+- `/briefing/:id` — página de um Briefing por Voz gerado (configurado em "Conta"; não há listagem própria no menu)
+- `/projetos` e `/projetos/:id` — projetos colaborativos
+- `/orquestrador` — orquestrador multi-agente
+- `/conversas` — histórico central de conversas
+- `/creditos` — comprar créditos / assinaturas
+- `/conta` — perfil, créditos, chaves de API, monitor PubMed, interesses, memória, Briefing por Voz
+- `/dashboard` — visão geral do usuário
+- `/docs` — documentação pública (sem login)
+- `/documentacao` — documentação completa dentro do app (logado; admins veem seções técnicas extras)
+- `/configuracoes` — configurações administrativas (apenas admins)
+- `/precos`, `/fale-conosco`, `/contato` — páginas públicas/institucionais
+- `/verificar` — verificar certificado de conteúdo (autenticidade SHA-256)
+- `/admin` e `/admin/agente/:agentId` — painel administrativo e editor de agentes nativos (apenas admins)
 
 ## 📚 Bases de Conhecimento (Conteúdos)
 - Acesse pelo menu lateral "Conteúdos"
@@ -5811,7 +5811,7 @@ Se o usuário disser "quero simular um OSCE virtual", "como aplico um OSCE", "co
 - Suporta **execução paralela** com Agente Sintetizador ao final
 - Detecção automática de perguntas: se um agente faz perguntas no final, o fluxo pausa e exibe chat inline para o usuário responder
 - Mapas mentais em formato ┣/┗ são renderizados como SVG interativo (zoom/pan)
-- Marketplace de Fluxos em \`/marketplace/fluxos\` para publicar/instalar pipelines prontos
+- Marketplace de Fluxos em `/marketplace/fluxos` para publicar/instalar pipelines prontos
 
 ## 🎥 Reuniões com IA
 - Acesse pelo menu lateral "Reuniões"
@@ -5824,9 +5824,9 @@ Se o usuário disser "quero simular um OSCE virtual", "como aplico um OSCE", "co
 
 ## 🏥 OSCE — Estações Clínicas com Paciente Virtual
 - Módulo completo de **simulação clínica estruturada** com paciente virtual. É a versão digital do OSCE (Objective Structured Clinical Examination) usado em provas de Medicina, Farmácia, Enfermagem, Odontologia etc.
-- Acesse pelo menu lateral "OSCE" (rota \`/osce\`). O módulo tem 3 abas: **Estações**, **Provas** e **Resultados**.
+- Acesse pelo menu lateral "OSCE" (rota `/osce`). O módulo tem 3 abas: **Estações**, **Provas** e **Resultados**.
 
-### 1. Estações (\`/osce/estacao/:id\`)
+### 1. Estações (`/osce/estacao/:id`)
 Crie cenários clínicos individuais. Cada estação tem:
 - **Título** e **briefing** (cenário que o aluno lê antes de iniciar)
 - **Persona do paciente virtual** (idade, queixa, história, comportamento)
@@ -5836,27 +5836,27 @@ Crie cenários clínicos individuais. Cada estação tem:
 - **Dificuldade**: fácil, média ou difícil
 - **Duração** em minutos
 
-### 2. Provas (\`/osce/prova/:id\`)
+### 2. Provas (`/osce/prova/:id`)
 Agrupam várias estações em ordem para compor um exame completo.
 
 ### 3. Modo Assíncrono
 - O aluno acessa a estação, lê o briefing e clica em "Iniciar"
 - Conversa por chat com o paciente virtual (IA roleplay 100% imersivo)
 - Ao encerrar, o sistema avalia a transcrição usando a rubrica e gera boletim com **nota**, **rubrica detalhada com evidências**, **pontos fortes**, **pontos a melhorar** e **feedback em pt-BR**
-- Pode visualizar/exportar resultado em \`/osce/resultado/:attemptId\`
+- Pode visualizar/exportar resultado em `/osce/resultado/:attemptId`
 
 ### 4. Modo ao Vivo (Sessão sincronizada)
 Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no comando:
 1. Na página da prova, clicar em **"Aplicar ao vivo"** → o sistema gera um **PIN de 6 dígitos**
-2. Alunos acessam \`/osce/entrar\`, digitam o PIN e entram **com conta** (usuário logado) **ou como convidados** (nome + e-mail)
-3. O professor abre o painel da sessão (\`/osce/sessao/:sessionId\`) e vê:
+2. Alunos acessam `/osce/entrar`, digitam o PIN e entram **com conta** (usuário logado) **ou como convidados** (nome + e-mail)
+3. O professor abre o painel da sessão (`/osce/sessao/:sessionId`) e vê:
    - PIN grande para projetar/compartilhar
    - Lista de participantes em tempo real (entram via Supabase Realtime, sem F5)
    - Cronômetro da estação atual
    - Ranking parcial e status (em andamento / concluído) de cada aluno
 4. Controles do professor: **Iniciar**, **Pausar**, **Próxima estação**, **Encerrar prova**
 5. Quando o professor clica "Iniciar", todos os alunos começam a primeira estação juntos. Ao avançar, o sistema fecha as tentativas em andamento, avalia automaticamente e cria as próximas
-6. Alunos veem a tela em \`/osce/sala/:sessionId\` ("Aguardando professor iniciar...") e são redirecionados automaticamente para \`/osce/atendimento/:attemptId\` quando a estação inicia
+6. Alunos veem a tela em `/osce/sala/:sessionId` ("Aguardando professor iniciar...") e são redirecionados automaticamente para `/osce/atendimento/:attemptId` quando a estação inicia
 7. Após o fim, cada aluno recebe boletim consolidado de todas as estações e o professor vê ranking final
 
 ### 5. Custo em créditos
@@ -5868,6 +5868,24 @@ Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no coma
 - Cada sessão ao vivo é descartada após "Encerrar prova" — para reutilizar a mesma prova com outra turma, gere uma nova sessão (novo PIN)
 - Se o PIN estiver vencido, o aluno recebe "Sessão não encontrada ou finalizada"
 - Realtime habilitado: timer para imediatamente quando o status muda para finished/paused; lista de participantes atualiza sozinha
+
+## 👥 Squads (Equipes de IA)
+- Organize agentes especializados para missões complexas com múltiplas etapas.
+- O sistema gerencia o fluxo de trabalho, a comunicação entre os agentes e as entregas.
+- As missões podem ser agendadas ou iniciadas manualmente.
+- O sistema avalia o formulário de entrada para a missão e aplica validações.
+
+### 🛡️ Mascaramento de Segredos
+- Em squads configurados (ex: squads de código), o sistema detecta e mascara automaticamente chaves de API, tokens JWT, senhas e outros identificadores de segredo nos dados de entrada (briefing e campos do formulário) antes de enviá-los aos modelos de IA.
+- Isso visa aumentar a segurança e evitar a exposição acidental de credenciais.
+- Uma notificação é exibida ao usuário caso segredos sejam detectados e mascarados.
+- Tipos de segredos detectados incluem chaves privadas, tokens JWT, chaves de API (OpenAI, Stripe, Supabase, GitHub, AWS, Google, Slack), e valores atribuídos a campos como `api_key`, `secret`, `password`, `token`, `senha`.
+
+### 👨‍💻 Squad "Vibe Coding e Full-Stack"
+- Um template de squad especializado para desenvolvimento de software.
+- Os agentes trabalham em conjunto para entregar arquitetura, código (front-end, back-end), scripts de deploy (Dockerfile, compose, ambiente de nuvem), testes e revisão de segurança.
+- **Característica chave**: Nenhuma execução de código ou deploy é realizada pelo squad; todas as entregas são propostas em texto para o usuário aplicar e testar.
+- **Segurança**: Este squad tem o mascaramento de segredos ativado por padrão para todas as entradas de código.
 
 ## 📱 Integração WhatsApp
 - No editor do agente personalizado, ative "Publicar no WhatsApp"
@@ -5887,7 +5905,7 @@ Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no coma
 - Gera um resumo narrado (áudio) e em texto cruzando seus interesses de pesquisa cadastrados com novidades recentes da plataforma
 - Frequência configurável (diária ou semanal) e horário de envio por e-mail
 - Também é possível gerar um briefing avulso na hora com o botão "Gerar briefing agora"
-- Cada briefing tem página própria em \`/briefing/:id\`, acessível e compartilhável mesmo sem login
+- Cada briefing tem página própria em `/briefing/:id`, acessível e compartilhável mesmo sem login
 
 ## 📁 Projetos e Colaboradores
 - Organize conversas, agentes e bases de conhecimento em projetos
@@ -5898,7 +5916,7 @@ Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no coma
 
 ## ✅ Certificado e Verificação de Conteúdo
 - Toda resposta gerada pode receber um certificado com hash SHA-256
-- Qualquer pessoa pode verificar a autenticidade do conteúdo em \`/verificar\` colando o texto ou o código do certificado
+- Qualquer pessoa pode verificar a autenticidade do conteúdo em `/verificar` colando o texto ou o código do certificado
 - Útil para garantir que o conteúdo não foi adulterado após gerado pela IA
 
 ## 📝 Templates de Entrada
@@ -5911,18 +5929,18 @@ Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no coma
 - **Saída por voz (TTS)**: cada mensagem do agente tem botão de "ouvir" via ElevenLabs
 
 ## 🧠 Memória do Usuário e Contexto
-- O sistema extrai automaticamente fatos relevantes do usuário durante as conversas (\`user_memory_facts\`)
-- Acesse e edite manualmente em \`/conta\` → "Memória"
+- O sistema extrai automaticamente fatos relevantes do usuário durante as conversas (`user_memory_facts`)
+- Acesse e edite manualmente em `/conta` → "Memória"
 - Esses fatos são injetados como contexto extra nos agentes para personalizar respostas
 
 ## 🔔 Notificações
 - Sino no topo da aplicação mostra notificações (PubMed semanal, convites, eventos da plataforma)
 
 ## 🧪 Outras funcionalidades
-- **Orquestrador** (\`/orquestrador\`): roteia automaticamente a pergunta para o melhor agente disponível
-- **Aula ao Vivo** (\`/salas-virtuais/aula/:pin\`): modo ao vivo de uma Sala Virtual, com broadcast de prompt e perguntas anônimas, para apresentações em sala
+- **Orquestrador** (`/orquestrador`): roteia automaticamente a pergunta para o melhor agente disponível
+- **Aula ao Vivo** (`/salas-virtuais/aula/:pin`): modo ao vivo de uma Sala Virtual, com broadcast de prompt e perguntas anônimas, para apresentações em sala
 - **Aba de mapa mental**: agentes com saída ┣/┗ renderizam SVG interativo
-- **Validador Clínico**: blocos \`[PACIENTE]\` e \`[ALERTAS]\` viram cards visuais
+- **Validador Clínico**: blocos `[PACIENTE]` e `[ALERTAS]` viram cards visuais
 - **Simulador de Prescrição**: validação gamificada com hotspots
 - **Auto Fine-Tuning** de agentes personalizados (otimização automática do prompt)
 
@@ -5957,7 +5975,7 @@ Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no coma
 - Agentes adquiridos ficam disponíveis na sua biblioteca
 - Custo padrão: 5 créditos (3 vão para o autor)
 - Reviews/avaliações disponíveis antes da compra
-- Também existe **Marketplace de Fluxos** em \`/marketplace/fluxos\`
+- Também existe **Marketplace de Fluxos** em `/marketplace/fluxos`
 
 ## 💳 Créditos
 - Cada interação debita créditos (geralmente 1-5; OSCE custa 10/15/20 por estação)
@@ -5966,7 +5984,7 @@ Permite que toda uma turma faça a prova ao mesmo tempo, com o professor no coma
 - **Pacotes avulsos**: Essencial (10), Avançado (30), Profissional (100)
 - Administradores, usuários convidados via Resend e o e-mail srfernandesaraujo@gmail.com têm créditos ilimitados
 - Débito é server-side, após a resposta ser gerada
-- Histórico completo em \`/conta\`
+- Histórico completo em `/conta`
 
 ## 🔑 Chaves de API Próprias
 - Em "Conta" → "Chaves de API", o usuário pode cadastrar suas próprias chaves
