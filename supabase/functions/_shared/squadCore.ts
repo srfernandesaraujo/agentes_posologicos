@@ -210,6 +210,9 @@ const PII_RULES: Array<{ type: string; label: string; re: RegExp }> = [
   },
 ];
 
+/** Identificadores mascarados nos squads de dados pessoais comuns (nomes e e-mails ficam). */
+export const PII_COMMON_MASKED = ["cpf", "telefone", "prontuario"];
+
 export interface PiiResult {
   text: string;
   findings: PiiFinding[];
@@ -220,10 +223,11 @@ export interface PiiResult {
  * prontuário): nomes próprios NÃO são detectados, por isso o formulário continua exigindo a
  * confirmação do usuário de que os dados estão anonimizados.
  */
-export function maskPii(input: string): PiiResult {
+export function maskPii(input: string, only?: string[]): PiiResult {
   let text = input;
   const findings: PiiFinding[] = [];
   for (const rule of PII_RULES) {
+    if (only && !only.includes(rule.type)) continue;
     let count = 0;
     text = text.replace(rule.re, (...args) => {
       count++;
@@ -237,8 +241,10 @@ export function maskPii(input: string): PiiResult {
 }
 
 export function screenInput(text: string, sensitivity: SquadSensitivity): PiiResult {
-  if (sensitivity !== "dados_saude") return { text, findings: [] };
-  return maskPii(text);
+  if (sensitivity === "dados_saude") return maskPii(text);
+  // Dados pessoais comuns: o squad precisa de nomes e e-mails para trabalhar; mascara só o que nunca deve ir ao modelo.
+  if (sensitivity === "dados_pessoais") return maskPii(text, PII_COMMON_MASKED);
+  return { text, findings: [] };
 }
 
 // ---------- Prompts ----------

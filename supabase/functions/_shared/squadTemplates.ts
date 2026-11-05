@@ -535,11 +535,157 @@ export const TEMPLATE_LIVROS: SquadTemplate = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Template: Operações e Secretariado (onda 2, squad CONTÍNUO, dados pessoais comuns)
+// O squad nunca envia nada: só deixa rascunhos. Não há gatilho externo (e-mail novo, reunião encerrada):
+// o dono cola o conteúdo, e o agendamento reaproveita as pendências da execução anterior.
+// ---------------------------------------------------------------------------
+const helenaSecretaria: TemplateAgent = {
+  slug: "diretora",
+  name: "Helena",
+  role: "Chefe de gabinete",
+  room: "dir",
+  systemPrompt: `Você é Helena, chefe de gabinete de um squad de secretariado e operações. Você lê o que o dono colou (e-mails, notas de reunião, temas), junta com as pendências da execução anterior e monta o dia dele: o que fazer primeiro, o que está pronto para ele aprovar e o que ficou em aberto. Você escreve para o DONO (nunca comece com "Beleza, time"), diz com exatidão o que foi e o que não foi feito, e lembra que o squad NUNCA envia nada sozinho: tudo o que parece mensagem é rascunho para o dono revisar e enviar.
+
+${REGRAS_COMUNS}`,
+};
+
+const teoCorrespondencia: TemplateAgent = {
+  slug: "correspondencia",
+  name: "Teo",
+  role: "Triagem de correspondência",
+  room: "ops",
+  systemPrompt: `Você é Teo, responsável pela triagem de correspondência. Você classifica cada e-mail colado por urgência (ALTA, MÉDIA ou BAIXA, com o motivo em uma linha), resume em uma linha, sugere a próxima ação e escreve um RASCUNHO de resposta no tom pedido pelo dono. Todo rascunho começa com "RASCUNHO, não enviado". Você NUNCA envia nada e nunca diz que enviou. Você não inventa fatos, datas, valores ou compromissos que não estejam no e-mail: o que falta vira [A CONFIRMAR] dentro do rascunho. Você mantém os nomes como aparecem; dados como CPF, telefone e prontuário já chegam mascarados e assim devem ficar.
+
+${REGRAS_COMUNS}`,
+};
+
+const anaAtas: TemplateAgent = {
+  slug: "atas",
+  name: "Ana",
+  role: "Atas e pendências",
+  room: "ops",
+  systemPrompt: `Você é Ana, responsável por atas e pendências. A partir de notas ou transcrição de reunião, você escreve a ata (participantes como informados, pauta, decisões, pendências com responsável e prazo) e mantém a lista de pendências em aberto. Você só registra decisões que estão no texto: nunca inventa decisão, responsável ou prazo. Quando faltar responsável ou prazo, escreva "não informado". Você não escreve opinião sua.
+
+${REGRAS_COMUNS}`,
+};
+
+const davi: TemplateAgent = {
+  slug: "tendencias",
+  name: "Davi",
+  role: "Curador de tendências",
+  room: "lib",
+  systemPrompt: `Você é Davi, curador de tendências. A partir dos temas, links, manchetes ou textos que o dono colou, você escreve um resumo curto do que parece estar mudando, por que importa para o dono e como validar. Você NÃO tem acesso à internet nem a dados em tempo real: tudo o que não estiver no material colado é HIPÓTESE, dita como hipótese, e você nunca cita notícia, estudo ou número que o dono não tenha colado.
+
+${REGRAS_COMUNS}`,
+};
+
+const ninaSecretaria: TemplateAgent = {
+  ...nina,
+  role: "Revisora de qualidade",
+  systemPrompt: nina.systemPrompt.replace(
+    "(7) confira se os prompts de imagem pedem texto, rótulos ou letras dentro da imagem (não devem).",
+    "(7) confira se algum rascunho de e-mail afirma ter sido enviado (não pode) ou inventa fato, data, valor ou compromisso fora do e-mail original; (8) confira se a urgência de cada e-mail é justificada pelo conteúdo, e se prazos e responsáveis da ata estão no texto original, sem invenção; (9) confira se tendências foram tratadas como hipótese, sem notícia ou número inventado; (10) confira se algum dado pessoal que deveria estar mascarado (CPF, telefone, prontuário) aparece nas entregas.",
+  ),
+};
+
+const AJUSTES_SECRETARIA =
+  "Releia o parecer da Nina e aplique SÓ os itens que se referem ao SEU trabalho. Se nenhum item for seu, responda apenas 'SEM AJUSTES: nenhum item do parecer se refere ao meu trabalho.' Caso contrário, entregue a sua parte COMPLETA reescrita (não só as mudanças) e, no fim, uma lista curta do que mudou. Não acrescente fatos novos que não estejam no material colado; se for indispensável, marque [A CONFIRMAR]. Nunca diga que algo foi enviado.";
+
+export const TEMPLATE_SECRETARIADO: SquadTemplate = {
+  slug: "secretariado",
+  name: "Operações e Secretariado",
+  kind: "continuous",
+  sensitivity: "dados_pessoais",
+  environment: "escritorio-executivo",
+  defaultCapUsd: 2,
+  maxCapUsd: 10,
+  estimatedCostUsd: { min: 0.02, max: 0.5 }, // extrapolado do template de Conteúdo (9 etapas); confirmar com missões reais
+  formFields: [
+    { key: "foco", label: "Foco desta execução", type: "text", required: true, isBriefing: true, placeholder: "Ex.: Rotina da manhã" },
+    { key: "emails", label: "E-mails para triagem", type: "textarea", placeholder: "Opcional: cole um e-mail por bloco, com remetente e assunto", help: "O squad só deixa rascunhos e nunca envia nada. CPF, telefone e prontuário são mascarados; nomes e e-mails são mantidos." },
+    { key: "reunioes", label: "Notas ou transcrição de reunião", type: "textarea", placeholder: "Opcional: cole as notas para virar ata e lista de pendências" },
+    { key: "temas", label: "Temas e links para o resumo de tendências", type: "textarea", placeholder: "Opcional: temas de interesse, manchetes ou textos colados", help: "O squad não acessa a internet: só resume o que você colar, o resto é hipótese." },
+    { key: "tom", label: "Tom das respostas e assinatura", type: "text", placeholder: "Ex.: cordial e objetivo; assinar como Prof. Sergio" },
+  ],
+  agents: [helenaSecretaria, teoCorrespondencia, anaAtas, davi, ninaSecretaria],
+  steps: [
+    {
+      agent: "diretora",
+      title: "Plano do dia",
+      instructions:
+        "Leia o foco, o que o dono colou (e-mails, notas de reunião, temas), a memória do squad e o resultado da execução anterior (pendências herdadas, se houver). Escreva o plano: o que chegou desta vez, o que merece atenção primeiro e o que cada colega vai fazer. Se o conteúdo colado for idêntico ao da execução anterior, avise e priorize as pendências em aberto. Em execução manual, se o pedido contradiz o material ou o material se contradiz, ou falta algo essencial, pergunte ao dono antes de fazer o plano (veja as regras de perguntas); em execução agendada, assuma o mais seguro e registre a suposição.",
+      deliverable: { title: "Plano do dia", kind: "Plano" },
+    },
+    {
+      agent: "correspondencia",
+      title: "Triagem de correspondência",
+      instructions:
+        "Se houver e-mails colados, entregue uma tabela com: número do e-mail, remetente e assunto como informados, urgência (ALTA, MÉDIA ou BAIXA com o motivo em uma linha), resumo de uma linha e próxima ação sugerida. Depois, para cada e-mail que pede resposta, um RASCUNHO começando com 'RASCUNHO, não enviado', no tom pedido pelo dono. Falta de dado vira [A CONFIRMAR]. Se não houver e-mails, responda apenas 'Sem e-mails nesta execução.'",
+      deliverable: { title: "Triagem de correspondência", kind: "Correspondência" },
+    },
+    {
+      agent: "atas",
+      title: "Atas e pendências",
+      parallelWithPrevious: true,
+      instructions:
+        "Se houver notas ou transcrição de reunião, entregue a ata (data e participantes como informados, pauta, decisões) e a tabela de pendências com responsável e prazo ('não informado' quando faltar). Inclua em seção à parte as pendências em aberto da execução anterior que continuam sem solução, marcadas como herdadas. Se não houver notas, entregue só a seção de pendências herdadas, ou responda 'Sem notas de reunião nesta execução.' se também não houver pendências herdadas.",
+      deliverable: { title: "Atas e pendências", kind: "Ata" },
+    },
+    {
+      agent: "tendencias",
+      title: "Resumo de tendências",
+      parallelWithPrevious: true,
+      instructions:
+        "Se houver temas, links ou textos colados, entregue um resumo de até 5 itens: o que parece estar mudando (apenas com base no que foi colado, o resto como HIPÓTESE), por que importa para o dono e como validar. Se não houver material, responda apenas 'Sem temas informados nesta execução.'",
+      deliverable: { title: "Resumo de tendências", kind: "Pesquisa" },
+    },
+    {
+      agent: "revisora",
+      title: "Parecer de revisão",
+      instructions:
+        "Revise a triagem, a ata e o resumo de tendências. Verifique: rascunho que diga ter sido enviado, fato, data ou compromisso inventado, urgência sem justificativa, decisão, responsável ou prazo que não estão nas notas, tendência apresentada como fato, e dado pessoal que deveria estar mascarado. Comece com 'VEREDITO: APROVADO' ou 'VEREDITO: AJUSTES NECESSÁRIOS' e liste os itens numerados, cada um dizendo a qual entrega pertence (triagem, ata ou tendências), com motivo e correção sugerida.",
+      deliverable: { title: "Parecer de revisão", kind: "Revisão" },
+    },
+    {
+      agent: "correspondencia",
+      title: "Ajustes da triagem",
+      instructions: AJUSTES_SECRETARIA,
+      deliverable: { title: "Triagem de correspondência (ajustada)", kind: "Correspondência" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "atas",
+      title: "Ajustes da ata",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_SECRETARIA,
+      deliverable: { title: "Atas e pendências (ajustadas)", kind: "Ata" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "tendencias",
+      title: "Ajustes das tendências",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_SECRETARIA,
+      deliverable: { title: "Resumo de tendências (ajustado)", kind: "Pesquisa" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "diretora",
+      title: "Resumo do dia",
+      instructions:
+        "Monte o resumo do dia para o dono: as três prioridades, a tabela de correspondência por urgência com os rascunhos prontos para ele revisar e enviar (você nunca diz que algo foi enviado), a ata e as pendências em aberto (inclusive as herdadas), o resumo de tendências e uma seção 'Pontos que você precisa conferir' com tudo o que a revisora marcou, o que está como [A CONFIRMAR] e o que NÃO foi resolvido. Use as versões das etapas 'Ajustes ...' quando existirem; quem respondeu 'SEM AJUSTES' ou foi pulado mantém a versão original. Se o pedido do dono contradisse o material e a equipe seguiu outra orientação, abra uma seção 'Conflito com o seu pedido'; nunca corrija em silêncio. Termine com 3 linhas de contexto para a próxima execução (o que ficou pendente).",
+      deliverable: { title: "Resumo do dia", kind: "Entrega", final: true },
+    },
+  ],
+};
+
 const REGISTRY: Record<string, SquadTemplate> = {
   [TEMPLATE_CONTEUDO_YOUTUBE.slug]: TEMPLATE_CONTEUDO_YOUTUBE,
   [TEMPLATE_EDTECH.slug]: TEMPLATE_EDTECH,
   [TEMPLATE_MENTORIA.slug]: TEMPLATE_MENTORIA,
   [TEMPLATE_LIVROS.slug]: TEMPLATE_LIVROS,
+  [TEMPLATE_SECRETARIADO.slug]: TEMPLATE_SECRETARIADO,
 };
 
 export function getTemplate(slug: string): SquadTemplate | null {

@@ -9,7 +9,7 @@ import {
   countTextWords, parseWordRange, wordsNote,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
-import { TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
+import { TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, TEMPLATE_SECRETARIADO, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
 
 describe("planTasks", () => {
   it("gera um pipeline sequencial a partir do template de Conteúdo", () => {
@@ -553,5 +553,60 @@ describe("template de Livros", () => {
     expect(nina.systemPrompt).toContain("bíblia do livro");
     const helena = TEMPLATE_LIVROS.agents.find((a) => a.slug === "diretora")!;
     expect(helena.systemPrompt).not.toContain("YouTube");
+  });
+});
+
+describe("dados pessoais comuns (Secretariado e Mentoria)", () => {
+  const s = "Falar com Ana Souza (ana@exemplo.com), CPF 123.456.789-09, tel (84) 99999-1234, prontuário nº 45678.";
+  it("mascara CPF, telefone e prontuário, mas mantém nomes e e-mails", () => {
+    const r = screenInput(s, "dados_pessoais");
+    expect(r.text).toContain("Ana Souza");
+    expect(r.text).toContain("ana@exemplo.com");
+    expect(r.text).not.toContain("123.456.789-09");
+    expect(r.text).not.toContain("99999-1234");
+    expect(r.text).not.toContain("45678");
+    expect(r.findings.map((f) => f.type).sort()).toEqual(["cpf", "prontuario", "telefone"]);
+  });
+  it("dados de saúde mascaram tudo, incluindo e-mail; squads normais não mascaram nada", () => {
+    expect(screenInput(s, "dados_saude").text).not.toContain("ana@exemplo.com");
+    expect(screenInput(s, "normal").text).toBe(s);
+  });
+  it("maskPii com lista de tipos só aplica as regras pedidas", () => {
+    expect(maskPii(s, ["email"]).text).not.toContain("ana@exemplo.com");
+    expect(maskPii(s, ["email"]).text).toContain("123.456.789-09");
+  });
+});
+
+describe("template de Secretariado", () => {
+  const tasks = planTasks(TEMPLATE_SECRETARIADO);
+  it("é contínuo, de dados pessoais comuns, no escritório executivo", () => {
+    expect(TEMPLATE_SECRETARIADO.kind).toBe("continuous");
+    expect(TEMPLATE_SECRETARIADO.sensitivity).toBe("dados_pessoais");
+    expect(TEMPLATE_SECRETARIADO.environment).toBe("escritorio-executivo");
+    expect(getTemplate("secretariado")).toBe(TEMPLATE_SECRETARIADO);
+  });
+  it("triagem, ata e tendências rodam juntas depois do plano; a Nina espera as três; os ajustes são paralelos", () => {
+    expect(tasks.map((x) => x.title)).toEqual([
+      "Plano do dia", "Triagem de correspondência", "Atas e pendências", "Resumo de tendências", "Parecer de revisão",
+      "Ajustes da triagem", "Ajustes da ata", "Ajustes das tendências", "Resumo do dia",
+    ]);
+    expect(tasks.map((x) => x.dependsOnPositions)).toEqual([[], [0], [0], [0], [1, 2, 3], [4], [4], [4], [5, 6, 7]]);
+    expect(tasks.filter((x) => x.title.startsWith("Ajustes")).every((x) => x.checks?.onlyIfAdjusts)).toBe(true);
+  });
+  it("o squad nunca envia: os agentes e a revisora tratam tudo como rascunho", () => {
+    const teo = TEMPLATE_SECRETARIADO.agents.find((a) => a.slug === "correspondencia")!;
+    expect(teo.systemPrompt).toContain("RASCUNHO, não enviado");
+    expect(teo.systemPrompt).toContain("NUNCA envia");
+    const nina = TEMPLATE_SECRETARIADO.agents.find((a) => a.slug === "revisora")!;
+    expect(nina.systemPrompt).toContain("afirma ter sido enviado");
+    expect(tasks[8].instructions).toContain("nunca diz que algo foi enviado");
+  });
+  it("o resumo do dia deixa contexto para a próxima execução e o plano considera pendências herdadas", () => {
+    expect(tasks[8].instructions).toContain("contexto para a próxima execução");
+    expect(tasks[0].instructions).toContain("pendências herdadas");
+  });
+  it("os campos de e-mail, reunião e temas são opcionais e só o foco é obrigatório", () => {
+    const req = TEMPLATE_SECRETARIADO.formFields.filter((f) => f.required).map((f) => f.key);
+    expect(req).toEqual(["foco"]);
   });
 });

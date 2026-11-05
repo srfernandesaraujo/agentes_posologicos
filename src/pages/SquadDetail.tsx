@@ -100,7 +100,7 @@ export default function SquadDetail() {
             <ShieldAlert className="h-4 w-4" />
             {squad.sensitivity === "dados_saude"
               ? "Squad de dados de saúde: use apenas dados anonimizados. Identificadores óbvios são mascarados, mas nomes de pessoas não são detectados."
-              : "Este squad lida com dados pessoais comuns. Não inclua dados de saúde."}
+              : "Este squad lida com dados pessoais comuns. CPF, telefone e prontuário são mascarados; nomes e e-mails são mantidos porque o squad precisa deles. Não inclua dados de saúde."}
           </p>
         )}
       </div>

@@ -1,5 +1,5 @@
 // Desenho do escritório em pixel art, 100% por código (sem imagens): kit base compartilhado
-// (piso, paredes, portas, móveis) + um tema por ambiente (estúdio, faculdade, campus, editora).
+// (piso, paredes, portas, móveis) + um tema por ambiente (estúdio, faculdade, campus, editora, escritório executivo).
 // Coordenadas lógicas 320x320, desenhadas em 2x num canvas de 640x640 (pixel art nítida).
 // Trocar por tiles desenhados à mão no futuro só exige mudar este arquivo.
 import { ROOMS, ROOM_LABELS, type RoomId, type SceneTheme } from "@/lib/squadOffice";
@@ -59,6 +59,17 @@ const PALETTES: Record<SceneTheme, Palette> = {
       meet: { base: "#4a2f3a", alt: "#412933", mode: "wood" },
     },
     desk: "#e6d6b3", deskEdge: "#b39e72", accent: "#b4532a",
+  },
+  executivo: {
+    hall: ["#43474f", "#4b4f58"],
+    floors: {
+      dir: { base: "#5c4332", alt: "#523b2c", mode: "wood" },
+      ops: { base: "#6b7a8c", alt: "#76869a", mode: "tile" },
+      lib: { base: "#b9a583", alt: "#ad9a79", mode: "wood" },
+      copa: { base: "#cfc6b4", alt: "#c3baa8", mode: "tile" },
+      meet: { base: "#2c3e5c", alt: "#263752", mode: "wood" },
+    },
+    desk: "#d7cdb8", deskEdge: "#a39879", accent: "#2b6cb0",
   },
 };
 
@@ -250,7 +261,32 @@ function decorEditora(g: G) {
   R(g, 236, 201, 30, 1, "#9ca3af"); R(g, 236, 204, 26, 1, "#9ca3af"); R(g, 236, 207, 30, 1, "#d6475f");
 }
 
-const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora };
+function decorExecutivo(g: G) {
+  // Gabinete: moldura da janela (o céu é animado), estante de pastas e diploma
+  R(g, 68, 14, 34, 14, "#2a2d38");
+  R(g, 22, 28, 44, 9, "#3a2a1f");
+  for (let i = 0; i < 11; i++) R(g, 24 + i * 4, 29, 3, 7, ["#1f3a5f", "#e8e0c8", "#2b6cb0", "#6b7280", "#8a6a4a"][i % 5]);
+  R(g, 108, 36, 12, 9, "#6b4a2e"); R(g, 109, 37, 10, 7, "#f4f1e6"); R(g, 111, 40, 6, 1, "#b45309");
+  // Recepção: caixas de correspondência por urgência (vermelho = alta, âmbar = média, verde = baixa)
+  R(g, 240, 15, 58, 10, "#2a2d38");
+  for (let i = 0; i < 8; i++) {
+    const urg = i < 2 ? "#d6475f" : i < 5 ? "#e5b83a" : "#4ca36b";
+    R(g, 242 + i * 7, 17, 6, 7, "#3c4150"); R(g, 243 + i * 7, 18, 4, 5, urg);
+    if (i % 3 !== 1) R(g, 243 + i * 7, 18, 4, 2, "#f4f1e6");
+  }
+  // Impressora de atas (a folha sai na camada animada)
+  R(g, 278, 40, 20, 14, "#9aa3b2"); R(g, 280, 42, 16, 6, "#6b7280"); R(g, 282, 52, 12, 3, "#2a2d38");
+  R(g, 292, 44, 3, 2, "#4ca36b");
+  // Clipping: mural de recortes e um mapa
+  R(g, 22, 134, 76, 10, "#6b4a2e"); R(g, 23, 135, 74, 8, "#caa56a");
+  ["#f4f1e6", "#e0e7f1", "#fef3c7", "#f4f1e6", "#fce7e7", "#e0e7f1"].forEach((c, i) => { R(g, 26 + i * 12, 137 + (i % 2), 9, 5, c); R(g, 28 + i * 12, 139 + (i % 2), 5, 1, "#9ca3af"); R(g, 29 + i * 12, 136, 1, 1, "#d6475f"); });
+  // Reunião: pauta na tela e calendário
+  R(g, 214, 196, 60, 18, "#1c2030"); R(g, 216, 198, 56, 14, "#f4f6f8");
+  [200, 204, 208].forEach((y, i) => { R(g, 220, y, 3, 2, i === 0 ? "#4ca36b" : "#d1d5db"); R(g, 226, y, 26 - i * 4, 1, "#6b7280"); });
+  R(g, 256, 200, 12, 9, "#ffffff"); R(g, 256, 200, 12, 2, "#2b6cb0"); R(g, 259, 204, 2, 2, "#d6475f");
+}
+
+const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora, executivo: decorExecutivo };
 
 const layerCache = new Map<SceneTheme, HTMLCanvasElement>();
 
@@ -309,6 +345,7 @@ export interface AnimInfo {
 
 /** Camada animada: salas vazias escurecidas, telas piscando, luz REC, pilha de entregas na mesa da diretora. */
 export function drawAnimated(ctx: G, theme: SceneTheme, info: AnimInfo) {
+  const d0 = new Date();
   ctx.save();
   ctx.setTransform(2, 0, 0, 2, 0, 0);
   ctx.imageSmoothingEnabled = false;
@@ -338,6 +375,19 @@ export function drawAnimated(ctx: G, theme: SceneTheme, info: AnimInfo) {
   if (theme === "editora") {
     const done = Math.min(info.deliverables, 6);
     for (let i = 0; i < done; i++) R(ctx, 295, 41 + i * 4, 3, 3, i % 2 ? "#86efac" : "#bbf7d0");
+  }
+
+  // Escritório executivo: céu da janela pelo horário real e folha saindo da impressora quando há trabalho na recepção
+  if (theme === "executivo") {
+    const h = d0.getHours() + d0.getMinutes() / 60;
+    const sky = h < 6 || h >= 19.5 ? "#16203d" : h < 8 || h >= 17.5 ? "#e0955a" : "#9ec5e8";
+    R(ctx, 70, 16, 30, 10, sky);
+    R(ctx, 70, 19, 30, 1, "rgba(42,45,56,.55)"); R(ctx, 70, 22, 30, 1, "rgba(42,45,56,.55)");
+    if (h < 6 || h >= 19.5) { R(ctx, 76, 18, 1, 1, "#f4f1e6"); R(ctx, 90, 20, 1, 1, "#f4f1e6"); R(ctx, 96, 17, 1, 1, "#f4f1e6"); }
+    if (info.working.has("ops")) {
+      const k = (info.t * 0.8) % 1;
+      R(ctx, 281, 54, 10, Math.round(2 + k * 7), "#fffdf3");
+    }
   }
 
   // Pilha de entregas na mesa da diretora
