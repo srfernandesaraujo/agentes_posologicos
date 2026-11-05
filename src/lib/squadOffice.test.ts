@@ -140,6 +140,11 @@ describe("perguntas ao dono no escritório", () => {
     expect(cmds).toHaveLength(1);
     expect(cmds[0]).toMatchObject({ kind: "goto", agentId: "b", place: "desk", then: "wait", tone: "warn" });
   });
+  it("memória confirmada faz a diretora anotar com um balão", () => {
+    const cmds = eventToCommands(ev("memory_saved", null, null, "Anotado na memória"), team);
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0]).toMatchObject({ kind: "bubble", text: "Anotei na memória", tone: "ok" });
+  });
   it("ao responder, o agente volta ao normal e a diretora avisa", () => {
     const cmds = eventToCommands(ev("question_answered", "b", null, "Manter constante"), team);
     expect(cmds[0]).toMatchObject({ kind: "goto", agentId: "b", then: "idle" });

@@ -536,3 +536,114 @@ export function buildOwnerRules(o: OwnerQaContext): string {
   }
   return parts.join("\n\n");
 }
+
+// ---------- Memória compartilhada do squad ----------
+
+export type MemoryKind = "preference" | "correction" | "decision" | "fact";
+export const MEMORY_KINDS: MemoryKind[] = ["preference", "correction", "decision", "fact"];
+export const MEMORY_MAX_CHARS = 300;
+export const MEMORY_CONTEXT_LIMIT = 20;
+export const MEMORY_PER_EXTRACTION = 3;
+
+export interface MemoryItem {
+  id?: string;
+  kind: MemoryKind;
+  content: string;
+  pinned?: boolean;
+  status?: "suggested" | "active" | "archived";
+  created_at?: string;
+}
+
+const MEMORY_LABELS: Record<MemoryKind, string> = {
+  preference: "Preferências",
+  correction: "Correções recorrentes (evitar)",
+  decision: "Decisões já tomadas",
+  fact: "Fatos do contexto",
+};
+
+/** Memórias ativas que entram no contexto: fixadas primeiro, depois as mais recentes, até o limite. */
+export function selectMemoriesForContext(items: MemoryItem[], limit = MEMORY_CONTEXT_LIMIT): MemoryItem[] {
+  return items
+    .filter((m) => (m.status ?? "active") === "active")
+    .sort((a, b) => {
+      if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
+      return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+    })
+    .slice(0, limit);
+}
+
+/** Texto de memória entregue aos agentes: notas livres do dono + itens confirmados, agrupados por tipo. */
+export function buildMemoryContext(notes: string, items: MemoryItem[]): string {
+  const parts: string[] = [];
+  if (notes.trim()) parts.push(`## Notas do dono\n${notes.trim()}`);
+  const chosen = selectMemoriesForContext(items);
+  if (chosen.length) {
+    const groups = MEMORY_KINDS
+      .map((k) => ({ k, rows: chosen.filter((m) => m.kind === k) }))
+      .filter((g) => g.rows.length)
+      .map((g) => `### ${MEMORY_LABELS[g.k]}\n${g.rows.map((m) => `- ${m.content}`).join("\n")}`);
+    parts.push(
+      `## Memória aprendida (confirmada pelo dono)\nValem como preferências do dono para este squad. Não sobrepõem o material de apoio da missão nem as regras de segurança clínica.\n${groups.join("\n")}`,
+    );
+  }
+  return parts.join("\n\n");
+}
+
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+
+/** Já existe (quase) o mesmo item? Igual ou um contido no outro, depois de normalizar. */
+export function isDuplicateMemory(content: string, existing: { content: string }[]): boolean {
+  const n = norm(content);
+  if (!n) return true;
+  return existing.some((e) => {
+    const m = norm(e.content);
+    return m === n || (n.length >= 12 && m.includes(n)) || (m.length >= 12 && n.includes(m));
+  });
+}
+
+export interface MemoryExtractionInput {
+  source: "changes" | "answer";
+  /** Comentário de ajustes do dono, ou a resposta dada a uma pergunta. */
+  ownerText: string;
+  /** Contexto curto: título da entrega ou a pergunta feita. */
+  about: string;
+  existing: { content: string }[];
+}
+
+export function buildMemoryExtractionPrompt(i: MemoryExtractionInput): { system: string; user: string } {
+  const system =
+    `Você extrai memória duradoura para um squad de agentes de IA. Recebe uma fala do dono do squad e decide se ela revela algo que valha para MISSÕES FUTURAS deste squad.\n` +
+    `Regras:\n` +
+    `- Extraia de 0 a ${MEMORY_PER_EXTRACTION} itens. Na dúvida, não extraia: devolva [].\n` +
+    `- Só preferências de estilo, formato, tom, termos a evitar, critérios de qualidade ou fatos fixos sobre o dono e o público. Ignore pedidos que valem só para o tema desta missão (ex.: "troque o exemplo do segundo bloco").\n` +
+    `- Cada item é uma frase curta e autoexplicativa (até ${MEMORY_MAX_CHARS} caracteres), sem nomes de pessoas reais, sem dados de pacientes, sem CPF, e-mail ou telefone.\n` +
+    `- Nunca registre orientações clínicas como fato; registre apenas a preferência do dono sobre como o squad deve trabalhar.\n` +
+    `- Tipos: "preference" (como fazer), "correction" (o que evitar, erro recorrente), "decision" (decisão já tomada pelo dono), "fact" (fato fixo do contexto).\n` +
+    `- Não repita itens que já existem.\n` +
+    `Responda APENAS com um array JSON, sem texto fora dele. Formato: [{"kind":"preference","content":"..."}]`;
+  const existing = i.existing.length ? `\nJá existe na memória:\n${i.existing.slice(0, 30).map((e) => `- ${e.content}`).join("\n")}` : "";
+  const user =
+    `${i.source === "changes" ? "O dono pediu ajustes na entrega" : "O dono respondeu a uma pergunta do squad"}: ${i.about}\n\n` +
+    `Fala do dono:\n"""\n${i.ownerText.slice(0, 2000)}\n"""${existing}`;
+  return { system, user };
+}
+
+/** Lê a resposta do modelo: aceita array JSON (com ou sem cercas de código), valida, dedupe e limita. */
+export function parseMemoryExtraction(text: string, existing: { content: string }[] = []): MemoryItem[] {
+  const m = text.match(/\[[\s\S]*\]/);
+  if (!m) return [];
+  let raw: unknown;
+  try { raw = JSON.parse(m[0]); } catch { return []; }
+  if (!Array.isArray(raw)) return [];
+  const out: MemoryItem[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== "object") continue;
+    const kind = (MEMORY_KINDS as string[]).includes((r as any).kind) ? ((r as any).kind as MemoryKind) : "preference";
+    const content = typeof (r as any).content === "string" ? maskPii((r as any).content).text.replace(/\s+/g, " ").trim().slice(0, MEMORY_MAX_CHARS) : "";
+    if (content.length < 8) continue;
+    if (isDuplicateMemory(content, [...existing, ...out])) continue;
+    out.push({ kind, content });
+    if (out.length >= MEMORY_PER_EXTRACTION) break;
+  }
+  return out;
+}

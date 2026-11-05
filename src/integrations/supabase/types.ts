@@ -2389,6 +2389,63 @@ export type Database = {
           },
         ]
       }
+      squad_memories: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          kind: string
+          mission_id: string | null
+          owner_id: string
+          pinned: boolean
+          source: string
+          squad_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          kind?: string
+          mission_id?: string | null
+          owner_id: string
+          pinned?: boolean
+          source?: string
+          squad_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          mission_id?: string | null
+          owner_id?: string
+          pinned?: boolean
+          source?: string
+          squad_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_memories_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "squad_missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_memories_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: false
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       squad_missions: {
         Row: {
           briefing: string

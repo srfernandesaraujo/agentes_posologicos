@@ -48,6 +48,8 @@ const EVENT_LABEL: Record<string, string> = {
   question_asked: "Perguntou a você",
   question_answered: "Resposta recebida",
   task_skipped: "Etapa dispensada",
+  memory_suggested: "Memória: sugestões novas",
+  memory_saved: "Anotado na memória",
 };
 
 const SAFE_ANSWER = "Decida você: siga a opção mais segura e deixe a suposição registrada na entrega para eu conferir.";

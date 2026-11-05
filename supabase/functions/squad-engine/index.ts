@@ -8,10 +8,12 @@
 //   decide         { missionId, decision, comment? } → "approve" ou "changes" na entrega final
 //   answer_question{ questionId, answer }            → responde uma pergunta do squad e retoma a missão
 //   update_memory  { squadId, memory }               → memória/preferências do squad
+//   memory_add     { squadId, content, kind? }       → item de memória manual (já ativo)
+//   memory_update  { memoryId, content?, kind?, pinned?, status? } → confirma/descarta sugestão, edita, fixa, arquiva
 //   set_schedule   { squadId, ... }                  → agendamento de squads contínuos
 // Cada passo grava eventos em squad_events; o escritório visual só lê esses eventos.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkForm, clampCap, screenInput } from "../_shared/squadCore.ts";
+import { checkForm, clampCap, screenInput, maskPii, isDuplicateMemory, MEMORY_KINDS, MEMORY_MAX_CHARS, type MemoryKind } from "../_shared/squadCore.ts";
 import { getTemplate, listTemplates } from "../_shared/squadTemplates.ts";
 import { HttpError, answerQuestion, createMission, decideMission, emit, loadOwnedMission, runNext } from "../_shared/squadRunner.ts";
 
@@ -22,6 +24,7 @@ const corsHeaders = {
 
 const RUN_ALL_BUDGET_MS = 100_000; // folga sob o limite de tempo da edge function
 const MAX_MEMORY_CHARS = 6000;
+const MAX_MEMORY_ITEMS = 100;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -149,6 +152,48 @@ Deno.serve(async (req) => {
       const memory = String(body?.memory ?? "").slice(0, MAX_MEMORY_CHARS);
       await admin.from("squads").update({ memory }).eq("id", squad.id);
       return json({ ok: true });
+    }
+
+    const cleanMemory = (v: unknown): string => maskPii(String(v ?? "")).text.replace(/\s+/g, " ").trim().slice(0, MEMORY_MAX_CHARS);
+    const cleanKind = (v: unknown): MemoryKind => ((MEMORY_KINDS as string[]).includes(String(v)) ? (String(v) as MemoryKind) : "preference");
+
+    if (action === "memory_add") {
+      const { squad } = await loadOwnedSquad(String(body?.squadId || ""));
+      const content = cleanMemory(body?.content);
+      if (content.length < 3) throw new HttpError(400, "Escreva o item da memória");
+      const { data: existing } = await admin.from("squad_memories").select("content").eq("squad_id", squad.id).neq("status", "archived");
+      if ((existing || []).length >= MAX_MEMORY_ITEMS) throw new HttpError(400, `Limite de ${MAX_MEMORY_ITEMS} itens. Arquive algum antes de adicionar.`);
+      if (isDuplicateMemory(content, existing || [])) throw new HttpError(409, "Esse item já está na memória");
+      const { data: row, error } = await admin.from("squad_memories").insert({
+        squad_id: squad.id, owner_id: user.id, kind: cleanKind(body?.kind), content, source: "manual", status: "active",
+      }).select().single();
+      if (error) throw error;
+      return json({ memory: row });
+    }
+
+    if (action === "memory_update") {
+      const { data: mem } = await admin.from("squad_memories").select("*").eq("id", String(body?.memoryId || "")).maybeSingle();
+      if (!mem || mem.owner_id !== user.id) throw new HttpError(404, "Item de memória não encontrado");
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (body?.content !== undefined) {
+        const content = cleanMemory(body.content);
+        if (content.length < 3) throw new HttpError(400, "O item não pode ficar vazio");
+        patch.content = content;
+      }
+      if (body?.kind !== undefined) patch.kind = cleanKind(body.kind);
+      if (typeof body?.pinned === "boolean") patch.pinned = body.pinned;
+      if (body?.status !== undefined) {
+        if (!["active", "archived"].includes(String(body.status))) throw new HttpError(400, "Estado inválido");
+        patch.status = body.status;
+      }
+      const { data: row, error } = await admin.from("squad_memories").update(patch).eq("id", mem.id).select().single();
+      if (error) throw error;
+      // Sugestão confirmada: o escritório mostra a diretora anotando na memória.
+      if (mem.status === "suggested" && patch.status === "active" && mem.mission_id) {
+        const { data: mission } = await admin.from("squad_missions").select("id, squad_id, owner_id").eq("id", mem.mission_id).maybeSingle();
+        if (mission) await emit(admin, mission, { type: "memory_saved", text: "Anotado na memória" });
+      }
+      return json({ memory: row });
     }
 
     if (action === "set_schedule") {

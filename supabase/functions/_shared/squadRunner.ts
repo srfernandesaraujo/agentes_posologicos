@@ -6,6 +6,7 @@ import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } fro
 import {
   planTasks, pickReadyTasks, budgetState, buildTaskUserMessage, formDisplay, buildRevisionInstructions,
   measureScript, parseDurationRange, durationNote, reviewRequestsAdjustments, extractOwnerQuestion, MAX_OWNER_QUESTIONS,
+  buildMemoryContext, buildMemoryExtractionPrompt, parseMemoryExtraction, type MemoryItem,
   type PreviousOutput, type SquadTemplate, type StepChecks,
 } from "./squadCore.ts";
 import { getTemplate } from "./squadTemplates.ts";
@@ -55,7 +56,10 @@ export async function createMission(
   },
 ) {
   // Contexto: memória do squad + (squads contínuos) a entrega final da última execução.
-  let context = (p.squad.memory || "").trim();
+  // Memória: notas livres do dono + itens aprendidos e confirmados (status ativo).
+  const { data: memRows } = await admin.from("squad_memories").select("id, kind, content, pinned, status, created_at")
+    .eq("squad_id", p.squad.id).eq("owner_id", p.userId).eq("status", "active");
+  let context = buildMemoryContext(p.squad.memory || "", (memRows || []) as MemoryItem[]);
   if (p.template.kind === "continuous") {
     const { data: prev } = await admin
       .from("squad_deliverables").select("title, content, created_at")
@@ -331,6 +335,63 @@ async function runTask(admin: SupabaseClient, mission: any, claimed: any, userId
   return { state: "task_done", taskId: claimed.id };
 }
 
+// ---------- Memória: sugestões aprendidas com o dono ----------
+
+const MEMORY_CAPTURE_TIMEOUT_MS = 25_000;
+
+/** Deixa a captura rodar depois da resposta ao dono (o Supabase mantém a função viva até ela terminar). */
+function inBackground(p: Promise<unknown>) {
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt && typeof rt.waitUntil === "function") rt.waitUntil(p.catch(() => {}));
+  else p.catch(() => {});
+}
+
+/**
+ * Lê uma fala do dono (pedido de ajustes ou resposta a uma pergunta) e grava de 0 a 3 sugestões de memória.
+ * Nunca derruba a ação do dono: qualquer falha só é registrada no log. Execuções agendadas não aprendem.
+ */
+export async function captureMemories(
+  admin: SupabaseClient, mission: any, userId: string,
+  input: { source: "changes" | "answer"; ownerText: string; about: string },
+): Promise<number> {
+  try {
+    if (mission.trigger === "schedule" || input.ownerText.trim().length < 12) return 0;
+    const { data: existingRows } = await admin.from("squad_memories").select("content")
+      .eq("squad_id", mission.squad_id).eq("owner_id", userId).neq("status", "archived");
+    const existing = (existingRows || []) as { content: string }[];
+    const keys = await getOrderedKeysForUser(admin, userId);
+    if (!keys.length) return 0;
+    const prompt = buildMemoryExtractionPrompt({ ...input, existing });
+    const res = await Promise.race([
+      callWithFallback(admin, keys, {
+        systemPrompt: prompt.system, messages: [{ role: "user", content: prompt.user }],
+        temperature: 0.2, mode: "text", maxTokens: 800,
+      }),
+      new Promise<null>((r) => setTimeout(() => r(null), MEMORY_CAPTURE_TIMEOUT_MS)),
+    ]);
+    if (!res || !res.ok || !res.output) return 0;
+    const cost = estimateCost(res.model!, res.tokensInput, res.tokensOutput);
+    await admin.rpc("squad_add_mission_cost", { p_mission: mission.id, p_cost: cost, p_in: res.tokensInput, p_out: res.tokensOutput });
+    await logAiUsage(admin, { userId, provider: res.provider!, model: res.model!, tokensInput: res.tokensInput, tokensOutput: res.tokensOutput, promptType: "squad" });
+    const items = parseMemoryExtraction(res.output, existing);
+    if (!items.length) return 0;
+    // Limite por squad: não empilha sugestões sem revisão.
+    const { count } = await admin.from("squad_memories").select("id", { count: "exact", head: true })
+      .eq("squad_id", mission.squad_id).eq("owner_id", userId).eq("status", "suggested");
+    const room = Math.max(0, 12 - (count || 0));
+    const toInsert = items.slice(0, room);
+    if (!toInsert.length) return 0;
+    await admin.from("squad_memories").insert(toInsert.map((m) => ({
+      squad_id: mission.squad_id, owner_id: userId, mission_id: mission.id, kind: m.kind, content: m.content, source: "auto", status: "suggested",
+    })));
+    await emit(admin, mission, { type: "memory_suggested", text: `${toInsert.length} sugestão(ões) de memória`, payload: { count: toInsert.length } });
+    return toInsert.length;
+  } catch (e) {
+    console.warn("[squad] captureMemories failed:", (e as Error).message);
+    return 0;
+  }
+}
+
 // ---------- Aprovar ou pedir ajustes ----------
 
 export async function decideMission(
@@ -365,6 +426,7 @@ export async function decideMission(
   });
   await admin.from("squad_missions").update({ status: "running" }).eq("id", mission.id);
   await emit(admin, mission, { type: "changes_requested", text: "Você pediu ajustes na entrega final.", payload: { comment: text } });
+  inBackground(captureMemories(admin, mission, userId, { source: "changes", ownerText: text, about: finalDeliv.title }));
   return { status: "running" };
 }
 
@@ -384,5 +446,6 @@ export async function answerQuestion(admin: SupabaseClient, questionId: string, 
     if (!count) await admin.from("squad_missions").update({ status: "running" }).eq("id", mission.id);
   }
   await emit(admin, mission, { type: "question_answered", agentId: q.agent_id, text: text.slice(0, 120), payload: { question_id: q.id } });
+  inBackground(captureMemories(admin, mission, userId, { source: "answer", ownerText: text, about: q.question }));
   return { status: "running" };
 }

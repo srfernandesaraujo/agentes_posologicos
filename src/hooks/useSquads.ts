@@ -199,6 +199,32 @@ export function useSquadSchedule(squadId?: string, enabled = true) {
   });
 }
 
+export type MemoryKind = "preference" | "correction" | "decision" | "fact";
+export interface SquadMemory {
+  id: string;
+  squad_id: string;
+  mission_id: string | null;
+  kind: MemoryKind;
+  content: string;
+  source: "auto" | "manual";
+  status: "suggested" | "active" | "archived";
+  pinned: boolean;
+  created_at: string;
+}
+
+/** Memória aprendida do squad (sugeridas, ativas e arquivadas). */
+export function useSquadMemories(squadId?: string) {
+  return useQuery({
+    queryKey: ["squad-memories", squadId],
+    enabled: !!squadId,
+    queryFn: async () => {
+      const { data, error } = await db.from("squad_memories").select("*").eq("squad_id", squadId).order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as SquadMemory[];
+    },
+  });
+}
+
 export function useMissionDetail(missionId?: string) {
   return useQuery({
     queryKey: ["squad-mission", missionId],
@@ -265,6 +291,11 @@ export function useSquadActions() {
     }
   };
 
+  // A extração de memória roda em segundo plano no servidor: confere de novo depois de alguns segundos.
+  const refreshMemoriesLater = (squadId: string) => {
+    for (const ms of [8000, 20000]) setTimeout(() => qc.invalidateQueries({ queryKey: ["squad-memories", squadId] }), ms);
+  };
+
   return {
     createSquad: useMutation({
       mutationFn: (v: { templateSlug: string; name?: string }) => call<{ squad: Squad }>({ action: "create_squad", ...v }),
@@ -278,12 +309,12 @@ export function useSquadActions() {
     decide: useMutation({
       mutationFn: (v: { missionId: string; squadId: string; decision: "approve" | "changes"; comment?: string }) =>
         call<{ status: string }>({ action: "decide", missionId: v.missionId, decision: v.decision, comment: v.comment }),
-      onSuccess: (_d, v) => { invalidate(v.squadId); qc.invalidateQueries({ queryKey: ["squad-mission", v.missionId] }); },
+      onSuccess: (_d, v) => { invalidate(v.squadId); qc.invalidateQueries({ queryKey: ["squad-mission", v.missionId] }); refreshMemoriesLater(v.squadId); },
     }),
     answerQuestion: useMutation({
       mutationFn: (v: { questionId: string; missionId: string; squadId: string; answer: string }) =>
         call({ action: "answer_question", questionId: v.questionId, answer: v.answer }),
-      onSuccess: (_d, v) => { invalidate(v.squadId); qc.invalidateQueries({ queryKey: ["squad-mission", v.missionId] }); },
+      onSuccess: (_d, v) => { invalidate(v.squadId); qc.invalidateQueries({ queryKey: ["squad-mission", v.missionId] }); refreshMemoriesLater(v.squadId); },
     }),
     raiseCap: useMutation({
       mutationFn: (v: { missionId: string; squadId: string; costCapUsd: number }) =>
@@ -293,6 +324,17 @@ export function useSquadActions() {
     updateMemory: useMutation({
       mutationFn: (v: { squadId: string; memory: string }) => call({ action: "update_memory", ...v }),
       onSuccess: (_d, v) => invalidate(v.squadId),
+    }),
+    addMemory: useMutation({
+      mutationFn: (v: { squadId: string; content: string; kind: MemoryKind }) => call({ action: "memory_add", ...v }),
+      onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["squad-memories", v.squadId] }),
+    }),
+    updateMemoryItem: useMutation({
+      mutationFn: (v: { squadId: string; memoryId: string; content?: string; kind?: MemoryKind; pinned?: boolean; status?: "active" | "archived" }) => {
+        const { squadId: _s, ...rest } = v;
+        return call({ action: "memory_update", ...rest });
+      },
+      onSuccess: (_d, v) => qc.invalidateQueries({ queryKey: ["squad-memories", v.squadId] }),
     }),
     setSchedule: useMutation({
       mutationFn: (v: {

@@ -4,10 +4,10 @@ import { toast } from "sonner";
 import { ArrowLeft, Loader2, Trash2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useSquad, useSquadActions, useSquadMissions, useSquadTemplates } from "@/hooks/useSquads";
+import { useSquad, useSquadActions, useSquadMemories, useSquadMissions, useSquadTemplates } from "@/hooks/useSquads";
+import { MemoryPanel } from "@/components/squads/MemoryPanel";
 import { TemplateFormFields, missingRequired } from "@/components/squads/TemplateFormFields";
 import { CostCapField, fmtUsd } from "@/components/squads/CostCapField";
 import { MissionPanel, MISSION_STATUS } from "@/components/squads/MissionPanel";
@@ -19,7 +19,9 @@ export default function SquadDetail() {
   const { data, isLoading } = useSquad(squadId);
   const { data: templates = [] } = useSquadTemplates();
   const { data: missions = [] } = useSquadMissions(squadId);
-  const { startMission, updateMemory, deleteSquad } = useSquadActions();
+  const { startMission, deleteSquad } = useSquadActions();
+  const { data: memories = [] } = useSquadMemories(squadId);
+  const pendingMemories = memories.filter((m) => m.status === "suggested").length;
 
   const squad = data?.squad;
   const agents = data?.agents || [];
@@ -27,11 +29,10 @@ export default function SquadDetail() {
 
   const [values, setValues] = useState<Record<string, string>>({});
   const [cap, setCap] = useState(4);
-  const [memory, setMemory] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState("missoes");
 
-  useEffect(() => { if (squad) { setMemory(squad.memory || ""); setCap(Number(squad.default_cost_cap_usd)); } }, [squad?.id]);
+  useEffect(() => { if (squad) { setCap(Number(squad.default_cost_cap_usd)); } }, [squad?.id]);
   // Abre a missão mais recente ao entrar na página.
   useEffect(() => { if (!selected && missions.length) setSelected(missions[0].id); }, [missions.length]);
 
@@ -59,11 +60,6 @@ export default function SquadDetail() {
     } catch (e: any) {
       toast.error(e.message || "Não foi possível iniciar a missão");
     }
-  };
-
-  const saveMemory = async () => {
-    try { await updateMemory.mutateAsync({ squadId: squad.id, memory }); toast.success("Memória salva"); }
-    catch (e: any) { toast.error(e.message); }
   };
 
   const remove = async () => {
@@ -114,7 +110,7 @@ export default function SquadDetail() {
           <TabsTrigger value="missoes">Missões</TabsTrigger>
           <TabsTrigger value="nova">{template.kind === "continuous" ? "Executar agora" : "Nova missão"}</TabsTrigger>
           {template.kind === "continuous" && <TabsTrigger value="agenda">Agendamento</TabsTrigger>}
-          <TabsTrigger value="memoria">Memória</TabsTrigger>
+          <TabsTrigger value="memoria">Memória{pendingMemories > 0 && <Badge className="ml-2 h-5 bg-amber-400 px-1.5 text-black hover:bg-amber-400" aria-label={`${pendingMemories} sugestões para revisar`}>{pendingMemories}</Badge>}</TabsTrigger>
           <TabsTrigger value="equipe">Equipe</TabsTrigger>
         </TabsList>
 
@@ -159,20 +155,7 @@ export default function SquadDetail() {
           <TabsContent value="agenda" className="mt-6 max-w-2xl"><SchedulePanel squad={squad} template={template} /></TabsContent>
         )}
 
-        <TabsContent value="memoria" className="mt-6 max-w-2xl space-y-3">
-          <p className="text-sm text-white/60">
-            Tudo o que você escrever aqui é entregue a todos os agentes em cada missão: tom de voz, preferências, termos a evitar, contexto fixo.
-            O squad ainda não aprende sozinho com os seus ajustes; por enquanto, a memória é manual.
-          </p>
-          <Textarea value={memory} onChange={(e) => setMemory(e.target.value)} maxLength={6000}
-            placeholder="Ex.: Sempre usar tom didático e frases curtas. Nunca prometer cura. Citar a diretriz usada." className="min-h-[200px] bg-white/5 border-white/10" />
-          <div className="flex items-center gap-3">
-            <Button onClick={saveMemory} disabled={updateMemory.isPending || memory === (squad.memory || "")} className="gap-2">
-              {updateMemory.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Salvar memória
-            </Button>
-            <span className="text-xs text-white/40">{memory.length} / 6000</span>
-          </div>
-        </TabsContent>
+        <TabsContent value="memoria" className="mt-6 max-w-2xl"><MemoryPanel squad={squad} /></TabsContent>
 
         <TabsContent value="equipe" className="mt-6">
           <div className="grid gap-3 sm:grid-cols-2">

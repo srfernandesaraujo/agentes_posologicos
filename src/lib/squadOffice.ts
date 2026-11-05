@@ -190,6 +190,8 @@ export function eventToCommands(ev: EventLite, agents: OfficeAgent[]): Command[]
       return [{ kind: "goto", agentId: agent.id, place: "desk", then: "wait", bubble: `Preciso de você: ${short(ev.text, 26)}`, tone: "warn" }];
     case "question_answered":
       return [...(agent ? [{ kind: "goto", agentId: agent.id, place: "desk", then: "idle" } as Command] : []), ...dirBubble("Resposta recebida, seguindo", "ok", 3500)];
+    case "memory_saved":
+      return dirBubble("Anotei na memória", "ok", 3500);
     case "budget_warning":
       return dirBubble("80% do teto de custo", "warn");
     case "budget_paused":

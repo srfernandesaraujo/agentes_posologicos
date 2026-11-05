@@ -4,6 +4,8 @@ import {
   checkForm, formDisplay, isScheduleDue, monthStartIso, buildRevisionInstructions,
   measureScript, parseDurationLimitSeconds, parseDurationRange, durationNote, reviewRequestsAdjustments,
   extractOwnerQuestion, buildOwnerRules,
+  selectMemoriesForContext, buildMemoryContext, isDuplicateMemory, buildMemoryExtractionPrompt, parseMemoryExtraction,
+  MEMORY_CONTEXT_LIMIT, MEMORY_MAX_CHARS,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
 import { TEMPLATE_CONTEUDO_YOUTUBE, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
@@ -424,5 +426,72 @@ Por quê: Muda a mensagem principal do vídeo.
       const plan = planTasks(t)[0];
       expect(plan.instructions, t.slug).toContain("pergunte ao dono");
     }
+  });
+});
+
+describe("memória compartilhada", () => {
+  const mem = (content: string, over: Record<string, unknown> = {}) => ({ kind: "preference" as const, content, status: "active" as const, created_at: "2026-11-01T00:00:00Z", ...over });
+
+  it("só entram memórias ativas, fixadas primeiro e depois as mais recentes, até o limite", () => {
+    const items = [
+      mem("antiga", { created_at: "2026-10-01T00:00:00Z" }),
+      mem("recente", { created_at: "2026-11-05T00:00:00Z" }),
+      mem("fixada velha", { pinned: true, created_at: "2026-09-01T00:00:00Z" }),
+      mem("sugerida", { status: "suggested" }),
+      mem("arquivada", { status: "archived" }),
+    ];
+    expect(selectMemoriesForContext(items).map((m) => m.content)).toEqual(["fixada velha", "recente", "antiga"]);
+    const many = Array.from({ length: 30 }, (_, i) => mem(`item ${i}`, { created_at: `2026-11-${String(i + 1).padStart(2, "0")}T00:00:00Z` }));
+    expect(selectMemoriesForContext(many)).toHaveLength(MEMORY_CONTEXT_LIMIT);
+  });
+
+  it("o contexto junta notas livres e itens agrupados por tipo, com a regra de que não sobrepõem o material", () => {
+    const ctx = buildMemoryContext("Tom didático.", [mem("Fechamento curto"), mem("Não usar exclamação no título", { kind: "correction" })]);
+    expect(ctx).toContain("## Notas do dono\nTom didático.");
+    expect(ctx).toContain("### Preferências\n- Fechamento curto");
+    expect(ctx).toContain("### Correções recorrentes (evitar)\n- Não usar exclamação no título");
+    expect(ctx).toContain("Não sobrepõem o material de apoio");
+    expect(buildMemoryContext("", [])).toBe("");
+    expect(buildMemoryContext("  ", [mem("x", { status: "suggested" })])).toBe("");
+  });
+
+  it("detecta duplicatas ignorando acento, caixa e pontuação, e um item contido no outro", () => {
+    const ex = [{ content: "Fechamento com no máximo 4 frases." }];
+    expect(isDuplicateMemory("fechamento com no maximo 4 frases", ex)).toBe(true);
+    expect(isDuplicateMemory("Fechamento com no máximo 4 frases e convite para comentar", ex)).toBe(true);
+    expect(isDuplicateMemory("Títulos sem ponto de exclamação", ex)).toBe(false);
+  });
+
+  it("o prompt de extração exclui o que vale só para o tema e proíbe dados pessoais e clínica", () => {
+    const p = buildMemoryExtractionPrompt({ source: "changes", ownerText: "Encurte o fechamento.", about: "Pacote final", existing: [{ content: "Tom didático" }] });
+    expect(p.system).toContain("MISSÕES FUTURAS");
+    expect(p.system).toContain("sem nomes de pessoas reais");
+    expect(p.system).toContain("Nunca registre orientações clínicas como fato");
+    expect(p.user).toContain("Encurte o fechamento.");
+    expect(p.user).toContain("- Tom didático");
+  });
+
+  it("lê a resposta do modelo com cercas de código, valida tipo, mascara dados pessoais e limita a 3", () => {
+    const out = parseMemoryExtraction(
+      "```json\n" + JSON.stringify([
+        { kind: "preference", content: "Fechamento com no máximo 4 frases" },
+        { kind: "inventado", content: "Escrever sempre em tópicos curtos" },
+        { kind: "fact", content: "Contato do dono: ana@exemplo.com para dúvidas" },
+        { kind: "decision", content: "Tom acolhedor e sem jargão" },
+        { kind: "decision", content: "Quinto item que deve ser cortado pelo limite" },
+        { kind: "fact", content: "curto" },
+      ]) + "\n```",
+    );
+    expect(out).toHaveLength(3);
+    expect(out[1].kind).toBe("preference");
+    expect(out[2].content).not.toContain("ana@exemplo.com");
+    expect(out.every((m) => m.content.length <= MEMORY_MAX_CHARS)).toBe(true);
+  });
+
+  it("devolve vazio para resposta sem array, JSON inválido, itens repetidos ou 'nada'", () => {
+    expect(parseMemoryExtraction("Nada a registrar.")).toEqual([]);
+    expect(parseMemoryExtraction("[{quebrado")).toEqual([]);
+    expect(parseMemoryExtraction("[]")).toEqual([]);
+    expect(parseMemoryExtraction('[{"kind":"preference","content":"Tom didático e direto"}]', [{ content: "tom didatico e direto" }])).toEqual([]);
   });
 });
