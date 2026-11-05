@@ -73,7 +73,7 @@ export const TEMPLATE_CONTEUDO_YOUTUBE: SquadTemplate = {
   environment: "estudio-video",
   defaultCapUsd: 4,
   maxCapUsd: 20,
-  estimatedCostUsd: { min: 1.8, max: 3.2 }, // chute inicial; recalibrar com o histórico real
+  estimatedCostUsd: { min: 0.02, max: 0.6 }, // medido: ~US$ 0,02 no gemini-2.5-flash (65 mil tokens); máx = mesma carga em modelo caro (claude-sonnet ~0,5) + ajustes
   formFields: [
     { key: "tema", label: "Tema do vídeo", type: "text", required: true, isBriefing: true, placeholder: "Ex.: Interações entre anticoagulantes e alimentos" },
     { key: "publico", label: "Público", type: "select", required: true, options: ["Pacientes e público geral", "Estudantes", "Profissionais de saúde"] },
@@ -181,7 +181,7 @@ export const TEMPLATE_EDTECH: SquadTemplate = {
   environment: "faculdade",
   defaultCapUsd: 4,
   maxCapUsd: 20,
-  estimatedCostUsd: { min: 1.5, max: 3 },
+  estimatedCostUsd: { min: 0.03, max: 0.7 }, // extrapolado do template de Conteúdo (8 etapas + 3 de ajustes); confirmar com missões reais
   formFields: [
     { key: "tema", label: "Tema da atividade", type: "text", required: true, isBriefing: true, placeholder: "Ex.: Insuficiência cardíaca descompensada" },
     { key: "metodo", label: "Método", type: "select", required: true, options: ["PBL", "TBL", "Sala de aula invertida"] },
@@ -296,7 +296,7 @@ export const TEMPLATE_MENTORIA: SquadTemplate = {
   environment: "campus",
   defaultCapUsd: 2,
   maxCapUsd: 10,
-  estimatedCostUsd: { min: 0.6, max: 1.4 },
+  estimatedCostUsd: { min: 0.02, max: 0.5 }, // extrapolado do template de Conteúdo (6 etapas + 3 de ajustes); confirmar com missões reais
   formFields: [
     { key: "foco", label: "Foco desta execução", type: "text", required: true, isBriefing: true, placeholder: "Ex.: Acompanhamento semanal dos orientandos" },
     { key: "orientandos", label: "Orientandos, etapa e prazos", type: "textarea", required: true, placeholder: "Um por linha: nome, etapa atual, próximo prazo e pendências", help: "Use iniciais ou apelidos se preferir. Não inclua dados de saúde." },
