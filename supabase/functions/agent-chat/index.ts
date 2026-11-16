@@ -6708,9 +6708,14 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const maxContentLength = body.flowMode ? 50000 : 10000;
+      // Long assistant replies (lesson plans, etc.) are legitimate history: truncate instead of
+      // rejecting, otherwise "repita" after a long answer fails with "histórico inválido".
+      const maxContentLength = body.flowMode ? 50000 : 20000;
       for (const msg of conversationHistory) {
-        if (!msg || typeof msg.role !== "string" || typeof msg.content !== "string" || msg.content.length > maxContentLength) {
+        if (msg && typeof msg.content === "string" && msg.content.length > maxContentLength) {
+          msg.content = msg.content.slice(0, maxContentLength) + "\n[...mensagem truncada...]";
+        }
+        if (!msg || typeof msg.role !== "string" || typeof msg.content !== "string") {
           return new Response(JSON.stringify({ error: "Mensagem do histórico inválida" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
