@@ -6982,6 +6982,9 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             model,
+            // Without this OpenRouter reserves the full context window and 402s on modest balances;
+            // 16k leaves room for gemini-2.5-pro's reasoning plus a 2000-word prompt.
+            max_tokens: 16000,
             messages: promptMessages,
             tools: [createAgentTool],
             tool_choice: { type: "function", function: { name: "create_agent" } },
@@ -7034,48 +7037,57 @@ Deno.serve(async (req) => {
         return { name: "", description: "", system_prompt: textBlock?.text || "" };
       };
 
-      // === User's own STRONG API keys (skip Groq — too weak for prompt engineering) ===
-      const SKIP_PROVIDERS_FOR_PROMPT_GEN = ["groq"]; // Models too weak for premium prompt generation
-      if (userId) {
-        const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-        const { data: userKeys } = await serviceClient
+      // === User's own STRONG API keys first, then the designated admin account's keys ===
+      // (skip Groq — too weak for prompt engineering). Until 2026-11-16 this branch had no
+      // admin fallback (lost with the Lovable Gateway), tried keys in updated_at order, sent no
+      // max_tokens (OpenRouter 402) and sent "gpt-4o" to NVIDIA — so any user without a working
+      // strong key of their own got a 502 from create-custom-agent.
+      const SKIP_PROVIDERS_FOR_PROMPT_GEN = ["groq"];
+      const PREMIUM_MODELS: Record<string, string> = {
+        openai: "gpt-4o",
+        anthropic: "claude-sonnet-4-20250514",
+        openrouter: "google/gemini-2.5-pro",
+        google: "gemini-2.5-pro",
+      };
+      const promptGenClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      const loadOrderedKeys = async (ownerId: string) => {
+        const { data } = await promptGenClient
           .from("user_api_keys")
-          .select("provider, api_key_encrypted")
-          .eq("user_id", userId)
-          .order("updated_at", { ascending: false });
+          .select("provider, api_key_encrypted, key_expires_at")
+          .eq("user_id", ownerId);
+        const now = Date.now();
+        return ((data || []) as any[])
+          .filter((k) => !SKIP_PROVIDERS_FOR_PROMPT_GEN.includes(k.provider) && PROVIDER_ENDPOINTS[k.provider]
+            && (!k.key_expires_at || new Date(k.key_expires_at).getTime() > now))
+          .sort((a, b) => {
+            const ai = PROVIDER_PRIORITY_ORDER.indexOf(a.provider);
+            const bi = PROVIDER_PRIORITY_ORDER.indexOf(b.provider);
+            return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+          });
+      };
+      const keySources: Array<{ label: string; ownerId: string }> = [];
+      if (userId) keySources.push({ label: "user's", ownerId: userId });
+      const promptGenAdminId = await resolveAdminFallbackUserId(promptGenClient);
+      if (promptGenAdminId && promptGenAdminId !== userId) keySources.push({ label: "admin fallback", ownerId: promptGenAdminId });
 
-        if (userKeys && userKeys.length > 0) {
-          for (const uk of userKeys) {
-            if (SKIP_PROVIDERS_FOR_PROMPT_GEN.includes(uk.provider)) {
-              console.log(`Skipping ${uk.provider} for premium prompt gen (model too weak)`);
-              continue;
-            }
+      for (const source of keySources) {
+        const keys = await loadOrderedKeys(source.ownerId);
+        for (const uk of keys) {
+          const decryptedKey = await decryptApiKey(uk.api_key_encrypted);
+          // Premium model first, then the provider's everyday default (e.g. 2.5-pro quota exhausted).
+          const candidates = [...new Set([PREMIUM_MODELS[uk.provider], DEFAULT_MODELS_PER_PROVIDER[uk.provider]].filter(Boolean))] as string[];
+          for (const model of candidates) {
             try {
-              const PREMIUM_MODELS: Record<string, string> = {
-                openai: "gpt-4o",
-                anthropic: "claude-sonnet-4-20250514",
-                openrouter: "google/gemini-2.5-pro",
-                google: "gemini-2.5-pro",
-              };
-              const model = PREMIUM_MODELS[uk.provider] || "gpt-4o";
-
-              const decryptedKey = await decryptApiKey(uk.api_key_encrypted);
-              let result: any;
-              if (uk.provider === "anthropic") {
-                result = await callAnthropicPremium(decryptedKey, model);
-              } else {
-                const endpoint = PROVIDER_ENDPOINTS[uk.provider];
-                if (!endpoint) continue;
-                result = await callOpenAICompatiblePremium(endpoint, decryptedKey, model);
-              }
-
-              console.log(`Premium prompt generation: used user's ${uk.provider} key`);
-              return new Response(JSON.stringify({ output: result.system_prompt || "", agent_meta: { name: result.name || "", description: result.description || "" } }), {
+              const result = uk.provider === "anthropic"
+                ? await callAnthropicPremium(decryptedKey, model)
+                : await callOpenAICompatiblePremium(PROVIDER_ENDPOINTS[uk.provider], decryptedKey, model);
+              if (!String(result?.system_prompt || "").trim()) throw new Error("empty system_prompt");
+              console.log(`Premium prompt generation: used ${source.label} ${uk.provider} key (${model})`);
+              return new Response(JSON.stringify({ output: result.system_prompt, agent_meta: { name: result.name || "", description: result.description || "" } }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
               });
             } catch (e) {
-              console.warn(`Premium prompt gen with ${uk.provider} failed:`, e.message);
-              continue;
+              console.warn(`Premium prompt gen with ${source.label} ${uk.provider}/${model} failed:`, String((e as Error).message || e).slice(0, 500));
             }
           }
         }
