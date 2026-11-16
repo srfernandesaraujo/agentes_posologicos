@@ -6436,6 +6436,8 @@ const DEFAULT_MODELS_PER_PROVIDER: Record<string, string> = {
 // 2026-09-01: requested 65535, account could only afford 16000). Capping this explicitly
 // avoids that failure mode and bounds cost for every OpenAI-compatible provider.
 const DEFAULT_MAX_TOKENS = 8192;
+// Gemini aceita saidas bem maiores (flash: ate 65536); planos de aula longos vinham cortados em 8192.
+const GOOGLE_MAX_TOKENS = 32000;
 
 // Process uploaded files into content parts for multimodal AI
 function processFilesForAI(files: any[]): { textContent: string; multimodalParts: any[] } {
@@ -7819,7 +7821,7 @@ Deno.serve(async (req) => {
                   "Content-Type": "application/json",
                   "Authorization": `Bearer ${apiKey}`,
                 },
-                body: JSON.stringify({ model, messages, max_tokens: DEFAULT_MAX_TOKENS }),
+                body: JSON.stringify({ model, messages, max_tokens: provider === "google" ? GOOGLE_MAX_TOKENS : DEFAULT_MAX_TOKENS }),
               });
 
               if (aiResponse.ok) {
@@ -8138,7 +8140,7 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
             model: effectiveModel,
             temperature: Number(customAgent.temperature),
             // OpenRouter 402s when max_tokens exceeds what the balance can afford (7732 live, 2026-11-16)
-            max_tokens: provider === "openrouter" ? 4096 : DEFAULT_MAX_TOKENS,
+            max_tokens: provider === "openrouter" ? 4096 : provider === "google" ? GOOGLE_MAX_TOKENS : DEFAULT_MAX_TOKENS,
             messages: [
               { role: "system", content: finalSystemPrompt },
               ...(conversationHistory || []),
