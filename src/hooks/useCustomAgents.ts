@@ -78,9 +78,15 @@ export function useCustomAgent(id: string | undefined) {
         .from("custom_agents" as any)
         .select("*")
         .eq("id", id!)
-        .single();
+        .maybeSingle();
       if (error) throw error;
-      return data as unknown as CustomAgent;
+      if (data) return data as unknown as CustomAgent;
+      // Not the owner (RLS hides it): marketplace buyers get only the safe public fields.
+      const { data: shared, error: rpcErr } = await (supabase as any).rpc("get_custom_agent_for_chat", { p_agent_id: id });
+      if (rpcErr) throw rpcErr;
+      const row = Array.isArray(shared) ? shared[0] : shared;
+      if (!row) throw new Error("Agente não encontrado");
+      return row as unknown as CustomAgent;
     },
     enabled: !!id,
   });
