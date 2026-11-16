@@ -41,7 +41,7 @@ export const LLM_PROVIDERS = [
     id: "google",
     name: "Google AI",
     url: "https://aistudio.google.com/apikey",
-    models: ["gemini-2.5-flash", "gemini-2.5-pro"],
+    models: ["gemini-2.5-flash", "gemini-3.1-pro-preview"],
   },
   {
     id: "nvidia-gptos",

@@ -7047,7 +7047,7 @@ Deno.serve(async (req) => {
         openai: "gpt-4o",
         anthropic: "claude-sonnet-4-20250514",
         openrouter: "google/gemini-2.5-pro",
-        google: "gemini-2.5-pro",
+        google: "gemini-3.1-pro-preview", // 2.5-pro now 404s for new accounts; falls back to the default flash model
       };
       const promptGenClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
       const loadOrderedKeys = async (ownerId: string) => {
@@ -8132,7 +8132,8 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
           body: JSON.stringify({
             model: effectiveModel,
             temperature: Number(customAgent.temperature),
-            max_tokens: DEFAULT_MAX_TOKENS,
+            // OpenRouter 402s when max_tokens exceeds what the balance can afford (7732 live, 2026-11-16)
+            max_tokens: provider === "openrouter" ? 4096 : DEFAULT_MAX_TOKENS,
             messages: [
               { role: "system", content: finalSystemPrompt },
               ...(conversationHistory || []),
@@ -8189,6 +8190,13 @@ Se houver blocos de contexto (<PUBMED_ARTICLES_CONTEXT>, <OPENFDA_CONTEXT>, <DAI
         const decryptedKey = await decryptApiKey(keyInfo.api_key_encrypted);
         const result = await tryProviderKey(keyInfo.provider, decryptedKey, keyInfo.model);
         if (result) return result;
+        // The agent's saved model may have been retired by the provider (e.g. Google dropped
+        // gemini-2.5-pro for new accounts, 2026-11) — retry the same key with the provider default.
+        const providerDefault = DEFAULT_MODELS_PER_PROVIDER[keyInfo.provider];
+        if (providerDefault && providerDefault !== keyInfo.model) {
+          const retry = await tryProviderKey(keyInfo.provider, decryptedKey, providerDefault);
+          if (retry) return retry;
+        }
       }
 
       console.log("All user API keys failed for custom agent, trying admin fallback");
