@@ -118,11 +118,16 @@ export function SalesAgentWidget() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-[hsl(14,90%,58%)] px-5 py-3 text-white font-semibold shadow-lg shadow-[hsl(14,90%,58%)]/30 transition-all hover:bg-[hsl(14,90%,52%)] hover:scale-105 hover:shadow-xl md:bottom-8 md:right-8 animate-fade-in"
+          aria-label="Fale com nosso consultor"
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border border-teal-300/35 bg-[#081c20]/90 px-3.5 py-2.5 text-sm font-semibold text-teal-50 shadow-xl shadow-black/50 backdrop-blur-md transition-all hover:border-teal-300/70 hover:bg-[#0d2c31] hover:scale-105 md:bottom-6 md:right-6 lg:px-4.5 lg:py-3 animate-fade-in"
         >
-          <MessageCircle className="h-5 w-5" />
-          <span className="hidden sm:inline">Fale com nosso consultor</span>
-          <span className="sm:hidden">Consultor</span>
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-300 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-teal-300" />
+          </span>
+          <MessageCircle className="h-4 w-4 text-teal-300" />
+          <span className="hidden lg:inline">Fale com nosso consultor</span>
+          <span className="lg:hidden">Consultor</span>
         </button>
       )}
 
