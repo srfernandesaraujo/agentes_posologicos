@@ -1,706 +1,103 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowUpRight, Pill, Shield, Zap, Brain, BarChart3, DoorOpen, Wrench, Stethoscope, Smartphone, Workflow, Users } from "lucide-react";
+import { BookOpen, FlaskConical, GraduationCap, MessageCircle, Pill, Stethoscope, Workflow } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
 import { SalesAgentWidget } from "@/components/sales/SalesAgentWidget";
 import { SEO } from "@/components/seo/SEO";
-import landingAvatar from "@/assets/landing-avatar.png";
-import sceneHorizon from "@/assets/scene-horizon.jpg";
-import sceneTunnel from "@/assets/scene-tunnel.jpg";
-import sceneDesert from "@/assets/scene-desert.jpg";
-import sceneAnatomy from "@/assets/scene-anatomy.jpg";
+import { LandingSquad } from "./LandingSquad";
+import "./Landing.css";
 
-/* ---------- Cinematic scene stack (sidewave-style) ----------
- * A sticky stage that cross-fades between full-screen scene images while scrolling.
- * Each scene gets a big word/headline overlay with its own eyebrow + body.
- * Mouse parallax adds a subtle drag-lag to the active scene + headline.
- */
-type Scene = {
-  id: string;
-  bg: string;
-  alt: string;
-  eyebrow: string;
-  word: string;
-  body: string;
-  align: "left" | "right" | "center";
-  tone: "dark" | "warm";
+const text = {
+ pt: {
+  eyebrow:"IA para saúde, educação e pesquisa", title:"Conhecimento em movimento.", intro:"Agentes especializados para explorar questões, preparar aulas e desenvolver ideias com mais clareza.", start:"Criar conta gratuita", explore:"Explorar agentes", access:"Entrar em atividade", scroll:"Role para descobrir",
+  sceneLabel:"Uma conversa, novas possibilidades", sceneTitle:"Da pergunta ao próximo passo.", sceneText:"Escolha um agente, compartilhe seu contexto e organize a conversa em torno do que importa para você.", example:"Exemplo ilustrativo", question:"Como posso estruturar uma aula sobre interações medicamentosas?", answerTitle:"Uma estrutura para começar", answer:"Defina os objetivos de aprendizagem, apresente um caso e proponha perguntas para discussão. Finalize com uma atividade de revisão.", note:"Revise as respostas e confira as fontes de acordo com seu contexto profissional.",
+  areasLabel:"Feito para o seu contexto", areasTitle:"Uma plataforma, diferentes caminhos.", areasText:"Explore possibilidades para sua prática, seu ensino e sua pesquisa.", demoLabel:"Experimente uma ideia", demoTitle:"Veja por onde começar.", demoText:"Selecione um contexto para conhecer uma possibilidade de uso. Os exemplos são ilustrativos.", prompt:"Uma pergunta possível", result:"Um caminho para explorar",
+  educationLabel:"Aprender juntos", educationTitle:"A sala de aula também pode ir além.", educationText:"Professores podem organizar atividades com agentes. Estudantes acessam salas virtuais ou provas OSCE com as informações fornecidas pelo professor.", room:"Sala virtual", roomText:"Entre em uma aula com o PIN recebido.", pin:"PIN da sala", pinGo:"Acessar sala", osceText:"Acesse uma prova com as informações recebidas do professor.", osce:"Entrar no OSCE",
+  toolsLabel:"Construa seu caminho", toolsTitle:"Seu conhecimento pode fazer parte da conversa.", toolsText:"Crie agentes personalizados, utilize bases de conhecimento e conecte etapas em fluxos de agentes.", toolsLink:"Conhecer a documentação", ctaTitle:"Comece com uma pergunta.", ctaText:"Encontre um agente para seu próximo desafio ou crie sua conta para explorar a plataforma.", pricing:"Planos e créditos", docs:"Documentação", contact:"Contato", privacy:"Privacidade", terms:"Termos", cookies:"Cookies", agents:"Agentes", flows:"Fluxos",
+  areas:[{title:"Saúde",desc:"Explore questões da prática clínica e farmacêutica com agentes especializados.",question:"Como organizar uma discussão sobre interações medicamentosas?",answer:"Estruture o contexto, identifique pontos de atenção e prepare perguntas para revisão."},{title:"Educação",desc:"Prepare atividades, planos de aula e experiências de aprendizagem.",question:"Como planejar uma atividade baseada em um caso clínico?",answer:"Comece pelos objetivos, desenvolva o caso e proponha uma discussão em grupo."},{title:"Pesquisa",desc:"Organize ideias e explore etapas do trabalho acadêmico.",question:"Como estruturar as próximas etapas de um projeto de pesquisa?",answer:"Organize a pergunta, os objetivos e os pontos que precisam de investigação."}]
+ },
+ en: {
+  eyebrow:"AI for health, education and research", title:"Knowledge in motion.", intro:"Specialized agents to explore questions, prepare lessons and develop ideas with greater clarity.", start:"Create a free account", explore:"Explore agents", access:"Join an activity", scroll:"Scroll to discover",
+  sceneLabel:"One conversation, new possibilities", sceneTitle:"From a question to the next step.", sceneText:"Choose an agent, share your context and organize the conversation around what matters to you.", example:"Illustrative example", question:"How can I structure a lesson about drug interactions?", answerTitle:"A structure to get started", answer:"Define learning objectives, present a case and propose discussion questions. Finish with a review activity.", note:"Review responses and check sources for your professional context.",
+  areasLabel:"Made for your context", areasTitle:"One platform, different paths.", areasText:"Explore possibilities for your practice, teaching and research.", demoLabel:"Try an idea", demoTitle:"See where to begin.", demoText:"Choose a context to explore a possible use. These examples are illustrative.", prompt:"A possible question", result:"A path to explore",
+  educationLabel:"Learn together", educationTitle:"Take the classroom further.", educationText:"Teachers can organize activities with agents. Students can join virtual rooms or OSCE exams using information provided by their teacher.", room:"Virtual room", roomText:"Join a class with the PIN you received.", pin:"Room PIN", pinGo:"Join room", osceText:"Join an exam with the information provided by your teacher.", osce:"Join OSCE",
+  toolsLabel:"Build your path", toolsTitle:"Your knowledge can be part of the conversation.", toolsText:"Create custom agents, use knowledge bases and connect steps in agent workflows.", toolsLink:"Read the documentation", ctaTitle:"Start with a question.", ctaText:"Find an agent for your next challenge or create an account to explore the platform.", pricing:"Plans and credits", docs:"Documentation", contact:"Contact", privacy:"Privacy", terms:"Terms", cookies:"Cookies", agents:"Agents", flows:"Workflows",
+  areas:[{title:"Health",desc:"Explore clinical and pharmaceutical questions with specialized agents.",question:"How can I organize a discussion about drug interactions?",answer:"Structure the context, identify points of attention and prepare questions for review."},{title:"Education",desc:"Prepare activities, lesson plans and learning experiences.",question:"How can I plan an activity based on a clinical case?",answer:"Start with objectives, develop the case and propose a group discussion."},{title:"Research",desc:"Organize ideas and explore stages of academic work.",question:"How can I structure the next stages of a research project?",answer:"Organize the question, objectives and points requiring investigation."}]
+ },
+ es: {
+  eyebrow:"IA para salud, educación e investigación", title:"Conocimiento en movimiento.", intro:"Agentes especializados para explorar preguntas, preparar clases y desarrollar ideas con mayor claridad.", start:"Crear cuenta gratuita", explore:"Explorar agentes", access:"Entrar a una actividad", scroll:"Desplázate para descubrir",
+  sceneLabel:"Una conversación, nuevas posibilidades", sceneTitle:"De la pregunta al siguiente paso.", sceneText:"Elige un agente, comparte tu contexto y organiza la conversación en torno a lo que te importa.", example:"Ejemplo ilustrativo", question:"¿Cómo puedo estructurar una clase sobre interacciones medicamentosas?", answerTitle:"Una estructura para empezar", answer:"Define los objetivos de aprendizaje, presenta un caso y propone preguntas para debatir. Termina con una actividad de revisión.", note:"Revisa las respuestas y comprueba las fuentes según tu contexto profesional.",
+  areasLabel:"Para tu contexto", areasTitle:"Una plataforma, distintos caminos.", areasText:"Explora posibilidades para tu práctica, enseñanza e investigación.", demoLabel:"Prueba una idea", demoTitle:"Descubre por dónde empezar.", demoText:"Selecciona un contexto para conocer una posibilidad de uso. Los ejemplos son ilustrativos.", prompt:"Una pregunta posible", result:"Un camino para explorar",
+  educationLabel:"Aprender juntos", educationTitle:"El aula también puede ir más allá.", educationText:"Los profesores pueden organizar actividades con agentes. Los estudiantes acceden a salas virtuales o pruebas OSCE con los datos proporcionados por su profesor.", room:"Sala virtual", roomText:"Entra a una clase con el PIN recibido.", pin:"PIN de la sala", pinGo:"Entrar a la sala", osceText:"Accede a una prueba con los datos proporcionados por tu profesor.", osce:"Entrar al OSCE",
+  toolsLabel:"Construye tu camino", toolsTitle:"Tu conocimiento puede formar parte de la conversación.", toolsText:"Crea agentes personalizados, utiliza bases de conocimiento y conecta etapas en flujos de agentes.", toolsLink:"Ver la documentación", ctaTitle:"Comienza con una pregunta.", ctaText:"Encuentra un agente para tu próximo desafío o crea una cuenta para explorar la plataforma.", pricing:"Planes y créditos", docs:"Documentación", contact:"Contacto", privacy:"Privacidad", terms:"Términos", cookies:"Cookies", agents:"Agentes", flows:"Flujos",
+  areas:[{title:"Salud",desc:"Explora cuestiones clínicas y farmacéuticas con agentes especializados.",question:"¿Cómo organizar una discusión sobre interacciones medicamentosas?",answer:"Estructura el contexto, identifica puntos de atención y prepara preguntas para revisar."},{title:"Educación",desc:"Prepara actividades, planes de clase y experiencias de aprendizaje.",question:"¿Cómo planear una actividad basada en un caso clínico?",answer:"Empieza por los objetivos, desarrolla el caso y propone una discusión en grupo."},{title:"Investigación",desc:"Organiza ideas y explora etapas del trabajo académico.",question:"¿Cómo estructurar las siguientes etapas de un proyecto de investigación?",answer:"Organiza la pregunta, los objetivos y los puntos que necesitan investigación."}]
+ }
 };
+type Copy = typeof text.pt;
 
-const SCENES: Scene[] = [
-  {
-    id: "sc-1",
-    bg: sceneHorizon,
-    alt: "Horizonte com figura solitária e orbe cintilante",
-    eyebrow: "[ 001 / SINTA ]",
-    word: "SINTA",
-    body: "Antes de ver. Antes de prescrever. Agentes de IA que traduzem dados clínicos densos em decisões claras.",
-    align: "right",
-    tone: "dark",
-  },
-  {
-    id: "sc-2",
-    bg: sceneTunnel,
-    alt: "Vórtice de anéis revelando deserto ao pôr do sol",
-    eyebrow: "[ 002 / FOCO ]",
-    word: "FOCO",
-    body: "Atravesse o ruído. Cada agente é um túnel direto para a resposta — ancorado em literatura, diretrizes e contexto.",
-    align: "center",
-    tone: "warm",
-  },
-  {
-    id: "sc-3",
-    bg: landingAvatar,
-    alt: "Avatar simbólico do agente de IA",
-    eyebrow: "[ 003 / PRESENÇA ]",
-    word: "PRESENÇA",
-    body: "Um copiloto que não pisca. Antibioticoterapia, interações, planos de aula, editais — sempre presente, sempre afiado.",
-    align: "left",
-    tone: "dark",
-  },
-  {
-    id: "sc-4",
-    bg: sceneAnatomy,
-    alt: "Figura anatômica com constelações de pontos",
-    eyebrow: "[ 004 / SINAL ]",
-    word: "SINAL",
-    body: "Pixels brutos viram nuances. Fragmentos viram contexto. Contexto vira ação clínica, didática e científica.",
-    align: "right",
-    tone: "warm",
-  },
-  {
-    id: "sc-5",
-    bg: sceneDesert,
-    alt: "Figura mascarada em deserto com ruínas e planeta",
-    eyebrow: "[ 005 / VOCÊ ]",
-    word: "VOCÊ",
-    body: "Médicos, farmacêuticos, professores, pesquisadores e criadores. Esta plataforma é um espelho da sua expertise.",
-    align: "left",
-    tone: "warm",
-  },
-];
-
-function CinematicAvatar() {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const scenesRef = useRef<HTMLDivElement>(null);
-  const counterRef = useRef<HTMLSpanElement>(null);
-  const mouse = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
-  const raf = useRef<number | null>(null);
-
-  useEffect(() => {
-    const wrap = wrapRef.current;
-    const scenes = scenesRef.current;
-    if (!wrap || !scenes) return;
-
-    const compute = () => {
-      const rect = wrap.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const total = rect.height - vh;
-      const p = Math.min(1, Math.max(0, -rect.top / total));
-
-      // Lerp mouse
-      mouse.current.tx += (mouse.current.x - mouse.current.tx) * 0.08;
-      mouse.current.ty += (mouse.current.y - mouse.current.ty) * 0.08;
-      const mx = mouse.current.tx;
-      const my = mouse.current.ty;
-
-      const nodes = scenes.querySelectorAll<HTMLElement>("[data-scene]");
-      const n = nodes.length;
-      let activeIndex = 0;
-      let bestOpacity = 0;
-      nodes.forEach((el, i) => {
-        const center = (i + 0.5) / n;
-        const dist = Math.abs(p - center);
-        // Each scene is fully visible at its center, fades into neighbors.
-        const half = 0.6 / n;
-        const o = Math.max(0, 1 - dist / half);
-        const local = o; // 0..1 active strength
-        if (local > bestOpacity) { bestOpacity = local; activeIndex = i; }
-
-        const bg = el.querySelector<HTMLElement>("[data-bg]");
-        const text = el.querySelector<HTMLElement>("[data-text]");
-        const big = el.querySelector<HTMLElement>("[data-big]");
-
-        // Scene zoom: grows from 1.04 to 1.18 as we cross it
-        const localProgress = Math.min(1, Math.max(0, (p - (i / n)) / (1 / n)));
-        const zoom = 1.04 + localProgress * 0.14;
-        if (bg) {
-          bg.style.opacity = String(Math.min(1, local * 1.2));
-          bg.style.transform = `scale(${zoom}) translate3d(${mx * 18}px, ${my * 14}px, 0)`;
-        }
-        if (text) {
-          const lift = (1 - local) * 40;
-          text.style.opacity = String(Math.max(0, local * 1.1 - 0.05));
-          text.style.transform = `translate3d(${mx * -22}px, ${lift + my * -12}px, 0)`;
-          text.style.pointerEvents = local > 0.6 ? "auto" : "none";
-        }
-        if (big) {
-          // Big watermark word slides horizontally based on local progress
-          const slide = (localProgress - 0.5) * 220;
-          big.style.transform = `translate3d(${slide + mx * 40}px, ${my * 20}px, 0)`;
-          big.style.opacity = String(Math.max(0, local * 0.9));
-        }
-      });
-
-      if (counterRef.current) {
-        counterRef.current.textContent = String(activeIndex + 1).padStart(3, "0");
-      }
-
-      raf.current = null;
-    };
-
-    const schedule = () => {
-      if (raf.current == null) raf.current = requestAnimationFrame(compute);
-    };
-    const onMouse = (e: MouseEvent) => {
-      mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.current.y = (e.clientY / window.innerHeight) * 2 - 1;
-      schedule();
-    };
-    compute();
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    window.addEventListener("mousemove", onMouse, { passive: true });
-    let loop = requestAnimationFrame(function tick() {
-      schedule();
-      loop = requestAnimationFrame(tick);
-    });
-    return () => {
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-      window.removeEventListener("mousemove", onMouse);
-      cancelAnimationFrame(loop);
-      if (raf.current) cancelAnimationFrame(raf.current);
-    };
-  }, []);
-
-  return (
-    <section ref={wrapRef} className="relative bg-black" style={{ height: `${SCENES.length * 120}vh` }}>
-      <div className="sticky top-0 h-screen w-full overflow-hidden">
-        {/* Scene layers */}
-        <div ref={scenesRef} className="absolute inset-0">
-          {SCENES.map((s, i) => (
-            <div key={s.id} data-scene className="absolute inset-0">
-              {/* Background image */}
-              <div
-                data-bg
-                className="absolute inset-0 will-change-transform"
-                style={{ opacity: i === 0 ? 1 : 0, transition: "opacity 0.5s ease" }}
-              >
-                <img
-                  src={s.bg}
-                  alt={s.alt}
-                  loading={i === 0 ? "eager" : "lazy"}
-                  width={1920}
-                  height={1080}
-                  className="h-full w-full object-cover"
-                  draggable={false}
-                />
-                {/* Tone vignette over each scene */}
-                <div
-                  aria-hidden
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      s.tone === "warm"
-                        ? "radial-gradient(120% 80% at 50% 60%, transparent 30%, rgba(0,0,0,0.55) 100%)"
-                        : "radial-gradient(120% 80% at 50% 60%, transparent 25%, rgba(0,0,0,0.7) 100%)",
-                  }}
-                />
-              </div>
-
-              {/* Giant watermark word that slides across */}
-              <div
-                data-big
-                aria-hidden
-                className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 will-change-transform"
-                style={{ opacity: 0 }}
-              >
-                <div className="font-display font-black uppercase tracking-[-0.04em] text-white/[0.07] text-center leading-none whitespace-nowrap" style={{ fontSize: "clamp(8rem, 22vw, 22rem)" }}>
-                  {s.word}
-                </div>
-              </div>
-
-              {/* Headline + body block */}
-              <div
-                data-text
-                className="absolute inset-0 flex items-center px-6 md:px-20 will-change-transform"
-                style={{ opacity: 0, transition: "opacity 0.3s ease" }}
-              >
-                <div
-                  className={`max-w-2xl ${
-                    s.align === "right" ? "ml-auto text-left" : s.align === "center" ? "mx-auto text-center" : "text-left"
-                  }`}
-                >
-                  <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/70 mb-6">{s.eyebrow}</p>
-                  <h2 className="font-display font-black uppercase leading-[0.9] tracking-[-0.02em] text-white drop-shadow-[0_6px_40px_rgba(0,0,0,0.8)]" style={{ fontSize: "clamp(3rem, 9vw, 8rem)" }}>
-                    {s.word}
-                  </h2>
-                  <p className="mt-6 font-mono text-[11px] md:text-[12px] uppercase tracking-[0.16em] leading-[1.8] text-white/80 max-w-md">
-                    {s.body}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* HUD: counter + vertical label */}
-        <div className="pointer-events-none absolute left-4 md:left-8 top-1/2 -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/60 flex flex-col gap-4">
-          <span className="text-white">
-            <span ref={counterRef}>001</span>
-            <span className="text-white/40"> / {String(SCENES.length).padStart(3, "0")}</span>
-          </span>
-          <span className="h-24 w-px bg-white/20" />
-          <span className="text-white/40 [writing-mode:vertical-rl] rotate-180">Cinema · Posológico</span>
-        </div>
-        <div className="pointer-events-none absolute right-4 md:right-8 top-1/2 -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-white/50 [writing-mode:vertical-rl] rotate-180">
-          PORTFÓLIO · AGENTES POSOLÓGICOS
-        </div>
-      </div>
-    </section>
-  );
+function MatrixRain() {
+ const canvas = useRef<HTMLCanvasElement>(null);
+ useEffect(() => {
+  const el = canvas.current; if (!el) return;
+  const ctx = el.getContext("2d"); if (!ctx) return;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let timer = 0; let columns: number[] = [];
+  const resize = () => { el.width = el.clientWidth; el.height = el.clientHeight; columns = Array.from({length: Math.ceil(el.width / 24)}, () => Math.random() * -40); };
+  const draw = () => {
+   ctx.fillStyle = "rgba(2, 9, 13, .12)"; ctx.fillRect(0, 0, el.width, el.height); ctx.font = "14px monospace";
+   columns.forEach((y, i) => { ctx.fillStyle = i % 7 === 0 ? "rgba(157,255,231,.7)" : "rgba(50,198,156,.4)"; ctx.fillText("01アイウエカキクケコ+<>".charAt(Math.floor(Math.random()*15)), i*24, y*21); if (y*21 > el.height && Math.random() > .975) columns[i] = 0; else columns[i] += .65; });
+  };
+  resize(); if (!reduced.matches) timer = window.setInterval(draw, 65);
+  window.addEventListener("resize", resize);
+  return () => { window.clearInterval(timer); window.removeEventListener("resize", resize); };
+ }, []);
+ return <canvas ref={canvas} className="matrix-rain" aria-hidden="true"/>;
 }
 
-function Reveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            el.style.animationPlayState = "running";
-            el.classList.add("opacity-100");
-            el.classList.remove("opacity-0");
-            io.unobserve(el);
-          }
-        });
-      },
-      { threshold: 0.15 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div
-      ref={ref}
-      className={`opacity-0 animate-sw-rise ${className}`}
-      style={{ animationDelay: `${delay}ms`, animationPlayState: "paused" }}
-    >
-      {children}
-    </div>
-  );
+const processCopy = {
+ pt: { label: "Fluxo ilustrativo", steps: ["Sua pergunta", "Agente organiza", "Próximo passo"], build: ["Contexto", "Caso", "Atividade"], tools: ["Conhecimento", "Agente", "Fluxo"] },
+ en: { label: "Illustrative workflow", steps: ["Your question", "Agent organizes", "Next step"], build: ["Context", "Case", "Activity"], tools: ["Knowledge", "Agent", "Workflow"] },
+ es: { label: "Flujo ilustrativo", steps: ["Tu pregunta", "Agente organiza", "Siguiente paso"], build: ["Contexto", "Caso", "Actividad"], tools: ["Conocimiento", "Agente", "Flujo"] },
+};
+
+function Process({ label, steps, variant = "flow" }: { label: string; steps: string[]; variant?: "flow" | "build" }) {
+ return <div className={"process-visual process-" + variant} aria-label={label}>
+  <span className="process-caption">{label}</span>
+  <div className="process-track">{steps.map((step, i) => <div className="process-step" key={step}><span className="process-node">{i === 1 ? <Pill size={16}/> : <span/>}</span><span>{step}</span></div>)}</div>
+ </div>;
+}
+
+function Story({ c }: { c: Copy }) {
+ const section = useRef<HTMLElement>(null);
+ useEffect(() => {
+  const el = section.current; if (!el) return;
+  let frame = 0;
+  const update = () => { frame = 0; const rect = el.getBoundingClientRect(); const distance = rect.height - window.innerHeight; const progress = distance > 0 ? Math.max(0, Math.min(1, -rect.top / distance)) : 0; el.style.setProperty("--story-progress", String(progress)); el.style.setProperty("--story-lift", ((1-progress)*55)+"px"); el.style.setProperty("--story-scale", String(.82+progress*.18)); el.style.setProperty("--portal-scale", String(.65+progress*1.15)); el.style.setProperty("--story-opacity", String(.65+progress*.35)); el.style.setProperty("--portal-opacity", String(.85-progress*.42)); };
+  const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
+  update(); window.addEventListener("scroll", schedule, {passive:true}); window.addEventListener("resize", schedule);
+  return () => { window.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule); if (frame) cancelAnimationFrame(frame); };
+ }, []);
+ return <section ref={section} className="landing-story" id="como-funciona"><div className="landing-story-stage"><div className="story-portal" aria-hidden="true"><i/><i/><i/><i/></div><div className="story-grid" aria-hidden="true"/><div className="landing-story-inner"><div className="landing-story-copy"><p className="landing-kicker">{c.sceneLabel}</p><h2>{c.sceneTitle}</h2><p>{c.sceneText}</p></div><div className="landing-story-visual"><div className="landing-conversation"><div className="landing-conversation-head"><div className="landing-agent-icon"><Pill size={18}/></div><div><strong>Agentes Posológicos</strong><span>{c.example}</span></div><span className="landing-conversation-dots">•••</span></div><div className="landing-conversation-body"><div className="landing-question">{c.question}</div><div className="landing-answer"><span className="landing-answer-icon"><MessageCircle size={17}/></span><div><strong>{c.answerTitle}</strong><p>{c.answer}</p></div></div><p className="landing-note">{c.note}</p></div></div></div></div></div></section>;
 }
 
 export default function Landing() {
-  const navigate = useNavigate();
-  const [pin, setPin] = useState("");
-  const { t } = useLanguage();
-
-  const FEATURES = [
-    { icon: Brain, title: t("feature.specialized"), description: t("feature.specialized.desc") },
-    { icon: Wrench, title: t("feature.custom"), description: t("feature.custom.desc") },
-    { icon: Stethoscope, title: t("feature.virtual"), description: t("feature.virtual.desc") },
-    { icon: Smartphone, title: t("feature.whatsapp"), description: t("feature.whatsapp.desc") },
-    { icon: Shield, title: t("feature.rag"), description: t("feature.rag.desc") },
-    { icon: Zap, title: t("feature.structured"), description: t("feature.structured.desc") },
-    { icon: Workflow, title: "Rede de Agentes (Fluxos)", description: "Encadeie múltiplos agentes em pipelines interativos. Cada etapa alimenta a próxima, com pausas inteligentes para perguntas e exportação em PDF ao final." },
-    { icon: BarChart3, title: "Dashboard Analítico", description: "Painel completo com saldo de créditos, conversas recentes, agentes criados e bases de conhecimento — tudo em uma visão rápida." },
-  ];
-
-  const CATEGORIES = [
-    { color: "hsl(199,89%,48%)", name: t("cat.clinical"), agents: ["Interações Cardiovasculares", "Antibioticoterapia", "Educador Clínico"] },
-    { color: "hsl(174,62%,47%)", name: t("cat.edtech"), agents: ["Metodologias Ativas", "Simulador Clínico", "Analisador de Turma"] },
-    { color: "hsl(262,52%,56%)", name: t("cat.research"), agents: ["Editais de Fomento", "Análise Estatística"] },
-    { color: "hsl(38,92%,50%)", name: t("cat.content"), agents: ["SEO para YouTube", "Fact-Checker de Saúde"] },
-  ];
-
-  const STATS = [
-    { value: "10+", label: t("landing.stats.agents") },
-    { value: "5", label: t("landing.stats.providers") },
-    { value: "∞", label: t("landing.stats.custom") },
-    { value: "RAG", label: t("landing.stats.rag") },
-    { value: "Fluxos", label: "Pipelines de agentes encadeados" },
-  ];
-
-  const handlePinAccess = () => {
-    if (pin.trim().length >= 4) {
-      navigate(`/sala/${pin.trim()}`);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-black text-white selection:bg-white selection:text-black antialiased">
-      <SEO
-        title="Agentes Posológicos — IA para Saúde, Educação e Pesquisa"
-        description="Plataforma de agentes de IA especializados em prática clínica, farmácia, ensino em saúde, pesquisa acadêmica e produção de conteúdo. Crie sua conta gratuita."
-        path="/"
-        jsonLd={{
-          "@context": "https://schema.org",
-          "@type": "SoftwareApplication",
-          name: "Agentes Posológicos",
-          applicationCategory: "HealthApplication",
-          operatingSystem: "Web",
-          offers: { "@type": "Offer", price: "0", priceCurrency: "BRL" },
-        }}
-      />
-      {/* Subtle grain overlay */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 z-[1] opacity-[0.035] mix-blend-overlay"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.7'/></svg>\")",
-        }}
-      />
-
-      {/* Nav */}
-      <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-md bg-black/40 border-b border-white/[0.06]">
-        <div className="mx-auto max-w-[1440px] flex h-14 items-center justify-between px-6 md:px-10 font-mono text-[11px] uppercase tracking-[0.18em]">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="h-5 w-5 rounded-[5px] bg-white grid place-items-center">
-              <Pill className="h-3 w-3 text-black" />
-            </div>
-            <span className="text-white">Agentes Posológicos<span className="text-white/40">®</span></span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-8 text-white/50">
-            <a href="#index" className="hover:text-white transition-colors">Índice</a>
-            <a href="#capabilities" className="hover:text-white transition-colors">Capacidades</a>
-            <a href="#agents" className="hover:text-white transition-colors">Agentes</a>
-            <a href="#access" className="hover:text-white transition-colors">Acesso</a>
-          </nav>
-          <div className="flex items-center gap-4">
-            <LanguageSelector />
-            <FloatingAuth />
-          </div>
-        </div>
-      </header>
-
-      <main className="relative z-[2] pt-14">
-        {/* Hero */}
-        <section className="relative min-h-[100svh] flex flex-col justify-between overflow-hidden">
-          {/* breathing orb */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute left-1/2 top-[58%] -translate-x-1/2 -translate-y-1/2 h-[680px] w-[680px] rounded-full animate-sw-orb"
-            style={{
-              background:
-                "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.18) 0%, rgba(56,189,248,0.12) 28%, rgba(20,184,166,0.08) 48%, transparent 70%)",
-              filter: "blur(40px)",
-            }}
-          />
-
-          {/* Top meta line */}
-          <div className="relative mx-auto w-full max-w-[1440px] px-6 md:px-10 pt-10 grid grid-cols-2 md:grid-cols-3 gap-6 font-mono text-[10px] uppercase tracking-[0.22em] text-white/40 animate-sw-fade">
-            <span>[ V.2026 / PT-BR ]</span>
-            <span className="hidden md:block text-center">Plataforma de Agentes de IA</span>
-            <span className="text-right">Saúde · Educação · Pesquisa</span>
-          </div>
-
-          {/* Headline */}
-          <div className="relative mx-auto w-full max-w-[1440px] px-6 md:px-10 py-24 md:py-32 text-center">
-            <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/40 mb-10 animate-sw-fade">
-              ✦ &nbsp; {t("landing.subtitle")} &nbsp; ✦
-            </p>
-            <h1 className="font-display font-light leading-[0.92] tracking-[-0.04em] text-[clamp(3rem,11vw,11rem)] animate-sw-rise">
-              <span className="block italic font-serif text-white/95">{t("landing.hero.title1")}.</span>
-              <span className="block font-bold uppercase">{t("landing.hero.title2")}</span>
-            </h1>
-
-            <p className="mx-auto max-w-xl text-base md:text-lg text-white/55 mt-12 leading-relaxed animate-sw-fade" style={{ animationDelay: "300ms" }}>
-              {t("landing.hero.desc")}
-            </p>
-
-            <div className="mt-14 flex items-center justify-center gap-3 animate-sw-fade" style={{ animationDelay: "500ms" }}>
-              <Link to="/signup">
-                <Button className="group h-12 rounded-full bg-white text-black hover:bg-white/90 px-7 text-[12px] font-mono uppercase tracking-[0.2em] gap-3">
-                  {t("landing.cta")}
-                  <span className="grid place-items-center h-7 w-7 rounded-full bg-black text-white transition-transform group-hover:rotate-45">
-                    <ArrowUpRight className="h-3.5 w-3.5" />
-                  </span>
-                </Button>
-              </Link>
-              <Link to="/login">
-                <Button variant="ghost" className="h-12 rounded-full border border-white/15 bg-transparent text-white hover:bg-white/5 hover:text-white px-7 text-[12px] font-mono uppercase tracking-[0.2em]">
-                  {t("landing.login")}
-                </Button>
-              </Link>
-            </div>
-          </div>
-
-          {/* Bottom scroll cue */}
-          <div className="relative mx-auto w-full max-w-[1440px] px-6 md:px-10 pb-8 flex items-end justify-between font-mono text-[10px] uppercase tracking-[0.24em] text-white/35 animate-sw-fade" style={{ animationDelay: "700ms" }}>
-            <span>Role para descobrir</span>
-            <div className="h-px w-24 md:w-64 bg-white/15" />
-            <span>↓ 001</span>
-          </div>
-        </section>
-
-        {/* Marquee strip */}
-        <section className="border-y border-white/[0.06] overflow-hidden py-5">
-          {/* Cinematic scroll act injected above marquee */}
-        </section>
-        <CinematicAvatar />
-        <section className="border-y border-white/[0.06] overflow-hidden py-5">
-          <div className="flex whitespace-nowrap animate-sw-marquee font-display italic text-3xl md:text-5xl text-white/70">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="flex items-center shrink-0 pr-12 gap-12">
-                <span>Clínica</span><span className="text-white/20">✦</span>
-                <span className="font-bold not-italic uppercase">Farmácia</span><span className="text-white/20">✦</span>
-                <span>Ensino</span><span className="text-white/20">✦</span>
-                <span className="font-bold not-italic uppercase">Pesquisa</span><span className="text-white/20">✦</span>
-                <span>Conteúdo</span><span className="text-white/20">✦</span>
-                <span className="font-bold not-italic uppercase">Fluxos</span><span className="text-white/20">✦</span>
-                <span>RAG</span><span className="text-white/20">✦</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Stats / Index */}
-        <section id="index" className="border-b border-white/[0.06]">
-          <div className="mx-auto max-w-[1440px] px-6 md:px-10 py-24 grid lg:grid-cols-12 gap-10">
-            <Reveal className="lg:col-span-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 001 ] Índice</p>
-              <h2 className="font-display text-4xl md:text-5xl leading-[1.05] tracking-tight">
-                <span className="italic font-serif font-light">A escala</span><br />
-                <span className="font-bold uppercase">em números.</span>
-              </h2>
-            </Reveal>
-            <div className="lg:col-span-8 grid grid-cols-2 md:grid-cols-5 gap-y-10 gap-x-6 self-end">
-              {STATS.map((s, i) => (
-                <Reveal key={s.label} delay={i * 80}>
-                  <p className="font-display text-4xl md:text-5xl font-light text-white">{s.value}</p>
-                  <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40 leading-relaxed">{s.label}</p>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Features / Capabilities */}
-        <section id="capabilities" className="border-b border-white/[0.06]">
-          <div className="mx-auto max-w-[1440px] px-6 md:px-10 py-28">
-            <div className="grid lg:grid-cols-12 gap-10 mb-20">
-              <Reveal className="lg:col-span-5">
-                <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 002 ] Capacidades</p>
-                <h2 className="font-display text-5xl md:text-7xl leading-[0.95] tracking-tight">
-                  <span className="italic font-serif font-light">Tudo o que</span><br />
-                  <span className="font-bold uppercase">você precisa.</span>
-                </h2>
-              </Reveal>
-              <Reveal delay={120} className="lg:col-span-5 lg:col-start-8 self-end">
-                <p className="text-white/55 text-base md:text-lg leading-relaxed">{t("landing.features.desc")}</p>
-              </Reveal>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 border-t border-white/[0.08]">
-              {FEATURES.map((f, i) => (
-                <Reveal
-                  key={f.title}
-                  delay={(i % 4) * 100}
-                  className="group relative border-b border-white/[0.08] md:border-r md:[&:nth-child(2n)]:border-r-0 lg:[&:nth-child(2n)]:border-r lg:[&:nth-child(4n)]:border-r-0 p-8 lg:p-10 hover:bg-white/[0.02] transition-colors min-h-[280px] flex flex-col"
-                >
-                  <div className="flex items-start justify-between mb-12">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/35">
-                      {String(i + 1).padStart(3, "0")}
-                    </span>
-                    <f.icon className="h-5 w-5 text-white/40 group-hover:text-white transition-colors" strokeWidth={1.2} />
-                  </div>
-                  <h3 className="font-display text-2xl leading-tight tracking-tight mb-4 text-white">{f.title}</h3>
-                  <p className="text-sm text-white/50 leading-relaxed mt-auto">{f.description}</p>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Categories / Agents */}
-        <section id="agents" className="border-b border-white/[0.06]">
-          <div className="mx-auto max-w-[1440px] px-6 md:px-10 py-28">
-            <Reveal className="max-w-3xl mb-20">
-              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 003 ] Agentes</p>
-              <h2 className="font-display text-5xl md:text-7xl leading-[0.95] tracking-tight">
-                <span className="italic font-serif font-light">Especialistas</span>{" "}
-                <span className="font-bold uppercase">por domínio.</span>
-              </h2>
-              <p className="mt-8 text-white/55 text-base md:text-lg max-w-xl leading-relaxed">{t("landing.categories.desc")}</p>
-            </Reveal>
-
-            <div className="space-y-px bg-white/[0.06]">
-              {CATEGORIES.map((cat, i) => (
-                <Reveal key={cat.name} delay={i * 90}>
-                  <div className="group grid grid-cols-12 items-center gap-6 bg-black hover:bg-white/[0.025] transition-colors px-2 md:px-6 py-8 md:py-10">
-                    <div className="col-span-1 font-mono text-[11px] text-white/35">
-                      {String(i + 1).padStart(2, "0")}
-                    </div>
-                    <div className="col-span-11 md:col-span-4 flex items-center gap-4">
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: cat.color, boxShadow: `0 0 24px ${cat.color}` }} />
-                      <h3 className="font-display text-2xl md:text-3xl tracking-tight text-white">{cat.name}</h3>
-                    </div>
-                    <div className="col-span-12 md:col-span-6 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-[0.16em] text-white/50">
-                      {cat.agents.map((a) => (
-                        <span key={a} className="before:content-['—_'] before:text-white/25">{a}</span>
-                      ))}
-                    </div>
-                    <div className="hidden md:flex col-span-1 justify-end">
-                      <ArrowUpRight className="h-5 w-5 text-white/30 group-hover:text-white group-hover:-translate-y-1 group-hover:translate-x-1 transition-all" strokeWidth={1.2} />
-                    </div>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Access / PIN */}
-        <section id="access" className="border-b border-white/[0.06] relative overflow-hidden">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute right-[-15%] top-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full opacity-50"
-            style={{
-              background: "radial-gradient(circle, rgba(20,184,166,0.18) 0%, transparent 60%)",
-              filter: "blur(60px)",
-            }}
-          />
-          <div className="relative mx-auto max-w-[1440px] px-6 md:px-10 py-28 grid lg:grid-cols-12 gap-10 items-center">
-            <Reveal className="lg:col-span-6">
-              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40 mb-6">[ 004 ] Acesso por PIN</p>
-              <h2 className="font-display text-5xl md:text-7xl leading-[0.95] tracking-tight">
-                <span className="italic font-serif font-light">Entre com</span><br />
-                <span className="font-bold uppercase inline-flex items-center gap-4">
-                  um PIN
-                  <DoorOpen className="h-12 w-12 text-white/60" strokeWidth={1.2} />
-                </span>
-              </h2>
-              <p className="mt-8 text-white/55 max-w-lg leading-relaxed">
-                Recebeu um PIN do seu professor? Escolha o tipo de atividade para entrar — você não precisa criar conta.
-              </p>
-            </Reveal>
-            <Reveal delay={150} className="lg:col-span-5 lg:col-start-8 grid sm:grid-cols-2 gap-4">
-              <Link
-                to="/sala/"
-                onClick={(e) => {
-                  e.preventDefault();
-                  const p = window.prompt("Digite o PIN da sala virtual:");
-                  if (p && p.trim()) navigate(`/sala/${p.trim()}`);
-                }}
-                className="group border border-white/10 bg-white/[0.02] p-6 hover:bg-white/[0.05] hover:border-white/20 transition-colors flex flex-col gap-4"
-              >
-                <div className="flex items-center justify-between">
-                  <Users className="h-7 w-7 text-[hsl(174,62%,55%)]" strokeWidth={1.5} />
-                  <ArrowUpRight className="h-4 w-4 text-white/40 group-hover:text-white transition-colors" />
-                </div>
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/40 mb-2">Aula colaborativa</p>
-                  <h3 className="text-xl font-bold text-white">Sala Virtual</h3>
-                  <p className="mt-2 text-sm text-white/55 leading-snug">
-                    Entre numa aula ao vivo com o agente do professor.
-                  </p>
-                </div>
-              </Link>
-
-              <Link
-                to="/osce/entrar"
-                className="group border border-[hsl(174,62%,47%)]/30 bg-[hsl(174,62%,47%)]/[0.06] p-6 hover:bg-[hsl(174,62%,47%)]/[0.12] hover:border-[hsl(174,62%,47%)]/50 transition-colors flex flex-col gap-4"
-              >
-                <div className="flex items-center justify-between">
-                  <Stethoscope className="h-7 w-7 text-[hsl(174,62%,55%)]" strokeWidth={1.5} />
-                  <ArrowUpRight className="h-4 w-4 text-white/40 group-hover:text-white transition-colors" />
-                </div>
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/40 mb-2">Prova clínica</p>
-                  <h3 className="text-xl font-bold text-white">OSCE Virtual</h3>
-                  <p className="mt-2 text-sm text-white/55 leading-snug">
-                    Entre na prova OSCE aplicada pelo seu professor.
-                  </p>
-                </div>
-              </Link>
-            </Reveal>
-          </div>
-        </section>
-
-        {/* Final CTA */}
-        <section className="relative overflow-hidden">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[800px] w-[800px] rounded-full animate-sw-orb"
-            style={{
-              background:
-                "radial-gradient(circle, rgba(255,255,255,0.14) 0%, rgba(56,189,248,0.10) 30%, transparent 65%)",
-              filter: "blur(50px)",
-            }}
-          />
-          <div className="relative mx-auto max-w-[1440px] px-6 md:px-10 py-32 md:py-44 text-center">
-            <Reveal>
-              <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-white/40 mb-10">[ 005 ] Comece agora</p>
-              <h2 className="font-display leading-[0.92] tracking-[-0.04em] text-[clamp(2.75rem,9vw,8rem)]">
-                <span className="block italic font-serif font-light text-white/95">{t("landing.cta2.title")}</span>
-              </h2>
-              <p className="mt-10 mx-auto max-w-xl text-white/55 text-base md:text-lg leading-relaxed">{t("landing.cta2.desc")}</p>
-              <div className="mt-14">
-                <Link to="/signup">
-                  <Button className="group h-14 rounded-full bg-white text-black hover:bg-white/90 px-10 text-[12px] font-mono uppercase tracking-[0.22em] gap-4">
-                    {t("landing.signup")}
-                    <span className="grid place-items-center h-8 w-8 rounded-full bg-black text-white transition-transform group-hover:rotate-45">
-                      <ArrowUpRight className="h-4 w-4" />
-                    </span>
-                  </Button>
-                </Link>
-              </div>
-            </Reveal>
-          </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="relative z-[2] border-t border-white/[0.08]">
-        <div className="container">
-          <div className="py-16 grid grid-cols-2 md:grid-cols-4 gap-10 font-mono text-[11px] uppercase tracking-[0.18em]">
-            <div className="col-span-2 md:col-span-1 flex flex-col gap-4">
-              <div className="flex items-center gap-2.5">
-                <div className="h-5 w-5 rounded-[5px] bg-white grid place-items-center">
-                  <Pill className="h-3 w-3 text-black" />
-                </div>
-                <span className="text-white">Agentes Posológicos</span>
-              </div>
-              <p className="text-white/40 text-[11px] leading-relaxed normal-case tracking-normal font-sans">
-                Agentes de IA especializados para profissionais de saúde, educadores e pesquisadores.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3">
-              <h4 className="text-white/40">Produto</h4>
-              <Link to="/signup" className="text-white/70 hover:text-white transition-colors">Criar Conta</Link>
-              <Link to="/login" className="text-white/70 hover:text-white transition-colors">Entrar</Link>
-              <Link to="/precos" className="text-white/70 hover:text-white transition-colors">Créditos</Link>
-              <Link to="/vitrine" className="text-white/70 hover:text-white transition-colors">Marketplace</Link>
-            </div>
-            <div className="flex flex-col gap-3">
-              <h4 className="text-white/40">Recursos</h4>
-              <Link to="/docs" className="text-white/70 hover:text-white transition-colors">Documentação</Link>
-              <Link to="/fale-conosco" className="text-white/70 hover:text-white transition-colors">Contato</Link>
-              <a href="#access" className="text-white/70 hover:text-white transition-colors">Salas Virtuais</a>
-            </div>
-            <div className="flex flex-col gap-3">
-              <h4 className="text-white/40">Legal</h4>
-              <Link to="/termos" className="text-white/70 hover:text-white transition-colors">Termos</Link>
-              <Link to="/privacidade" className="text-white/70 hover:text-white transition-colors">Privacidade</Link>
-              <Link to="/cookies" className="text-white/70 hover:text-white transition-colors">Cookies</Link>
-            </div>
-          </div>
-
-          <div className="border-t border-white/[0.06] py-6 flex flex-col md:flex-row items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-white/40">
-            <span>© {new Date().getFullYear()} Agentes Posológicos — {t("landing.footer.rights")}</span>
-            <span>Sérgio Araújo · Posologia Produções</span>
-          </div>
-        </div>
-      </footer>
-      <SalesAgentWidget />
-    </div>
-  );
+ const {locale} = useLanguage(); const c = text[locale] || text.pt; const process = processCopy[locale] || processCopy.pt; const navigate = useNavigate();
+ const [area,setArea] = useState(0); const [pin,setPin] = useState(""); const icons = [Stethoscope,GraduationCap,FlaskConical];
+ return <div className="landing-page">
+  <SEO title="Agentes Posológicos — IA para Saúde, Educação e Pesquisa" description="Agentes de IA para prática clínica, ensino em saúde e pesquisa." path="/" />
+  <MatrixRain/>
+  <header className="landing-header"><div className="landing-nav"><Link to="/" className="landing-brand"><span><Pill size={15}/></span>Agentes Posológicos</Link><nav aria-label="Navigation"><a href="#areas">{c.areasLabel}</a><a href="#access">{c.access}</a><Link to="/precos">{c.pricing}</Link></nav><div className="landing-header-actions"><LanguageSelector/><FloatingAuth/></div></div></header>
+  <main>
+   <section className="landing-hero"><div className="landing-hero-glow" aria-hidden="true"/><div className="hero-orbit" aria-hidden="true"><i/><i/><i/><span/></div><div className="landing-hero-content"><div className="hero-copy"><p className="landing-kicker">{c.eyebrow}</p><h1>{c.title}</h1><p className="landing-hero-intro">{c.intro}</p><div className="landing-actions"><Link className="landing-button landing-button-primary" to="/signup">{c.start}</Link><Link className="landing-button landing-button-secondary" to="/vitrine">{c.explore}</Link></div></div><div className="hero-access"><div className="hero-access-heading"><span className="hero-pulse"/><span>{c.access}</span></div><form onSubmit={e=>{e.preventDefault(); if(pin.trim()) navigate("/sala/"+encodeURIComponent(pin.trim()));}}><div className="hero-card-top"><span className="hero-icon"><MessageCircle size={22}/></span><span>LIVE</span></div><h2>{c.room}</h2><p>{c.roomText}</p><label htmlFor="landing-pin">{c.pin}</label><div className="landing-pin-row"><input id="landing-pin" value={pin} onChange={e=>setPin(e.target.value)} required/><button type="submit">{c.pinGo}</button></div></form><Link className="hero-osce" to="/osce/entrar"><div className="hero-card-top"><span className="hero-icon"><Stethoscope size={22}/></span><span>OSCE</span></div><h2>OSCE Virtual</h2><p>{c.osceText}</p><span className="hero-osce-action">{c.osce} <span aria-hidden="true">↗</span></span></Link></div></div><div className="landing-hero-bottom"><span>{c.scroll}</span><span aria-hidden="true">↓</span><span>Agentes Posológicos</span></div></section>
+   <Story c={c}/>
+   <section className="landing-section landing-areas" id="areas"><div className="landing-section-heading"><div><p className="landing-kicker">{c.areasLabel}</p><h2>{c.areasTitle}</h2></div><p>{c.areasText}</p></div><div className="landing-area-grid">{c.areas.map((item,i) => {const Icon=icons[i]; return <article key={item.title}><Icon size={25} strokeWidth={1.5}/><h3>{item.title}</h3><p>{item.desc}</p></article>;})}</div><LandingSquad locale={locale}/></section>
+   <section className="landing-section landing-demo"><div className="landing-demo-intro"><p className="landing-kicker">{c.demoLabel}</p><h2>{c.demoTitle}</h2><p>{c.demoText}</p><div className="landing-tabs" aria-label={c.demoLabel}>{c.areas.map((item,i)=><button key={item.title} type="button" aria-pressed={area===i} onClick={()=>setArea(i)}>{item.title}</button>)}</div><Process label={process.label} steps={process.steps} variant="build"/></div><div className="landing-demo-card" aria-live="polite"><span>{c.example}</span><div><small>{c.prompt}</small><p>{c.areas[area].question}</p></div><div><small>{c.result}</small><p>{c.areas[area].answer}</p></div><Link to="/vitrine">{c.explore}</Link></div></section>
+   <section className="landing-section landing-education" id="access"><div><p className="landing-kicker">{c.educationLabel}</p><h2>{c.educationTitle}</h2><p>{c.educationText}</p><Process label={c.example} steps={process.build} variant="build"/></div><div className="education-portal"><div className="education-portal-ring" aria-hidden="true"/><div className="education-portal-content"><span className="hero-pulse"/><h3>{c.room} &amp; OSCE</h3><p>{c.educationText}</p><a className="landing-inline-link" href="#landing-pin">{c.access}</a></div></div></section>
+   <section className="landing-section landing-tools"><div className="landing-tools-visual" aria-hidden="true"><div><BookOpen/><span>{process.tools[0]}</span></div><div><Pill/><span>{process.tools[1]}</span></div><div><Workflow/><span>{process.tools[2]}</span></div></div><div><p className="landing-kicker">{c.toolsLabel}</p><h2>{c.toolsTitle}</h2><p>{c.toolsText}</p><Link className="landing-inline-link" to="/docs">{c.toolsLink}</Link></div></section>
+   <section className="landing-final"><p className="landing-kicker">Agentes Posológicos</p><h2>{c.ctaTitle}</h2><p>{c.ctaText}</p><div className="landing-actions"><Link className="landing-button landing-button-primary" to="/signup">{c.start}</Link><Link className="landing-button landing-button-secondary" to="/vitrine">{c.explore}</Link></div></section>
+  </main>
+  <footer className="landing-footer"><Link to="/" className="landing-brand"><span><Pill size={15}/></span>Agentes Posológicos</Link><div><Link to="/precos">{c.pricing}</Link><Link to="/docs">{c.docs}</Link><Link to="/fale-conosco">{c.contact}</Link><Link to="/privacidade">{c.privacy}</Link><Link to="/termos">{c.terms}</Link><Link to="/cookies">{c.cookies}</Link></div><p>© {new Date().getFullYear()} Agentes Posológicos · Posologia Produções</p></footer><SalesAgentWidget/>
+ </div>;
 }
