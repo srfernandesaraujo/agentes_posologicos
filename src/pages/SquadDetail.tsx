@@ -158,7 +158,16 @@ export default function SquadDetail() {
           <TabsContent value="agenda" className="mt-6 max-w-2xl"><SchedulePanel squad={squad} template={template} /></TabsContent>
         )}
 
-        <TabsContent value="conversa" className="mt-6"><SquadChat squad={squad} agents={agents} /></TabsContent>
+        <TabsContent value="conversa" className="mt-6">
+          <SquadChat squad={squad} agents={agents} lastMission={missions[0] ?? null}
+            onOpenMission={(id) => { setSelected(id); setTab("missoes"); }}
+            onNewMission={(text) => {
+              const key = template.formFields.find((f) => f.isBriefing)?.key;
+              if (key) setValues((p) => ({ ...p, [key]: text.replace(/\s+/g, " ").trim().slice(0, 300) }));
+              setTab("nova");
+              toast.info("Texto levado para o formulário. Revise e inicie a missão.");
+            }} />
+        </TabsContent>
 
         <TabsContent value="memoria" className="mt-6 max-w-2xl"><MemoryPanel squad={squad} /></TabsContent>
 

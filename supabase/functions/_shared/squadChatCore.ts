@@ -13,6 +13,18 @@ export const CHAT_MAX_CAP_USD = 100;
 export const CHAT_RATE_LIMIT_PER_MIN = 20;
 export const CHAT_MISSION_CONTEXT_CHARS = 7000;
 export const TEAM_THREAD = "team";
+export const CHAT_MEMORY_MAX_PENDING = 12;
+export const CHAT_CITED_CHARS = 4500;
+
+/**
+ * A fala do dono parece ensinar algo duradouro ("use sempre", "nunca", "a partir de agora")? Só nesses casos o servidor gasta uma
+ * chamada extra para sugerir memória: perguntas comuns não custam nada além da resposta.
+ */
+export function looksLikeTeaching(text: string): boolean {
+  const t = normName(text);
+  if (t.length < 15) return false;
+  return /\b(sempre|nunca|jamais|a partir de agora|daqui (pra|para) frente|de agora em diante|prefiro|nao quero|nao use|nao usem|evite|evitem|use sempre|usem sempre|lembre|lembra que|lembrem|fica combinado|fica decidido|decidi que|nossa regra|como regra|por padrao|o padrao e|padrao do time)\b/.test(t);
+}
 
 export interface ChatAgent { id: string; slug: string; name: string; role: string }
 export interface ChatLine { author: "user" | "agent" | "system"; agentName?: string; content: string }

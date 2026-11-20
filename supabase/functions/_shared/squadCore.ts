@@ -614,8 +614,8 @@ export function isDuplicateMemory(content: string, existing: { content: string }
 }
 
 export interface MemoryExtractionInput {
-  source: "changes" | "answer";
-  /** Comentário de ajustes do dono, ou a resposta dada a uma pergunta. */
+  source: "changes" | "answer" | "chat";
+  /** Comentário de ajustes do dono, a resposta dada a uma pergunta ou o que ele disse ao time numa conversa. */
   ownerText: string;
   /** Contexto curto: título da entrega ou a pergunta feita. */
   about: string;
@@ -635,7 +635,7 @@ export function buildMemoryExtractionPrompt(i: MemoryExtractionInput): { system:
     `Responda APENAS com um array JSON, sem texto fora dele. Formato: [{"kind":"preference","content":"..."}]`;
   const existing = i.existing.length ? `\nJá existe na memória:\n${i.existing.slice(0, 30).map((e) => `- ${e.content}`).join("\n")}` : "";
   const user =
-    `${i.source === "changes" ? "O dono pediu ajustes na entrega" : "O dono respondeu a uma pergunta do squad"}: ${i.about}\n\n` +
+    `${i.source === "changes" ? "O dono pediu ajustes na entrega" : i.source === "chat" ? "O dono disse isto numa conversa com o time" : "O dono respondeu a uma pergunta do squad"}: ${i.about}\n\n` +
     `Fala do dono:\n"""\n${i.ownerText.slice(0, 2000)}\n"""${existing}`;
   return { system, user };
 }

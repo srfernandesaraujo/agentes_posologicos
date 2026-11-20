@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   CHAT_DEFAULT_CAP_USD, CHAT_HISTORY_LIMIT, CHAT_MAX_MESSAGE_CHARS, CHAT_MAX_ROUTED, CHAT_MODE_RULES,
   buildChatSystemPrompt, buildRouterPrompt, buildTranscriptMessage, capCrossing, chatBudget, cleanChatText, clampChatCap, clip,
-  monthStartIso, normName, parseMentions, parseRouterReply, routeByRules, type ChatAgent, type ChatLine,
+  looksLikeTeaching, monthStartIso, normName, parseMentions, parseRouterReply, routeByRules, type ChatAgent, type ChatLine,
 } from "../../supabase/functions/_shared/squadChatCore";
+import { buildMemoryExtractionPrompt } from "../../supabase/functions/_shared/squadCore";
 import { TEMPLATE_PESQUISA_CLINICA, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
 
 const team: ChatAgent[] = [
@@ -148,6 +149,30 @@ describe("teto mensal da conversa", () => {
   it("o mês começa no dia 1 às 00:00 UTC", () => {
     expect(monthStartIso(new Date("2026-11-20T18:30:00Z"))).toBe("2026-11-01T00:00:00.000Z");
     expect(monthStartIso(new Date("2026-12-31T23:59:59Z"))).toBe("2026-12-01T00:00:00.000Z");
+  });
+});
+
+describe("ensinar o time pela conversa", () => {
+  it("reconhece quando o dono ensina algo duradouro", () => {
+    for (const t of [
+      "A partir de agora, use sempre referências em Vancouver.",
+      "Nunca use adjetivos de marketing nos roteiros",
+      "Daqui pra frente evite siglas sem explicar",
+      "Prefiro um tom mais direto nas respostas",
+      "Fica combinado: o público é de graduação",
+      "Lembre que a instituição exige formato ABNT",
+    ]) expect(looksLikeTeaching(t), t).toBe(true);
+  });
+  it("perguntas comuns e mensagens curtas não gastam a chamada extra", () => {
+    for (const t of ["Qual é o maior risco deste protocolo?", "Resuma onde paramos", "obrigado!", "ok", "Por que o estudo ficou de fora da síntese?"]) expect(looksLikeTeaching(t), t).toBe(false);
+  });
+  it("o prompt de extração distingue a fala numa conversa e mantém as regras de memória", () => {
+    const p = buildMemoryExtractionPrompt({ source: "chat", ownerText: "Use sempre Vancouver", about: "canal #time", existing: [{ content: "Tom objetivo" }] });
+    expect(p.user).toContain("numa conversa com o time");
+    expect(p.user).toContain("Use sempre Vancouver");
+    expect(p.user).toContain("- Tom objetivo");
+    expect(p.system).toContain("Na dúvida, não extraia");
+    expect(buildMemoryExtractionPrompt({ source: "answer", ownerText: "x", about: "y", existing: [] }).user).toContain("respondeu a uma pergunta");
   });
 });
 

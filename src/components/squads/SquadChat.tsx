@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Hash, Loader2, Send, Settings2, Trash2, Info } from "lucide-react";
+import { BookMarked, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useChatActions, useChatMessages, useChatUsage, TEAM_THREAD, type ChatMessage } from "@/hooks/useSquadChat";
+import { useChatActions, useChatMessages, useChatUsage, useCitableDeliverables, TEAM_THREAD, type ChatMessage } from "@/hooks/useSquadChat";
 import { agentLook } from "@/lib/squadOffice";
-import type { Squad, SquadAgent } from "@/hooks/useSquads";
+import { useSquadActions, useSquadMemories, type MemoryKind, type Squad, type SquadAgent, type SquadMemory, type SquadMission } from "@/hooks/useSquads";
 
 const MAX_CHARS = 2000;
+const MEMORY_MAX = 300;
+const KIND_LABEL: Record<MemoryKind, string> = { preference: "Preferência", correction: "Evitar", decision: "Decisão", fact: "Fato" };
 
 /** Valores de conversa são centavos: mostra mais casas quando o número é pequeno. */
 function usd(n: number): string {
@@ -27,18 +31,72 @@ function Avatar({ name, size = 32 }: { name: string; size?: number }) {
   );
 }
 
-function Bubble({ m, agent }: { m: ChatMessage; agent?: SquadAgent }) {
+/** Cartão de sugestão de memória: o agente propõe, você confirma, edita ou descarta. */
+function MemorySuggestion({ items, squadId, memories }: { items: { id: string; kind: MemoryKind; content: string }[]; squadId: string; memories: SquadMemory[] }) {
+  const { updateMemoryItem } = useSquadActions();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const byId = useMemo(() => new Map(memories.map((m) => [m.id, m])), [memories]);
+
+  const run = async (id: string, patch: { content?: string; status?: "active" | "archived" }, ok: string) => {
+    try { await updateMemoryItem.mutateAsync({ squadId, memoryId: id, ...patch }); toast.success(ok); setEditing(null); }
+    catch (e: any) { toast.error(e.message || "Não foi possível salvar"); }
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-[88%] space-y-2 rounded-xl border border-amber-400/30 bg-amber-400/5 p-3">
+      <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-amber-300"><BookMarked className="h-3.5 w-3.5" /> Guardar na memória do time?</div>
+      {items.map((it) => {
+        const live = byId.get(it.id);
+        const status = live?.status ?? "suggested";
+        const text = live?.content ?? it.content;
+        return (
+          <div key={it.id} className="space-y-2 rounded-lg bg-black/20 p-2.5 text-sm">
+            {editing === it.id ? (
+              <div className="flex gap-2">
+                <Input value={draft} maxLength={MEMORY_MAX} onChange={(e) => setDraft(e.target.value)} aria-label="Texto do item de memória" className="h-8 flex-1 bg-white/5 border-white/10" />
+                <Button size="sm" className="h-8" disabled={draft.trim().length < 3 || updateMemoryItem.isPending} onClick={() => run(it.id, { content: draft, status: "active" }, "Guardado na memória")}>Salvar</Button>
+                <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditing(null)}>Cancelar</Button>
+              </div>
+            ) : (
+              <>
+                <p className="break-words text-white/90"><span className="mr-1.5 rounded border border-white/20 px-1.5 py-0.5 text-[10px] text-white/60">{KIND_LABEL[(live?.kind ?? it.kind) as MemoryKind] ?? "Preferência"}</span>{text}</p>
+                {status === "suggested" ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button size="sm" className="h-7 gap-1" disabled={updateMemoryItem.isPending} onClick={() => run(it.id, { status: "active" }, "Guardado na memória")}><Check className="h-3 w-3" /> Guardar</Button>
+                    <Button size="sm" variant="outline" className="h-7 gap-1 border-white/20 bg-transparent" onClick={() => { setDraft(text); setEditing(it.id); }}><Pencil className="h-3 w-3" /> Editar</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-white/50" disabled={updateMemoryItem.isPending} onClick={() => run(it.id, { status: "archived" }, "Sugestão descartada")}>Descartar</Button>
+                  </div>
+                ) : status === "active" ? (
+                  <span className="text-xs text-teal-300">Guardada: vale para todos os agentes e para as próximas missões.</span>
+                ) : (
+                  <span className="text-xs text-white/40">Descartada.</span>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; agent?: SquadAgent; onMemory: (text: string) => void; onAdjust: (text: string) => void; children?: React.ReactNode }) {
   if (m.author === "system") {
+    if (m.meta?.memory) return <>{children}</>;
     const cls = m.meta?.error ? "border-red-400/40 text-red-300" : m.meta?.cap ? "border-amber-400/40 text-amber-300" : "border-white/15 text-white/50";
     return <div className="flex justify-center"><span className={`rounded-full border border-dashed px-3 py-1 text-center text-xs ${cls}`}>{m.content}</span></div>;
   }
+  const action = "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-white/40 hover:bg-white/10 hover:text-white/80";
   if (m.author === "user") {
     const masked = (m.meta?.masked_pii?.length || m.meta?.masked_secrets?.length) as number | undefined;
     return (
       <div className="flex justify-end">
         <div className="max-w-[88%] space-y-1">
+          {m.meta?.cited && <div className="flex justify-end"><span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-white/60"><FileText className="h-3 w-3" /> {m.meta.cited.title} · v{m.meta.cited.version}</span></div>}
           <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tr-sm bg-teal-600 px-3.5 py-2 text-sm text-white">{m.content}</div>
           {masked ? <div className="text-right text-[11px] text-amber-300/80">Dados pessoais ou segredos foram mascarados antes do envio ao modelo.</div> : null}
+          <div className="flex justify-end"><button type="button" className={action} onClick={() => onMemory(m.content)}><BookMarked className="h-3 w-3" /> Guardar na memória</button></div>
         </div>
       </div>
     );
@@ -49,38 +107,61 @@ function Bubble({ m, agent }: { m: ChatMessage; agent?: SquadAgent }) {
       <div className="min-w-0 max-w-[88%] space-y-1">
         <div className="text-xs text-white/50"><span className="font-semibold text-white/80">{agent?.name || "Agente"}</span>{agent ? ` · ${agent.role}` : ""}</div>
         <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm bg-white/10 px-3.5 py-2 text-sm text-white/90">{m.content}</div>
-        <div className="font-mono text-[10px] text-white/30">{m.model ? `${m.model} · ` : ""}{usd(Number(m.cost_usd))}</div>
+        <div className="flex flex-wrap items-center gap-x-1 font-mono text-[10px] text-white/30">
+          <span>{m.model ? `${m.model} · ` : ""}{usd(Number(m.cost_usd))}</span>
+          <span className="mx-1 text-white/15">|</span>
+          <button type="button" className={action} onClick={() => onMemory(m.content)}><BookMarked className="h-3 w-3" /> Guardar na memória</button>
+          <button type="button" className={action} onClick={() => onAdjust(m.content)}><Wand2 className="h-3 w-3" /> Pedir ajuste</button>
+        </div>
       </div>
     </div>
   );
 }
 
-export function SquadChat({ squad, agents }: { squad: Squad; agents: SquadAgent[] }) {
+interface Props {
+  squad: Squad;
+  agents: SquadAgent[];
+  /** Missão mais recente do squad: decide se "Pedir ajuste" vira ajuste na entrega final ou missão nova. */
+  lastMission?: SquadMission | null;
+  onOpenMission: (missionId: string) => void;
+  onNewMission: (text: string) => void;
+}
+
+export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMission }: Props) {
   const [thread, setThread] = useState<string>(TEAM_THREAD);
   const [text, setText] = useState("");
+  const [cited, setCited] = useState<{ id: string; title: string; version: number } | null>(null);
   const { data: all = [], isLoading } = useChatMessages(squad.id);
   const { data: usage } = useChatUsage(squad.id);
+  const { data: citable = [] } = useCitableDeliverables(squad.id);
+  const { data: memories = [] } = useSquadMemories(squad.id);
   const { send, setCap, clear } = useChatActions(squad.id);
+  const { addMemory, decide } = useSquadActions();
   const endRef = useRef<HTMLDivElement>(null);
   const [capDraft, setCapDraft] = useState("");
   const [capOpen, setCapOpen] = useState(false);
+  const [citeOpen, setCiteOpen] = useState(false);
+  const [memoryDraft, setMemoryDraft] = useState<{ text: string; kind: MemoryKind } | null>(null);
+  const [adjustDraft, setAdjustDraft] = useState<string | null>(null);
 
   const agentById = useMemo(() => new Map(agents.map((a) => [a.id, a])), [agents]);
   const messages = useMemo(() => all.filter((m) => m.thread === thread), [all, thread]);
   const current = thread === TEAM_THREAD ? null : agentById.get(thread) || null;
   const exceeded = usage?.state === "exceeded";
+  const awaitingApproval = lastMission?.status === "awaiting_approval";
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.length, send.isPending, thread]);
-  useEffect(() => { if (usage) setCapDraft(String(usage.capUsd)); }, [usage?.capUsd]);
+  useEffect(() => { if (usage) setCapDraft(String(usage.capUsd)); }, [usage?.capUsd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async () => {
     const t = text.trim();
     if (!t || send.isPending) return;
-    setText("");
+    const citing = cited;
+    setText(""); setCited(null);
     try {
-      await send.mutateAsync({ thread, text: t });
+      await send.mutateAsync({ thread, text: t, ...(citing ? { deliverableId: citing.id } : {}) });
     } catch (e: any) {
-      setText(t);
+      setText(t); setCited(citing);
       toast.error(e.message || "Não foi possível enviar");
     }
   };
@@ -95,6 +176,31 @@ export function SquadChat({ squad, agents }: { squad: Squad; agents: SquadAgent[
   const wipe = async () => {
     try { await clear.mutateAsync(thread); toast.success("Conversa apagada"); }
     catch (e: any) { toast.error(e.message || "Não foi possível apagar"); }
+  };
+
+  const openMemory = (t: string) => setMemoryDraft({ text: t.replace(/\s+/g, " ").trim().slice(0, MEMORY_MAX), kind: "preference" });
+  const saveMemory = async () => {
+    if (!memoryDraft) return;
+    try {
+      await addMemory.mutateAsync({ squadId: squad.id, content: memoryDraft.text, kind: memoryDraft.kind });
+      toast.success("Guardado na memória do time");
+      setMemoryDraft(null);
+    } catch (e: any) { toast.error(e.message || "Não foi possível guardar"); }
+  };
+
+  const sendAdjust = async () => {
+    if (adjustDraft === null || !lastMission) return;
+    try {
+      await decide.mutateAsync({ missionId: lastMission.id, squadId: squad.id, decision: "changes", comment: adjustDraft });
+      toast.success("Pedido de ajustes enviado ao squad");
+      setAdjustDraft(null);
+      onOpenMission(lastMission.id);
+    } catch (e: any) { toast.error(e.message || "Não foi possível pedir o ajuste"); }
+  };
+  const toNewMission = () => {
+    if (adjustDraft === null) return;
+    onNewMission(adjustDraft);
+    setAdjustDraft(null);
   };
 
   return (
@@ -149,10 +255,14 @@ export function SquadChat({ squad, agents }: { squad: Squad; agents: SquadAgent[
             ) : messages.length === 0 ? (
               <div className="mx-auto max-w-md space-y-2 py-10 text-center text-sm text-white/50">
                 <p>{current ? `Pergunte, discorde ou peça uma opinião a ${current.name}.` : "Converse com o time sem abrir uma missão."}</p>
-                <p className="text-xs text-white/35">Os agentes conhecem a memória do time e o resultado da última missão. Por enquanto eles só conversam: não alteram entregas.</p>
+                <p className="text-xs text-white/35">Os agentes conhecem a memória do time e o resultado da última missão. Eles só conversam: para mudar uma entrega, use "Pedir ajuste" ou abra uma missão nova. Diga "use sempre…" e eles sugerem guardar na memória.</p>
               </div>
             ) : (
-              messages.map((m) => <Bubble key={m.id} m={m} agent={m.agent_id ? agentById.get(m.agent_id) : undefined} />)
+              messages.map((m) => (
+                <Bubble key={m.id} m={m} agent={m.agent_id ? agentById.get(m.agent_id) : undefined} onMemory={openMemory} onAdjust={(t) => setAdjustDraft(t.slice(0, 4000))}>
+                  {m.meta?.memory?.items?.length ? <MemorySuggestion items={m.meta.memory.items} squadId={squad.id} memories={memories} /> : null}
+                </Bubble>
+              ))
             )}
             {send.isPending && (
               <div className="flex items-center gap-2 text-xs text-white/50"><Loader2 className="h-3.5 w-3.5 animate-spin" /> {current ? `${current.name} está escrevendo…` : "O time está pensando…"}</div>
@@ -161,13 +271,33 @@ export function SquadChat({ squad, agents }: { squad: Squad; agents: SquadAgent[
           </div>
 
           <div className="space-y-2 border-t border-white/10 p-3">
-            {thread === TEAM_THREAD && (
-              <div className="flex flex-wrap gap-1.5">
-                {agents.map((a) => (
-                  <button key={a.id} type="button" onClick={() => mention(a.name)} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-xs text-white/70 hover:border-teal-400/60">@{a.name}</button>
-                ))}
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {thread === TEAM_THREAD && agents.map((a) => (
+                <button key={a.id} type="button" onClick={() => mention(a.name)} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-xs text-white/70 hover:border-teal-400/60">@{a.name}</button>
+              ))}
+              <Popover open={citeOpen} onOpenChange={setCiteOpen}>
+                <PopoverTrigger asChild>
+                  <button type="button" className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-xs text-white/70 hover:border-teal-400/60"><FileText className="h-3 w-3" /> Citar entrega</button>
+                </PopoverTrigger>
+                <PopoverContent className="max-h-72 w-80 space-y-1 overflow-y-auto border-white/10 bg-[hsl(220,25%,10%)] p-2 text-white">
+                  {citable.length === 0 ? (
+                    <p className="p-2 text-sm text-white/50">Nenhuma entrega ainda. Rode uma missão primeiro.</p>
+                  ) : citable.map((d) => (
+                    <button key={d.id} type="button" onClick={() => { setCited({ id: d.id, title: d.title, version: d.version }); setCiteOpen(false); }}
+                      className="block w-full rounded-lg px-2.5 py-2 text-left text-sm hover:bg-white/10">
+                      <span className="block font-medium">{d.title}</span>
+                      <span className="block text-xs text-white/40">{d.kind} · versão {d.version} · {new Date(d.created_at).toLocaleDateString("pt-BR")}</span>
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+              {cited && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/20 px-2.5 py-0.5 text-xs text-teal-200">
+                  Citando: {cited.title} · v{cited.version}
+                  <button type="button" aria-label="Remover entrega citada" onClick={() => setCited(null)} className="rounded-full p-0.5 hover:bg-white/10"><X className="h-3 w-3" /></button>
+                </span>
+              )}
+            </div>
             {exceeded ? (
               <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">O teto mensal da conversa foi atingido. Aumente o teto abaixo para continuar.</p>
             ) : (
@@ -206,6 +336,62 @@ export function SquadChat({ squad, agents }: { squad: Squad; agents: SquadAgent[
         </Popover>
         <p className="flex w-full items-start gap-1.5 text-xs text-white/40"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Cada resposta mostra o modelo e o custo. Aos 80% do teto aparece um aviso e aos 100% a conversa pausa até você aumentar o teto. A conversa usa as suas chaves de IA.</p>
       </div>
+
+      {/* guardar na memória */}
+      <Dialog open={!!memoryDraft} onOpenChange={(o) => { if (!o) setMemoryDraft(null); }}>
+        <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+          <DialogHeader>
+            <DialogTitle>Guardar na memória do time</DialogTitle>
+            <DialogDescription className="text-white/60">Escreva o item como uma regra curta e clara. Todos os agentes e as próximas missões vão usar.</DialogDescription>
+          </DialogHeader>
+          {memoryDraft && (
+            <div className="space-y-3">
+              <Textarea value={memoryDraft.text} maxLength={MEMORY_MAX} rows={3} aria-label="Texto do item de memória" className="bg-white/5 border-white/10"
+                onChange={(e) => setMemoryDraft({ ...memoryDraft, text: e.target.value })} />
+              <div className="flex items-center justify-between gap-3">
+                <Select value={memoryDraft.kind} onValueChange={(v) => setMemoryDraft({ ...memoryDraft, kind: v as MemoryKind })}>
+                  <SelectTrigger className="w-44 bg-white/5 border-white/10" aria-label="Tipo do item"><SelectValue /></SelectTrigger>
+                  <SelectContent>{(Object.keys(KIND_LABEL) as MemoryKind[]).map((k) => <SelectItem key={k} value={k}>{KIND_LABEL[k]}</SelectItem>)}</SelectContent>
+                </Select>
+                <span className="font-mono text-xs text-white/40">{memoryDraft.text.length}/{MEMORY_MAX}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setMemoryDraft(null)}>Cancelar</Button>
+            <Button onClick={saveMemory} disabled={addMemory.isPending || (memoryDraft?.text.trim().length ?? 0) < 3} className="gap-1.5">
+              {addMemory.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* pedir ajuste */}
+      <Dialog open={adjustDraft !== null} onOpenChange={(o) => { if (!o) setAdjustDraft(null); }}>
+        <DialogContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+          <DialogHeader>
+            <DialogTitle>{awaitingApproval ? "Pedir ajuste na entrega final" : "Levar para uma missão nova"}</DialogTitle>
+            <DialogDescription className="text-white/60">
+              {awaitingApproval
+                ? "A última missão está esperando a sua decisão. O texto abaixo vai como pedido de ajuste e o squad reescreve a entrega final."
+                : lastMission
+                  ? "A última missão já foi encerrada, então não dá para ajustá-la. O texto abaixo vai para o formulário de uma missão nova, onde você revisa antes de iniciar."
+                  : "Ainda não há missão neste squad. O texto abaixo vai para o formulário da primeira missão, onde você revisa antes de iniciar."}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea value={adjustDraft ?? ""} maxLength={4000} rows={6} aria-label="Texto do pedido" className="bg-white/5 border-white/10" onChange={(e) => setAdjustDraft(e.target.value)} />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAdjustDraft(null)}>Cancelar</Button>
+            {awaitingApproval ? (
+              <Button onClick={sendAdjust} disabled={decide.isPending || !(adjustDraft ?? "").trim()} className="gap-1.5">
+                {decide.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Enviar pedido de ajuste
+              </Button>
+            ) : (
+              <Button onClick={toNewMission} disabled={!(adjustDraft ?? "").trim()}>Abrir missão nova com este texto</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

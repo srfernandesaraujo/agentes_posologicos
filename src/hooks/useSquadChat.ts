@@ -61,6 +61,37 @@ export function useChatMessages(squadId?: string) {
   return query;
 }
 
+export interface CitableDeliverable {
+  id: string;
+  mission_id: string;
+  agent_id: string | null;
+  title: string;
+  kind: string;
+  version: number;
+  created_at: string;
+}
+
+/** Entregas recentes do squad, para citar no chat (a mais nova de cada título). */
+export function useCitableDeliverables(squadId?: string) {
+  return useQuery({
+    queryKey: ["squad-chat-deliverables", squadId],
+    enabled: !!squadId,
+    queryFn: async () => {
+      const { data, error } = await db.from("squad_deliverables").select("id, mission_id, agent_id, title, kind, version, created_at")
+        .eq("squad_id", squadId).order("created_at", { ascending: false }).limit(60);
+      if (error) throw error;
+      const seen = new Set<string>();
+      const out: CitableDeliverable[] = [];
+      for (const d of (data || []) as CitableDeliverable[]) {
+        if (seen.has(d.title)) continue;
+        seen.add(d.title);
+        out.push(d);
+      }
+      return out.slice(0, 20);
+    },
+  });
+}
+
 export function useChatUsage(squadId?: string) {
   return useQuery({
     queryKey: ["squad-chat-usage", squadId],
@@ -77,8 +108,10 @@ export function useChatActions(squadId: string) {
   };
 
   const send = useMutation({
-    mutationFn: (p: { thread: string; text: string }) => call<{ messages: ChatMessage[]; usage: ChatUsage }>({ action: "send", squadId, ...p }),
+    mutationFn: (p: { thread: string; text: string; deliverableId?: string }) => call<{ messages: ChatMessage[]; usage: ChatUsage }>({ action: "send", squadId, ...p }),
     onSuccess: (r) => {
+      // Se o servidor sugeriu itens de memória, a aba Memória e os cartões do chat precisam da lista nova.
+      if (r.messages.some((m) => m.meta?.memory?.items?.length)) qc.invalidateQueries({ queryKey: ["squad-memories", squadId] });
       qc.setQueryData(["squad-chat-usage", squadId], r.usage);
       // Junta o que a função devolveu com o que já está na tela, sem repetir mensagens que o Realtime já trouxe.
       qc.setQueryData<ChatMessage[]>(["squad-chat", squadId], (old = []) => {

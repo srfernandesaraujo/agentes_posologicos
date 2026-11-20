@@ -7,14 +7,15 @@
 // Função separada da `squad-engine`: uma resposta de chat é curta e não deve disputar tempo de execução com as missões.
 // O agente só conversa: não executa, não altera entregas. Mensagens e respostas usam os mesmos filtros de dados das missões.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { screenInput, maskSecrets, buildMemoryContext, type MemoryItem } from "../_shared/squadCore.ts";
+import { screenInput, maskSecrets, buildMemoryContext, buildMemoryExtractionPrompt, parseMemoryExtraction, type MemoryItem } from "../_shared/squadCore.ts";
 import { getTemplate } from "../_shared/squadTemplates.ts";
 import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } from "../_shared/llmProvider.ts";
 import { HttpError } from "../_shared/squadRunner.ts";
 import {
   CHAT_MAX_OUTPUT_TOKENS, CHAT_RATE_LIMIT_PER_MIN, CHAT_MISSION_CONTEXT_CHARS, CHAT_HISTORY_LIMIT, TEAM_THREAD,
+  CHAT_MEMORY_MAX_PENDING, CHAT_CITED_CHARS,
   buildChatSystemPrompt, buildRouterPrompt, buildTranscriptMessage, capCrossing, chatBudget, cleanChatText, clampChatCap,
-  clip, monthStartIso, parseMentions, parseRouterReply, routeByRules, type ChatAgent, type ChatLine,
+  clip, looksLikeTeaching, monthStartIso, parseMentions, parseRouterReply, routeByRules, type ChatAgent, type ChatLine,
 } from "../_shared/squadChatCore.ts";
 
 const corsHeaders = {
@@ -122,6 +123,15 @@ Deno.serve(async (req) => {
       if (pii.findings.length) userMeta.masked_pii = pii.findings;
       if (sec.findings.length) userMeta.masked_secrets = sec.findings;
 
+      // Entrega citada pelo dono: o agente recebe o texto dela (recortado) junto com o resto do contexto.
+      let cited: { id: string; title: string; version: number; content: string } | null = null;
+      if (body?.deliverableId) {
+        const { data: d } = await admin.from("squad_deliverables").select("id, title, version, content, squad_id, owner_id").eq("id", String(body.deliverableId)).maybeSingle();
+        if (!d || d.squad_id !== squad.id || d.owner_id !== user.id) throw new HttpError(404, "Entrega não encontrada");
+        cited = { id: d.id, title: d.title, version: d.version, content: d.content };
+        userMeta.cited = { id: d.id, title: d.title, version: d.version };
+      }
+
       // Histórico da conversa (antes de gravar a mensagem nova) e contexto compartilhado.
       const { data: histRows } = await admin.from("squad_chat_messages").select("author, agent_id, content")
         .eq("squad_id", squad.id).eq("thread", thread).order("created_at", { ascending: false }).limit(CHAT_HISTORY_LIMIT);
@@ -182,7 +192,14 @@ Deno.serve(async (req) => {
           .eq("mission_id", lastMission.id).order("created_at", { ascending: false }).limit(40);
         delivs = data || [];
       }
+      const citedBlock = cited
+        ? `Entrega citada pelo dono, "${cited.title}" (versão ${cited.version}). Responda sobre ela:\n${clip(String(cited.content || ""), CHAT_CITED_CHARS)}`
+        : "";
       const missionContextFor = (agentId: string): string => {
+        const base = baseMissionContext(agentId);
+        return [base, citedBlock].filter(Boolean).join("\n\n");
+      };
+      const baseMissionContext = (agentId: string): string => {
         if (!lastMission) return "";
         const latestPerTitle = new Map<string, any>();
         for (const d of delivs) if (!latestPerTitle.has(d.title)) latestPerTitle.set(d.title, d);
@@ -197,6 +214,41 @@ Deno.serve(async (req) => {
 
       const deadlineAt = Date.now() + FUNCTION_DEADLINE_MS;
       const channel = thread === TEAM_THREAD ? "team" : "direct";
+
+      // Quando o dono ensina algo duradouro ("use sempre Vancouver"), sugere um item de memória em paralelo às respostas.
+      // Só sugere: o item entra como "suggested" e o dono confirma no próprio chat ou na aba Memória.
+      const suggestMemory = async (): Promise<{ items: { id: string; kind: string; content: string }[]; cost: number } | null> => {
+        try {
+          const { data: existingRows } = await admin.from("squad_memories").select("content").eq("squad_id", squad.id).eq("owner_id", user.id).neq("status", "archived");
+          const existing = (existingRows || []) as { content: string }[];
+          const { count: pending } = await admin.from("squad_memories").select("id", { count: "exact", head: true })
+            .eq("squad_id", squad.id).eq("owner_id", user.id).eq("status", "suggested");
+          const room = Math.max(0, CHAT_MEMORY_MAX_PENDING - (pending || 0));
+          if (!room) return null;
+          const prompt = buildMemoryExtractionPrompt({
+            source: "chat", ownerText: clean, existing,
+            about: thread === TEAM_THREAD ? "canal #time" : `mensagem direta com ${nameById.get(thread)}`,
+          });
+          const res = await callWithFallback(admin, keys, {
+            systemPrompt: prompt.system, messages: [{ role: "user", content: prompt.user }], temperature: 0.2, mode: "text", maxTokens: 800,
+            deadlineAt: Date.now() + 25_000,
+          });
+          if (!res || !res.ok || !res.output) return null;
+          const cost = estimateCost(res.model!, res.tokensInput, res.tokensOutput);
+          await logAiUsage(admin, { userId: user.id, provider: res.provider!, model: res.model!, tokensInput: res.tokensInput, tokensOutput: res.tokensOutput, promptType: "squad_chat_memory" });
+          const items = parseMemoryExtraction(res.output, existing).slice(0, room);
+          if (!items.length) return { items: [], cost };
+          const { data: rows, error } = await admin.from("squad_memories")
+            .insert(items.map((m) => ({ squad_id: squad.id, owner_id: user.id, kind: m.kind, content: m.content, source: "auto", status: "suggested" })))
+            .select("id, kind, content");
+          if (error) throw error;
+          return { items: (rows || []) as { id: string; kind: string; content: string }[], cost };
+        } catch (e) {
+          console.warn("[squad-chat] suggestMemory failed:", (e as Error).message);
+          return null;
+        }
+      };
+      const memoryPromise = looksLikeTeaching(clean) ? suggestMemory() : Promise.resolve(null);
       const results = await Promise.all(responders.map(async (agentId) => {
         const agent = agents.find((a) => a.id === agentId)!;
         const system = buildChatSystemPrompt({
@@ -222,6 +274,16 @@ Deno.serve(async (req) => {
         await insert({
           author: "agent", agent_id: agent.id, content, cost_usd: cost, tokens_input: res.tokensInput, tokens_output: res.tokensOutput,
           provider: res.provider, model: res.model, meta: res.finishReason === "length" ? { truncated: true } : {},
+        });
+      }
+
+      // Sugestão de memória (se o dono ensinou algo): vira um cartão no chat; o custo da extração conta no teto da conversa.
+      const mem = await memoryPromise;
+      if (mem) {
+        totalCost += mem.cost;
+        await insert({
+          author: "system", content: mem.items.length ? "Sugestão de memória" : "Nada novo para guardar na memória", cost_usd: mem.cost,
+          meta: { memory: { items: mem.items } },
         });
       }
 
