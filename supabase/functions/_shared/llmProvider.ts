@@ -250,6 +250,12 @@ export async function callProvider(params: CallProviderParams): Promise<CallProv
     max_tokens: maxTokens ?? DEFAULT_MAX_TOKENS,
     messages: [...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []), ...messages],
   };
+  // Gemini 2.5 "pensa" antes de responder e os tokens de raciocínio contam no max_tokens:
+  // com limites curtos a resposta saía cortada. Flash: desliga o raciocínio; Pro (não dá para desligar): folga extra.
+  if (provider === "google" && /gemini-2\.5/.test(effectiveModel) && mode !== "tools") {
+    if (/flash/.test(effectiveModel)) body.reasoning_effort = "none";
+    else body.max_tokens = (maxTokens ?? DEFAULT_MAX_TOKENS) + 2048;
+  }
   if (mode === "tools" && tools) {
     body.tools = tools;
     if (toolChoice) body.tool_choice = toolChoice;
