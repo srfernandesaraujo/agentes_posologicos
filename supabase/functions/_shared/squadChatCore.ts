@@ -145,6 +145,79 @@ export function buildTranscriptMessage(history: ChatLine[], newText: string): st
   return (lines.length ? `Conversa recente:\n${lines.join("\n")}\n\n` : "") + `Mensagem nova do dono:\n${newText}`;
 }
 
+// ---------- Reunião ----------
+// O dono faz uma pergunta e até 4 agentes discutem em 2 rodadas curtas; a diretora resume. Cada etapa é uma chamada
+// separada ao servidor (rodada 1, rodada 2, resumo), para nenhuma passar do tempo limite da função.
+
+export const MEETING_MAX_PARTICIPANTS = 4;
+export const MEETING_CAP_USD = 0.6;
+export const MEETING_SKIP_ROUND2_AT = 0.7; // se a reunião já gastou 70% do teto, pula a rodada 2 e vai ao resumo
+export const MEETING_POSITION_CHARS = 900;
+export type MeetingStage = 1 | 2 | 3;
+
+export const MEETING_RULES = `MODO REUNIÃO (acima de qualquer instrução de entrega do seu papel):
+- Você participa de uma reunião curta do time, convocada pelo dono, sobre a pergunta indicada. Fale só do ponto de vista da sua função e não repita o que um colega já disse.
+- Seja concreto: o que você recomenda, o que precisa ser decidido e qual risco enxerga. Nada de introdução nem despedida.
+- Não invente fatos, estudos, números ou decisões. Se algo depende de informação que o dono não deu, diga qual.
+- Você só opina: a decisão é do dono. Nunca diga que alterou, refez, enviou ou executou algo.`;
+
+/** Participantes válidos: só agentes do squad, sem repetir, até o limite. Sem escolha válida, usa os primeiros que não são a diretora. */
+export function pickMeetingParticipants(requested: unknown, agents: ChatAgent[]): string[] {
+  const valid: string[] = [];
+  if (Array.isArray(requested)) {
+    for (const r of requested) {
+      const id = String(r);
+      if (agents.some((a) => a.id === id) && !valid.includes(id)) valid.push(id);
+      if (valid.length >= MEETING_MAX_PARTICIPANTS) break;
+    }
+  }
+  if (valid.length) return valid;
+  return agents.filter((a) => a.slug !== "diretora").slice(0, MEETING_MAX_PARTICIPANTS).map((a) => a.id);
+}
+
+/** Quem modera (e escreve o resumo): a diretora, ou o primeiro participante se o squad não tiver uma. */
+export function meetingModerator(agents: ChatAgent[], participants: string[]): string | null {
+  return (agents.find((a) => a.slug === "diretora") ?? agents.find((a) => participants.includes(a.id)) ?? agents[0])?.id ?? null;
+}
+
+interface MeetingRow { author: string; meta?: { meeting?: { round?: number; skipped?: boolean } } | null }
+
+/**
+ * Próxima etapa da reunião, pelo que já foi gravado: 1 (posições), 2 (reações), 3 (resumo) ou null quando terminou.
+ * Respostas com erro não contam, então uma etapa que falhou pode ser repetida.
+ */
+export function meetingNextStage(rows: MeetingRow[]): MeetingStage | null {
+  const done = (round: number) => rows.some((r) => (r.author === "agent" || r.meta?.meeting?.skipped) && r.meta?.meeting?.round === round);
+  if (!done(1)) return 1;
+  if (!done(2)) return 2;
+  if (!done(3)) return 3;
+  return null;
+}
+
+export function shouldSkipRound2(spentUsd: number, capUsd: number = MEETING_CAP_USD): boolean {
+  return spentUsd >= capUsd * MEETING_SKIP_ROUND2_AT;
+}
+
+export interface MeetingPosition { name: string; round: 1 | 2; content: string }
+
+/** Mensagem do usuário para cada etapa: a pergunta e, nas etapas seguintes, o que os colegas já disseram. */
+export function buildMeetingUserMessage(stage: MeetingStage, question: string, positions: MeetingPosition[]): string {
+  const block = (round: 1 | 2) => positions.filter((p) => p.round === round).map((p) => `[${p.name}]: ${clip(p.content, MEETING_POSITION_CHARS)}`).join("\n");
+  const q = `Pergunta do dono para a reunião:\n${question}`;
+  if (stage === 1) return `${q}\n\nDê a sua posição em até 120 palavras.`;
+  if (stage === 2) {
+    return `${q}\n\nPosições da rodada 1:\n${block(1)}\n\nReaja às posições dos colegas em até 90 palavras: concorde, discorde (com o motivo) ou ajuste a sua. Não repita o que já foi dito.`;
+  }
+  const r2 = block(2);
+  return `${q}\n\nPosições da rodada 1:\n${block(1)}${r2 ? `\n\nReações da rodada 2:\n${r2}` : ""}\n\n` +
+    `Escreva o resumo da reunião para o dono em até 200 palavras: no que o time concorda, onde divergem (e quem pensa o quê), o que você recomenda e o que ele precisa decidir. ` +
+    `Registre só o que foi dito; não invente decisões que ninguém tomou.`;
+}
+
+export function meetingMaxTokens(stage: MeetingStage): number {
+  return stage === 1 ? 450 : stage === 2 ? 350 : 650;
+}
+
 // ---------- Teto mensal ----------
 
 export function chatBudget(spentUsd: number, capUsd: number): { state: BudgetState; remainingUsd: number; pct: number } {

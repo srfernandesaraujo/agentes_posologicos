@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeFunction } from "@/lib/invokeFunction";
+import type { SquadEvent, SquadQuestion } from "@/hooks/useSquads";
 
 // Conversa com o Time (Fase A). As mensagens são gravadas pela função `squad-chat`; aqui só se lê (com Realtime) e se envia.
 // A tabela é nova e só entra em types.ts quando ele for regerado depois da migração: as consultas passam por `any`.
@@ -92,6 +93,45 @@ export function useCitableDeliverables(squadId?: string) {
   });
 }
 
+/** Eventos do escritório que não pertencem a uma missão (quem está pensando, respondeu, reunião). Mais antigo primeiro. */
+export function useChatOfficeEvents(squadId?: string) {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ["squad-chat-events", squadId],
+    enabled: !!squadId,
+    queryFn: async () => {
+      const { data, error } = await db.from("squad_events").select("*").eq("squad_id", squadId).is("mission_id", null)
+        .order("id", { ascending: false }).limit(80);
+      if (error) throw error;
+      return ((data || []) as SquadEvent[]).reverse();
+    },
+  });
+  useEffect(() => {
+    if (!squadId) return;
+    const channel = supabase
+      .channel(`squad-chat-events-${squadId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "squad_events", filter: `squad_id=eq.${squadId}` },
+        () => qc.invalidateQueries({ queryKey: ["squad-chat-events", squadId] }))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [squadId, qc]);
+  return query;
+}
+
+/** Perguntas abertas do squad (de qualquer missão): aparecem também no chat. Confere de tempos em tempos. */
+export function useOpenQuestions(squadId?: string) {
+  return useQuery({
+    queryKey: ["squad-open-questions", squadId],
+    enabled: !!squadId,
+    refetchInterval: 20_000,
+    queryFn: async () => {
+      const { data, error } = await db.from("squad_questions").select("*").eq("squad_id", squadId).eq("status", "open").order("created_at");
+      if (error) throw error;
+      return (data || []) as SquadQuestion[];
+    },
+  });
+}
+
 export function useChatUsage(squadId?: string) {
   return useQuery({
     queryKey: ["squad-chat-usage", squadId],
@@ -122,6 +162,41 @@ export function useChatActions(squadId: string) {
     onError: refresh,
   });
 
+  // Junta mensagens novas (do servidor) com as que já estão na tela e atualiza o medidor do teto.
+  const merge = (r: { messages: ChatMessage[]; usage: ChatUsage }) => {
+    qc.setQueryData(["squad-chat-usage", squadId], r.usage);
+    qc.setQueryData<ChatMessage[]>(["squad-chat", squadId], (old = []) => {
+      const seen = new Set(old.map((m) => m.id));
+      return [...old, ...r.messages.filter((m) => !seen.has(m.id))].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    });
+  };
+
+  /**
+   * Reunião: cada etapa é uma chamada (rodada 1, rodada 2, resumo), para nenhuma passar do tempo da função.
+   * Com `meetingId` retoma uma reunião que parou no meio. `onStage` recebe o nome da etapa que está rodando.
+   */
+  const runMeeting = async (p: { question?: string; participants?: string[]; meetingId?: string }, onStage?: (label: string) => void) => {
+    type R = { meetingId: string; stage: 1 | 2 | 3 | null; done: boolean; messages: ChatMessage[]; usage: ChatUsage };
+    let meetingId = p.meetingId;
+    try {
+      if (!meetingId) {
+        onStage?.("Rodada 1: posições");
+        const r = await call<R>({ action: "meeting_start", squadId, question: p.question, participants: p.participants });
+        merge(r);
+        meetingId = r.meetingId;
+        if (r.done) return;
+      }
+      for (let i = 0; i < 4; i++) {
+        onStage?.(i === 0 && p.meetingId ? "Retomando a reunião" : i === 0 ? "Rodada 2: reações" : "Resumo da coordenação");
+        const r = await call<R>({ action: "meeting_next", squadId, meetingId });
+        merge(r);
+        if (r.done || !r.stage) return;
+      }
+    } finally {
+      refresh();
+    }
+  };
+
   const setCap = useMutation({
     mutationFn: (capUsd: number) => call<{ usage: ChatUsage }>({ action: "set_cap", squadId, capUsd }),
     onSuccess: (r) => { qc.setQueryData(["squad-chat-usage", squadId], r.usage); qc.invalidateQueries({ queryKey: ["squad", squadId] }); },
@@ -132,5 +207,5 @@ export function useChatActions(squadId: string) {
     onSuccess: refresh,
   });
 
-  return { send, setCap, clear };
+  return { send, setCap, clear, runMeeting };
 }

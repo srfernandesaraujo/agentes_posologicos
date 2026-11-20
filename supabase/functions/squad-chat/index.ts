@@ -11,9 +11,10 @@ import { screenInput, maskSecrets, buildMemoryContext, buildMemoryExtractionProm
 import { getTemplate } from "../_shared/squadTemplates.ts";
 import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } from "../_shared/llmProvider.ts";
 import { HttpError } from "../_shared/squadRunner.ts";
+import { emitChatEvent, loadMissionContext, runMeetingNext, type AgentRow } from "../_shared/squadChatRunner.ts";
 import {
-  CHAT_MAX_OUTPUT_TOKENS, CHAT_RATE_LIMIT_PER_MIN, CHAT_MISSION_CONTEXT_CHARS, CHAT_HISTORY_LIMIT, TEAM_THREAD,
-  CHAT_MEMORY_MAX_PENDING, CHAT_CITED_CHARS,
+  CHAT_MAX_OUTPUT_TOKENS, CHAT_RATE_LIMIT_PER_MIN, CHAT_HISTORY_LIMIT, TEAM_THREAD,
+  CHAT_MEMORY_MAX_PENDING, CHAT_CITED_CHARS, MEETING_CAP_USD, MEETING_MAX_PARTICIPANTS, pickMeetingParticipants,
   buildChatSystemPrompt, buildRouterPrompt, buildTranscriptMessage, capCrossing, chatBudget, cleanChatText, clampChatCap,
   clip, looksLikeTeaching, monthStartIso, parseMentions, parseRouterReply, routeByRules, type ChatAgent, type ChatLine,
 } from "../_shared/squadChatCore.ts";
@@ -28,11 +29,6 @@ const FUNCTION_DEADLINE_MS = 70_000;
 const ROUTER_DEADLINE_MS = 12_000;
 // Roteador barato: onde o provedor tem um modelo pequeno conhecido, usa-o; nos demais vale o modelo padrão (já econômico).
 const ROUTER_MODELS: Record<string, string> = { openai: "gpt-4o-mini", anthropic: "claude-3-5-haiku-20241022" };
-
-const MISSION_STATUS: Record<string, string> = {
-  running: "em andamento", paused: "pausada por custo", awaiting_approval: "aguardando a decisão do dono", awaiting_owner: "aguardando resposta do dono",
-  completed: "concluída", failed: "falhou", cancelled: "cancelada",
-};
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -95,8 +91,8 @@ Deno.serve(async (req) => {
       const text = cleanChatText(body?.text);
       if (!text) throw new HttpError(400, "Escreva uma mensagem");
 
-      const { data: agentRows } = await admin.from("squad_agents").select("id, slug, name, role, system_prompt, sort_order").eq("squad_id", squad.id).order("sort_order");
-      const agents = (agentRows || []) as (ChatAgent & { system_prompt: string })[];
+      const { data: agentRows } = await admin.from("squad_agents").select("id, slug, name, role, room, system_prompt, sort_order").eq("squad_id", squad.id).order("sort_order");
+      const agents = (agentRows || []) as AgentRow[];
       const thread = String(body?.thread || TEAM_THREAD);
       if (thread !== TEAM_THREAD && !agents.some((a) => a.id === thread)) throw new HttpError(400, "Conversa inexistente");
 
@@ -184,33 +180,11 @@ Deno.serve(async (req) => {
       }
 
       // Contexto do trabalho mais recente (uma vez só; cada agente recorta a parte dele).
-      const { data: lastMission } = await admin.from("squad_missions").select("id, briefing, status").eq("squad_id", squad.id).eq("owner_id", user.id)
-        .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      let delivs: any[] = [];
-      if (lastMission) {
-        const { data } = await admin.from("squad_deliverables").select("title, kind, status, content, agent_id, created_at")
-          .eq("mission_id", lastMission.id).order("created_at", { ascending: false }).limit(40);
-        delivs = data || [];
-      }
+      const contextFor = await loadMissionContext(admin, squad.id, user.id);
       const citedBlock = cited
         ? `Entrega citada pelo dono, "${cited.title}" (versão ${cited.version}). Responda sobre ela:\n${clip(String(cited.content || ""), CHAT_CITED_CHARS)}`
         : "";
-      const missionContextFor = (agentId: string): string => {
-        const base = baseMissionContext(agentId);
-        return [base, citedBlock].filter(Boolean).join("\n\n");
-      };
-      const baseMissionContext = (agentId: string): string => {
-        if (!lastMission) return "";
-        const latestPerTitle = new Map<string, any>();
-        for (const d of delivs) if (!latestPerTitle.has(d.title)) latestPerTitle.set(d.title, d);
-        const all = [...latestPerTitle.values()];
-        const final = all.find((d) => d.kind === "Entrega");
-        const own = all.filter((d) => d.agent_id === agentId && d.kind !== "Entrega").slice(0, 2);
-        const parts = [`Última missão (${MISSION_STATUS[lastMission.status] || lastMission.status}). Pedido: ${clip(String(lastMission.briefing || ""), 400)}`];
-        for (const d of own) parts.push(`Entrega sua, "${d.title}":\n${clip(String(d.content || ""), 2500)}`);
-        if (final) parts.push(`Pacote final, "${final.title}":\n${clip(String(final.content || ""), 3000)}`);
-        return clip(parts.join("\n\n"), CHAT_MISSION_CONTEXT_CHARS);
-      };
+      const missionContextFor = (agentId: string): string => [contextFor(agentId), citedBlock].filter(Boolean).join("\n\n");
 
       const deadlineAt = Date.now() + FUNCTION_DEADLINE_MS;
       const channel = thread === TEAM_THREAD ? "team" : "direct";
@@ -249,6 +223,8 @@ Deno.serve(async (req) => {
         }
       };
       const memoryPromise = looksLikeTeaching(clean) ? suggestMemory() : Promise.resolve(null);
+      // O escritório mostra quem está pensando e quem respondeu (eventos reais, sem missão).
+      await Promise.all(responders.map((id) => emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_thinking", agentId: id, room: agents.find((a) => a.id === id)?.room ?? null, text: "Pensando" })));
       const results = await Promise.all(responders.map(async (agentId) => {
         const agent = agents.find((a) => a.id === agentId)!;
         const system = buildChatSystemPrompt({
@@ -265,6 +241,7 @@ Deno.serve(async (req) => {
       for (const { agent, res } of results) {
         if (!res || !res.ok || !res.output) {
           await insert({ author: "system", agent_id: agent.id, content: `${agent.name} não conseguiu responder agora (provedor de IA indisponível). Tente de novo em instantes.`, meta: { error: true } });
+          await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_failed", agentId: agent.id, room: agent.room ?? null, text: "Sem resposta" });
           continue;
         }
         const cost = estimateCost(res.model!, res.tokensInput, res.tokensOutput);
@@ -275,6 +252,7 @@ Deno.serve(async (req) => {
           author: "agent", agent_id: agent.id, content, cost_usd: cost, tokens_input: res.tokensInput, tokens_output: res.tokensOutput,
           provider: res.provider, model: res.model, meta: res.finishReason === "length" ? { truncated: true } : {},
         });
+        await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_replied", agentId: agent.id, room: agent.room ?? null, text: "Respondeu" });
       }
 
       // Sugestão de memória (se o dono ensinou algo): vira um cartão no chat; o custo da extração conta no teto da conversa.
@@ -299,6 +277,82 @@ Deno.serve(async (req) => {
         });
       }
       return json({ messages: inserted, usage: usageOf(spentAfter, cap) });
+    }
+
+    // Reunião: o dono faz uma pergunta e até 4 agentes discutem em 2 rodadas; a diretora resume. Cada etapa é uma chamada
+    // (meeting_start roda a rodada 1; meeting_next roda a 2 e depois o resumo), para nenhuma passar do tempo da função.
+    if (action === "meeting_start" || action === "meeting_next") {
+      const { squad, template } = await loadOwnedSquad(String(body?.squadId || ""));
+      const { data: agentRows } = await admin.from("squad_agents").select("id, slug, name, role, room, system_prompt, sort_order").eq("squad_id", squad.id).order("sort_order");
+      const agents = (agentRows || []) as AgentRow[];
+
+      const cap = Number(squad.chat_monthly_cap_usd);
+      const spentBefore = await monthSpend(squad.id);
+      if (chatBudget(spentBefore, cap).state === "exceeded") {
+        throw new HttpError(402, "O teto mensal da conversa deste squad foi atingido. Aumente o teto para continuar.", "chat_cap_reached");
+      }
+      const keys = await getOrderedKeysForUser(admin, user.id);
+      if (!keys.length) throw new HttpError(400, "Nenhuma chave de API configurada. Adicione uma em Configurações para conversar com o time.");
+
+      const inserted: any[] = [];
+      const insert = async (row: Record<string, unknown>) => {
+        const { data, error } = await admin.from("squad_chat_messages").insert({ squad_id: squad.id, owner_id: user.id, thread: TEAM_THREAD, ...row }).select().single();
+        if (error) throw error;
+        inserted.push(data);
+        return data;
+      };
+
+      let meetingId = "";
+      let question = "";
+      let participants: string[] = [];
+      if (action === "meeting_start") {
+        const raw = cleanChatText(body?.question);
+        if (!raw) throw new HttpError(400, "Escreva a pergunta da reunião");
+        const { count: recent } = await admin.from("squad_chat_messages").select("id", { count: "exact", head: true })
+          .eq("squad_id", squad.id).eq("author", "user").gte("created_at", new Date(Date.now() - 60_000).toISOString());
+        if ((recent || 0) >= CHAT_RATE_LIMIT_PER_MIN) throw new HttpError(429, "Muitas mensagens em pouco tempo. Aguarde um minuto.", "chat_rate_limit");
+        participants = pickMeetingParticipants(body?.participants, agents);
+        if (!participants.length) throw new HttpError(400, "Escolha ao menos um agente para a reunião");
+        const pii = screenInput(raw, squad.sensitivity);
+        const sec = template.maskSecrets ? maskSecrets(pii.text) : { text: pii.text, findings: [] as { type: string; count: number }[] };
+        question = sec.text;
+        meetingId = crypto.randomUUID();
+        const meta: Record<string, unknown> = { meeting: { id: meetingId, round: 0 } };
+        if (pii.findings.length) meta.masked_pii = pii.findings;
+        if (sec.findings.length) meta.masked_secrets = sec.findings;
+        await insert({ author: "user", content: `Reunião: ${question}`, meta });
+        const names = participants.map((id) => agents.find((a) => a.id === id)?.name).filter(Boolean).join(", ");
+        await insert({
+          author: "system", content: `Reunião aberta com ${names}: 2 rodadas e um resumo da coordenação.`,
+          meta: { meeting: { id: meetingId, round: 0, participants, question } },
+        });
+        await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "meeting_started", text: "Reunião aberta" });
+      } else {
+        meetingId = String(body?.meetingId || "");
+        const { data: opening } = await admin.from("squad_chat_messages").select("meta").eq("squad_id", squad.id).eq("thread", TEAM_THREAD).eq("author", "system")
+          .contains("meta", { meeting: { id: meetingId, round: 0 } }).order("created_at").limit(1).maybeSingle();
+        const m = (opening?.meta as any)?.meeting;
+        if (!m || !Array.isArray(m.participants)) throw new HttpError(404, "Reunião não encontrada");
+        participants = pickMeetingParticipants(m.participants, agents);
+        question = String(m.question || "");
+      }
+
+      const { data: memRows } = await admin.from("squad_memories").select("id, kind, content, pinned, status, created_at")
+        .eq("squad_id", squad.id).eq("owner_id", user.id).eq("status", "active");
+      const run = await runMeetingNext({
+        admin, userId: user.id, squadId: squad.id, agents, keys, meetingId, question, participants, insert,
+        memoryContext: buildMemoryContext(squad.memory || "", (memRows || []) as MemoryItem[]),
+        contextFor: await loadMissionContext(admin, squad.id, user.id), deadlineAt: Date.now() + 60_000,
+      });
+      const spentAfter = spentBefore + run.cost;
+      const crossing = capCrossing(spentBefore, spentAfter, cap);
+      if (crossing) {
+        await insert({
+          author: "system", meta: { cap: crossing },
+          content: crossing === "exceeded" ? "Teto mensal da conversa atingido. Aumente o teto para continuar conversando." : "A conversa deste mês passou de 80% do teto.",
+        });
+      }
+      return json({ meetingId, stage: run.stage, done: run.done, messages: inserted, usage: usageOf(spentAfter, cap), meetingCapUsd: MEETING_CAP_USD, maxParticipants: MEETING_MAX_PARTICIPANTS });
     }
 
     throw new HttpError(400, "Ação desconhecida");

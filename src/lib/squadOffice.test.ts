@@ -168,6 +168,33 @@ describe("perguntas ao dono no escritório", () => {
   });
 });
 
+describe("conversa com o time no escritório", () => {
+  it("quem vai responder senta e trabalha com um balão, e depois mostra o balão e volta ao normal", () => {
+    const t = eventToCommands(ev("chat_thinking", "c", "ops", "Pensando"), team);
+    expect(t).toHaveLength(1);
+    expect(t[0]).toMatchObject({ kind: "goto", agentId: "c", place: "desk", then: "work", bubble: "Pensando" });
+    const r = eventToCommands(ev("chat_replied", "c", "ops", "Respondeu"), team);
+    expect(r[0]).toMatchObject({ kind: "bubble", agentId: "c", tone: "ok" });
+    expect(r[1]).toMatchObject({ kind: "goto", agentId: "c", then: "idle" });
+  });
+  it("falha de resposta mostra balão de erro e libera o agente", () => {
+    const f = eventToCommands(ev("chat_failed", "b", "ops", "Sem resposta"), team);
+    expect(f[0]).toMatchObject({ kind: "bubble", agentId: "b", tone: "bad" });
+    expect(f[1]).toMatchObject({ kind: "goto", agentId: "b", then: "idle" });
+  });
+  it("a reunião leva todo mundo à sala de reunião e, ao acabar, de volta às mesas", () => {
+    const s = eventToCommands(ev("meeting_started", null, null, "Reunião aberta"), team);
+    expect(s[0]).toMatchObject({ kind: "goto_all", place: "meet", then: "meet" });
+    expect(s[1]).toMatchObject({ kind: "bubble", agentId: "h" });
+    const e = eventToCommands(ev("meeting_ended", null, null, "Reunião encerrada"), team);
+    expect(e[0]).toMatchObject({ kind: "goto_all", place: "desk", then: "idle" });
+  });
+  it("evento de agente desconhecido não gera movimento", () => {
+    expect(eventToCommands(ev("chat_thinking", "zzz"), team)).toEqual([]);
+    expect(eventToCommands(ev("chat_replied", null), team)).toEqual([]);
+  });
+});
+
 describe("aparência por função", () => {
   it("cada função de template tem acessório definido ou nenhum, nunca erro", () => {
     for (const t of listTemplates()) {

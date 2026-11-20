@@ -218,6 +218,19 @@ export function eventToCommands(ev: EventLite, agents: OfficeAgent[]): Command[]
       return [{ kind: "goto_all", place: "desk", then: "idle" }, ...dirBubble("Ajustes pedidos, mãos à obra", "info")];
     case "mission_approved":
       return [{ kind: "goto_all", place: "desk", then: "idle" }, { kind: "celebrate" }, ...dirBubble("Aprovado! Obrigada", "ok", 6000)];
+    // Conversa com o time (eventos sem missão): quem vai responder senta e trabalha; quem respondeu mostra um balão e volta ao normal.
+    case "chat_thinking":
+      return agent ? [{ kind: "goto", agentId: agent.id, place: "desk", then: "work", bubble: short(ev.text, 24) || "Pensando", tone: "info" }] : [];
+    case "chat_replied":
+      return agent
+        ? [{ kind: "bubble", agentId: agent.id, text: short(ev.text, 24) || "Respondeu", ms: 3500, tone: "ok" }, { kind: "goto", agentId: agent.id, place: "desk", then: "idle" }]
+        : [];
+    case "chat_failed":
+      return agent ? [{ kind: "bubble", agentId: agent.id, text: "Sem resposta", ms: 6000, tone: "bad" }, { kind: "goto", agentId: agent.id, place: "desk", then: "idle" }] : [];
+    case "meeting_started":
+      return [{ kind: "goto_all", place: "meet", then: "meet" }, ...dirBubble("Reunião aberta", "info", 4000)];
+    case "meeting_ended":
+      return [{ kind: "goto_all", place: "desk", then: "idle" }, ...dirBubble("Reunião encerrada", "ok", 4500)];
     case "task_retry":
       return agent ? [{ kind: "bubble", agentId: agent.id, text: "Tentando de novo", ms: 5000, tone: "warn" }] : [];
     case "task_failed":

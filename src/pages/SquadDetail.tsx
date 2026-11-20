@@ -13,6 +13,7 @@ import { CostCapField, fmtUsd } from "@/components/squads/CostCapField";
 import { MissionPanel, MISSION_STATUS } from "@/components/squads/MissionPanel";
 import { SchedulePanel } from "@/components/squads/SchedulePanel";
 import { SquadChat } from "@/components/squads/SquadChat";
+import { useOpenQuestions } from "@/hooks/useSquadChat";
 
 export default function SquadDetail() {
   const { squadId } = useParams();
@@ -23,6 +24,7 @@ export default function SquadDetail() {
   const { startMission, deleteSquad } = useSquadActions();
   const { data: memories = [] } = useSquadMemories(squadId);
   const pendingMemories = memories.filter((m) => m.status === "suggested").length;
+  const { data: openQuestions = [] } = useOpenQuestions(squadId);
 
   const squad = data?.squad;
   const agents = data?.agents || [];
@@ -112,7 +114,7 @@ export default function SquadDetail() {
           <TabsTrigger value="missoes">Missões</TabsTrigger>
           <TabsTrigger value="nova">{template.kind === "continuous" ? "Executar agora" : "Nova missão"}</TabsTrigger>
           {template.kind === "continuous" && <TabsTrigger value="agenda">Agendamento</TabsTrigger>}
-          <TabsTrigger value="conversa">Conversa</TabsTrigger>
+          <TabsTrigger value="conversa">Conversa{openQuestions.length > 0 && <Badge className="ml-2 h-5 bg-amber-400 px-1.5 text-black hover:bg-amber-400" aria-label={`${openQuestions.length} pergunta(s) do squad esperando você`}>{openQuestions.length}</Badge>}</TabsTrigger>
           <TabsTrigger value="memoria">Memória{pendingMemories > 0 && <Badge className="ml-2 h-5 bg-amber-400 px-1.5 text-black hover:bg-amber-400" aria-label={`${pendingMemories} sugestões para revisar`}>{pendingMemories}</Badge>}</TabsTrigger>
           <TabsTrigger value="equipe">Equipe</TabsTrigger>
         </TabsList>

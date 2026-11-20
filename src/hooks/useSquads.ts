@@ -101,7 +101,8 @@ export interface SquadQuestion {
 
 export interface SquadEvent {
   id: number;
-  mission_id: string;
+  /** Nulo nos eventos da conversa com o time (não pertencem a uma missão). */
+  mission_id: string | null;
   agent_id: string | null;
   type: string;
   text: string | null;

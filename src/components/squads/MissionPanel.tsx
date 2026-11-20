@@ -67,7 +67,7 @@ function fmtDuration(ms: number | null): string {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;
 }
 
-function QuestionCard({ q, agentName, busy, onAnswer }: { q: SquadQuestion; agentName: string; busy: boolean; onAnswer: (answer: string) => void }) {
+export function QuestionCard({ q, agentName, busy, onAnswer }: { q: SquadQuestion; agentName: string; busy: boolean; onAnswer: (answer: string) => void }) {
   const [text, setText] = useState("");
   return (
     <div className="space-y-3 rounded-lg border border-amber-400/40 bg-amber-400/5 p-4">

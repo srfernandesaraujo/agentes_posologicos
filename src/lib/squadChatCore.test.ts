@@ -3,6 +3,8 @@ import {
   CHAT_DEFAULT_CAP_USD, CHAT_HISTORY_LIMIT, CHAT_MAX_MESSAGE_CHARS, CHAT_MAX_ROUTED, CHAT_MODE_RULES,
   buildChatSystemPrompt, buildRouterPrompt, buildTranscriptMessage, capCrossing, chatBudget, cleanChatText, clampChatCap, clip,
   looksLikeTeaching, monthStartIso, normName, parseMentions, parseRouterReply, routeByRules, type ChatAgent, type ChatLine,
+  MEETING_CAP_USD, MEETING_MAX_PARTICIPANTS, MEETING_RULES, buildMeetingUserMessage, meetingMaxTokens, meetingModerator, meetingNextStage,
+  pickMeetingParticipants, shouldSkipRound2,
 } from "../../supabase/functions/_shared/squadChatCore";
 import { buildMemoryExtractionPrompt } from "../../supabase/functions/_shared/squadCore";
 import { TEMPLATE_PESQUISA_CLINICA, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
@@ -173,6 +175,70 @@ describe("ensinar o time pela conversa", () => {
     expect(p.user).toContain("- Tom objetivo");
     expect(p.system).toContain("Na dúvida, não extraia");
     expect(buildMemoryExtractionPrompt({ source: "answer", ownerText: "x", about: "y", existing: [] }).user).toContain("respondeu a uma pergunta");
+  });
+});
+
+describe("reunião", () => {
+  const row = (author: string, round?: number, skipped?: boolean) => ({ author, meta: round === undefined ? {} : { meeting: { round, ...(skipped ? { skipped: true } : {}) } } });
+
+  it("a etapa seguinte vem do que já foi gravado: posições, reações, resumo, fim", () => {
+    expect(meetingNextStage([row("user", 0), row("system", 0)])).toBe(1);
+    expect(meetingNextStage([row("user", 0), row("agent", 1), row("agent", 1)])).toBe(2);
+    expect(meetingNextStage([row("agent", 1), row("agent", 2)])).toBe(3);
+    expect(meetingNextStage([row("agent", 1), row("agent", 2), row("agent", 3)])).toBeNull();
+  });
+  it("erro de um agente não conta como etapa feita, e rodada pulada conta", () => {
+    expect(meetingNextStage([row("agent", 1), row("system", 2)])).toBe(2);
+    expect(meetingNextStage([row("agent", 1), row("system", 2, true)])).toBe(3);
+    expect(meetingNextStage([row("system", 1)])).toBe(1);
+  });
+  it("participantes: só agentes do squad, sem repetir, até 4; sem escolha usa os que não são a diretora", () => {
+    expect(pickMeetingParticipants(["l", "d", "l", "zzz"], team)).toEqual(["l", "d"]);
+    expect(pickMeetingParticipants(["l", "d", "c", "i", "n"], team)).toHaveLength(MEETING_MAX_PARTICIPANTS);
+    expect(pickMeetingParticipants([], team)).toEqual(["l", "d", "c", "i"]);
+    expect(pickMeetingParticipants(undefined, team)).not.toContain("h");
+    expect(pickMeetingParticipants("l", team)).toEqual(["l", "d", "c", "i"]);
+  });
+  it("a diretora modera; sem diretora, o primeiro participante", () => {
+    expect(meetingModerator(team, ["l", "d"])).toBe("h");
+    const noDir = team.filter((a) => a.slug !== "diretora");
+    expect(meetingModerator(noDir, ["d", "c"])).toBe("d");
+    expect(meetingModerator([], [])).toBeNull();
+  });
+  it("pula a rodada 2 quando a reunião já gastou 70% do teto dela", () => {
+    expect(shouldSkipRound2(0.1)).toBe(false);
+    expect(shouldSkipRound2(MEETING_CAP_USD * 0.7)).toBe(true);
+    expect(shouldSkipRound2(0.5, 0.6)).toBe(true);
+    expect(shouldSkipRound2(0.5, 2)).toBe(false);
+  });
+  it("cada etapa pede o que deve: posição curta, reação aos colegas, resumo com divergências", () => {
+    const pos = [
+      { name: "Lia", round: 1 as const, content: "Falta revisar a literatura." },
+      { name: "Davi", round: 1 as const, content: "A amostra está apertada." },
+      { name: "Lia", round: 2 as const, content: "Concordo com o Davi." },
+    ];
+    const s1 = buildMeetingUserMessage(1, "O protocolo está pronto?", []);
+    expect(s1).toContain("O protocolo está pronto?");
+    expect(s1).toContain("120 palavras");
+    expect(s1).not.toContain("Posições da rodada 1");
+    const s2 = buildMeetingUserMessage(2, "O protocolo está pronto?", pos);
+    expect(s2).toContain("[Lia]: Falta revisar a literatura.");
+    expect(s2).toContain("[Davi]: A amostra está apertada.");
+    expect(s2).not.toContain("Reações da rodada 2");
+    expect(s2).toContain("concorde, discorde");
+    const s3 = buildMeetingUserMessage(3, "O protocolo está pronto?", pos);
+    expect(s3).toContain("Reações da rodada 2:\n[Lia]: Concordo com o Davi.");
+    expect(s3).toContain("onde divergem");
+    expect(s3).toContain("não invente decisões");
+  });
+  it("as regras da reunião mantêm o agente opinando, sem executar nada nem inventar", () => {
+    expect(MEETING_RULES).toContain("a decisão é do dono");
+    expect(MEETING_RULES).toContain("Nunca diga que alterou, refez, enviou ou executou");
+    expect(MEETING_RULES).toContain("Não invente fatos");
+  });
+  it("limites de tamanho por etapa e teto próprio da reunião", () => {
+    expect(meetingMaxTokens(1)).toBeLessThan(meetingMaxTokens(3));
+    expect(MEETING_CAP_USD).toBe(0.6);
   });
 });
 
