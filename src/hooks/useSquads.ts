@@ -40,6 +40,7 @@ export interface Squad {
   environment: string;
   default_cost_cap_usd: number;
   memory: string;
+  chat_monthly_cap_usd?: number;
   created_at: string;
 }
 
