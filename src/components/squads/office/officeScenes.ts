@@ -82,6 +82,17 @@ const PALETTES: Record<SceneTheme, Palette> = {
     },
     desk: "#aab3c2", deskEdge: "#7d8798", accent: "#34d399",
   },
+  laboratorio: {
+    hall: ["#4a5560", "#525d69"],
+    floors: {
+      dir: { base: "#cfd9db", alt: "#c3cfd2", mode: "tile" },
+      ops: { base: "#dbe6ea", alt: "#d0dde2", mode: "tile" },
+      lib: { base: "#a98a63", alt: "#9c7d58", mode: "wood" },
+      copa: { base: "#e6dfca", alt: "#dad2bb", mode: "tile" },
+      meet: { base: "#8fb3c4", alt: "#83a7b8", mode: "tile" },
+    },
+    desk: "#eef2f4", deskEdge: "#aab6bb", accent: "#14b8a6",
+  },
 };
 
 function floor(g: G, room: RoomId, p: Palette) {
@@ -317,7 +328,33 @@ function decorLoft(g: G) {
   R(g, 232, 204, 8, 1, "#6b7280"); R(g, 252, 204, 6, 1, "#6b7280"); R(g, 244, 208, 1, 3, "#6b7280");
 }
 
-const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora, executivo: decorExecutivo, loft: decorLoft };
+function decorLaboratorio(g: G) {
+  // Coordenação: janela, quadro do protocolo (fluxo PICO), pôster de DNA e diploma do comitê
+  R(g, 68, 14, 34, 14, "#2a2d38"); R(g, 70, 16, 30, 10, "#bfe3f2"); R(g, 84, 16, 1, 10, "#2a2d38");
+  R(g, 22, 28, 42, 12, "#e9e5da"); R(g, 23, 29, 40, 10, "#f4f6f8");
+  R(g, 26, 31, 9, 5, "#14b8a6"); R(g, 41, 31, 9, 5, "#2b6cb0"); R(g, 56, 31, 5, 5, "#e5b83a");
+  R(g, 35, 33, 6, 1, "#6b7280"); R(g, 50, 33, 6, 1, "#6b7280");
+  R(g, 106, 32, 18, 12, "#1c2a44");
+  for (let i = 0; i < 6; i++) { R(g, 110 + Math.round(Math.sin(i) * 3) + 3, 34 + i * 2, 2, 1, "#5eead4"); R(g, 110 + Math.round(Math.sin(i + Math.PI) * 3) + 3, 34 + i * 2, 2, 1, "#f9a8d4"); }
+  // Bancadas: prateleira com frascos, centrífuga, incubadora e bancada com microscópio e estante de tubos
+  R(g, 188, 22, 64, 2, "#8d6a46");
+  ["#5eead4", "#f9a8d4", "#fde68a", "#93c5fd", "#86efac", "#fca5a5"].forEach((c, i) => { R(g, 192 + i * 10, 16, 5, 6, c); R(g, 193 + i * 10, 14, 3, 2, "#cfd8dc"); });
+  R(g, 280, 36, 18, 14, "#cfd8dc"); R(g, 282, 38, 14, 3, "#90a4ae"); R(g, 286, 43, 6, 5, "#546e7a"); R(g, 282, 47, 2, 2, "#c0392b");
+  R(g, 280, 52, 18, 15, "#e3eaee"); R(g, 281, 53, 16, 13, "#cfd9de"); R(g, 294, 56, 1, 6, "#78909c"); R(g, 283, 55, 4, 3, "#14b8a6");
+  R(g, 178, 100, 36, 10, "#e8eef0"); R(g, 178, 110, 36, 2, "#aab6bb");
+  R(g, 190, 92, 4, 8, "#37474f"); R(g, 188, 88, 8, 3, "#546e7a"); R(g, 186, 98, 12, 2, "#37474f");
+  R(g, 200, 95, 12, 5, "#8d6a46");
+  ["#5eead4", "#f9a8d4", "#fde68a"].forEach((c, i) => R(g, 202 + i * 4, 92, 2, 4, c));
+  // Literatura: estante de periódicos
+  R(g, 22, 134, 76, 12, "#6b4a2e");
+  for (let i = 0; i < 17; i++) R(g, 24 + i * 4, 136, 3, 9, ["#1f3a5f", "#f4f1e6", "#14b8a6", "#6b7280", "#b45309", "#9b2c2c"][i % 6]);
+  // Comitê de ética: tela com o checklist do CEP (as caixas se marcam na camada animada)
+  R(g, 214, 196, 60, 18, "#1c2030"); R(g, 216, 198, 56, 14, "#f4f6f8"); R(g, 216, 198, 56, 3, "#14b8a6");
+  for (let i = 0; i < 6; i++) { R(g, 220 + i * 8, 203, 5, 5, "#cfd8dc"); R(g, 221 + i * 8, 204, 3, 3, "#f4f6f8"); }
+  R(g, 220, 209, 40, 1, "#9ca3af");
+}
+
+const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora, executivo: decorExecutivo, loft: decorLoft, laboratorio: decorLaboratorio };
 
 const layerCache = new Map<SceneTheme, HTMLCanvasElement>();
 
@@ -440,6 +477,19 @@ export function drawAnimated(ctx: G, theme: SceneTheme, info: AnimInfo) {
     }
     const lit = Math.min(info.deliverables, 6);
     for (let i = 0; i < 6; i++) R(ctx, 109 + i * 4, 36, 3, 4, i < lit ? "#34d399" : "#3c4352");
+  }
+
+  // Laboratório: a centrífuga gira e a incubadora pisca quando há trabalho nas bancadas; o checklist do CEP ganha uma marca por entrega
+  if (theme === "laboratorio") {
+    if (info.working.has("ops")) {
+      const k = Math.floor(info.t * 6) % 4;
+      const pos = [[287, 44], [290, 44], [290, 46], [287, 46]][k];
+      R(ctx, pos[0], pos[1], 1, 1, "#e5f2f7");
+      R(ctx, 282, 47, 2, 2, "#34d399");
+      if (Math.floor(info.t * 2) % 2 === 0) R(ctx, 283, 55, 4, 3, "#99f6e4");
+    }
+    const lit = Math.min(info.deliverables, 6);
+    for (let i = 0; i < lit; i++) { R(ctx, 221 + i * 8, 204, 3, 3, "#34d399"); }
   }
 
   // Pilha de entregas na mesa da diretora

@@ -120,7 +120,7 @@ export function OfficeCanvas({ agents, events, environment }: Props) {
           g.addColorStop(0, "rgba(255,226,150,.26)"); g.addColorStop(1, "rgba(255,226,150,0)");
           ctx.fillStyle = g; ctx.fillRect(gx - 44, gy - 44, 88, 88);
         });
-        order.forEach((a) => drawAgentSprite(ctx, a, t, theme === "university", nowS));
+        order.forEach((a) => drawAgentSprite(ctx, a, t, theme === "university" || theme === "laboratorio", nowS));
         drawNames(ctx, sim);
         order.forEach((a) => drawBubble(ctx, a));
       }

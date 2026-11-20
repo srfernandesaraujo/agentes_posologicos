@@ -9,7 +9,7 @@ import {
   countTextWords, parseWordRange, wordsNote, maskSecrets, canRetryTask, MAX_TASK_ATTEMPTS,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
-import { TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, TEMPLATE_SECRETARIADO, TEMPLATE_VIBE_CODING, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
+import { TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, TEMPLATE_PESQUISA_CLINICA, TEMPLATE_SECRETARIADO, TEMPLATE_VIBE_CODING, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
 
 describe("planTasks", () => {
   it("gera um pipeline sequencial a partir do template de Conteúdo", () => {
@@ -685,6 +685,55 @@ describe("template de Vibe Coding", () => {
   });
   it("só os campos essenciais são obrigatórios", () => {
     expect(TEMPLATE_VIBE_CODING.formFields.filter((f) => f.required).map((f) => f.key)).toEqual(["projeto", "tipo", "stack", "alvo", "requisitos"]);
+  });
+});
+
+describe("template de Pesquisa Clínica", () => {
+  const T = TEMPLATE_PESQUISA_CLINICA;
+  const tasks = planTasks(T);
+  it("é missão com dados de saúde anonimizados, no laboratório", () => {
+    expect(T.kind).toBe("mission");
+    expect(T.sensitivity).toBe("dados_saude");
+    expect(T.environment).toBe("laboratorio-pesquisa");
+    expect(getTemplate("pesquisa-clinica")).toBe(T);
+  });
+  it("literatura, metodologia e ética rodam juntas; o protocolo espera as três; ajustes em paralelo e o protocolo ajustado por último", () => {
+    expect(tasks.map((x) => x.title)).toEqual([
+      "Plano da pesquisa", "Literatura e estratégia de busca", "Desenho metodológico", "Checklist ético e regulatório", "Protocolo de pesquisa",
+      "Parecer de revisão", "Ajustes da literatura", "Ajustes da metodologia", "Ajustes da ética", "Ajustes do protocolo", "Entrega final",
+    ]);
+    expect(tasks.map((x) => x.dependsOnPositions)).toEqual([[], [0], [0], [0], [1, 2, 3], [4], [5], [5], [5], [6, 7, 8], [9]]);
+  });
+  it("todos os agentes só citam o que o dono colou e nunca aprovam nem submetem nada", () => {
+    for (const a of T.agents) {
+      expect(a.systemPrompt, a.name).toContain("NÃO VERIFICADO");
+      expect(a.systemPrompt, a.name).toContain("Nunca invente referência");
+      expect(a.systemPrompt, a.name).toContain("Você não aprova, não submete e não registra nada");
+    }
+    expect(tasks[10].instructions).toContain("RASCUNHO DE APOIO");
+  });
+  it("a Nina confere referências inventadas, aprovação indevida e coerência com o protocolo", () => {
+    const nina = T.agents.find((a) => a.slug === "revisora")!;
+    expect(nina.systemPrompt).toContain("aparece no material colado");
+    expect(nina.systemPrompt).toContain("aprovação, isenção ou dispensa");
+    expect(nina.systemPrompt).toContain("bate com o desenho e a ética");
+  });
+  it("sem literatura colada a Lia entrega só a estratégia e não sintetiza", () => {
+    expect(tasks[1].instructions).toContain("Sem literatura fornecida");
+    expect(T.formFields.find((f) => f.key === "literatura")!.required).toBeFalsy();
+  });
+  it("o protocolo ajustado só roda se o parecer pediu ajustes e alinha com as versões ajustadas", () => {
+    const adj = T.steps.find((s) => s.title === "Ajustes do protocolo")!;
+    expect(adj.checks?.onlyIfAdjusts).toBe(true);
+    expect(adj.instructions).toContain("coerente");
+  });
+  it("só os campos essenciais são obrigatórios", () => {
+    expect(T.formFields.filter((f) => f.required).map((f) => f.key)).toEqual(["pergunta", "tipo", "populacao", "objetivos"]);
+  });
+  it("dados de saúde: filtro mascara e-mail, CPF e telefone antes do envio ao modelo", () => {
+    const r = screenInput("Coorte. Maria, CPF 123.456.789-09, tel (11) 91234-5678, maria@exemplo.com", "dados_saude");
+    expect(r.text).not.toContain("123.456.789-09");
+    expect(r.text).not.toContain("maria@exemplo.com");
   });
 });
 

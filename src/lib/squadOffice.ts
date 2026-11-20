@@ -120,6 +120,7 @@ const ACCESSORIES: Record<string, Accessory> = {
   estrutura: "glasses", redatora: "headphones", nicho: "headset",
   correspondencia: "headset", atas: "glasses", tendencias: "headphones",
   fullstack: "headphones", devops: "headset", "qa-seguranca": "glasses",
+  literatura: "glasses", metodologia: "glasses", etica: "headset", "redacao-cientifica": "headphones",
 };
 /** Cada função tem um traço visual próprio, para reconhecer quem é quem de relance. */
 export function accessoryFor(slug?: string): Accessory {
@@ -227,13 +228,14 @@ export function eventToCommands(ev: EventLite, agents: OfficeAgent[]): Command[]
 }
 
 /** Qual ambiente temático desenhar para o `environment` salvo no squad (cai no estúdio se desconhecido). */
-export type SceneTheme = "studio" | "university" | "campus" | "editora" | "executivo" | "loft";
+export type SceneTheme = "studio" | "university" | "campus" | "editora" | "executivo" | "loft" | "laboratorio";
 export function themeForEnvironment(env: string | null | undefined): SceneTheme {
   if (env === "faculdade") return "university";
   if (env === "campus") return "campus";
   if (env === "editora") return "editora";
   if (env === "escritorio-executivo") return "executivo";
   if (env === "loft-startup") return "loft";
+  if (env === "laboratorio-pesquisa") return "laboratorio";
   return "studio";
 }
 
@@ -244,4 +246,5 @@ export const ROOM_LABELS: Record<SceneTheme, Record<RoomId, string>> = {
   editora: { dir: "DIREÇÃO EDITORIAL", ops: "REDAÇÃO E CAPA", lib: "ACERVO", copa: "COPA", meet: "REVISÃO" },
   loft: { dir: "LIDERANÇA TÉCNICA", ops: "BANCADA DE DEV", lib: "SERVIDORES", copa: "COPA", meet: "QUADRO DE ARQUITETURA" },
   executivo: { dir: "GABINETE", ops: "RECEPÇÃO E CORRESPONDÊNCIA", lib: "CLIPPING", copa: "COPA", meet: "SALA DE REUNIÕES" },
+  laboratorio: { dir: "COORDENAÇÃO", ops: "BANCADAS", lib: "LITERATURA", copa: "COPA", meet: "COMITÊ DE ÉTICA" },
 };

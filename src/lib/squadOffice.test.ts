@@ -131,6 +131,7 @@ describe("lugares e aparência", () => {
     expect(themeForEnvironment("editora")).toBe("editora");
     expect(themeForEnvironment("escritorio-executivo")).toBe("executivo");
     expect(themeForEnvironment("loft-startup")).toBe("loft");
+    expect(themeForEnvironment("laboratorio-pesquisa")).toBe("laboratorio");
     expect(themeForEnvironment("estudio-video")).toBe("studio");
     expect(themeForEnvironment("hospital-futuro")).toBe("studio");
     expect(themeForEnvironment(null)).toBe("studio");
