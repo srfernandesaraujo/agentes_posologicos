@@ -93,6 +93,17 @@ const PALETTES: Record<SceneTheme, Palette> = {
     },
     desk: "#eef2f4", deskEdge: "#aab6bb", accent: "#14b8a6",
   },
+  central: {
+    hall: ["#3b4150", "#434958"],
+    floors: {
+      dir: { base: "#4f5d75", alt: "#47546b", mode: "tile" },
+      ops: { base: "#8a97ab", alt: "#94a1b4", mode: "tile" },
+      lib: { base: "#b59a74", alt: "#a98d68", mode: "wood" },
+      copa: { base: "#d9c6a0", alt: "#cdba94", mode: "wood" },
+      meet: { base: "#3d6a62", alt: "#365f57", mode: "tile" },
+    },
+    desk: "#dfe4ec", deskEdge: "#a1a9b8", accent: "#22c55e",
+  },
 };
 
 function floor(g: G, room: RoomId, p: Palette) {
@@ -354,7 +365,26 @@ function decorLaboratorio(g: G) {
   R(g, 220, 209, 40, 1, "#9ca3af");
 }
 
-const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora, executivo: decorExecutivo, loft: decorLoft, laboratorio: decorLaboratorio };
+function decorCentral(g: G) {
+  // Gerência: janela, quadro de metas e placa de "atendimento humano"
+  R(g, 68, 14, 34, 14, "#2a2d38"); R(g, 70, 16, 30, 10, "#9ec5e8"); R(g, 84, 16, 1, 10, "#2a2d38");
+  R(g, 22, 28, 42, 12, "#e9e5da"); R(g, 23, 29, 40, 10, "#f4f6f8");
+  [0, 1, 2, 3].forEach((i) => { R(g, 26 + i * 9, 36 - (i + 2) * 2, 6, (i + 2) * 2, ["#22c55e", "#3b82f6", "#e5b83a", "#22c55e"][i]); });
+  R(g, 106, 32, 22, 12, "#1c2030"); R(g, 108, 34, 18, 8, "#22c55e"); R(g, 111, 37, 12, 1, "#f4f6f8"); R(g, 111, 39, 8, 1, "#f4f6f8");
+  // Atendimento: painel de filas (as barras se mexem na camada animada) e mural de conversas
+  R(g, 212, 14, 60, 11, "#1c2030");
+  R(g, 280, 34, 20, 34, "#1c2030"); R(g, 282, 36, 16, 30, "#e9e5da");
+  R(g, 283, 38, 10, 5, "#bbf7d0"); R(g, 287, 45, 10, 5, "#ffffff"); R(g, 283, 52, 12, 5, "#bbf7d0"); R(g, 287, 59, 8, 4, "#ffffff");
+  // Base de conhecimento: pastas e manuais
+  R(g, 22, 134, 76, 12, "#4a3a2c");
+  for (let i = 0; i < 17; i++) R(g, 24 + i * 4, 136, 3, 9, ["#22c55e", "#f4f1e6", "#3b82f6", "#e5b83a", "#6b7280", "#9b2c2c"][i % 6]);
+  // Sala de qualidade: tela com o diagrama do fluxo (os nós acendem a cada entrega)
+  R(g, 214, 196, 60, 18, "#1c2030"); R(g, 216, 198, 56, 14, "#0f172a");
+  for (let i = 0; i < 6; i++) R(g, 220 + i * 8, 204, 5, 5, "#334155");
+  for (let i = 0; i < 5; i++) R(g, 225 + i * 8, 206, 3, 1, "#475569");
+}
+
+const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora, executivo: decorExecutivo, loft: decorLoft, laboratorio: decorLaboratorio, central: decorCentral };
 
 const layerCache = new Map<SceneTheme, HTMLCanvasElement>();
 
@@ -490,6 +520,18 @@ export function drawAnimated(ctx: G, theme: SceneTheme, info: AnimInfo) {
     }
     const lit = Math.min(info.deliverables, 6);
     for (let i = 0; i < lit; i++) { R(ctx, 221 + i * 8, 204, 3, 3, "#34d399"); }
+  }
+
+  // Central de atendimento: as barras das filas sobem e descem, uma mensagem nova pisca no mural, os nós do fluxo acendem por entrega
+  if (theme === "central") {
+    const busy = info.working.has("ops");
+    for (let i = 0; i < 6; i++) {
+      const hgt = busy ? 2 + ((Math.floor(info.t * 3) + i * 3) % 7) : 2;
+      R(ctx, 215 + i * 10, 24 - hgt, 6, hgt, i % 3 === 0 ? "#22c55e" : i % 3 === 1 ? "#3b82f6" : "#e5b83a");
+    }
+    if (busy && Math.floor(info.t * 2) % 2 === 0) R(ctx, 283, 38, 10, 5, "#4ade80");
+    const lit = Math.min(info.deliverables, 6);
+    for (let i = 0; i < lit; i++) R(ctx, 221 + i * 8, 205, 3, 3, "#4ade80");
   }
 
   // Pilha de entregas na mesa da diretora

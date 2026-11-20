@@ -9,7 +9,7 @@ import {
   countTextWords, parseWordRange, wordsNote, maskSecrets, canRetryTask, MAX_TASK_ATTEMPTS,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
-import { TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, TEMPLATE_PESQUISA_CLINICA, TEMPLATE_SECRETARIADO, TEMPLATE_VIBE_CODING, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
+import { TEMPLATE_AUTOMACAO_WHATSAPP, TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, TEMPLATE_PESQUISA_CLINICA, TEMPLATE_SECRETARIADO, TEMPLATE_VIBE_CODING, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
 
 describe("planTasks", () => {
   it("gera um pipeline sequencial a partir do template de Conteúdo", () => {
@@ -734,6 +734,58 @@ describe("template de Pesquisa Clínica", () => {
     const r = screenInput("Coorte. Maria, CPF 123.456.789-09, tel (11) 91234-5678, maria@exemplo.com", "dados_saude");
     expect(r.text).not.toContain("123.456.789-09");
     expect(r.text).not.toContain("maria@exemplo.com");
+  });
+});
+
+describe("template de Automação e WhatsApp", () => {
+  const T = TEMPLATE_AUTOMACAO_WHATSAPP;
+  const tasks = planTasks(T);
+  it("é contínuo, com dados pessoais comuns, na central de atendimento", () => {
+    expect(T.kind).toBe("continuous");
+    expect(T.sensitivity).toBe("dados_pessoais");
+    expect(T.environment).toBe("central-atendimento");
+    expect(getTemplate("automacao-whatsapp")).toBe(T);
+  });
+  it("mensagens e regras rodam juntas depois do fluxo; os testes esperam os dois; ajustes em paralelo e os testes ajustados por último", () => {
+    expect(tasks.map((x) => x.title)).toEqual([
+      "Plano do atendimento", "Fluxo da conversa", "Mensagens do fluxo", "Regras e integrações", "Cenários de teste",
+      "Parecer de revisão", "Ajustes do fluxo", "Ajustes das mensagens", "Ajustes das regras", "Ajustes dos testes", "Pacote de atendimento",
+    ]);
+    expect(tasks.map((x) => x.dependsOnPositions)).toEqual([[], [0], [1], [1], [2, 3], [4], [5], [5], [5], [6, 7, 8], [9]]);
+  });
+  it("nenhum agente envia, integra ou testa: todos exigem NÃO EXECUTADO, revisão humana em mensagem clínica e saída para humano", () => {
+    for (const a of T.agents) {
+      expect(a.systemPrompt, a.name).toContain("NÃO envia mensagens");
+      expect(a.systemPrompt, a.name).toContain("NÃO EXECUTADO");
+      expect(a.systemPrompt, a.name).toContain("[REVISÃO HUMANA OBRIGATÓRIA]");
+      expect(a.systemPrompt, a.name).toContain("saída para um humano");
+      expect(a.systemPrompt, a.name).toContain("[CONFERIR política vigente]");
+    }
+    expect(tasks[10].instructions).toContain("NADA FOI ENVIADO, CONECTADO OU TESTADO");
+  });
+  it("a Nina confere saída para humano, urgência, mensagem clínica, opt-out e coerência com o fluxo", () => {
+    const nina = T.agents.find((a) => a.slug === "revisora")!;
+    expect(nina.systemPrompt).toContain("saída para humano");
+    expect(nina.systemPrompt).toContain("caminho para urgência");
+    expect(nina.systemPrompt).toContain("opt-out");
+    expect(nina.systemPrompt).toContain("batem com o fluxo");
+  });
+  it("o plano pergunta ao dono quando o pedido manda o robô orientar conduta clínica", () => {
+    expect(tasks[0].instructions).toContain("oriente dose ou conduta clínica");
+  });
+  it("os testes ajustados só rodam se o parecer pediu ajustes e alinham com as versões ajustadas", () => {
+    const adj = T.steps.find((s) => s.title === "Ajustes dos testes")!;
+    expect(adj.checks?.onlyIfAdjusts).toBe(true);
+    expect(adj.instructions).toContain("coerentes");
+  });
+  it("só os campos essenciais são obrigatórios", () => {
+    expect(T.formFields.filter((f) => f.required).map((f) => f.key)).toEqual(["foco", "tipo", "negocio"]);
+  });
+  it("telefone e CPF colados são mascarados, nomes ficam", () => {
+    const r = screenInput("Maria pediu retorno no 11 91234-5678, CPF 123.456.789-09", "dados_pessoais");
+    expect(r.text).not.toContain("91234-5678");
+    expect(r.text).not.toContain("123.456.789-09");
+    expect(r.text).toContain("Maria");
   });
 });
 

@@ -121,6 +121,7 @@ const ACCESSORIES: Record<string, Accessory> = {
   correspondencia: "headset", atas: "glasses", tendencias: "headphones",
   fullstack: "headphones", devops: "headset", "qa-seguranca": "glasses",
   literatura: "glasses", metodologia: "glasses", etica: "headset", "redacao-cientifica": "headphones",
+  fluxos: "headset", mensagens: "headphones", integracoes: "glasses", "testes-cenario": "glasses",
 };
 /** Cada função tem um traço visual próprio, para reconhecer quem é quem de relance. */
 export function accessoryFor(slug?: string): Accessory {
@@ -228,7 +229,7 @@ export function eventToCommands(ev: EventLite, agents: OfficeAgent[]): Command[]
 }
 
 /** Qual ambiente temático desenhar para o `environment` salvo no squad (cai no estúdio se desconhecido). */
-export type SceneTheme = "studio" | "university" | "campus" | "editora" | "executivo" | "loft" | "laboratorio";
+export type SceneTheme = "studio" | "university" | "campus" | "editora" | "executivo" | "loft" | "laboratorio" | "central";
 export function themeForEnvironment(env: string | null | undefined): SceneTheme {
   if (env === "faculdade") return "university";
   if (env === "campus") return "campus";
@@ -236,6 +237,7 @@ export function themeForEnvironment(env: string | null | undefined): SceneTheme 
   if (env === "escritorio-executivo") return "executivo";
   if (env === "loft-startup") return "loft";
   if (env === "laboratorio-pesquisa") return "laboratorio";
+  if (env === "central-atendimento") return "central";
   return "studio";
 }
 
@@ -247,4 +249,5 @@ export const ROOM_LABELS: Record<SceneTheme, Record<RoomId, string>> = {
   loft: { dir: "LIDERANÇA TÉCNICA", ops: "BANCADA DE DEV", lib: "SERVIDORES", copa: "COPA", meet: "QUADRO DE ARQUITETURA" },
   executivo: { dir: "GABINETE", ops: "RECEPÇÃO E CORRESPONDÊNCIA", lib: "CLIPPING", copa: "COPA", meet: "SALA DE REUNIÕES" },
   laboratorio: { dir: "COORDENAÇÃO", ops: "BANCADAS", lib: "LITERATURA", copa: "COPA", meet: "COMITÊ DE ÉTICA" },
+  central: { dir: "GERÊNCIA", ops: "ATENDIMENTO", lib: "BASE DE CONHECIMENTO", copa: "COPA", meet: "SALA DE QUALIDADE" },
 };

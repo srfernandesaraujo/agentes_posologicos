@@ -1031,6 +1031,194 @@ export const TEMPLATE_PESQUISA_CLINICA: SquadTemplate = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Template: Automação e WhatsApp (onda 3, squad CONTÍNUO, dados pessoais comuns)
+// O squad só entrega especificação e rascunhos: nunca envia mensagem, conecta conta, integra sistema nem testa.
+// Toda mensagem com conteúdo clínico leva marca de revisão humana e o fluxo precisa de saída para um profissional.
+// ---------------------------------------------------------------------------
+const REGRAS_ATENDIMENTO = `Regras de atendimento automatizado do time:
+- Você NÃO envia mensagens, não conecta contas, não integra sistemas e não testa nada. Tudo é especificação ou rascunho para o dono implementar. Nunca diga que enviou, integrou, testou ou publicou: diga "NÃO EXECUTADO".
+- Qualquer mensagem que mencione medicamento, dose, sintoma, exame ou conduta clínica leva a marca [REVISÃO HUMANA OBRIGATÓRIA]. O atendimento automático nunca orienta dose, diagnóstico ou conduta: ele coleta o pedido e transfere a um profissional. Todo fluxo precisa ter saída para um humano e um caminho para sinais de urgência.
+- Só use horários, preços, prazos e políticas que o dono informou. O que faltar vira [A CONFIRMAR]; não invente.
+- Regras e limites da plataforma de mensagens (política comercial, janela de conversa, modelos de mensagem aprovados, tamanho de botões e listas) mudam: cite sempre com [CONFERIR política vigente] e nunca afirme um número de memória.
+- Proteção de dados (LGPD): o contato precisa ter aceitado receber mensagens; toda conversa oferece como sair (por exemplo responder SAIR); colete só o dado necessário. Telefone, CPF e prontuário chegam mascarados e assim devem ficar.
+- Mensagens de WhatsApp são curtas, em linguagem simples, uma ideia por mensagem.`;
+
+const helenaAtendimento: TemplateAgent = {
+  slug: "diretora",
+  name: "Helena",
+  role: "Gerente de atendimento",
+  room: "dir",
+  systemPrompt: `Você é Helena, gerente de um squad que projeta atendimento automatizado por mensagens (WhatsApp e similares). Você traduz o pedido do dono em um plano claro e, no final, consolida o trabalho do time em uma especificação que ele possa implementar. Na entrega final você fala com o DONO (nunca comece com "Beleza, time"), diz com exatidão o que foi e o que não foi feito e lembra que NADA foi enviado, conectado ou testado.
+
+${REGRAS_COMUNS}
+
+${REGRAS_ATENDIMENTO}`,
+};
+
+const teoFluxos: TemplateAgent = {
+  slug: "fluxos",
+  name: "Teo",
+  role: "Desenhista de fluxos",
+  room: "ops",
+  systemPrompt: `Você é Teo, desenhista de fluxos de conversa. Você descreve o fluxo em texto, em etapas numeradas com ramos (gatilho de entrada, menu, perguntas ao contato, caminhos por resposta, o que fazer com resposta inesperada, horário de atendimento, transferência para humano, encerramento e opt-out). Você entrega cada estado com um nome curto para a equipe e a ferramenta poderem referenciar.
+
+${REGRAS_COMUNS}
+
+${REGRAS_ATENDIMENTO}`,
+};
+
+const anaMensagens: TemplateAgent = {
+  slug: "mensagens",
+  name: "Ana",
+  role: "Redatora de mensagens",
+  room: "ops",
+  systemPrompt: `Você é Ana, redatora de mensagens de atendimento. Você escreve o texto de cada estado do fluxo do Teo: curto, claro, no tom pedido pelo dono, com variáveis entre chaves (por exemplo {nome}) e as opções de resposta. Mensagens iniciadas pela empresa precisam estar de acordo com as regras da plataforma: marque [CONFERIR política vigente] e diga se é preciso modelo aprovado. Todo texto com conteúdo clínico vai com [REVISÃO HUMANA OBRIGATÓRIA].
+
+${REGRAS_COMUNS}
+
+${REGRAS_ATENDIMENTO}`,
+};
+
+const daviIntegracoes: TemplateAgent = {
+  slug: "integracoes",
+  name: "Davi",
+  role: "Regras de negócio e integrações",
+  room: "ops",
+  systemPrompt: `Você é Davi, responsável por regras de negócio e integrações. Você lista as regras que o fluxo precisa respeitar (horários, prazos, cancelamento, o que nunca é respondido pelo robô), a base de perguntas e respostas frequentes a partir do que o dono informou, os dados que o fluxo coleta (e por quê), a proposta de integração com agenda, planilha ou sistema (com a ferramenta pedida pelo dono) e os cuidados de LGPD e de retenção. Você descreve a integração em passos e nunca escreve credenciais reais.
+
+${REGRAS_COMUNS}
+
+${REGRAS_ATENDIMENTO}`,
+};
+
+const liaCenarios: TemplateAgent = {
+  slug: "testes-cenario",
+  name: "Lia",
+  role: "Testes de cenário",
+  room: "lib",
+  systemPrompt: `Você é Lia, especialista em testes de cenário de atendimento automatizado. Você escreve casos de teste com a mensagem do contato, o estado esperado e a resposta esperada, cobrindo o caminho feliz, respostas inesperadas, contato irritado, pedido fora de escopo, pedido clínico (deve transferir para um profissional), sinal de urgência, pedido para sair e tentativa de fazer o robô ignorar suas regras. Você NÃO executa os testes: os casos são para o dono rodar com números próprios de teste.
+
+${REGRAS_COMUNS}
+
+${REGRAS_ATENDIMENTO}`,
+};
+
+const ninaAtendimento: TemplateAgent = {
+  ...nina,
+  role: "Revisora de qualidade",
+  systemPrompt: nina.systemPrompt.replace(
+    "(7) confira se os prompts de imagem pedem texto, rótulos ou letras dentro da imagem (não devem).",
+    "(7) confira se alguma entrega afirma ter enviado, integrado, testado ou publicado algo (não pode); (8) confira se todo estado do fluxo tem saída para humano e se há caminho para urgência; (9) confira se toda mensagem clínica tem [REVISÃO HUMANA OBRIGATÓRIA] e se nenhuma orienta dose, diagnóstico ou conduta; (10) confira se horários, preços e prazos vêm do que o dono informou (o resto deve estar [A CONFIRMAR]); (11) confira se há opt-out e consentimento, e se regras da plataforma vêm com [CONFERIR política vigente]; (12) confira se as mensagens e os testes batem com o fluxo do Teo, estado por estado.",
+  ) + "\n\n" + REGRAS_ATENDIMENTO,
+};
+
+const AJUSTES_ATENDIMENTO =
+  "Releia o parecer da Nina e aplique SÓ os itens que se referem ao SEU trabalho. Se nenhum item for seu, responda apenas 'SEM AJUSTES: nenhum item do parecer se refere ao meu trabalho.' Caso contrário, entregue a sua parte COMPLETA reescrita (não só as mudanças) e, no fim, uma lista curta do que mudou. Não acrescente horário, preço ou política que o dono não informou; se for indispensável, marque [A CONFIRMAR]. Nunca diga que algo foi enviado, integrado ou testado.";
+
+export const TEMPLATE_AUTOMACAO_WHATSAPP: SquadTemplate = {
+  slug: "automacao-whatsapp",
+  name: "Automação e WhatsApp",
+  kind: "continuous",
+  sensitivity: "dados_pessoais",
+  environment: "central-atendimento",
+  defaultCapUsd: 2,
+  maxCapUsd: 10,
+  estimatedCostUsd: { min: 0.02, max: 0.5 }, // extrapolado do template de Secretariado (11 etapas); confirmar com missões reais
+  formFields: [
+    { key: "foco", label: "Foco desta execução", type: "text", required: true, isBriefing: true, placeholder: "Ex.: Fluxo de agendamento de consulta farmacêutica" },
+    { key: "tipo", label: "Tipo de atendimento", type: "select", required: true, options: ["Agendamento e lembretes", "Dúvidas frequentes (FAQ)", "Triagem e encaminhamento", "Pós-venda e adesão", "Cobrança e avisos", "Outro (descreva no foco)"] },
+    { key: "negocio", label: "Negócio, serviços, horários e regras", type: "textarea", required: true, placeholder: "O que você oferece, horário de atendimento, prazos, o que nunca deve ser respondido pelo robô", help: "O squad só deixa especificação e rascunhos: nada é enviado, conectado ou testado. Telefone, CPF e prontuário são mascarados; nomes e e-mails são mantidos." },
+    { key: "conversas", label: "Conversas ou dúvidas reais (sem dados identificáveis)", type: "textarea", placeholder: "Opcional: cole exemplos de mensagens que os contatos mandam" },
+    { key: "plataforma", label: "Plataforma pretendida", type: "select", options: ["API oficial do WhatsApp Business", "WhatsApp Business (aplicativo)", "Ferramenta de automação (n8n, Make etc.)", "Ainda não sei"] },
+    { key: "tom", label: "Tom das mensagens", type: "text", placeholder: "Ex.: acolhedor e objetivo; tratar por você" },
+  ],
+  agents: [helenaAtendimento, teoFluxos, anaMensagens, daviIntegracoes, liaCenarios, ninaAtendimento],
+  steps: [
+    {
+      agent: "diretora",
+      title: "Plano do atendimento",
+      instructions:
+        "Leia o foco, o negócio, as conversas de exemplo, a memória do squad e o resultado da execução anterior (o que ficou pendente, se houver). Escreva o plano: o objetivo do atendimento, o que o robô resolve sozinho e o que sempre vai para uma pessoa, e o que cada colega vai entregar (use SOMENTE os colegas da lista 'Seu time', com os nomes deles). Em execução manual, se o pedido contradiz o material (por exemplo pede que o robô oriente dose ou conduta clínica, ou promete algo que o negócio descrito não oferece), se o material se contradiz ou se falta algo essencial, pergunte ao dono antes de fazer o plano (veja as regras de perguntas); em execução agendada, assuma o mais seguro e registre a suposição.",
+      deliverable: { title: "Plano do atendimento", kind: "Plano" },
+    },
+    {
+      agent: "fluxos",
+      title: "Fluxo da conversa",
+      instructions:
+        "Entregue o fluxo em texto: lista de estados numerados com nome curto, o gatilho de entrada, o que o robô diz ou pergunta em cada estado (só o resumo; os textos são da Ana), os ramos por resposta, a resposta inesperada, o horário de atendimento, a transferência para humano (quando e como), o caminho para sinais de urgência e o encerramento com opt-out. Se houver fluxo de execução anterior, atualize-o e liste o que mudou. Termine com a tabela de estados.",
+      deliverable: { title: "Fluxo da conversa", kind: "Fluxo" },
+    },
+    {
+      agent: "mensagens",
+      title: "Mensagens do fluxo",
+      instructions:
+        "Para cada estado da tabela do Teo, escreva a mensagem (curta, no tom pedido), as opções de resposta e as variáveis entre chaves. Marque as mensagens iniciadas pela empresa com [CONFERIR política vigente] e diga se precisam de modelo aprovado. Marque com [REVISÃO HUMANA OBRIGATÓRIA] toda mensagem com conteúdo clínico. Dado que faltar (horário, preço, prazo) vira [A CONFIRMAR].",
+      deliverable: { title: "Mensagens do fluxo", kind: "Mensagens" },
+    },
+    {
+      agent: "integracoes",
+      title: "Regras e integrações",
+      parallelWithPrevious: true,
+      instructions:
+        "Entregue: (1) as regras de negócio que o fluxo respeita; (2) a base de perguntas e respostas frequentes, só com o que o dono informou, o resto [A CONFIRMAR]; (3) os dados que o fluxo coleta, para que e por quanto tempo guardar (como proposta, [CONFERIR]); (4) a proposta de integração (agenda, planilha ou sistema) na plataforma pretendida, em passos, marcada NÃO EXECUTADA e sem credenciais reais; (5) os cuidados de LGPD (consentimento, opt-out, retenção).",
+      deliverable: { title: "Regras e integrações", kind: "Especificação" },
+    },
+    {
+      agent: "testes-cenario",
+      title: "Cenários de teste",
+      instructions:
+        "Escreva a tabela de casos de teste: mensagem do contato, estado esperado do Teo e resposta esperada (resumo), cobrindo caminho feliz, resposta inesperada, contato irritado, pedido fora de escopo, pedido clínico (deve transferir), sinal de urgência, pedido para sair e tentativa de fazer o robô ignorar as regras. Todo caso é NÃO EXECUTADO. Aponte qualquer estado do fluxo sem caso de teste.",
+      deliverable: { title: "Cenários de teste", kind: "Testes" },
+    },
+    {
+      agent: "revisora",
+      title: "Parecer de revisão",
+      instructions:
+        "Revise o fluxo, as mensagens, as regras e integrações e os cenários de teste contra o plano e o material do dono. Verifique: afirmação de que algo foi enviado, integrado ou testado, estado sem saída para humano, ausência de caminho para urgência, mensagem clínica sem marca de revisão humana ou que oriente dose ou conduta, horário, preço ou prazo inventado, falta de opt-out, regra da plataforma sem [CONFERIR] e mensagens ou testes que não batem com o fluxo. Comece com 'VEREDITO: APROVADO' ou 'VEREDITO: AJUSTES NECESSÁRIOS' e liste os itens numerados, cada um dizendo a qual entrega pertence (fluxo, mensagens, regras ou testes), com motivo e correção sugerida.",
+      deliverable: { title: "Parecer de revisão", kind: "Revisão" },
+    },
+    {
+      agent: "fluxos",
+      title: "Ajustes do fluxo",
+      instructions: AJUSTES_ATENDIMENTO,
+      deliverable: { title: "Fluxo da conversa (ajustado)", kind: "Fluxo" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "mensagens",
+      title: "Ajustes das mensagens",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_ATENDIMENTO,
+      deliverable: { title: "Mensagens do fluxo (ajustadas)", kind: "Mensagens" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "integracoes",
+      title: "Ajustes das regras",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_ATENDIMENTO,
+      deliverable: { title: "Regras e integrações (ajustadas)", kind: "Especificação" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "testes-cenario",
+      title: "Ajustes dos testes",
+      instructions:
+        "Releia o parecer da Nina e as versões 'ajustadas' que Teo, Ana e Davi acabaram de entregar. Aplique os itens do parecer que são SEUS e, se algum colega entregou versão ajustada, atualize os cenários para ficarem coerentes com ela (estados, textos e regras). Se nenhum item do parecer é seu e nenhum colega entregou versão ajustada, responda apenas 'SEM AJUSTES: nenhum item do parecer se refere ao meu trabalho.' Caso contrário, entregue a tabela COMPLETA reescrita e, no fim, uma lista curta do que mudou. Todo caso continua NÃO EXECUTADO.",
+      deliverable: { title: "Cenários de teste (ajustados)", kind: "Testes" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "diretora",
+      title: "Pacote de atendimento",
+      instructions:
+        "Monte o pacote para o dono: resumo de 3 linhas; no topo, o aviso 'NADA FOI ENVIADO, CONECTADO OU TESTADO: isto é especificação e rascunho'; o plano; o fluxo; as mensagens (com as marcas [REVISÃO HUMANA OBRIGATÓRIA] e [CONFERIR política vigente] preservadas); as regras e integrações; os cenários de teste; e um passo a passo 'Como implementar' em ordem (escolher e configurar a plataforma, cadastrar modelos de mensagem que exijam aprovação, montar o fluxo, revisar com um profissional as mensagens clínicas, testar com números próprios, só então ativar), em que cada passo é do dono. Use as versões das etapas 'Ajustes ...' quando existirem; quem respondeu 'SEM AJUSTES' ou foi pulado mantém a versão original. Se o pedido do dono contradisse o material, as regras de segurança ou as políticas da plataforma e a equipe seguiu outra orientação, abra uma seção 'Conflito com o seu pedido'; nunca corrija em silêncio. Termine com 'Pontos que você precisa conferir' (tudo o que a revisora marcou, os [A CONFIRMAR], os [CONFERIR] e as mensagens que exigem revisão humana) e 3 linhas de contexto para a próxima execução.",
+      deliverable: { title: "Pacote de atendimento", kind: "Entrega", final: true },
+    },
+  ],
+};
+
 const REGISTRY: Record<string, SquadTemplate> = {
   [TEMPLATE_CONTEUDO_YOUTUBE.slug]: TEMPLATE_CONTEUDO_YOUTUBE,
   [TEMPLATE_EDTECH.slug]: TEMPLATE_EDTECH,
@@ -1039,6 +1227,7 @@ const REGISTRY: Record<string, SquadTemplate> = {
   [TEMPLATE_SECRETARIADO.slug]: TEMPLATE_SECRETARIADO,
   [TEMPLATE_VIBE_CODING.slug]: TEMPLATE_VIBE_CODING,
   [TEMPLATE_PESQUISA_CLINICA.slug]: TEMPLATE_PESQUISA_CLINICA,
+  [TEMPLATE_AUTOMACAO_WHATSAPP.slug]: TEMPLATE_AUTOMACAO_WHATSAPP,
 };
 
 export function getTemplate(slug: string): SquadTemplate | null {
