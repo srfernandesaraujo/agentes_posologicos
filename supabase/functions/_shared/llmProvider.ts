@@ -178,6 +178,8 @@ export interface CallProviderParams {
   toolChoice?: any;
   /** Teto de tokens da resposta (padrão 8192; modelos com raciocínio gastam parte dele "pensando"). */
   maxTokens?: number;
+  /** Tempo máximo desta chamada (ms). Sem isso a chamada espera o provedor indefinidamente. */
+  timeoutMs?: number;
 }
 
 export interface CallProviderResult {
@@ -196,7 +198,8 @@ export interface CallProviderResult {
 // callers using getOrderedKeys*/callWithFallback with mode "tools"/"stream" should exclude it up front;
 // callProvider still guards here as a defensive fallback.
 export async function callProvider(params: CallProviderParams): Promise<CallProviderResult> {
-  const { provider, apiKey, model, systemPrompt, messages, temperature, mode = "text", tools, toolChoice, maxTokens } = params;
+  const { provider, apiKey, model, systemPrompt, messages, temperature, mode = "text", tools, toolChoice, maxTokens, timeoutMs } = params;
+  const signal = timeoutMs && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : undefined;
   const endpoint = PROVIDER_ENDPOINTS[provider];
   if (!endpoint) return { ok: false, tokensInput: 0, tokensOutput: 0, errorText: `Unknown provider: ${provider}` };
 
@@ -207,6 +210,7 @@ export async function callProvider(params: CallProviderParams): Promise<CallProv
     try {
       const resp = await fetch(endpoint, {
         method: "POST",
+        signal,
         headers: {
           "x-api-key": apiKey,
           "Content-Type": "application/json",
@@ -260,6 +264,7 @@ export async function callProvider(params: CallProviderParams): Promise<CallProv
   try {
     const resp = await fetch(endpoint, {
       method: "POST",
+      signal,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(body),
     });
@@ -307,7 +312,7 @@ export interface FallbackCallResult extends CallProviderResult {
 export async function callWithFallback(
   supabaseAdmin: SupabaseClient,
   orderedKeys: OrderedKey[],
-  params: Omit<CallProviderParams, "provider" | "apiKey" | "model"> & { modelOverridePerProvider?: Record<string, string> },
+  params: Omit<CallProviderParams, "provider" | "apiKey" | "model"> & { modelOverridePerProvider?: Record<string, string>; /** Instante (epoch ms) em que a função precisa ter terminado: cada tentativa recebe só o tempo que sobra. */ deadlineAt?: number },
 ): Promise<FallbackCallResult | null> {
   const mode = params.mode || "text";
   for (const key of orderedKeys) {
@@ -315,10 +320,16 @@ export async function callWithFallback(
       console.log("Skipping anthropic key for mode", mode, "— trying next provider");
       continue;
     }
+    let timeoutMs = params.timeoutMs;
+    if (params.deadlineAt) {
+      const left = params.deadlineAt - Date.now();
+      if (left < 5000) { console.warn("Prazo da função esgotado: não tenta mais provedores"); break; }
+      timeoutMs = timeoutMs ? Math.min(timeoutMs, left) : left;
+    }
     const apiKey = await decryptApiKey(supabaseAdmin, key.apiKeyEncrypted);
     const model = params.modelOverridePerProvider?.[key.provider] || key.model;
     console.log(`Trying provider ${key.provider} (mode=${mode}, model=${model})`);
-    const result = await callProvider({ ...params, provider: key.provider, apiKey, model });
+    const result = await callProvider({ ...params, timeoutMs, provider: key.provider, apiKey, model });
     if (result.ok) {
       return { ...result, provider: key.provider, model };
     }

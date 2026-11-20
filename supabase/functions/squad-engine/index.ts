@@ -22,7 +22,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const RUN_ALL_BUDGET_MS = 100_000; // folga sob o limite de tempo da edge function
+// A plataforma encerra a edge function (erro 546) se ela passar do limite de tempo. Não começa etapa nova depois de
+// RUN_ALL_BUDGET_MS, e toda chamada ao modelo recebe só o tempo que sobra até FUNCTION_DEADLINE_MS.
+const RUN_ALL_BUDGET_MS = 45_000;
+const FUNCTION_DEADLINE_MS = 125_000;
 const MAX_MEMORY_CHARS = 6000;
 const MAX_MEMORY_ITEMS = 100;
 
@@ -122,16 +125,17 @@ Deno.serve(async (req) => {
     }
 
     if (action === "run_next") {
-      return json(await runNext(admin, String(body?.missionId || ""), user.id));
+      return json(await runNext(admin, String(body?.missionId || ""), user.id, Date.now() + FUNCTION_DEADLINE_MS));
     }
 
     if (action === "run_all") {
       const missionId = String(body?.missionId || "");
       const started = Date.now();
-      let last = await runNext(admin, missionId, user.id);
+      const deadlineAt = started + FUNCTION_DEADLINE_MS;
+      let last = await runNext(admin, missionId, user.id, deadlineAt);
       let ran = last.state === "task_done" ? 1 : 0;
       while (last.state === "task_done" && Date.now() - started < RUN_ALL_BUDGET_MS) {
-        last = await runNext(admin, missionId, user.id);
+        last = await runNext(admin, missionId, user.id, deadlineAt);
         if (last.state === "task_done") ran++;
       }
       // hasMore: ainda há tarefas a executar (o chamador deve chamar run_all de novo).

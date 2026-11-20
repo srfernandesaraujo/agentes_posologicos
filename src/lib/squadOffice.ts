@@ -215,6 +215,8 @@ export function eventToCommands(ev: EventLite, agents: OfficeAgent[]): Command[]
       return [{ kind: "goto_all", place: "desk", then: "idle" }, ...dirBubble("Ajustes pedidos, mãos à obra", "info")];
     case "mission_approved":
       return [{ kind: "goto_all", place: "desk", then: "idle" }, { kind: "celebrate" }, ...dirBubble("Aprovado! Obrigada", "ok", 6000)];
+    case "task_retry":
+      return agent ? [{ kind: "bubble", agentId: agent.id, text: "Tentando de novo", ms: 5000, tone: "warn" }] : [];
     case "task_failed":
       return agent ? [{ kind: "bubble", agentId: agent.id, text: "Algo deu errado", ms: 8000, tone: "bad" }] : [];
     case "mission_failed":

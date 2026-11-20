@@ -7,6 +7,7 @@ import {
   planTasks, pickReadyTasks, budgetState, buildTaskUserMessage, formDisplay, buildRevisionInstructions,
   measureScript, parseDurationRange, durationNote, reviewRequestsAdjustments, extractOwnerQuestion, MAX_OWNER_QUESTIONS,
   countTextWords, parseWordRange, wordsNote,
+  canRetryTask,
   buildMemoryContext, buildMemoryExtractionPrompt, parseMemoryExtraction, type MemoryItem,
   type PreviousOutput, type SquadTemplate, type StepChecks,
 } from "./squadCore.ts";
@@ -115,7 +116,19 @@ export async function createMission(
 
 export type StepState = "task_done" | "awaiting_approval" | "awaiting_owner" | "paused" | "failed" | "busy" | "closed";
 
-export async function runNext(admin: SupabaseClient, missionId: string, userId: string): Promise<{ state: StepState; taskId?: string; message?: string }> {
+/** Quantas vezes a etapa já começou (cada início grava um evento task_started). */
+async function attemptsSoFar(admin: SupabaseClient, missionId: string, taskId: string): Promise<number> {
+  const { count } = await admin.from("squad_events").select("id", { count: "exact", head: true })
+    .eq("mission_id", missionId).eq("type", "task_started").contains("payload", { task_id: taskId });
+  return count || 0;
+}
+
+/**
+ * `deadlineAt` (epoch ms): instante em que a edge function precisa ter terminado. A plataforma encerra a função
+ * (erro 546) se passar do limite de tempo, deixando a etapa "running" para sempre; por isso cada chamada ao modelo
+ * recebe só o tempo que sobra, e uma etapa que estoura o prazo volta para a fila e recomeça em outra chamada.
+ */
+export async function runNext(admin: SupabaseClient, missionId: string, userId: string, deadlineAt?: number): Promise<{ state: StepState; taskId?: string; message?: string }> {
   const mission = await loadOwnedMission(admin, missionId, userId);
   if (mission.status === "paused") return { state: "paused" };
   if (mission.status === "awaiting_owner") return { state: "awaiting_owner" };
@@ -139,11 +152,18 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
 
   if (next.kind === "failed") { await failMission(admin, mission, "Uma tarefa falhou."); return { state: "failed" }; }
   if (next.kind === "busy") {
-    // Tarefa "running" há muito tempo = a execução anterior morreu no meio. Falha explícita em vez de travar.
+    // Tarefa "running" há muito tempo = a execução anterior morreu no meio (limite de tempo da plataforma).
+    // Volta para a fila até MAX_TASK_ATTEMPTS vezes; depois falha com clareza em vez de travar.
     const stale = (tasks || []).find((t: any) => t.status === "running" && t.started_at && Date.now() - new Date(t.started_at).getTime() > STALE_TASK_MS);
     if (stale) {
+      const attempts = await attemptsSoFar(admin, mission.id, stale.id);
+      if (canRetryTask(attempts)) {
+        await admin.from("squad_tasks").update({ status: "pending", started_at: null }).eq("id", stale.id).eq("status", "running");
+        await emit(admin, mission, { type: "task_retry", text: "Etapa interrompida pelo servidor; tentando de novo", payload: { task_id: stale.id, attempts } });
+        return { state: "task_done", taskId: stale.id, message: "retry" };
+      }
       await admin.from("squad_tasks").update({ status: "failed", error: "Tempo esgotado", completed_at: new Date().toISOString() }).eq("id", stale.id);
-      await failMission(admin, mission, "Uma tarefa ficou sem resposta e foi marcada como falha.");
+      await failMission(admin, mission, "Uma etapa foi interrompida pelo servidor várias vezes e foi marcada como falha.");
       return { state: "failed" };
     }
     return { state: "busy" };
@@ -166,7 +186,7 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
   if (!claimedRows.length) return { state: "busy" };
 
   const results = await Promise.all(claimedRows.map((claimed) =>
-    runTask(admin, mission, claimed, userId).catch(async (e) => {
+    runTask(admin, mission, claimed, userId, deadlineAt).catch(async (e) => {
       // Erro inesperado numa tarefa não pode deixá-la "running" para sempre nem derrubar as irmãs.
       const msg = e instanceof Error ? e.message : "Erro inesperado";
       await admin.from("squad_tasks").update({ status: "failed", error: msg, completed_at: new Date().toISOString() }).eq("id", claimed.id);
@@ -180,7 +200,7 @@ export async function runNext(admin: SupabaseClient, missionId: string, userId: 
 
 // ---------- Executar UMA tarefa já reservada ----------
 
-async function runTask(admin: SupabaseClient, mission: any, claimed: any, userId: string): Promise<{ state: StepState; taskId?: string; message?: string }> {
+async function runTask(admin: SupabaseClient, mission: any, claimed: any, userId: string, deadlineAt?: number): Promise<{ state: StepState; taskId?: string; message?: string }> {
   const { data: agent } = await admin.from("squad_agents").select("*").eq("id", claimed.agent_id).single();
   await emit(admin, mission, { type: "task_started", agentId: agent.id, room: agent.room, text: claimed.title, payload: { task_id: claimed.id, position: claimed.position } });
 
@@ -253,9 +273,18 @@ async function runTask(admin: SupabaseClient, mission: any, claimed: any, userId
   // Teto alto de tokens: modelos com raciocínio gastam parte do teto "pensando" e cortavam a resposta no meio.
   const baseMessages = [{ role: "user", content: userMessage }];
   const first = await callWithFallback(admin, keys, {
-    systemPrompt: agent.system_prompt, messages: baseMessages, temperature: 0.6, mode: "text", maxTokens: SQUAD_MAX_TOKENS,
+    systemPrompt: agent.system_prompt, messages: baseMessages, temperature: 0.6, mode: "text", maxTokens: SQUAD_MAX_TOKENS, deadlineAt,
   });
-  if (!first || !first.ok || !first.output) return await failTask("Nenhum provedor de IA respondeu. Tente novamente em instantes.");
+  if (!first || !first.ok || !first.output) {
+    // Sem resposta (provedor lento ou prazo da função esgotado): a etapa volta para a fila e recomeça em outra chamada.
+    const attempts = await attemptsSoFar(admin, mission.id, claimed.id);
+    if (canRetryTask(attempts)) {
+      await admin.from("squad_tasks").update({ status: "pending", started_at: null }).eq("id", claimed.id);
+      await emit(admin, mission, { type: "task_retry", agentId: agent.id, room: agent.room, text: "Sem resposta do modelo a tempo; tentando de novo", payload: { task_id: claimed.id, attempts } });
+      return { state: "task_done", taskId: claimed.id, message: "retry" };
+    }
+    return await failTask("Nenhum provedor de IA respondeu a tempo depois de várias tentativas. Tente novamente em instantes.");
+  }
 
   // Resposta cortada por tamanho: pede continuação em vez de entregar texto pela metade.
   let output = first.output;
@@ -265,7 +294,7 @@ async function runTask(admin: SupabaseClient, mission: any, claimed: any, userId
   let cost = estimateCost(first.model!, first.tokensInput, first.tokensOutput);
   for (let i = 0; i < MAX_CONTINUATIONS && finish === "length"; i++) {
     const more = await callWithFallback(admin, keys, {
-      systemPrompt: agent.system_prompt, temperature: 0.6, mode: "text", maxTokens: SQUAD_MAX_TOKENS,
+      systemPrompt: agent.system_prompt, temperature: 0.6, mode: "text", maxTokens: SQUAD_MAX_TOKENS, deadlineAt,
       messages: [...baseMessages, { role: "assistant", content: output }, { role: "user", content: "Sua resposta foi cortada. Continue EXATAMENTE de onde parou, sem repetir nada e sem comentários." }],
     });
     if (!more || !more.ok || !more.output) break;

@@ -12,7 +12,9 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
-const TIME_BUDGET_MS = 110_000;
+// Mesmos limites do squad-engine: não começa etapa nova depois de TIME_BUDGET_MS e limita cada chamada ao modelo a DEADLINE_MS.
+const TIME_BUDGET_MS = 45_000;
+const DEADLINE_MS = 125_000;
 const MAX_MISSIONS_PER_TICK = 10;
 
 function json(body: unknown, status = 200) {
@@ -72,7 +74,7 @@ Deno.serve(async (req) => {
       let ran = 0;
       let state = "";
       while (Date.now() - started < TIME_BUDGET_MS) {
-        const r = await runNext(admin, m.id, m.owner_id);
+        const r = await runNext(admin, m.id, m.owner_id, started + DEADLINE_MS);
         state = r.state;
         if (r.state !== "task_done") break;
         ran++;

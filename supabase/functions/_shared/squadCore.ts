@@ -734,3 +734,13 @@ export function maskSecrets(input: string): PiiResult {
   });
   return { text, findings };
 }
+
+// ---------- Novas tentativas de etapa ----------
+
+/** Quantas vezes uma etapa pode começar (a primeira conta) antes de a missão falhar. */
+export const MAX_TASK_ATTEMPTS = 3;
+
+/** Uma etapa interrompida pela plataforma (limite de tempo) ou sem resposta do provedor pode recomeçar? */
+export function canRetryTask(attemptsSoFar: number): boolean {
+  return attemptsSoFar < MAX_TASK_ATTEMPTS;
+}

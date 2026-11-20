@@ -273,9 +273,27 @@ export function useMissionRealtime(missionId?: string, squadId?: string) {
  * Se a página fechar no meio, o agendador (squad-cron-tick) retoma a missão depois.
  */
 export async function driveMission(missionId: string): Promise<{ state: string }> {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   let last: { state: string; hasMore?: boolean } = { state: "task_done", hasMore: true };
-  for (let i = 0; i < 12 && last.hasMore; i++) {
-    last = await call({ action: "run_all", missionId });
+  let errors = 0;
+  let busyWaits = 0;
+  for (let i = 0; i < 80 && last.hasMore; i++) {
+    try {
+      last = await call({ action: "run_all", missionId });
+      errors = 0;
+    } catch (e) {
+      // A plataforma pode encerrar a função no meio (erro 546) ou a rede pode cair: tenta de novo antes de desistir.
+      // A etapa interrompida volta para a fila sozinha (ver runNext), então basta chamar de novo.
+      if (++errors > 4) throw e;
+      await sleep(3000 * errors);
+      last = { state: "task_done", hasMore: true };
+      continue;
+    }
+    // "busy": outra chamada (ou uma etapa interrompida esperando ser retomada) ocupa a missão. Espera e confere de novo.
+    if (last.state === "busy" && ++busyWaits <= 45) {
+      await sleep(8000);
+      last = { ...last, hasMore: true };
+    }
   }
   return last;
 }

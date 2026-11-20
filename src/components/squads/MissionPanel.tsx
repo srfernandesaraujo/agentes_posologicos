@@ -48,6 +48,7 @@ const EVENT_LABEL: Record<string, string> = {
   secrets_masked: "Segredos mascarados",
   question_asked: "Perguntou a você",
   question_answered: "Resposta recebida",
+  task_retry: "Etapa recomeçou",
   task_skipped: "Etapa dispensada",
   memory_suggested: "Memória: sugestões novas",
   memory_saved: "Anotado na memória",

@@ -153,6 +153,11 @@ describe("perguntas ao dono no escritório", () => {
     expect(cmds).toHaveLength(1);
     expect(cmds[0]).toMatchObject({ kind: "bubble", text: "Segredos mascarados", tone: "warn" });
   });
+  it("etapa que recomeça mostra um balão de aviso no agente", () => {
+    const cmds = eventToCommands(ev("task_retry", "b", "ops", "Tentando de novo"), team);
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0]).toMatchObject({ kind: "bubble", agentId: "b", text: "Tentando de novo", tone: "warn" });
+  });
   it("ao responder, o agente volta ao normal e a diretora avisa", () => {
     const cmds = eventToCommands(ev("question_answered", "b", null, "Manter constante"), team);
     expect(cmds[0]).toMatchObject({ kind: "goto", agentId: "b", then: "idle" });

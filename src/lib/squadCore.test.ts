@@ -6,7 +6,7 @@ import {
   extractOwnerQuestion, buildOwnerRules,
   selectMemoriesForContext, buildMemoryContext, isDuplicateMemory, buildMemoryExtractionPrompt, parseMemoryExtraction,
   MEMORY_CONTEXT_LIMIT, MEMORY_MAX_CHARS,
-  countTextWords, parseWordRange, wordsNote, maskSecrets,
+  countTextWords, parseWordRange, wordsNote, maskSecrets, canRetryTask, MAX_TASK_ATTEMPTS,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
 import { TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, TEMPLATE_SECRETARIADO, TEMPLATE_VIBE_CODING, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
@@ -685,5 +685,15 @@ describe("template de Vibe Coding", () => {
   });
   it("só os campos essenciais são obrigatórios", () => {
     expect(TEMPLATE_VIBE_CODING.formFields.filter((f) => f.required).map((f) => f.key)).toEqual(["projeto", "tipo", "stack", "alvo", "requisitos"]);
+  });
+});
+
+describe("novas tentativas de etapa", () => {
+  it("a etapa pode recomeçar até o limite de tentativas e depois falha", () => {
+    expect(MAX_TASK_ATTEMPTS).toBe(3);
+    expect(canRetryTask(1)).toBe(true);
+    expect(canRetryTask(2)).toBe(true);
+    expect(canRetryTask(3)).toBe(false);
+    expect(canRetryTask(7)).toBe(false);
   });
 });
