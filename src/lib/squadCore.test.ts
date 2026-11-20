@@ -9,7 +9,7 @@ import {
   countTextWords, parseWordRange, wordsNote, maskSecrets, canRetryTask, MAX_TASK_ATTEMPTS,
   type SquadTemplate, type TaskLite,
 } from "../../supabase/functions/_shared/squadCore";
-import { TEMPLATE_AUTOMACAO_WHATSAPP, TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_LIVROS, TEMPLATE_PESQUISA_CLINICA, TEMPLATE_SECRETARIADO, TEMPLATE_VIBE_CODING, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
+import { TEMPLATE_AUTOMACAO_WHATSAPP, TEMPLATE_CONTEUDO_YOUTUBE, TEMPLATE_INFRA_LOCAL, TEMPLATE_LIVROS, TEMPLATE_PESQUISA_CLINICA, TEMPLATE_SECRETARIADO, TEMPLATE_VIBE_CODING, getTemplate, listTemplates } from "../../supabase/functions/_shared/squadTemplates";
 
 describe("planTasks", () => {
   it("gera um pipeline sequencial a partir do template de Conteúdo", () => {
@@ -786,6 +786,52 @@ describe("template de Automação e WhatsApp", () => {
     expect(r.text).not.toContain("91234-5678");
     expect(r.text).not.toContain("123.456.789-09");
     expect(r.text).toContain("Maria");
+  });
+});
+
+describe("template de Infraestrutura e Servidores Locais", () => {
+  const T = TEMPLATE_INFRA_LOCAL;
+  const tasks = planTasks(T);
+  it("é missão sem dados pessoais, com filtro de segredos, na sala de servidores", () => {
+    expect(T.kind).toBe("mission");
+    expect(T.sensitivity).toBe("normal");
+    expect(T.maskSecrets).toBe(true);
+    expect(T.environment).toBe("sala-servidores");
+    expect(getTemplate("infra-local")).toBe(T);
+  });
+  it("rede e backup rodam juntos depois do servidor; a Nina espera os dois; os ajustes são paralelos", () => {
+    expect(tasks.map((x) => x.title)).toEqual([
+      "Plano de infraestrutura", "Arquitetura do servidor", "Rede e segurança", "Backup e recuperação", "Parecer de revisão",
+      "Ajustes do servidor", "Ajustes da rede", "Ajustes do backup", "Entrega final",
+    ]);
+    expect(tasks.map((x) => x.dependsOnPositions)).toEqual([[], [0], [1], [1], [2, 3], [4], [4], [4], [5, 6, 7]]);
+  });
+  it("nenhum agente executa nada, todos exigem NÃO EXECUTADO, aviso de destrutivo e proíbem segredo real", () => {
+    for (const a of T.agents) {
+      expect(a.systemPrompt, a.name).toContain("NÃO executa nada");
+      expect(a.systemPrompt, a.name).toContain("NÃO EXECUTADO");
+      expect(a.systemPrompt, a.name).toContain("DESTRUTIVO: confirme antes");
+      expect(a.systemPrompt, a.name).toContain("Nunca peça nem escreva senhas");
+    }
+    expect(tasks[8].instructions).toContain("NADA DO QUE ESTÁ AQUI FOI EXECUTADO");
+  });
+  it("firewall exige jeito de recuperar o acesso e o backup exige teste de restauração e cópia fora do local", () => {
+    expect(tasks[2].instructions).toContain("recuperar o acesso");
+    expect(tasks[3].instructions).toContain("RESTAURAÇÃO");
+    expect(tasks[3].instructions).toContain("fora do local");
+    const nina = T.agents.find((a) => a.slug === "revisora")!;
+    expect(nina.systemPrompt).toContain("teste de restauração");
+    expect(nina.systemPrompt).toContain("exposto à internet sem autenticação");
+  });
+  it("o plano pergunta ao dono quando o pedido expõe serviço sem proteção", () => {
+    expect(tasks[0].instructions).toContain("expõe serviço à internet sem proteção");
+  });
+  it("só os campos essenciais são obrigatórios", () => {
+    expect(T.formFields.filter((f) => f.required).map((f) => f.key)).toEqual(["objetivo", "tipo", "hardware", "requisitos"]);
+  });
+  it("senha e chave coladas na configuração são mascaradas", () => {
+    const r = maskSecrets("DB_PASSWORD=SuperSegredo123 e AWS_SECRET_ACCESS_KEY=abcd1234efgh5678ijkl");
+    expect(r.text).not.toContain("SuperSegredo123");
   });
 });
 

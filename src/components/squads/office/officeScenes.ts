@@ -104,6 +104,17 @@ const PALETTES: Record<SceneTheme, Palette> = {
     },
     desk: "#dfe4ec", deskEdge: "#a1a9b8", accent: "#22c55e",
   },
+  servidores: {
+    hall: ["#2f3440", "#363c49"],
+    floors: {
+      dir: { base: "#59647a", alt: "#515c72", mode: "tile" },
+      ops: { base: "#3b4558", alt: "#343e50", mode: "tile" },
+      lib: { base: "#2b3342", alt: "#252d3b", mode: "tile" },
+      copa: { base: "#c4a47a", alt: "#b69669", mode: "wood" },
+      meet: { base: "#44566b", alt: "#3d4e62", mode: "tile" },
+    },
+    desk: "#9aa7bb", deskEdge: "#6e7b90", accent: "#38bdf8",
+  },
 };
 
 function floor(g: G, room: RoomId, p: Palette) {
@@ -384,7 +395,29 @@ function decorCentral(g: G) {
   for (let i = 0; i < 5; i++) R(g, 225 + i * 8, 206, 3, 1, "#475569");
 }
 
-const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora, executivo: decorExecutivo, loft: decorLoft, laboratorio: decorLaboratorio, central: decorCentral };
+function decorServidores(g: G) {
+  // Arquitetura: parede de monitoramento, quadro da topologia e placa de aviso
+  R(g, 68, 14, 34, 14, "#12161f");
+  [0, 1, 2].forEach((i) => { R(g, 70 + i * 10, 16, 9, 10, "#0b1220"); R(g, 71 + i * 10, 22 - i, 7, 1, "#34d399"); R(g, 71 + i * 10, 19 + i, 7, 1, "#38bdf8"); });
+  R(g, 22, 28, 42, 12, "#0f172a"); R(g, 23, 29, 40, 10, "#111c33");
+  R(g, 38, 31, 8, 4, "#38bdf8"); [[27, 36], [38, 36], [49, 36], [57, 31]].forEach(([x, y]) => R(g, x, y, 5, 3, "#34d399"));
+  R(g, 42, 35, 1, 1, "#64748b"); R(g, 30, 35, 9, 1, "#64748b"); R(g, 51, 35, 1, 1, "#64748b");
+  R(g, 106, 32, 22, 12, "#facc15"); R(g, 108, 34, 18, 8, "#1c2030"); R(g, 114, 35, 6, 1, "#facc15"); R(g, 116, 37, 2, 3, "#facc15");
+  // Racks e rede: fileira de racks na parede da direita, switch com portas, nobreak e painel de patch
+  [280, 291].forEach((x) => { R(g, x, 34, 9, 34, "#12161f"); R(g, x + 1, 35, 7, 32, "#222b3a"); for (let y = 37; y < 65; y += 4) R(g, x + 2, y, 5, 2, "#3b4658"); });
+  R(g, 216, 14, 56, 11, "#12161f"); for (let i = 0; i < 12; i++) R(g, 219 + i * 4, 17, 3, 3, "#1e293b"); for (let i = 0; i < 12; i++) R(g, 219 + i * 4, 21, 3, 2, "#334155");
+  R(g, 178, 96, 22, 16, "#2a2d38"); R(g, 180, 98, 18, 5, "#0b1220"); R(g, 182, 100, 8, 1, "#34d399"); R(g, 180, 106, 18, 4, "#3b4658");
+  R(g, 204, 100, 28, 6, "#1c2030"); for (let i = 0; i < 8; i++) R(g, 206 + i * 3, 102, 2, 2, "#475569");
+  // Backup: armário de discos e cofre de fitas
+  R(g, 22, 134, 76, 12, "#12161f"); R(g, 23, 135, 74, 10, "#222b3a");
+  for (let i = 0; i < 8; i++) { R(g, 25 + i * 9, 137, 7, 6, "#3b4658"); R(g, 27 + i * 9, 140, 3, 1, "#64748b"); }
+  // Incidentes: tela com a topologia (os nós acendem a cada entrega)
+  R(g, 214, 196, 60, 18, "#1c2030"); R(g, 216, 198, 56, 14, "#0b1220");
+  R(g, 240, 200, 8, 4, "#334155"); R(g, 244, 204, 1, 2, "#475569"); R(g, 224, 206, 40, 1, "#475569");
+  for (let i = 0; i < 5; i++) R(g, 222 + i * 10, 207, 4, 3, "#334155");
+}
+
+const DECOR: Record<SceneTheme, (g: G) => void> = { studio: decorStudio, university: decorUniversity, campus: decorCampus, editora: decorEditora, executivo: decorExecutivo, loft: decorLoft, laboratorio: decorLaboratorio, central: decorCentral, servidores: decorServidores };
 
 const layerCache = new Map<SceneTheme, HTMLCanvasElement>();
 
@@ -532,6 +565,23 @@ export function drawAnimated(ctx: G, theme: SceneTheme, info: AnimInfo) {
     if (busy && Math.floor(info.t * 2) % 2 === 0) R(ctx, 283, 38, 10, 5, "#4ade80");
     const lit = Math.min(info.deliverables, 6);
     for (let i = 0; i < lit; i++) R(ctx, 221 + i * 8, 205, 3, 3, "#4ade80");
+  }
+
+  // Sala de servidores: LEDs dos racks e do switch piscam com trabalho nas bancadas, discos do backup piscam com trabalho no backup, nós da topologia acendem por entrega
+  if (theme === "servidores") {
+    if (info.working.has("ops")) {
+      for (let r = 0; r < 2; r++) for (let k = 0; k < 7; k++) {
+        const on = (Math.floor(info.t * 4) + r * 3 + k * 2) % 3 !== 0;
+        R(ctx, 280 + r * 11 + 2, 37 + k * 4, 1, 2, on ? (k % 2 ? "#34d399" : "#38bdf8") : "#1e293b");
+      }
+      for (let i = 0; i < 12; i++) if ((Math.floor(info.t * 5) + i * 7) % 4 !== 0) R(ctx, 219 + i * 4, 17, 3, 3, i % 3 === 0 ? "#34d399" : "#38bdf8");
+    }
+    if (info.working.has("lib")) {
+      for (let i = 0; i < 8; i++) R(ctx, 25 + i * 9 + 5, 141, 1, 1, (Math.floor(info.t * 3) + i) % 2 ? "#34d399" : "#f59e0b");
+    }
+    R(ctx, 182, 100, 8, 1, Math.floor(info.t) % 2 ? "#34d399" : "#16a34a");
+    const lit = Math.min(info.deliverables, 5);
+    for (let i = 0; i < lit; i++) R(ctx, 222 + i * 10, 207, 4, 3, "#34d399");
   }
 
   // Pilha de entregas na mesa da diretora

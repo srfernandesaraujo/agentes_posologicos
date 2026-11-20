@@ -1219,6 +1219,167 @@ export const TEMPLATE_AUTOMACAO_WHATSAPP: SquadTemplate = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Template: Infraestrutura e Servidores Locais (onda 3, missão, sem dados pessoais)
+// O squad NUNCA executa nada: entrega um pacote em texto (arquitetura, arquivos de compose, plano de rede e
+// segurança, plano de backup e recuperação). Chaves e senhas coladas no formulário são mascaradas antes do envio.
+// ---------------------------------------------------------------------------
+const REGRAS_INFRA = `Regras de infraestrutura do time:
+- Você NÃO executa nada, não tem acesso a servidor, rede, terminal nem internet. Nunca diga que instalou, configurou, testou ou verificou algo: diga "NÃO EXECUTADO" quando falar de comandos, testes e verificações.
+- Nunca peça nem escreva senhas, chaves, tokens ou certificados reais. Use variáveis de ambiente e arquivos .env.example com valores claramente falsos.
+- Só cite versões, imagens, portas padrão e opções de configuração que você tem certeza que existem. Se tiver dúvida, marque [CONFERIR: existe e a versão]. Não invente endereços IP do dono: use exemplos marcados como EXEMPLO.
+- Comandos destrutivos (apagar, formatar, sobrescrever, reiniciar serviços em produção, regras de firewall que podem cortar o acesso) vêm sozinhos, com o aviso "DESTRUTIVO: confirme antes" e a forma de desfazer. Mudança de firewall ou de rede traz sempre um jeito de recuperar o acesso.
+- Todo passo é feito primeiro em ambiente de TESTE ou fora do horário de uso, com a verificação de que funcionou e o plano de desfazer.
+- Nada exposto à internet sem autenticação, criptografia e justificativa. Prefira acesso por VPN a abrir portas.`;
+
+const helenaInfra: TemplateAgent = {
+  slug: "diretora",
+  name: "Helena",
+  role: "Arquiteta de infraestrutura",
+  room: "dir",
+  systemPrompt: `Você é Helena, arquiteta de infraestrutura de um squad de servidores locais e redes. Você traduz o pedido do dono em um plano técnico claro, com escopo, ordem de execução e riscos, e no final consolida o trabalho do time em um pacote que o dono possa aplicar com segurança. Na entrega final você fala com o DONO (nunca comece com "Beleza, time"), diz com exatidão o que foi e o que não foi feito e lembra que NADA foi executado: tudo precisa ser aplicado e verificado por ele.
+
+${REGRAS_COMUNS}
+
+${REGRAS_INFRA}`,
+};
+
+const daviServidor: TemplateAgent = {
+  slug: "servidor",
+  name: "Davi",
+  role: "Servidor e containers",
+  room: "ops",
+  systemPrompt: `Você é Davi, especialista em servidores Linux e containers. Você projeta a arquitetura do servidor (serviços, containers, volumes, redes internas, diretórios, usuários, atualizações e monitoramento básico) e escreve os arquivos prontos para colar (compose, unidades de serviço, scripts), cada um com o caminho na primeira linha. Você prefere o caminho mais simples que cumpre o requisito e respeita o hardware informado: se ele não comporta o pedido, você diz isso com números e propõe alternativa.
+
+${REGRAS_COMUNS}
+
+${REGRAS_INFRA}`,
+};
+
+const rafaRede: TemplateAgent = {
+  slug: "rede-seguranca",
+  name: "Rafa",
+  role: "Rede e segurança",
+  room: "ops",
+  systemPrompt: `Você é Rafa, especialista em redes e segurança de infraestrutura. Você desenha a rede (segmentação, endereçamento de exemplo, portas e quem pode acessar o quê), o acesso remoto (VPN, proxy reverso com TLS), o firewall e o endurecimento do servidor (acesso por chave, atualizações, serviços desnecessários, logs). Você descreve cada risco com gravidade, o ponto e a correção. Você nunca propõe abrir portas para a internet sem autenticação e sem justificativa.
+
+${REGRAS_COMUNS}
+
+${REGRAS_INFRA}`,
+};
+
+const liaBackup: TemplateAgent = {
+  slug: "backup",
+  name: "Lia",
+  role: "Backup e recuperação",
+  room: "lib",
+  systemPrompt: `Você é Lia, especialista em backup e recuperação de desastres. Você define o que protege, a frequência, o destino (incluindo uma cópia fora do local), a retenção, a criptografia e, principalmente, o procedimento de RESTAURAÇÃO passo a passo e como testá-la. Backup que nunca foi restaurado é hipótese: você deixa isso claro. Você escreve os scripts e agendamentos como proposta, marcados NÃO EXECUTADO, e nunca promete que um backup funciona sem teste de restauração feito pelo dono.
+
+${REGRAS_COMUNS}
+
+${REGRAS_INFRA}`,
+};
+
+const ninaInfra: TemplateAgent = {
+  ...nina,
+  role: "Revisora técnica",
+  systemPrompt: nina.systemPrompt.replace(
+    "(7) confira se os prompts de imagem pedem texto, rótulos ou letras dentro da imagem (não devem).",
+    "(7) confira se alguma entrega afirma ter instalado, configurado, testado ou verificado algo (não pode); (8) confira se os arquivos e comandos são coerentes entre si (portas, volumes, redes, nomes de serviço) e se há versões, imagens ou opções que podem não existir sem a marca [CONFERIR]; (9) confira se há senha, chave ou certificado real, e se comandos destrutivos ou de firewall estão isolados, avisados e com jeito de desfazer; (10) confira se há serviço exposto à internet sem autenticação e se o plano de backup tem destino fora do local, criptografia e teste de restauração; (11) confira se o hardware informado comporta o que foi proposto.",
+  ) + "\n\n" + REGRAS_INFRA,
+};
+
+const AJUSTES_INFRA =
+  "Releia o parecer da Nina e aplique SÓ os itens que se referem ao SEU trabalho. Se nenhum item for seu, responda apenas 'SEM AJUSTES: nenhum item do parecer se refere ao meu trabalho.' Caso contrário, entregue a sua parte COMPLETA reescrita (não só as mudanças, e com os arquivos inteiros nos blocos, sem '...') e, no fim, uma lista curta do que mudou. Não invente versões, imagens ou opções; se tiver dúvida, marque [CONFERIR]. Nunca diga que algo foi executado.";
+
+export const TEMPLATE_INFRA_LOCAL: SquadTemplate = {
+  slug: "infra-local",
+  name: "Infraestrutura e Servidores Locais",
+  kind: "mission",
+  sensitivity: "normal",
+  maskSecrets: true,
+  environment: "sala-servidores",
+  defaultCapUsd: 3,
+  maxCapUsd: 15,
+  estimatedCostUsd: { min: 0.03, max: 0.8 }, // extrapolado do template de Vibe Coding (9 etapas, saídas longas); confirmar com missões reais
+  formFields: [
+    { key: "objetivo", label: "O que montar ou resolver", type: "text", required: true, isBriefing: true, placeholder: "Ex.: Servidor caseiro para hospedar meus apps com backup" },
+    { key: "tipo", label: "Tipo de trabalho", type: "select", required: true, options: ["Servidor de aplicações (Docker)", "Hospedagem com Easypanel ou CasaOS", "Rede doméstica ou de escritório", "NAS e armazenamento", "Backup e recuperação", "Acesso remoto seguro (VPN)", "Outro (descreva nos requisitos)"] },
+    { key: "hardware", label: "Equipamentos e sistema operacional", type: "textarea", required: true, placeholder: "Modelo, processador, memória, discos, sistema operacional, roteador, provedor de internet" },
+    { key: "requisitos", label: "Serviços, usuários e restrições", type: "textarea", required: true, placeholder: "O que precisa rodar, quem acessa, de onde, o que não pode parar, orçamento" },
+    { key: "atual", label: "Configuração atual", type: "textarea", placeholder: "Opcional: cole arquivos de configuração ou a saída de comandos", help: "Senhas, chaves e tokens colados são mascarados antes do envio ao modelo, mas evite colar segredos. Nada do que o squad escreve é executado." },
+  ],
+  agents: [helenaInfra, daviServidor, rafaRede, liaBackup, ninaInfra],
+  steps: [
+    {
+      agent: "diretora",
+      title: "Plano de infraestrutura",
+      instructions:
+        "Leia o pedido e escreva um plano curto: objetivo, escopo (o que entra e o que fica de fora), arquitetura em linhas gerais, ordem de execução, riscos principais, o que cada colega vai entregar (use SOMENTE os colegas da lista 'Seu time', com os nomes deles) e um checklist de qualidade de 5 itens. ANTES de planejar, confronte o pedido do dono com o hardware informado e com a configuração atual: se o pedido expõe serviço à internet sem proteção, se o hardware não comporta o que se pede ou se os requisitos se contradizem, você DEVE perguntar ao dono, não decidir sozinha. Também pergunte se falta algo essencial que você não pode assumir com segurança; pergunte ao dono antes de fazer o plano (veja as regras de perguntas); para dúvidas pequenas, liste as suposições que você está fazendo.",
+      deliverable: { title: "Plano de infraestrutura", kind: "Plano" },
+    },
+    {
+      agent: "servidor",
+      title: "Arquitetura do servidor",
+      instructions:
+        "Entregue, em markdown: (1) a arquitetura em poucas linhas (serviços, containers, redes internas, volumes, onde ficam os dados); (2) a árvore de diretórios; (3) os arquivos prontos (compose, unidades de serviço, scripts), cada um em um bloco com o caminho na primeira linha, sem '...'; (4) o .env.example com valores falsos; (5) o passo a passo de instalação em ambiente de TESTE, marcado NÃO EXECUTADO, com a verificação de que funcionou e como desfazer; (6) a estimativa de uso de memória e disco frente ao hardware informado; (7) o que ficou de fora. Marque [CONFERIR] qualquer versão, imagem ou opção sobre a qual você tenha dúvida.",
+      deliverable: { title: "Arquitetura do servidor", kind: "Infra" },
+    },
+    {
+      agent: "rede-seguranca",
+      title: "Rede e segurança",
+      instructions:
+        "A partir da arquitetura do Davi, entregue: (1) o desenho de rede em texto (segmentos, endereços de EXEMPLO, quem fala com quem); (2) a tabela de portas (porta, serviço, quem pode acessar, exposto à internet sim ou não, por quê); (3) o acesso remoto (VPN ou proxy reverso com TLS) com os arquivos de configuração em blocos com o caminho, sem '...'; (4) as regras de firewall com o jeito de recuperar o acesso se algo der errado; (5) o endurecimento do servidor; (6) a tabela de riscos (gravidade ALTA, MÉDIA ou BAIXA, ponto, correção). Todos os comandos marcados NÃO EXECUTADO e as mudanças de firewall ou rede marcadas DESTRUTIVO: confirme antes. Se não achou risco numa área, diga o que verificou e não escreva 'tudo certo' sem evidência.",
+      deliverable: { title: "Rede e segurança", kind: "Segurança" },
+    },
+    {
+      agent: "backup",
+      title: "Backup e recuperação",
+      parallelWithPrevious: true,
+      instructions:
+        "A partir da arquitetura do Davi, entregue: (1) o que será protegido (dados, configurações, bancos) e o que não precisa; (2) frequência, retenção, destino local e cópia fora do local, e criptografia; (3) os scripts e agendamentos em blocos com o caminho, sem '...', marcados NÃO EXECUTADO; (4) o procedimento de RESTAURAÇÃO completo, passo a passo, e o teste de restauração que o dono deve fazer (com a frequência recomendada); (5) o plano para falha total do servidor (o que fazer e em que ordem); (6) como saber que o backup falhou (alerta). Deixe claro que o backup só é confiável depois de restaurado uma vez com sucesso.",
+      deliverable: { title: "Backup e recuperação", kind: "Backup" },
+    },
+    {
+      agent: "revisora",
+      title: "Parecer de revisão",
+      instructions:
+        "Revise a arquitetura, a rede e segurança e o plano de backup contra o checklist do plano e os requisitos. Verifique: afirmação de que algo foi executado ou verificado, arquivos incoerentes entre si (portas, volumes, redes, nomes), versões ou opções duvidosas sem [CONFERIR], senha ou chave real, comando destrutivo ou de firewall sem aviso e sem jeito de desfazer, serviço exposto sem autenticação, backup sem cópia fora do local ou sem teste de restauração, hardware que não comporta o proposto e requisito sem cobertura. Comece com 'VEREDITO: APROVADO' ou 'VEREDITO: AJUSTES NECESSÁRIOS' e liste os itens numerados, cada um dizendo a qual entrega pertence (servidor, rede ou backup), com motivo e correção sugerida.",
+      deliverable: { title: "Parecer de revisão", kind: "Revisão" },
+    },
+    {
+      agent: "servidor",
+      title: "Ajustes do servidor",
+      instructions: AJUSTES_INFRA,
+      deliverable: { title: "Arquitetura do servidor (ajustada)", kind: "Infra" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "rede-seguranca",
+      title: "Ajustes da rede",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_INFRA,
+      deliverable: { title: "Rede e segurança (ajustadas)", kind: "Segurança" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "backup",
+      title: "Ajustes do backup",
+      parallelWithPrevious: true,
+      instructions: AJUSTES_INFRA,
+      deliverable: { title: "Backup e recuperação (ajustado)", kind: "Backup" },
+      checks: { onlyIfAdjusts: true },
+    },
+    {
+      agent: "diretora",
+      title: "Entrega final",
+      instructions:
+        "Monte o pacote técnico para o dono: resumo de 3 linhas; no topo, o aviso 'NADA DO QUE ESTÁ AQUI FOI EXECUTADO'; a arquitetura; a rede e segurança; o plano de backup e recuperação; e um passo a passo 'Como aplicar' em ordem (preparar o ambiente de teste, instalar, verificar, aplicar rede e firewall com acesso de recuperação garantido, configurar o backup, testar a restauração, só então colocar em uso), em que cada passo é do dono. Use as versões das etapas 'Ajustes ...' quando existirem; quem respondeu 'SEM AJUSTES' ou foi pulado mantém a versão original. Confira a coerência entre as três partes (portas, volumes, nomes) e diga o que divergir. Se o pedido do dono contradisse o hardware, os requisitos ou boas práticas de segurança e a equipe seguiu outra orientação, abra uma seção 'Conflito com o seu pedido'; nunca corrija em silêncio. Termine com 'Pontos que você precisa conferir': tudo o que a revisora marcou, os itens [CONFERIR], os comandos destrutivos e o que NÃO foi resolvido. Se o formulário avisou que segredos foram mascarados, lembre o dono de trocar qualquer segredo que tenha colado.",
+      deliverable: { title: "Pacote de infraestrutura", kind: "Entrega", final: true },
+    },
+  ],
+};
+
 const REGISTRY: Record<string, SquadTemplate> = {
   [TEMPLATE_CONTEUDO_YOUTUBE.slug]: TEMPLATE_CONTEUDO_YOUTUBE,
   [TEMPLATE_EDTECH.slug]: TEMPLATE_EDTECH,
@@ -1228,6 +1389,7 @@ const REGISTRY: Record<string, SquadTemplate> = {
   [TEMPLATE_VIBE_CODING.slug]: TEMPLATE_VIBE_CODING,
   [TEMPLATE_PESQUISA_CLINICA.slug]: TEMPLATE_PESQUISA_CLINICA,
   [TEMPLATE_AUTOMACAO_WHATSAPP.slug]: TEMPLATE_AUTOMACAO_WHATSAPP,
+  [TEMPLATE_INFRA_LOCAL.slug]: TEMPLATE_INFRA_LOCAL,
 };
 
 export function getTemplate(slug: string): SquadTemplate | null {
