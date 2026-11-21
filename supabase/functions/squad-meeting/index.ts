@@ -25,7 +25,7 @@ import {
   applyBrakes, facilitatorDue, isOpenCall, pickByLeastRecent, buildEvaluatorPrompt, buildLiveUserMessage, buildMinutesDocPrompt, parseMinutesDoc, composeMinutesDoc, renderMinutesMarkdown, clampMeetingCap, isPass, isSilenced,
   nextItemMessage, normalizeProactivity, openingMessage, parseAgenda, parseEvaluatorReply, parseMeetingCommand,
   proposalMessage, shouldNudge, transcriptBlock, detectToolIntent, buildPubmedQueryPrompt, parsePubmedQuery, pickToolAgent, shouldUpdateMinutes,
-  buildLiveMinutesPrompt, MINUTES_LIVE_MAX_CHARS, detectFileIntent, needsCalc, pickFilesForRequest, buildFileBlock, pickFileAgent, MEETING_MAX_FILES, type AgendaItem, type EvaluatorPick, type LiveLine, type Proactivity,
+  buildLiveMinutesPrompt, MINUTES_LIVE_MAX_CHARS, detectFileIntent, needsCalc, pickFilesForRequest, buildFileBlock, pickFileAgent, FILE_RULES, MEETING_MAX_FILES, type AgendaItem, type EvaluatorPick, type LiveLine, type Proactivity,
 } from "../_shared/squadMeetingCore.ts";
 
 const corsHeaders = {
@@ -236,6 +236,26 @@ Deno.serve(async (req) => {
       const team = agents.map((a) => ({ name: a.name, role: a.role }));
       const deadlineAt = Date.now() + FUNCTION_DEADLINE_MS;
 
+      // Todo agente da reunião enxerga os arquivos anexados (resumo curto), mesmo quando o pedido não foi dirigido a ele.
+      // Sem isso, quem entra por conta própria ou é chamado pela diretora diz que "não consegue acessar planilhas".
+      let filesOverview = "";
+      {
+        const { data: fRows } = await admin.from("squad_meeting_files")
+          .select("name, kind, pages, table_data, content_text").eq("meeting_id", meetingId).order("created_at");
+        if (fRows && fRows.length) {
+          const parts: string[] = [];
+          for (const f of fRows as any[]) {
+            if (f.kind === "sheet" && f.table_data) {
+              const table = f.table_data as Table;
+              parts.push(describeTable(String(f.name), table, inferColumns(table), 6));
+            } else {
+              parts.push(`Documento "${f.name}"${f.pages ? ` (${f.pages} páginas)` : ""}:\n${String(f.content_text || "").slice(0, 2500)}`);
+            }
+          }
+          filesOverview = `${FILE_RULES}\n\nArquivos anexados à reunião (o dono já os enviou; você PODE usá-los):\n\n${parts.join("\n\n---\n\n")}`.slice(0, 9000);
+        }
+      }
+
       type Mode = "mention" | "open" | "spontaneous";
       // Uma rodada de falas em paralelo. A conversa que cada agente vê inclui o que as rodadas anteriores acabaram de dizer.
       const speakRound = async (list: EvaluatorPick[], mode: Mode, facilitate: boolean, tool?: ToolCtx): Promise<{ agentId: string; content: string }[]> => {
@@ -251,7 +271,7 @@ Deno.serve(async (req) => {
           }) + "\n\n" + MEETING_LIVE_RULES;
           const userMessage = buildLiveUserMessage({
             agenda, current, transcript, why: p.why, mentioned: mode === "mention", quiet: opts.quiet && !facilitate, openCall: mode === "open", facilitate,
-          }) + (tool ? `\n\n${tool.block}` : "");
+          }) + (tool ? `\n\n${tool.block}` : filesOverview ? `\n\n${filesOverview}` : "");
           const res = await callWithFallback(admin, keys, {
             systemPrompt: system, messages: [{ role: "user", content: userMessage }], temperature: 0.5, mode: "text",
             maxTokens: tool ? MEETING_TOOL_SPEAK_TOKENS : MEETING_SPEAK_TOKENS, deadlineAt: Math.min(deadlineAt, Date.now() + 45_000),
