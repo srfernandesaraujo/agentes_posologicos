@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useNavigate } from "react-router-dom";
 import { useAgentFlows, useCreateFlow, useDeleteFlow } from "@/hooks/useAgentFlows";
 import { Button } from "@/components/ui/button";
@@ -138,6 +139,7 @@ export default function Flows() {
     <div className="container py-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
+          <DomainEyebrow domain="equipes" section="Fluxos" />
           <h1 className="text-3xl font-bold gradient-text">Fluxos de Agentes</h1>
           <p className="text-white/60 mt-1">Monte pipelines conectando agentes em sequência ou paralelo</p>
         </div>

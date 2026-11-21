@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { supabase } from "@/integrations/supabase/client";
 import { useCredits } from "@/hooks/useCredits";
 import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
@@ -92,6 +93,7 @@ export default function Orchestrator() {
               <Workflow className="h-6 w-6 text-white" />
             </div>
             <div>
+              <DomainEyebrow domain="equipes" section="Orquestrador" />
               <h1 className="text-2xl font-bold text-white">Agente Orquestrador</h1>
               <p className="text-sm text-white/60">Um único objetivo, múltiplos especialistas trabalhando em conjunto</p>
             </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -236,7 +237,8 @@ export default function Meetings() {
       <div className="flex items-center gap-3">
         <Video className="h-7 w-7 text-[hsl(174,62%,47%)]" />
         <div>
-          <h1 className="text-2xl font-bold text-white">Reuniões</h1>
+          <DomainEyebrow domain="equipes" section="Reuniões" />
+          <h1 className="font-display text-2xl font-bold text-white">Reuniões</h1>
           <p className="text-sm text-muted-foreground">Grave, transcreva e gere atas automáticas de reuniões do Google Meet</p>
         </div>
       </div>

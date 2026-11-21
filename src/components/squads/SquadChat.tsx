@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNewUI } from "@/contexts/NewUIContext";
 import { BellOff, BookMarked, Download, ExternalLink, FileSpreadsheet, Paperclip, ScrollText, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -92,6 +93,7 @@ function MemorySuggestion({ items, squadId, memories }: { items: { id: string; k
 }
 
 function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; agent?: SquadAgent; onMemory: (text: string) => void; onAdjust: (text: string) => void; children?: React.ReactNode }) {
+  const { enabled: v2 } = useNewUI();
   if (m.author === "system") {
     if (m.meta?.memory) return <>{children}</>;
     const cls = m.meta?.error ? "border-red-400/40 text-red-300" : m.meta?.cap ? "border-amber-400/40 text-amber-300" : "border-white/15 text-white/50";
@@ -106,7 +108,7 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
         <div className="max-w-[88%] space-y-1">
           {m.meta?.cited && <div className="flex justify-end"><span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-white/60"><FileText className="h-3 w-3" /> {m.meta.cited.title} · v{m.meta.cited.version}</span></div>}
           {guestName && <div className="text-right text-xs text-white/50">{guestName} · convidado</div>}
-          <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm text-white ${guestName ? "bg-sky-700/70" : "bg-teal-600"}`}>{m.content}</div>
+          <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm ${guestName ? "bg-sky-700/70 text-white" : v2 ? "bg-[hsl(var(--dom-equipes))] font-medium text-[#0b0820]" : "bg-teal-600 text-white"}`}>{m.content}</div>
           {masked ? <div className="text-right text-[11px] text-amber-300/80">Dados pessoais ou segredos foram mascarados antes do envio ao modelo.</div> : null}
           <div className="flex justify-end"><button type="button" className={action} onClick={() => onMemory(m.content)}><BookMarked className="h-3 w-3" /> Guardar na memória</button></div>
         </div>
@@ -126,10 +128,10 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
       <div className="min-w-0 max-w-[88%] space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 text-xs text-white/50">
           <span><span className="font-semibold text-white/80">{agent?.name || "Agente"}</span>{agent ? ` · ${agent.role}` : ""}</span>
-          {meetingTag && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${highlighted ? "bg-teal-500/25 text-teal-200" : "bg-white/10 text-white/60"}`}>{meetingTag}</span>}
+          {meetingTag && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${highlighted ? (v2 ? "bg-[hsl(var(--dom-equipes))]/25 text-[hsl(var(--dom-equipes))]" : "bg-teal-500/25 text-teal-200") : "bg-white/10 text-white/60"}`}>{meetingTag}</span>}
         </div>
         {m.meta?.minutes_doc ? <MinutesCard doc={m.meta.minutes_doc as MinutesDocData} markdown={m.content} /> : (
-          <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm px-3.5 py-2 text-sm text-white/90 ${highlighted ? "border border-teal-400/40 bg-teal-500/10" : "bg-white/10"}`}>{m.content}</div>
+          <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm px-3.5 py-2 text-sm text-white/90 ${highlighted ? (v2 ? "border border-[hsl(var(--dom-equipes))]/50 bg-[hsl(var(--dom-equipes))]/10" : "border border-teal-400/40 bg-teal-500/10") : v2 ? "border border-white/10 bg-[hsl(var(--pos-elevado))]" : "bg-white/10"}`}>{m.content}</div>
         )}
         {why && <div className="font-mono text-[10px] text-amber-300/80">Entrou por conta própria: {why}</div>}
         {tool && tool.name === "file" && <CalcCard files={tool.query} calcs={(m.meta?.calc || []) as Record<string, any>[]} />}
@@ -389,6 +391,7 @@ interface Props {
 }
 
 export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMission }: Props) {
+  const newUI = useNewUI();
   const [thread, setThread] = useState<string>(TEAM_THREAD);
   const [text, setText] = useState("");
   const [cited, setCited] = useState<{ id: string; title: string; version: number } | null>(null);
@@ -600,11 +603,11 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
         </div>
       )}
 
-      <div className="grid overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] md:grid-cols-[210px_minmax(0,1fr)]">
+      <div className={`grid overflow-hidden border border-white/10 md:grid-cols-[210px_minmax(0,1fr)] ${newUI.enabled ? "rounded-2xl bg-[hsl(var(--pos-base))]" : "rounded-xl bg-white/[0.03]"}`}>
         {/* conversas */}
         <nav aria-label="Conversas do squad" className="flex gap-1 overflow-x-auto border-b border-white/10 p-2 md:flex-col md:overflow-visible md:border-b-0 md:border-r">
           <button type="button" onClick={() => setThread(TEAM_THREAD)} aria-pressed={thread === TEAM_THREAD}
-            className={`flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm ${thread === TEAM_THREAD ? "bg-teal-500/20" : "hover:bg-white/5"}`}>
+            className={`flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm ${thread === TEAM_THREAD ? (newUI.enabled ? "bg-[hsl(var(--dom-equipes))]/20" : "bg-teal-500/20") : "hover:bg-white/5"}`}>
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-black"><Hash className="h-4 w-4" /></span>
             <span><span className="block font-semibold leading-tight">time</span><span className="hidden text-xs text-white/50 md:block">todos os agentes</span></span>
           </button>
