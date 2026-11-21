@@ -21,6 +21,7 @@ export interface MinutesDoc {
   deliberations: string[];
   actionPlan: { action: string; owner: string; deadline: string; product: string }[];
   references: { pmid: string; title: string; journal: string; year: string }[];
+  files?: { name: string; detail: string }[];
   pending: { item: string; validation: string }[];
   nextMeeting: string;
   closing: string;
@@ -252,6 +253,10 @@ export function buildMinutesPdf(data: MinutesDoc): jsPDF {
   } else paragraph("Nenhuma ação registrada.", { c: MUTED });
 
   let n = 6;
+  if (data.files?.length) {
+    sectionTitle(`${n++} Arquivos analisados`);
+    bullets(data.files.map((f) => `${f.name}: ${f.detail}`));
+  }
   if (data.references.length) {
     sectionTitle(`${n++} Referências consultadas (PubMed)`);
     bullets(data.references.map((r) => `${r.title} ${r.journal}${r.year ? `, ${r.year}` : ""}. PMID ${r.pmid}.`));

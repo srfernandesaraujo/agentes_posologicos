@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BellOff, BookMarked, Download, ExternalLink, ScrollText, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
+import { BellOff, BookMarked, Download, ExternalLink, FileSpreadsheet, Paperclip, ScrollText, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import { useChatActions, useChatMessages, useChatOfficeEvents, useChatUsage, use
 import { agentLook } from "@/lib/squadOffice";
 import { driveMission, useSquadActions, useSquadMemories, type MemoryKind, type Squad, type SquadAgent, type SquadMemory, type SquadMission } from "@/hooks/useSquads";
 import type { MinutesDoc as MinutesDocData } from "@/lib/minutesDocPdf";
-import { useLiveMeeting, useLiveMeetingActions, PROACTIVITY_OPTIONS, type LiveMeeting, type Proactivity } from "@/hooks/useSquadMeeting";
+import { useLiveMeeting, useLiveMeetingActions, useMeetingFiles, FILE_ACCEPT, MEETING_MAX_FILES, PROACTIVITY_OPTIONS, type LiveMeeting, type MeetingFile, type Proactivity } from "@/hooks/useSquadMeeting";
 import { OfficeSection } from "./office/OfficeSection";
 import { QuestionCard } from "./MissionPanel";
 
@@ -128,7 +128,8 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
           <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm px-3.5 py-2 text-sm text-white/90 ${highlighted ? "border border-teal-400/40 bg-teal-500/10" : "bg-white/10"}`}>{m.content}</div>
         )}
         {why && <div className="font-mono text-[10px] text-amber-300/80">Entrou por conta própria: {why}</div>}
-        {tool && (
+        {tool && tool.name === "file" && <CalcCard files={tool.query} calcs={(m.meta?.calc || []) as Record<string, any>[]} />}
+        {tool && tool.name !== "file" && (
           <div className="space-y-1.5 rounded-lg border border-white/10 bg-black/20 p-2.5 text-xs" aria-label="Fontes da busca no PubMed">
             <div className="font-mono text-[10px] uppercase tracking-widest text-teal-300/80">Busca no PubMed · {tool.query}</div>
             {tool.error ? <p className="text-red-300">O PubMed não respondeu: {tool.error}</p>
@@ -197,6 +198,79 @@ function MinutesCard({ doc, markdown }: { doc: MinutesDocData; markdown: string 
   );
 }
 
+/** O que o código calculou para a resposta (os números vêm do programa, não do modelo). */
+function CalcCard({ files, calcs }: { files: string; calcs: Record<string, any>[] }) {
+  const pct = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  return (
+    <div className="space-y-2 rounded-lg border border-white/10 bg-black/20 p-2.5 text-xs" aria-label="Cálculo feito por código">
+      <div className="font-mono text-[10px] uppercase tracking-widest text-teal-300/80">Arquivo · {files}</div>
+      {calcs.length === 0 && <p className="text-white/50">O agente leu o arquivo e respondeu sem cálculo.</p>}
+      {calcs.map((c, i) => (
+        <div key={i} className="space-y-1">
+          {c.action === "forecast" && (
+            <>
+              <p className="text-white/70">Projeção linear de {c.file}: {c.n} pontos, R² = {pct(c.r2)}.</p>
+              <ul className="font-mono text-[11px] text-white/80">{(c.predictions || []).map((q: any) => <li key={q.label}>{q.label}: {pct(q.value)}</li>)}</ul>
+              {(c.warnings || []).map((w: string) => <p key={w} className="text-amber-300/80">Atenção: {w}.</p>)}
+            </>
+          )}
+          {c.action === "aggregate" && (
+            <ul className="font-mono text-[11px] text-white/80">{(c.rows || []).map((r: any) => <li key={r.group}>{r.group}: {pct(r.value)} ({r.count})</li>)}</ul>
+          )}
+          {c.action === "correlation" && <p className="text-white/70">Correlação de Pearson r = {pct(c.r)} com {c.n} pares.</p>}
+        </div>
+      ))}
+      <p className="text-[10px] text-white/35">Contas feitas por código a partir do arquivo. O agente só interpreta. Confira antes de usar.</p>
+    </div>
+  );
+}
+
+/** Arquivos da reunião: anexar (planilha ou documento), ver o que foi lido e remover. Squad com dados de saúde pede confirmação antes. */
+function MeetingFiles({ files, sensitivity, busy, uploading, onUpload, onDelete }: {
+  files: MeetingFile[]; sensitivity: "normal" | "dados_pessoais" | "dados_saude"; busy: boolean; uploading: boolean;
+  onUpload: (file: File, confirmed: boolean) => void; onDelete: (id: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<File | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const pick = (f: File | undefined) => {
+    if (inputRef.current) inputRef.current.value = "";
+    if (!f) return;
+    if (sensitivity === "dados_saude") { setPending(f); setConfirmed(false); } else onUpload(f, false);
+  };
+  const full = files.length >= MEETING_MAX_FILES;
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <input ref={inputRef} type="file" accept={FILE_ACCEPT} className="hidden" aria-label="Escolher arquivo para a reunião" onChange={(e) => pick(e.target.files?.[0])} />
+        <Button size="sm" variant="outline" className="h-7 gap-1 border-white/20 bg-transparent text-xs" disabled={busy || uploading || full}
+          title={full ? "Limite de " + MEETING_MAX_FILES + " arquivos. Remova um para anexar outro." : "CSV, XLSX, TXT, MD, DOCX ou PDF, até 4 MB"} onClick={() => inputRef.current?.click()}>
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />} Anexar arquivo
+        </Button>
+        {files.map((f) => (
+          <span key={f.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/15 px-2.5 py-0.5 text-xs text-white/70" title={f.truncated ? "Só o começo do arquivo foi guardado" : undefined}>
+            {f.kind === "sheet" ? <FileSpreadsheet className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
+            <span className="truncate">{f.name}</span>
+            <span className="font-mono text-[10px] text-white/40">{f.kind === "sheet" ? `${f.rows}×${f.cols}` : f.pages ? `${f.pages} pág.` : "texto"}</span>
+            <button type="button" aria-label={`Remover ${f.name}`} disabled={busy} onClick={() => onDelete(f.id)} className="rounded-full p-0.5 hover:bg-white/10"><X className="h-3 w-3" /></button>
+          </span>
+        ))}
+      </div>
+      {files.length === 0 && <p className="text-[11px] text-white/40">Anexe uma planilha ou um documento e peça aos agentes uma análise, um resumo ou uma previsão. As contas são feitas por código; o agente só interpreta.</p>}
+      {pending && (
+        <div className="space-y-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5 text-xs text-amber-100">
+          <p>Este squad trata dados de saúde. O arquivo {pending.name} só pode ter dados anonimizados.</p>
+          <label className="flex items-start gap-2"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 accent-teal-500" /> Confirmo que o arquivo não tem dados que identifiquem pacientes (nome, CPF, telefone, prontuário).</label>
+          <div className="flex gap-2">
+            <Button size="sm" className="h-7 text-xs" disabled={!confirmed} onClick={() => { onUpload(pending, true); setPending(null); }}>Anexar</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setPending(null)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Ata ao vivo: o servidor atualiza durante a conversa; você pode editar (a próxima atualização respeita o seu texto). */
 function LiveMinutes({ minutes, version, busy, onSave }: { minutes: string; version: number; busy: boolean; onSave: (text: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -237,8 +311,10 @@ function LiveMinutes({ minutes, version, busy, onSave }: { minutes: string; vers
 }
 
 /** Barra da reunião ao vivo: pauta, proatividade, silêncio, avanço de item, teto e encerramento (gera a ata). */
-function LiveMeetingBar({ meeting, spent, busy, onControl, onEnd }: {
+function LiveMeetingBar({ meeting, spent, busy, onControl, onEnd, files, sensitivity, uploading, onUpload, onDeleteFile }: {
   meeting: LiveMeeting; spent: number; busy: boolean;
+  files: MeetingFile[]; sensitivity: "normal" | "dados_pessoais" | "dados_saude"; uploading: boolean;
+  onUpload: (file: File, confirmed: boolean) => void; onDeleteFile: (id: string) => void;
   onControl: (op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "raise_cap" | "edit_minutes", value?: unknown) => void; onEnd: () => void;
 }) {
   const cap = Number(meeting.cap_usd);
@@ -292,6 +368,7 @@ function LiveMeetingBar({ meeting, spent, busy, onControl, onEnd }: {
           {pct >= 80 && <Button size="sm" variant="outline" className="h-6 border-white/20 bg-transparent px-2 text-xs" disabled={busy} onClick={() => onControl("raise_cap", Math.round((cap + 0.5) * 100) / 100)}>+ US$ 0,50</Button>}
         </div>
       </div>
+      <MeetingFiles files={files} sensitivity={sensitivity} busy={busy} uploading={uploading} onUpload={onUpload} onDelete={onDeleteFile} />
       <LiveMinutes minutes={meeting.minutes_live || ""} version={meeting.minutes_live_version || 0} busy={busy} onSave={(t) => onControl("edit_minutes", t)} />
     </div>
   );
@@ -325,6 +402,7 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
   const [meetingAgenda, setMeetingAgenda] = useState("");
   const [meetingProactivity, setMeetingProactivity] = useState<Proactivity>("balanced");
   const { data: liveMeeting } = useLiveMeeting(squad.id);
+  const { data: meetingFiles = [] } = useMeetingFiles(liveMeeting?.id);
   const live = useLiveMeetingActions(squad.id);
   const tickingRef = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -338,7 +416,7 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
   // Mensagens ocultas (avaliação do turno, falas descartadas) só existem para contar custo.
   const messages = useMemo(() => all.filter((m) => m.thread === thread && !m.meta?.meeting?.hidden), [all, thread]);
   const inLive = !!liveMeeting && thread === TEAM_THREAD;
-  const liveBusy = live.say.isPending || live.control.isPending || live.end.isPending || live.start.isPending;
+  const liveBusy = live.say.isPending || live.control.isPending || live.end.isPending || live.start.isPending || live.deleteFile.isPending;
   const liveSpent = useMemo(
     () => (liveMeeting ? all.reduce((s, m) => (m.meta?.meeting?.id === liveMeeting.id ? s + Number(m.cost_usd || 0) : s), 0) : 0),
     [all, liveMeeting],
@@ -404,6 +482,18 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
     } finally {
       setMeetingStage(null);
     }
+  };
+  const uploadMeetingFile = async (file: File, confirmed: boolean) => {
+    if (!liveMeeting) return;
+    try {
+      await live.uploadFile.mutateAsync({ meetingId: liveMeeting.id, file, confirmedAnonymous: confirmed });
+      toast.success("Arquivo anexado. Peça uma análise, um resumo ou uma previsão aos agentes.");
+    } catch (e: any) { toast.error(e.message || "Não foi possível anexar o arquivo"); }
+  };
+  const deleteMeetingFile = async (fileId: string) => {
+    if (!liveMeeting) return;
+    try { await live.deleteFile.mutateAsync({ meetingId: liveMeeting.id, fileId }); }
+    catch (e: any) { toast.error(e.message || "Não foi possível remover"); }
   };
   const liveControl = async (op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "dismiss_proposal" | "raise_cap" | "edit_minutes", value?: unknown) => {
     if (!liveMeeting) return;
@@ -550,7 +640,8 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
           </div>
 
           {inLive && liveMeeting && (
-            <LiveMeetingBar meeting={liveMeeting} spent={liveSpent} busy={liveBusy} onControl={liveControl} onEnd={endLiveMeeting} />
+            <LiveMeetingBar meeting={liveMeeting} spent={liveSpent} busy={liveBusy} onControl={liveControl} onEnd={endLiveMeeting}
+              files={meetingFiles} sensitivity={squad.sensitivity} uploading={live.uploadFile.isPending} onUpload={uploadMeetingFile} onDeleteFile={deleteMeetingFile} />
           )}
 
           <div className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4" style={{ maxHeight: "58vh" }} aria-live="polite">

@@ -13,6 +13,9 @@ import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } fro
 import { HttpError } from "../_shared/squadRunner.ts";
 import { emitChatEvent, loadMissionContext, type AgentRow } from "../_shared/squadChatRunner.ts";
 import { searchPubmed, formatPubmedForPrompt, scrubUnknownPmids } from "../_shared/pubmedSearch.ts";
+import { parseUpload } from "../_shared/fileParsers.ts";
+import { pickDocExcerpts } from "../_shared/fileText.ts";
+import { inferColumns, describeTable, buildPlanPrompt, parsePlan, runPlan, type Plan, type Table } from "../_shared/sheetAnalysis.ts";
 import {
   CHAT_RATE_LIMIT_PER_MIN, TEAM_THREAD, buildChatSystemPrompt, capCrossing, chatBudget, cleanChatText,
   meetingModerator, parseMentions, pickMeetingParticipants, monthStartIso, type ChatAgent,
@@ -22,7 +25,7 @@ import {
   applyBrakes, facilitatorDue, isOpenCall, pickByLeastRecent, buildEvaluatorPrompt, buildLiveUserMessage, buildMinutesDocPrompt, parseMinutesDoc, composeMinutesDoc, renderMinutesMarkdown, clampMeetingCap, isPass, isSilenced,
   nextItemMessage, normalizeProactivity, openingMessage, parseAgenda, parseEvaluatorReply, parseMeetingCommand,
   proposalMessage, shouldNudge, transcriptBlock, detectToolIntent, buildPubmedQueryPrompt, parsePubmedQuery, pickToolAgent, shouldUpdateMinutes,
-  buildLiveMinutesPrompt, MINUTES_LIVE_MAX_CHARS, type AgendaItem, type EvaluatorPick, type LiveLine, type Proactivity,
+  buildLiveMinutesPrompt, MINUTES_LIVE_MAX_CHARS, detectFileIntent, needsCalc, pickFilesForRequest, buildFileBlock, pickFileAgent, MEETING_MAX_FILES, type AgendaItem, type EvaluatorPick, type LiveLine, type Proactivity,
 } from "../_shared/squadMeetingCore.ts";
 
 const corsHeaders = {
@@ -134,7 +137,7 @@ Deno.serve(async (req) => {
       insert: (row: Record<string, unknown>) => Promise<any>;
     }
     /** Resultado de uma ferramenta (hoje, a busca no PubMed) entregue ao agente que vai responder. */
-    interface ToolCtx { name: "pubmed"; query: string; block: string; pmids: string[]; sources: PubmedSource[]; error: string | null }
+    interface ToolCtx { name: "pubmed" | "file"; query: string; block: string; pmids: string[]; sources: PubmedSource[]; error: string | null; calc?: Record<string, unknown>[]; fileCount?: number }
     interface PubmedSource { pmid: string; title: string; authors: string; journal: string; year: string; url: string }
     const runTurn = async (c: TurnCtx, opts: { quiet: boolean; mentions: string[]; userText?: string; tool?: ToolCtx }): Promise<{ cost: number; spoke: number }> => {
       const { squad, meeting, agents, keys, insert } = c;
@@ -273,7 +276,7 @@ Deno.serve(async (req) => {
           }
           let content = res.output.trim() + (res.finishReason === "length" ? " […]" : "");
           let removedPmids = 0;
-          if (tool) {
+          if (tool && tool.name === "pubmed") {
             // Citação só com o que a busca devolveu: PMID fora da lista é removido do texto.
             const s = scrubUnknownPmids(content, tool.pmids);
             content = s.text;
@@ -285,9 +288,10 @@ Deno.serve(async (req) => {
             meta: {
               meeting: {
                 why: pick.why, spontaneous: mode === "spontaneous" && !facilitate, ...(facilitate ? { facilitator: true } : {}), ...(opts.quiet ? { nudge: true } : {}),
-                ...(tool ? { tool: { name: tool.name, query: tool.query, count: tool.sources.length, ...(tool.error ? { error: tool.error } : {}), ...(removedPmids ? { removed_pmids: removedPmids } : {}) } } : {}),
+                ...(tool ? { tool: { name: tool.name, query: tool.query, count: tool.name === "file" ? (tool.fileCount ?? 0) : tool.sources.length, ...(tool.error ? { error: tool.error } : {}), ...(removedPmids ? { removed_pmids: removedPmids } : {}) } } : {}),
               },
-              ...(tool ? { sources: tool.sources } : {}),
+              ...(tool?.name === "pubmed" ? { sources: tool.sources } : {}),
+              ...(tool?.calc?.length ? { calc: tool.calc } : {}),
               ...(res.finishReason === "length" ? { truncated: true } : {}),
             },
           });
@@ -475,6 +479,83 @@ Deno.serve(async (req) => {
       return json({ messages: sink });
     }
 
+    // ---------- arquivos da reunião ----------
+    if (action === "upload_file") {
+      requireOpen(meeting);
+      const fileName = String(body?.fileName || "arquivo").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_").trim().slice(0, 120) || "arquivo";
+      const rawB64 = String(body?.base64 || "");
+      if (!rawB64) throw new HttpError(400, "Nenhum arquivo recebido");
+      if (rawB64.length > 5_800_000) throw new HttpError(413, "O arquivo passa de 4 MB. Envie uma versão menor.");
+      if (squad.sensitivity === "dados_saude" && body?.confirmedAnonymous !== true) {
+        throw new HttpError(400, "Confirme que o arquivo não tem dados identificáveis de pacientes.", "needs_anonymous_confirmation");
+      }
+      const { count: fileCount } = await admin.from("squad_meeting_files").select("id", { count: "exact", head: true }).eq("meeting_id", meeting.id);
+      if ((fileCount || 0) >= MEETING_MAX_FILES) throw new HttpError(409, `Limite de ${MEETING_MAX_FILES} arquivos por reunião. Remova um para anexar outro.`);
+
+      let bytes: Uint8Array;
+      try {
+        const bin = atob(rawB64.includes(",") ? rawB64.split(",")[1] : rawB64);
+        bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      } catch {
+        throw new HttpError(400, "Não consegui ler o arquivo enviado.");
+      }
+      let parsed;
+      try {
+        parsed = await parseUpload(fileName, bytes);
+      } catch (e) {
+        throw new HttpError(400, (e as Error).message || "Não consegui ler esse arquivo.");
+      }
+
+      // Mesmos filtros das mensagens: dados pessoais conforme a sensibilidade do squad e, nos squads de código, segredos.
+      const found = new Map<string, number>();
+      const note = (fs: { type: string; count: number }[]) => fs.forEach((f) => found.set(f.type, (found.get(f.type) ?? 0) + f.count));
+      const maskText = (s: string): string => {
+        let t = s;
+        if (squad.sensitivity !== "normal" && /[\d@]/.test(t)) { const r = screenInput(t, squad.sensitivity); t = r.text; note(r.findings); }
+        if (template.maskSecrets && t.length >= 8) { const r = maskSecrets(t); t = r.text; note(r.findings); }
+        return t;
+      };
+
+      const row: Record<string, unknown> = {
+        meeting_id: meeting.id, squad_id: squad.id, owner_id: user.id, name: fileName, kind: parsed.kind, size_bytes: bytes.length,
+      };
+      let summary = "";
+      if (parsed.kind === "sheet") {
+        const table = {
+          headers: parsed.table.headers.map((h) => maskText(h)),
+          rows: parsed.table.rows.map((r) => r.map((c) => (typeof c === "string" ? maskText(c) : c))),
+        };
+        const cols = inferColumns(table);
+        row.table_data = table; row.sheet_name = parsed.sheetName; row.rows = table.rows.length; row.cols = table.headers.length;
+        summary = `Arquivo anexado: ${fileName}. Li ${table.rows.length} linhas e ${table.headers.length} colunas${parsed.sheetCount > 1 ? ` (planilha "${parsed.sheetName}", a maior de ${parsed.sheetCount})` : ""}. ` +
+          `Colunas: ${cols.map((c) => `${c.name} (${c.type === "number" ? "número" : c.type === "date" ? "data" : "texto"})`).join(", ")}.`;
+      } else {
+        row.content_text = maskText(parsed.text); row.pages = parsed.pages; row.truncated = parsed.truncated;
+        summary = `Arquivo anexado: ${fileName}. Li ${parsed.text.length.toLocaleString("pt-BR")} caracteres${parsed.pages ? ` de ${parsed.pages} páginas` : ""}${parsed.truncated ? " (só o começo foi guardado, o arquivo é maior que o limite)" : ""}.`;
+      }
+      row.masked = [...found.entries()].map(([type, count]) => ({ type, count }));
+      const { data: saved, error: saveErr } = await admin.from("squad_meeting_files").insert(row).select("id, name, kind, rows, cols, pages, size_bytes, truncated, masked, created_at").single();
+      if (saveErr) throw saveErr;
+      const sink: any[] = [];
+      const insert = makeInsert(squad.id, meeting.id, sink);
+      const maskedTotal = [...found.values()].reduce((a, b) => a + b, 0);
+      await insert({
+        author: "system", content: summary + (maskedTotal ? ` ${maskedTotal} dado(s) pessoal(is) ou segredo(s) foram mascarados na leitura.` : ""),
+        meta: { meeting: { file: { id: saved.id, name: saved.name, kind: saved.kind } }, ...(maskedTotal ? { masked_files: row.masked } : {}) },
+      });
+      return json({ file: saved, messages: sink });
+    }
+
+    if (action === "delete_file") {
+      requireOpen(meeting);
+      const { data: gone } = await admin.from("squad_meeting_files").delete().eq("id", String(body?.fileId || "")).eq("meeting_id", meeting.id).eq("owner_id", user.id).select("name");
+      if (!gone || !gone.length) throw new HttpError(404, "Arquivo não encontrado");
+      const sink: any[] = [];
+      await makeInsert(squad.id, meeting.id, sink)({ author: "system", content: `Arquivo removido da reunião: ${gone[0].name}.` });
+      return json({ messages: sink });
+    }
+
     // ---------- tick ----------
     if (action === "tick") {
       if (meeting.status !== "open") return json({ idle: true });
@@ -562,6 +643,58 @@ Deno.serve(async (req) => {
             mentions = target;
           }
         }
+        // Pergunta sobre os arquivos da reunião: as contas são feitas por código e o agente indicado (ou chamado com @) só interpreta os números.
+        if (!tool && detectFileIntent(sec.text)) {
+          const { data: fileRows } = await admin.from("squad_meeting_files")
+            .select("id, name, kind, sheet_name, rows, cols, pages, table_data, content_text, truncated").eq("meeting_id", meeting.id).order("created_at");
+          if (fileRows && fileRows.length) {
+            const picked = pickFilesForRequest(fileRows as any[], sec.text);
+            const blocks: string[] = [];
+            const calcs: Record<string, unknown>[] = [];
+            let planned = false;
+            for (const f of picked) {
+              if (f.kind === "sheet") {
+                const table = f.table_data as Table;
+                const cols = inferColumns(table);
+                let calcText = "";
+                // Só uma planilha por pedido gasta a chamada que escolhe o cálculo, e só quando o pedido exige conta.
+                if (!planned && needsCalc(sec.text)) {
+                  planned = true;
+                  const pp = buildPlanPrompt(sec.text, cols);
+                  const pr = await callWithFallback(admin, keys, {
+                    systemPrompt: pp.system, messages: [{ role: "user", content: pp.user }], temperature: 0, mode: "text", maxTokens: 160,
+                    modelOverridePerProvider: EVALUATOR_MODELS, deadlineAt: Date.now() + EVALUATOR_DEADLINE_MS,
+                  });
+                  let planCost = 0;
+                  let plan: Plan = { action: "summary" };
+                  if (pr && pr.ok && pr.output) {
+                    planCost = estimateCost(pr.model!, pr.tokensInput, pr.tokensOutput);
+                    await logAiUsage(admin, { userId: user.id, provider: pr.provider!, model: pr.model!, tokensInput: pr.tokensInput, tokensOutput: pr.tokensOutput, promptType: "squad_meeting_sheet_plan" });
+                    plan = parsePlan(pr.output, cols);
+                  }
+                  toolCost += planCost;
+                  await insert({ author: "system", content: "escolha do cálculo", cost_usd: planCost, meta: { meeting: { hidden: true, kind: "sheet_plan" } } });
+                  const result = runPlan(table, cols, plan);
+                  calcText = result.text;
+                  if (result.calc) calcs.push({ file: f.name, ...result.calc });
+                }
+                blocks.push(buildFileBlock({ kind: "sheet", description: describeTable(f.name, table, cols), calc: calcText }));
+              } else {
+                const ex = pickDocExcerpts(String(f.content_text || ""), sec.text);
+                blocks.push(buildFileBlock({
+                  kind: "doc", partial: ex.partial, truncated: !!f.truncated,
+                  description: `Documento "${f.name}"${f.pages ? ` (${f.pages} páginas)` : ""}:\n${ex.text}`, calc: "",
+                }));
+              }
+            }
+            const candidates = agents.filter((a) => meeting.participants.includes(a.id) || a.id === meetingModerator(agents, meeting.participants));
+            const target = mentions.length ? mentions : [pickFileAgent(candidates, sec.text)].filter((x): x is string => !!x);
+            if (target.length && blocks.length) {
+              tool = { name: "file", query: picked.map((f) => f.name).join(", "), block: blocks.join("\n\n---\n\n").slice(0, 22000), pmids: [], sources: [], error: null, calc: calcs, fileCount: picked.length };
+              mentions = target;
+            }
+          }
+        }
         const run = await runTurn({ squad, template, meeting, agents, keys, insert }, { quiet: false, mentions, userText: sec.text, tool });
         run.cost += toolCost;
         const monthAfter = before + run.cost;
@@ -605,6 +738,8 @@ Deno.serve(async (req) => {
           if (s?.pmid && !refMap.has(String(s.pmid))) refMap.set(String(s.pmid), { pmid: String(s.pmid), title: String(s.title || ""), journal: String(s.journal || ""), year: String(s.year || "") });
         }
         const references = [...refMap.values()];
+        const { data: fileRows } = await admin.from("squad_meeting_files").select("name, kind, rows, cols, pages").eq("meeting_id", meeting.id).order("created_at");
+        const files = ((fileRows || []) as any[]).map((f) => ({ name: String(f.name), detail: f.kind === "sheet" ? `planilha com ${f.rows} linhas e ${f.cols} colunas` : `documento${f.pages ? ` de ${f.pages} páginas` : ""}` }));
 
         let content: ReturnType<typeof parseMinutesDoc> = null;
         let cost = 0;
@@ -617,6 +752,7 @@ Deno.serve(async (req) => {
             title: meeting.title, agenda, transcript: transcriptBlock(lines, 250, 1400), draft,
             participants: ["Anfitrião (dono do squad)", ...partAgents.map((a) => `${a.name} (${a.role})`)].join("\n"),
             sources: references.map((r) => `PMID ${r.pmid}: ${r.title} (${r.journal}, ${r.year})`).join("\n"),
+            files: files.map((f) => `${f.name}: ${f.detail}`).join("\n"),
           });
           const res = await callWithFallback(admin, keys, {
             systemPrompt: prompt.system, messages: [{ role: "user", content: prompt.user }], temperature: 0.2, mode: "text", maxTokens: 6000,
@@ -636,7 +772,7 @@ Deno.serve(async (req) => {
         const doc = composeMinutesDoc(content, {
           title: meeting.title, startedAt: meeting.created_at, endedAt: new Date().toISOString(),
           moderator: moderator ? { name: moderator.name, role: moderator.role } : null,
-          participants: partAgents.map((a) => ({ name: a.name, role: a.role })), references, agenda, draft,
+          participants: partAgents.map((a) => ({ name: a.name, role: a.role })), references, files, agenda, draft,
         });
         const markdown = renderMinutesMarkdown(doc);
         await insert({

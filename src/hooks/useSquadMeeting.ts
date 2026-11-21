@@ -60,6 +60,44 @@ export function useLiveMeeting(squadId?: string) {
   return query;
 }
 
+export interface MeetingFile {
+  id: string;
+  name: string;
+  kind: "sheet" | "doc";
+  rows: number | null;
+  cols: number | null;
+  pages: number | null;
+  size_bytes: number;
+  truncated: boolean;
+  masked: { type: string; count: number }[];
+  created_at: string;
+}
+
+export const FILE_ACCEPT = ".csv,.tsv,.txt,.md,.xlsx,.xls,.xlsm,.ods,.docx,.pdf";
+export const FILE_MAX_BYTES = 4 * 1024 * 1024;
+export const MEETING_MAX_FILES = 5;
+
+/** Arquivos anexados à reunião (só a lista; o conteúdo lido fica no servidor). */
+export function useMeetingFiles(meetingId?: string) {
+  return useQuery({
+    queryKey: ["squad-meeting-files", meetingId],
+    enabled: !!meetingId,
+    queryFn: async () => {
+      const { data, error } = await db.from("squad_meeting_files").select("id, name, kind, rows, cols, pages, size_bytes, truncated, masked, created_at")
+        .eq("meeting_id", meetingId).order("created_at");
+      if (error) throw error;
+      return (data || []) as MeetingFile[];
+    },
+  });
+}
+
+const fileToBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(String(r.result).split(",")[1] || "");
+  r.onerror = () => reject(new Error("Não consegui ler o arquivo"));
+  r.readAsDataURL(file);
+});
+
 type MessagesResult = { messages: ChatMessage[]; usage?: ChatUsage };
 
 export function useLiveMeetingActions(squadId: string) {
@@ -102,6 +140,18 @@ export function useLiveMeetingActions(squadId: string) {
     onSuccess: (r) => merge(r),
     onSettled: refresh,
   });
+  const uploadFile = useMutation({
+    mutationFn: async (p: { meetingId: string; file: File; confirmedAnonymous?: boolean }) => {
+      if (p.file.size > FILE_MAX_BYTES) throw new Error("O arquivo passa de 4 MB. Envie uma versão menor.");
+      const base64 = await fileToBase64(p.file);
+      return call<MessagesResult & { file: MeetingFile }>({ action: "upload_file", meetingId: p.meetingId, fileName: p.file.name, base64, confirmedAnonymous: !!p.confirmedAnonymous });
+    },
+    onSuccess: (r, v) => { merge(r); qc.invalidateQueries({ queryKey: ["squad-meeting-files", v.meetingId] }); },
+  });
+  const deleteFile = useMutation({
+    mutationFn: (p: { meetingId: string; fileId: string }) => call<MessagesResult>({ action: "delete_file", ...p }),
+    onSuccess: (r, v) => { merge(r); qc.invalidateQueries({ queryKey: ["squad-meeting-files", v.meetingId] }); },
+  });
   /** Batimento: a diretora pode puxar a conversa se a sala ficou parada. Silencioso: erros não incomodam. */
   const tick = async (meetingId: string) => {
     try {
@@ -110,5 +160,5 @@ export function useLiveMeetingActions(squadId: string) {
     } catch { /* o próximo batimento tenta de novo */ }
   };
 
-  return { start, say, control, end, tick };
+  return { start, say, control, end, tick, uploadFile, deleteFile };
 }
