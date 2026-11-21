@@ -145,3 +145,6 @@ verify_jwt = false
 
 [functions.squad-chat]
 verify_jwt = false
+
+[functions.squad-meeting]
+verify_jwt = false

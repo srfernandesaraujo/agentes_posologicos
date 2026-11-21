@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BookMarked, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
+import { BellOff, BookMarked, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useChatActions, useChatMessages, useChatOfficeEvents, useChatUsage, useCitableDeliverables, useOpenQuestions, TEAM_THREAD, type ChatMessage } from "@/hooks/useSquadChat";
 import { agentLook } from "@/lib/squadOffice";
 import { driveMission, useSquadActions, useSquadMemories, type MemoryKind, type Squad, type SquadAgent, type SquadMemory, type SquadMission } from "@/hooks/useSquads";
+import { useLiveMeeting, useLiveMeetingActions, PROACTIVITY_OPTIONS, type LiveMeeting, type Proactivity } from "@/hooks/useSquadMeeting";
 import { OfficeSection } from "./office/OfficeSection";
 import { QuestionCard } from "./MissionPanel";
 
@@ -105,22 +106,87 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
       </div>
     );
   }
-  const meeting = m.meta?.meeting as { round?: number; summary?: boolean } | undefined;
-  const meetingTag = meeting?.summary ? "Resumo da reunião" : meeting?.round ? `Reunião · rodada ${meeting.round}` : null;
+  const meeting = m.meta?.meeting as { round?: number; summary?: boolean; minutes?: boolean; live?: boolean; why?: string; spontaneous?: boolean } | undefined;
+  const highlighted = !!(meeting?.summary || meeting?.minutes);
+  const meetingTag = meeting?.minutes ? "Ata da reunião" : meeting?.summary ? "Resumo da reunião" : meeting?.round ? `Reunião · rodada ${meeting.round}` : null;
+  // Por que o agente entrou sem ser chamado: aparece para você entender e ajustar a proatividade.
+  const why = meeting?.spontaneous && meeting?.why ? meeting.why : null;
   return (
     <div className="flex gap-2.5">
       <Avatar name={agent?.name || "?"} />
       <div className="min-w-0 max-w-[88%] space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 text-xs text-white/50">
           <span><span className="font-semibold text-white/80">{agent?.name || "Agente"}</span>{agent ? ` · ${agent.role}` : ""}</span>
-          {meetingTag && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${meeting?.summary ? "bg-teal-500/25 text-teal-200" : "bg-white/10 text-white/60"}`}>{meetingTag}</span>}
+          {meetingTag && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${highlighted ? "bg-teal-500/25 text-teal-200" : "bg-white/10 text-white/60"}`}>{meetingTag}</span>}
         </div>
-        <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm px-3.5 py-2 text-sm text-white/90 ${meeting?.summary ? "border border-teal-400/40 bg-teal-500/10" : "bg-white/10"}`}>{m.content}</div>
+        <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm px-3.5 py-2 text-sm text-white/90 ${highlighted ? "border border-teal-400/40 bg-teal-500/10" : "bg-white/10"}`}>{m.content}</div>
+        {why && <div className="font-mono text-[10px] text-amber-300/80">Entrou por conta própria: {why}</div>}
+        {children}
         <div className="flex flex-wrap items-center gap-x-1 font-mono text-[10px] text-white/30">
           <span>{m.model ? `${m.model} · ` : ""}{usd(Number(m.cost_usd))}</span>
           <span className="mx-1 text-white/15">|</span>
           <button type="button" className={action} onClick={() => onMemory(m.content)}><BookMarked className="h-3 w-3" /> Guardar na memória</button>
           <button type="button" className={action} onClick={() => onAdjust(m.content)}><Wand2 className="h-3 w-3" /> Pedir ajuste</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Barra da reunião ao vivo: pauta, proatividade, silêncio, avanço de item, teto e encerramento (gera a ata). */
+function LiveMeetingBar({ meeting, spent, busy, onControl, onEnd }: {
+  meeting: LiveMeeting; spent: number; busy: boolean;
+  onControl: (op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "raise_cap", value?: unknown) => void; onEnd: () => void;
+}) {
+  const cap = Number(meeting.cap_usd);
+  const silenced = !!meeting.silenced_until && new Date(meeting.silenced_until).getTime() > Date.now();
+  const cur = meeting.current_item;
+  const total = meeting.agenda.length;
+  const pct = cap > 0 ? Math.min(100, Math.round((spent / cap) * 100)) : 100;
+  const hint = PROACTIVITY_OPTIONS.find((o) => o.value === meeting.proactivity)?.hint;
+  return (
+    <div className="space-y-2.5 border-b border-teal-400/20 bg-teal-500/[0.06] px-4 py-3" role="region" aria-label="Reunião ao vivo">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-widest text-teal-300"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-300" /> Reunião ao vivo</div>
+          <div className="truncate font-semibold">{meeting.title}</div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Select value={meeting.proactivity} onValueChange={(v) => onControl("set_proactivity", v)}>
+            <SelectTrigger className="h-8 w-36 border-white/15 bg-white/5 text-xs" aria-label="Nível de proatividade dos agentes"><SelectValue /></SelectTrigger>
+            <SelectContent>{PROACTIVITY_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+          </Select>
+          {silenced ? (
+            <Button size="sm" variant="outline" className="h-8 gap-1 border-amber-300/40 bg-transparent text-xs text-amber-200" disabled={busy} onClick={() => onControl("unsilence")}>
+              <BellOff className="h-3.5 w-3.5" /> Em silêncio até {new Date(meeting.silenced_until!).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · voltar
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" className="h-8 gap-1 border-white/20 bg-transparent text-xs" disabled={busy} onClick={() => onControl("silence", 10)}><BellOff className="h-3.5 w-3.5" /> Silêncio 10 min</Button>
+          )}
+          <Button size="sm" className="h-8 gap-1 text-xs" disabled={busy} onClick={onEnd}>Encerrar e gerar ata</Button>
+        </div>
+      </div>
+      {hint && <p className="text-[11px] text-white/40">{hint}</p>}
+      <ol className="flex flex-wrap gap-1.5" aria-label="Pauta">
+        {meeting.agenda.map((it, i) => (
+          <li key={i} title={it.decision ? `Decisão: ${it.decision}` : undefined}
+            className={`flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs ${it.done ? "border-teal-400/30 text-teal-200/80" : i === cur ? "border-teal-300 bg-teal-500/20 text-white" : "border-white/15 text-white/50"}`}>
+            {it.done ? <Check className="h-3 w-3 shrink-0" /> : <span className="font-mono text-[10px]">{i + 1}</span>}
+            <span className="truncate">{it.title}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex items-center gap-2 text-xs text-white/60">
+          {cur < total ? <>Item {cur + 1} de {total}</> : <>Pauta concluída</>}
+          {cur < total && <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-white/60" disabled={busy} onClick={() => onControl("next_item")}>Seguir para o próximo</Button>}
+        </div>
+        <div className="flex min-w-[200px] flex-1 items-center justify-end gap-2 text-xs text-white/50">
+          <span className="font-mono">{usd(spent)} de {usd(cap)}</span>
+          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Uso do teto da reunião">
+            <div className={`h-full ${pct >= 100 ? "bg-red-400" : pct >= 80 ? "bg-amber-400" : "bg-teal-400"}`} style={{ width: `${Math.max(pct, spent ? 2 : 0)}%` }} />
+          </div>
+          {pct >= 80 && <Button size="sm" variant="outline" className="h-6 border-white/20 bg-transparent px-2 text-xs" disabled={busy} onClick={() => onControl("raise_cap", Math.round((cap + 0.5) * 100) / 100)}>+ US$ 0,50</Button>}
         </div>
       </div>
     </div>
@@ -152,6 +218,11 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
   const [meetingQuestion, setMeetingQuestion] = useState("");
   const [meetingPick, setMeetingPick] = useState<string[]>([]);
   const [meetingStage, setMeetingStage] = useState<string | null>(null);
+  const [meetingAgenda, setMeetingAgenda] = useState("");
+  const [meetingProactivity, setMeetingProactivity] = useState<Proactivity>("balanced");
+  const { data: liveMeeting } = useLiveMeeting(squad.id);
+  const live = useLiveMeetingActions(squad.id);
+  const tickingRef = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
   const [capDraft, setCapDraft] = useState("");
   const [capOpen, setCapOpen] = useState(false);
@@ -160,7 +231,26 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
   const [adjustDraft, setAdjustDraft] = useState<string | null>(null);
 
   const agentById = useMemo(() => new Map(agents.map((a) => [a.id, a])), [agents]);
-  const messages = useMemo(() => all.filter((m) => m.thread === thread), [all, thread]);
+  // Mensagens ocultas (avaliação do turno, falas descartadas) só existem para contar custo.
+  const messages = useMemo(() => all.filter((m) => m.thread === thread && !m.meta?.meeting?.hidden), [all, thread]);
+  const inLive = !!liveMeeting && thread === TEAM_THREAD;
+  const liveBusy = live.say.isPending || live.control.isPending || live.end.isPending || live.start.isPending;
+  const liveSpent = useMemo(
+    () => (liveMeeting ? all.reduce((s, m) => (m.meta?.meeting?.id === liveMeeting.id ? s + Number(m.cost_usd || 0) : s), 0) : 0),
+    [all, liveMeeting],
+  );
+  // Proposta da diretora para seguir ao próximo item, ainda sem resposta (os botões só aparecem nela).
+  const activeProposalId = useMemo(() => {
+    if (!liveMeeting) return null;
+    let found: string | null = null;
+    for (const m of all) {
+      const mt = m.meta?.meeting;
+      if (mt?.id !== liveMeeting.id) continue;
+      if (mt.propose_next === liveMeeting.current_item) found = m.id;
+      if (mt.dismissed === liveMeeting.current_item) found = null;
+    }
+    return found;
+  }, [all, liveMeeting]);
   const current = thread === TEAM_THREAD ? null : agentById.get(thread) || null;
   const exceeded = usage?.state === "exceeded";
   const awaitingApproval = lastMission?.status === "awaiting_approval";
@@ -184,23 +274,56 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
   const openMeeting = () => {
     setMeetingPick(meetingCandidates.slice(0, MEETING_MAX).map((a) => a.id));
     setMeetingQuestion("");
+    setMeetingAgenda("");
+    setMeetingProactivity("balanced");
     setMeetingOpen(true);
   };
   const togglePick = (id: string) => setMeetingPick((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= MEETING_MAX ? p : [...p, id]));
-  const startMeeting = async (resumeId?: string) => {
-    if (!resumeId && (!meetingQuestion.trim() || !meetingPick.length)) return;
-    const question = meetingQuestion.trim();
-    const participants = meetingPick;
+  /** Abre a reunião ao vivo (pauta + proatividade). */
+  const startLiveMeeting = async () => {
+    if (!meetingQuestion.trim() || !meetingPick.length) return;
     setMeetingOpen(false);
     setThread(TEAM_THREAD);
     try {
-      await runMeeting(resumeId ? { meetingId: resumeId } : { question, participants }, setMeetingStage);
+      await live.start.mutateAsync({ title: meetingQuestion.trim(), agenda: meetingAgenda, participants: meetingPick, proactivity: meetingProactivity });
+    } catch (e: any) {
+      toast.error(e.message || "Não foi possível abrir a reunião");
+    }
+  };
+  /** Só para reuniões antigas (3 etapas) que pararam no meio. */
+  const resumeOldMeeting = async (resumeId: string) => {
+    setThread(TEAM_THREAD);
+    try {
+      await runMeeting({ meetingId: resumeId }, setMeetingStage);
     } catch (e: any) {
       toast.error(e.message || "A reunião parou. Use Retomar reunião para continuar.");
     } finally {
       setMeetingStage(null);
     }
   };
+  const liveControl = async (op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "dismiss_proposal" | "raise_cap", value?: unknown) => {
+    if (!liveMeeting) return;
+    try { await live.control.mutateAsync({ meetingId: liveMeeting.id, op, value }); }
+    catch (e: any) { toast.error(e.message || "Não foi possível aplicar"); }
+  };
+  const endLiveMeeting = async () => {
+    if (!liveMeeting) return;
+    try {
+      const r = await live.end.mutateAsync({ meetingId: liveMeeting.id });
+      toast.success(r.fallback ? "Reunião encerrada com a ata mínima (o modelo não respondeu)" : "Reunião encerrada. A ata está na conversa.");
+    } catch (e: any) { toast.error(e.message || "Não foi possível encerrar"); }
+  };
+
+  // Batimento: enquanto a reunião está aberta e visível, a cada 45 s o servidor vê se a sala ficou parada e a diretora puxa a conversa.
+  useEffect(() => {
+    if (!liveMeeting) return;
+    const id = window.setInterval(async () => {
+      if (document.visibilityState !== "visible" || tickingRef.current || liveBusy) return;
+      tickingRef.current = true;
+      try { await live.tick(liveMeeting.id); } finally { tickingRef.current = false; }
+    }, 45_000);
+    return () => window.clearInterval(id);
+  }, [liveMeeting?.id, liveBusy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const answerFromChat = async (q: { id: string; mission_id: string }, answer: string) => {
     try {
@@ -216,11 +339,13 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
 
   const submit = async () => {
     const t = text.trim();
-    if (!t || send.isPending) return;
+    if (!t || send.isPending || liveBusy) return;
     const citing = cited;
     setText(""); setCited(null);
     try {
-      await send.mutateAsync({ thread, text: t, ...(citing ? { deliverableId: citing.id } : {}) });
+      // Com reunião aberta, o que você escreve no #time vai para a reunião (os agentes escolhem quem entra).
+      if (inLive && liveMeeting) await live.say.mutateAsync({ meetingId: liveMeeting.id, text: t });
+      else await send.mutateAsync({ thread, text: t, ...(citing ? { deliverableId: citing.id } : {}) });
     } catch (e: any) {
       setText(t); setCited(citing);
       toast.error(e.message || "Não foi possível enviar");
@@ -320,6 +445,10 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
             )}
           </div>
 
+          {inLive && liveMeeting && (
+            <LiveMeetingBar meeting={liveMeeting} spent={liveSpent} busy={liveBusy} onControl={liveControl} onEnd={endLiveMeeting} />
+          )}
+
           <div className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4" style={{ maxHeight: "58vh" }} aria-live="polite">
             {isLoading ? (
               <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-white/40" /></div>
@@ -332,11 +461,20 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
               messages.map((m) => (
                 <Bubble key={m.id} m={m} agent={m.agent_id ? agentById.get(m.agent_id) : undefined} onMemory={openMemory} onAdjust={(t) => setAdjustDraft(t.slice(0, 4000))}>
                   {m.meta?.memory?.items?.length ? <MemorySuggestion items={m.meta.memory.items} squadId={squad.id} memories={memories} /> : null}
+                  {m.id === activeProposalId && (
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      <Button size="sm" className="h-7 gap-1 text-xs" disabled={liveBusy} onClick={() => liveControl("next_item")}><Check className="h-3 w-3" /> Seguir para o próximo item</Button>
+                      <Button size="sm" variant="outline" className="h-7 border-white/20 bg-transparent text-xs" disabled={liveBusy} onClick={() => liveControl("dismiss_proposal")}>Ainda não</Button>
+                    </div>
+                  )}
                 </Bubble>
               ))
             )}
-            {send.isPending && (
-              <div className="flex items-center gap-2 text-xs text-white/50"><Loader2 className="h-3.5 w-3.5 animate-spin" /> {current ? `${current.name} está escrevendo…` : "O time está pensando…"}</div>
+            {(send.isPending || live.say.isPending) && (
+              <div className="flex items-center gap-2 text-xs text-white/50"><Loader2 className="h-3.5 w-3.5 animate-spin" /> {current ? `${current.name} está escrevendo…` : inLive ? "O time está ouvindo…" : "O time está pensando…"}</div>
+            )}
+            {live.end.isPending && (
+              <div className="flex items-center gap-2 text-xs text-white/50"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Escrevendo a ata…</div>
             )}
             <div ref={endRef} />
           </div>
@@ -345,10 +483,10 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
             {meetingBusy && (
               <div className="flex items-center gap-2 rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-2 text-sm text-teal-100"><Loader2 className="h-4 w-4 animate-spin" /> Reunião em andamento: {meetingStage}. Pode levar um minuto.</div>
             )}
-            {!meetingBusy && unfinishedMeeting && thread === TEAM_THREAD && (
+            {!meetingBusy && !liveMeeting && unfinishedMeeting && thread === TEAM_THREAD && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
                 <span>Há uma reunião que parou no meio.</span>
-                <Button size="sm" variant="outline" className="h-7 border-amber-300/40 bg-transparent" onClick={() => startMeeting(unfinishedMeeting)}>Retomar reunião</Button>
+                <Button size="sm" variant="outline" className="h-7 border-amber-300/40 bg-transparent" onClick={() => resumeOldMeeting(unfinishedMeeting)}>Retomar reunião</Button>
               </div>
             )}
             <div className="flex flex-wrap items-center gap-1.5">
@@ -356,8 +494,9 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
                 <button key={a.id} type="button" onClick={() => mention(a.name)} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-xs text-white/70 hover:border-teal-400/60">@{a.name}</button>
               ))}
               {thread === TEAM_THREAD && (
-                <button type="button" onClick={openMeeting} disabled={meetingBusy || exceeded || send.isPending || agents.length < 2}
-                  className="inline-flex items-center gap-1 rounded-full border border-teal-400/40 bg-teal-500/10 px-2.5 py-0.5 text-xs text-teal-100 hover:border-teal-300 disabled:opacity-50"><Users className="h-3 w-3" /> Reunião</button>
+                <button type="button" onClick={openMeeting} disabled={meetingBusy || !!liveMeeting || exceeded || send.isPending || liveBusy || agents.length < 2}
+                  title={liveMeeting ? "Já há uma reunião aberta. Encerre-a para abrir outra." : undefined}
+                  className="inline-flex items-center gap-1 rounded-full border border-teal-400/40 bg-teal-500/10 px-2.5 py-0.5 text-xs text-teal-100 hover:border-teal-300 disabled:opacity-50"><Users className="h-3 w-3" /> {liveMeeting ? "Reunião aberta" : "Reunião"}</button>
               )}
               <Popover open={citeOpen} onOpenChange={setCiteOpen}>
                 <PopoverTrigger asChild>
@@ -386,12 +525,13 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
               <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-200">O teto mensal da conversa foi atingido. Aumente o teto abaixo para continuar.</p>
             ) : (
               <div className="flex items-end gap-2">
-                <Textarea value={text} maxLength={MAX_CHARS} rows={2} placeholder={current ? `Escreva para ${current.name}…` : "Escreva para o time… use @ para chamar alguém"}
+                <Textarea value={text} maxLength={MAX_CHARS} rows={2}
+                  placeholder={current ? `Escreva para ${current.name}…` : inLive ? "Fale na reunião… use @ para chamar alguém" : "Escreva para o time… use @ para chamar alguém"}
                   aria-label="Mensagem" disabled={meetingBusy} className="min-h-[44px] flex-1 resize-none bg-white/5 border-white/10"
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void submit(); } }} />
-                <Button onClick={submit} disabled={!text.trim() || send.isPending || meetingBusy} className="h-[44px] gap-1.5" aria-label="Enviar mensagem">
-                  {send.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar
+                <Button onClick={submit} disabled={!text.trim() || send.isPending || liveBusy || meetingBusy} className="h-[44px] gap-1.5" aria-label="Enviar mensagem">
+                  {send.isPending || live.say.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar
                 </Button>
               </div>
             )}
@@ -427,12 +567,21 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
           <DialogHeader>
             <DialogTitle>Reunião do time</DialogTitle>
             <DialogDescription className="text-white/60">
-              Os agentes escolhidos dão a posição, reagem uns aos outros e a coordenação resume. Eles só opinam: a decisão é sua.
+              Uma reunião ao vivo com pauta: você conversa, os agentes escutam e entram quando têm algo útil a dizer. A coordenação conduz a pauta e gera a ata no fim. Eles só opinam: a decisão é sua.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <Textarea value={meetingQuestion} maxLength={MAX_CHARS} rows={3} aria-label="Pergunta da reunião" className="bg-white/5 border-white/10"
-              placeholder="Qual é a pergunta ou a decisão que o time deve discutir?" onChange={(e) => setMeetingQuestion(e.target.value)} />
+            <Input value={meetingQuestion} maxLength={160} aria-label="Tema da reunião" className="bg-white/5 border-white/10"
+              placeholder="Tema da reunião (ex.: escolher o tema do próximo livro)" onChange={(e) => setMeetingQuestion(e.target.value)} />
+            <Textarea value={meetingAgenda} maxLength={800} rows={4} aria-label="Pauta da reunião" className="bg-white/5 border-white/10"
+              placeholder={"Pauta, um item por linha (opcional, até 8):\nVendas dos últimos 12 meses\nCandidatos a tema\nDecisão e próximos passos"} onChange={(e) => setMeetingAgenda(e.target.value)} />
+            <div className="space-y-1">
+              <Select value={meetingProactivity} onValueChange={(v) => setMeetingProactivity(v as Proactivity)}>
+                <SelectTrigger className="bg-white/5 border-white/10" aria-label="Nível de proatividade"><SelectValue /></SelectTrigger>
+                <SelectContent>{PROACTIVITY_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <p className="text-xs text-white/45">{PROACTIVITY_OPTIONS.find((o) => o.value === meetingProactivity)?.hint} Dá para mudar durante a reunião.</p>
+            </div>
             <fieldset className="space-y-1.5">
               <legend className="mb-1 text-xs text-white/60">Quem participa (até {MEETING_MAX})</legend>
               <div className="grid gap-1.5 sm:grid-cols-2">
@@ -450,12 +599,13 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
               </div>
             </fieldset>
             <p className="text-xs text-white/45">
-              Custo: cerca de US$ 0,02 a 0,30 por reunião, conforme o modelo. A reunião tem teto próprio de US$ 0,60 (se passar de 70%, a rodada 2 é pulada) e conta no teto mensal da conversa.
+              Cada mensagem sua gasta uma avaliação barata e as falas dos agentes. A reunião tem teto próprio de US$ 1,00 (aviso aos 80%, pausa aos 100%, dá para aumentar) e conta no teto mensal da conversa. Ainda não medi o custo médio com modelo real.
             </p>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setMeetingOpen(false)}>Cancelar</Button>
-            <Button onClick={() => startMeeting()} disabled={!meetingQuestion.trim() || !meetingPick.length} className="gap-1.5"><Users className="h-4 w-4" /> Iniciar reunião</Button>
+            <Button onClick={startLiveMeeting} disabled={meetingQuestion.trim().length < 3 || !meetingPick.length || live.start.isPending} className="gap-1.5">
+              {live.start.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />} Iniciar reunião</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
