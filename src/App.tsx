@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { NewUIProvider } from "@/contexts/NewUIContext";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Login from "./pages/Login";
@@ -74,6 +75,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <NewUIProvider>
         <LanguageProvider>
         <AuthProvider>
           <Routes>
@@ -143,6 +145,7 @@ const App = () => (
           </Routes>
         </AuthProvider>
         </LanguageProvider>
+        </NewUIProvider>
         <CookieConsent />
       </BrowserRouter>
     </TooltipProvider>

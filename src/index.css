@@ -9,6 +9,12 @@
 @import '@fontsource/space-grotesk/500.css';
 @import '@fontsource/space-grotesk/600.css';
 @import '@fontsource/space-grotesk/700.css';
+/* Novo sistema visual (Onda 0): títulos Bricolage, dados em JetBrains Mono */
+@import '@fontsource/bricolage-grotesque/500.css';
+@import '@fontsource/bricolage-grotesque/700.css';
+@import '@fontsource/bricolage-grotesque/800.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
 
 @tailwind base;
 @tailwind components;
@@ -88,6 +94,39 @@
     --border: 220 20% 18%;
     --input: 220 20% 18%;
     --ring: 199 89% 48%;
+  }
+}
+
+/* ===== Novo sistema visual: tokens (Onda 0). Os overrides só valem com <html data-ui="v2"> ===== */
+@layer base {
+  :root {
+    /* cor-assinatura por domínio de navegação */
+    --dom-inicio: 174 62% 47%;
+    --dom-clinica: 199 89% 60%;
+    --dom-equipes: 255 90% 76%;
+    --dom-ensino: 40 92% 57%;
+    --dom-acervo: 142 69% 58%;
+    --dom-ajuda: 351 95% 71%;
+    --destructive-vivid: 351 95% 71%;
+    /* superfícies do tema escuro novo */
+    --pos-vacuo: 208 46% 4%;
+    --pos-base: 208 36% 8%;
+    --pos-elevado: 205 34% 11%;
+    --pos-realce: 205 33% 15%;
+  }
+  [data-ui="v2"] {
+    --background: 208 46% 4%;
+    --card: 208 36% 8%;
+    --popover: 205 34% 11%;
+    --secondary: 205 33% 15%;
+    --muted: 205 34% 11%;
+    --border: 195 20% 24%;
+    --input: 195 20% 24%;
+    --radius: 0.875rem;
+  }
+  [data-ui="v2"] .font-display {
+    font-family: "Bricolage Grotesque", "Space Grotesk", system-ui, sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 

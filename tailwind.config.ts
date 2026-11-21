@@ -16,6 +16,8 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         display: ["Space Grotesk", "system-ui", "sans-serif"],
+        brand: ["Bricolage Grotesque", "Inter", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -68,6 +70,20 @@ export default {
         warning: {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
+        },
+        dom: {
+          inicio: "hsl(var(--dom-inicio))",
+          clinica: "hsl(var(--dom-clinica))",
+          equipes: "hsl(var(--dom-equipes))",
+          ensino: "hsl(var(--dom-ensino))",
+          acervo: "hsl(var(--dom-acervo))",
+          ajuda: "hsl(var(--dom-ajuda))",
+        },
+        pos: {
+          vacuo: "hsl(var(--pos-vacuo))",
+          base: "hsl(var(--pos-base))",
+          elevado: "hsl(var(--pos-elevado))",
+          realce: "hsl(var(--pos-realce))",
         },
         cat: {
           clinica: "hsl(var(--cat-clinica))",
