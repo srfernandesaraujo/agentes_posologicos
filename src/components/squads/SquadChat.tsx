@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BellOff, BookMarked, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
+import { BellOff, BookMarked, ExternalLink, ScrollText, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -111,6 +113,8 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
   const meetingTag = meeting?.minutes ? "Ata da reunião" : meeting?.summary ? "Resumo da reunião" : meeting?.round ? `Reunião · rodada ${meeting.round}` : null;
   // Por que o agente entrou sem ser chamado: aparece para você entender e ajustar a proatividade.
   const why = (meeting?.spontaneous || meeting?.facilitator) && meeting?.why ? meeting.why : null;
+  const tool = (m.meta?.meeting as any)?.tool as { name: string; query: string; count: number; error?: string; removed_pmids?: number } | undefined;
+  const sources = (m.meta?.sources || []) as { pmid: string; title: string; authors: string; journal: string; year: string; url: string }[];
   return (
     <div className="flex gap-2.5">
       <Avatar name={agent?.name || "?"} />
@@ -121,6 +125,25 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
         </div>
         <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm px-3.5 py-2 text-sm text-white/90 ${highlighted ? "border border-teal-400/40 bg-teal-500/10" : "bg-white/10"}`}>{m.content}</div>
         {why && <div className="font-mono text-[10px] text-amber-300/80">Entrou por conta própria: {why}</div>}
+        {tool && (
+          <div className="space-y-1.5 rounded-lg border border-white/10 bg-black/20 p-2.5 text-xs" aria-label="Fontes da busca no PubMed">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-teal-300/80">Busca no PubMed · {tool.query}</div>
+            {tool.error ? <p className="text-red-300">O PubMed não respondeu: {tool.error}</p>
+              : sources.length === 0 ? <p className="text-white/50">Nenhum artigo encontrado para essa busca.</p>
+              : (
+                <ul className="space-y-1.5">
+                  {sources.map((a) => (
+                    <li key={a.pmid} className="min-w-0">
+                      <a href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1 text-white/80 hover:text-teal-200"><ExternalLink className="mt-0.5 h-3 w-3 shrink-0" /><span className="break-words">{a.title}</span></a>
+                      <div className="font-mono text-[10px] text-white/40">PMID {a.pmid} · {a.journal}{a.year ? `, ${a.year}` : ""}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            {tool.removed_pmids ? <p className="text-amber-300/80">{tool.removed_pmids} citação(ões) de PMID fora da busca foram removidas do texto.</p> : null}
+            <p className="text-[10px] text-white/35">A lista vem direto do PubMed. Confira o resumo no artigo antes de usar a informação.</p>
+          </div>
+        )}
         {children}
         <div className="flex flex-wrap items-center gap-x-1 font-mono text-[10px] text-white/30">
           <span>{m.model ? `${m.model} · ` : ""}{usd(Number(m.cost_usd))}</span>
@@ -133,10 +156,49 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
   );
 }
 
+/** Ata ao vivo: o servidor atualiza durante a conversa; você pode editar (a próxima atualização respeita o seu texto). */
+function LiveMinutes({ minutes, version, busy, onSave }: { minutes: string; version: number; busy: boolean; onSave: (text: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  return (
+    <div className="rounded-lg border border-white/10 bg-black/20">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-white/70 hover:text-white">
+        <span className="flex items-center gap-1.5">
+          <ScrollText className="h-3.5 w-3.5" /> Ata ao vivo {version > 0 ? <span className="font-mono text-white/40">· versão {version}</span> : <span className="text-white/40">· começa depois de umas 3 mensagens</span>}
+        </span>
+        <span className="text-white/40">{open ? "Esconder" : "Ver"}</span>
+      </button>
+      {open && (
+        <div className="space-y-2 border-t border-white/10 px-3 py-2.5">
+          {editing ? (
+            <>
+              <Textarea value={draft} rows={10} maxLength={6000} aria-label="Editar a ata" className="bg-white/5 border-white/10 font-mono text-xs" onChange={(e) => setDraft(e.target.value)} />
+              <div className="flex gap-2">
+                <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={() => { onSave(draft); setEditing(false); }}>Salvar ata</Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditing(false)}>Cancelar</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              {minutes ? (
+                <div className="prose prose-invert prose-sm max-w-none prose-headings:mb-1 prose-headings:mt-3 prose-headings:text-white prose-p:my-1 prose-p:text-white/80 prose-li:my-0 prose-li:text-white/80">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{minutes}</ReactMarkdown>
+                </div>
+              ) : <p className="text-xs text-white/45">A ata aparece aqui conforme a conversa avança: resumo, decisões, ações e pendências.</p>}
+              <Button size="sm" variant="outline" className="h-7 border-white/20 bg-transparent text-xs" disabled={busy} onClick={() => { setDraft(minutes); setEditing(true); }}>Editar ata</Button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Barra da reunião ao vivo: pauta, proatividade, silêncio, avanço de item, teto e encerramento (gera a ata). */
 function LiveMeetingBar({ meeting, spent, busy, onControl, onEnd }: {
   meeting: LiveMeeting; spent: number; busy: boolean;
-  onControl: (op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "raise_cap", value?: unknown) => void; onEnd: () => void;
+  onControl: (op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "raise_cap" | "edit_minutes", value?: unknown) => void; onEnd: () => void;
 }) {
   const cap = Number(meeting.cap_usd);
   const silenced = !!meeting.silenced_until && new Date(meeting.silenced_until).getTime() > Date.now();
@@ -189,6 +251,7 @@ function LiveMeetingBar({ meeting, spent, busy, onControl, onEnd }: {
           {pct >= 80 && <Button size="sm" variant="outline" className="h-6 border-white/20 bg-transparent px-2 text-xs" disabled={busy} onClick={() => onControl("raise_cap", Math.round((cap + 0.5) * 100) / 100)}>+ US$ 0,50</Button>}
         </div>
       </div>
+      <LiveMinutes minutes={meeting.minutes_live || ""} version={meeting.minutes_live_version || 0} busy={busy} onSave={(t) => onControl("edit_minutes", t)} />
     </div>
   );
 }
@@ -301,7 +364,7 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
       setMeetingStage(null);
     }
   };
-  const liveControl = async (op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "dismiss_proposal" | "raise_cap", value?: unknown) => {
+  const liveControl = async (op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "dismiss_proposal" | "raise_cap" | "edit_minutes", value?: unknown) => {
     if (!liveMeeting) return;
     try { await live.control.mutateAsync({ meetingId: liveMeeting.id, op, value }); }
     catch (e: any) { toast.error(e.message || "Não foi possível aplicar"); }

@@ -1,6 +1,6 @@
 // Lógica pura da Reunião Viva (sem banco, sem rede): pauta, proatividade, freios, avaliador de turno e prompts.
 // Testada em src/lib/squadMeetingCore.test.ts.
-import { clip, normName, type ChatAgent } from "./squadChatCore.ts";
+import { clip, normName, routeByRules, type ChatAgent } from "./squadChatCore.ts";
 
 export type Proactivity = "calm" | "balanced" | "active";
 export interface AgendaItem { title: string; done: boolean; decision?: string }
@@ -240,12 +240,15 @@ export function isPass(output: string): boolean {
 
 // ---------- Ata ----------
 
-export function buildMinutesPrompt(p: { title: string; agenda: AgendaItem[]; transcript: string }): { system: string; user: string } {
+export function buildMinutesPrompt(p: { title: string; agenda: AgendaItem[]; transcript: string; draft?: string }): { system: string; user: string } {
   const system =
     `Você escreve a ata de uma reunião entre o dono e um time de agentes. Registre só o que foi dito; não invente decisões, números nem responsáveis. ` +
     `Use markdown com estas seções, nesta ordem: "## Resumo" (até 4 linhas), "## Decisões" (lista), "## Ações" (lista; "Responsável: ..." só se foi dito, senão "responsável não definido"), "## Pendências e perguntas em aberto" (lista). ` +
     `Se uma seção não tem nada, escreva "Nada registrado". Português do Brasil, no máximo 350 palavras.`;
-  const user = `Tema: ${p.title}\n\nPauta:\n${agendaText(p.agenda, -1)}\n\nConversa:\n${clip(p.transcript, 14000)}`;
+  const draft = p.draft?.trim()
+    ? `\n\nRascunho da ata ao vivo (o dono pode ter editado: preserve as edições dele e corrija só o que a conversa contradiz):\n${p.draft.trim()}`
+    : "";
+  const user = `Tema: ${p.title}\n\nPauta:\n${agendaText(p.agenda, -1)}${draft}\n\nConversa:\n${clip(p.transcript, 14000)}`;
   return { system, user };
 }
 
@@ -254,4 +257,67 @@ export function minutesFallback(title: string, agenda: AgendaItem[]): string {
   const decisions = agenda.filter((i) => i.done && i.decision).map((i) => `- ${i.title}: ${i.decision}`);
   const open = agenda.filter((i) => !i.done).map((i) => `- ${i.title}`);
   return `## Resumo\nReunião "${title}" encerrada. Ata automática, sem resumo do modelo.\n\n## Decisões\n${decisions.join("\n") || "Nada registrado"}\n\n## Ações\nNada registrado\n\n## Pendências e perguntas em aberto\n${open.join("\n") || "Nada registrado"}`;
+}
+
+// ---------- Ferramentas dos agentes (Fase 2) ----------
+
+export type ToolIntent = "pubmed" | null;
+
+/** Pedido de busca em literatura científica: só então o servidor gasta uma chamada para montar a busca. */
+export function detectToolIntent(text: string): ToolIntent {
+  const t = normName(text);
+  if (/\bpubmed\b/.test(t)) return "pubmed";
+  const verb = /\b(busca|busque|buscar|procure|procurar|pesquis[ae]r?|ache|achar|levante|levantar|traga|trazer|encontre|encontrar|veja|ver)\b/.test(t);
+  const noun = /\b(artigos?|literatura|estudos?|evidencias?|referencias?|meta-?analises?|revisao sistematica|revisoes sistematicas|ensaios? clinicos?|papers?)\b/.test(t);
+  return verb && noun ? "pubmed" : null;
+}
+
+export function buildPubmedQueryPrompt(p: { request: string; transcript: string }): { system: string; user: string } {
+  const system =
+    `Você monta buscas para o PubMed. Transforme o pedido do dono em uma busca curta em inglês, com termos MeSH ou palavras-chave e operadores AND/OR quando ajudar (até 12 palavras). ` +
+    `Use o contexto da reunião só para entender o assunto. Responda SOMENTE com JSON: {"query":"termos em inglês"}.`;
+  const user = `Pedido do dono:\n${p.request}\n\nContexto recente da reunião:\n${p.transcript || "(sem contexto)"}`;
+  return { system, user };
+}
+
+export function parsePubmedQuery(text: string, fallback: string): string {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) {
+    try {
+      const q = String(JSON.parse(m[0])?.query ?? "").replace(/\s+/g, " ").trim();
+      if (q.length >= 3) return q.slice(0, 200);
+    } catch { /* cai no plano B */ }
+  }
+  // Plano B: o próprio pedido, sem verbos e palavras de ligação.
+  const cleaned = fallback.replace(/pubmed/gi, " ").replace(/\b(busca|busque|buscar|procure|pesquise|pesquisar|artigos?|sobre|algo|um|uma|no|na|de|do|da|para|por favor)\b/gi, " ").replace(/\s+/g, " ").trim();
+  return cleaned.slice(0, 200);
+}
+
+// ---------- Ata ao vivo ----------
+
+export const MINUTES_LIVE_MAX_CHARS = 6000;
+export const MINUTES_MIN_NEW_MESSAGES = 3;
+export const MINUTES_MIN_INTERVAL_MS = 20_000;
+
+/** Atualiza a ata ao vivo quando há conversa nova suficiente e já passou um tempo desde a última atualização. */
+export function shouldUpdateMinutes(p: { newMessages: number; lastUpdateAt: number | null; now: number }): boolean {
+  if (p.newMessages < MINUTES_MIN_NEW_MESSAGES) return false;
+  return p.lastUpdateAt === null || p.now - p.lastUpdateAt >= MINUTES_MIN_INTERVAL_MS;
+}
+
+export function buildLiveMinutesPrompt(p: { title: string; agenda: AgendaItem[]; current: number; minutes: string; newTranscript: string }): { system: string; user: string } {
+  const system =
+    `Você mantém a ata ao vivo de uma reunião entre o dono e um time de agentes. Atualize a ata com a conversa nova. Registre só o que foi dito; não invente decisões, números nem responsáveis. ` +
+    `Mantenha o texto que já está na ata e respeite edições do dono; acrescente ou ajuste só o necessário. ` +
+    `Formato markdown, nesta ordem: "## Resumo" (até 4 linhas), "## Decisões" (lista), "## Ações" (lista; "Responsável: ..." só se foi dito, senão "responsável não definido"), "## Pendências e perguntas em aberto" (lista). ` +
+    `Em "Ações" e "Pendências" remova o que já foi resolvido. Se uma seção está vazia, escreva "Nada registrado". Português do Brasil, no máximo 350 palavras. Responda só com a ata.`;
+  const user = `Tema: ${p.title}\n\nPauta:\n${agendaText(p.agenda, p.current)}\n\nAta atual:\n${p.minutes || "(ainda vazia)"}\n\nConversa nova:\n${p.newTranscript}`;
+  return { system, user };
+}
+
+/** Quem responde a um pedido de busca sem @: o agente de literatura/pesquisa; sem ele, o mais indicado pelas regras do roteador. */
+export function pickToolAgent(candidates: ChatAgent[], text: string): string | null {
+  const research = candidates.find((a) => a.slug !== "diretora" && /literatur|referenc|pesquis|evidenc|cientific|metodolog|estatist/.test(normName(`${a.role} ${a.slug}`)));
+  if (research) return research.id;
+  return routeByRules(text, candidates)[0] ?? candidates[0]?.id ?? null;
 }

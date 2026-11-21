@@ -20,6 +20,9 @@ export interface LiveMeeting {
   cap_usd: number | string;
   silenced_until: string | null;
   minutes: string | null;
+  /** Ata atualizada pelo servidor durante a conversa (o dono pode editar). */
+  minutes_live: string | null;
+  minutes_live_version: number;
   created_at: string;
 }
 
@@ -89,7 +92,7 @@ export function useLiveMeetingActions(squadId: string) {
     onSettled: refresh,
   });
   const control = useMutation({
-    mutationFn: (p: { meetingId: string; op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "dismiss_proposal" | "raise_cap"; value?: unknown }) =>
+    mutationFn: (p: { meetingId: string; op: "set_proactivity" | "silence" | "unsilence" | "next_item" | "dismiss_proposal" | "raise_cap" | "edit_minutes"; value?: unknown }) =>
       call<MessagesResult>({ action: "control", ...p }),
     onSuccess: (r) => merge(r),
     onSettled: refresh,

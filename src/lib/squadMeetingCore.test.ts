@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   MEETING_HARD_MAX_AGENT_MESSAGES, MEETING_QUIET_MS, MEETING_LIVE_RULES, agendaText, applyBrakes, buildEvaluatorPrompt, buildLiveUserMessage,
   buildMinutesPrompt, clampMeetingCap, isPass, isSilenced, minutesFallback, nextItemMessage, normalizeProactivity, openingMessage, parseAgenda,
-  parseEvaluatorReply, parseMeetingCommand, proposalMessage, isOpenCall, pickByLeastRecent, facilitatorDue, shouldNudge, transcriptBlock, type AgendaItem,
+  parseEvaluatorReply, parseMeetingCommand, proposalMessage, isOpenCall, pickByLeastRecent, facilitatorDue,
+  detectToolIntent, parsePubmedQuery, pickToolAgent, shouldUpdateMinutes, buildLiveMinutesPrompt, shouldNudge, transcriptBlock, type AgendaItem,
 } from "../../supabase/functions/_shared/squadMeetingCore";
 import type { ChatAgent } from "../../supabase/functions/_shared/squadChatCore";
 
@@ -263,5 +264,44 @@ describe("chamada ao grupo e condução da diretora", () => {
     const f = buildLiveUserMessage({ ...base, facilitate: true });
     expect(f).toContain("coordenação");
     expect(f).toContain("@Bia");
+  });
+});
+
+describe("ferramentas e ata ao vivo (fase 2)", () => {
+  it("detecta pedido de busca em literatura", () => {
+    expect(detectToolIntent("Íris, busca no PubMed algo sobre adesão")).toBe("pubmed");
+    expect(detectToolIntent("procure artigos sobre polimedicação em idosos")).toBe("pubmed");
+    expect(detectToolIntent("Levante a literatura sobre semaglutida")).toBe("pubmed");
+    expect(detectToolIntent("Quais estudos você conhece sobre isso?")).toBeNull();
+    expect(detectToolIntent("Vamos decidir o título do vídeo")).toBeNull();
+  });
+  it("monta a busca e tem plano B", () => {
+    expect(parsePubmedQuery('{"query":"medication adherence AND polypharmacy"}', "x")).toBe("medication adherence AND polypharmacy");
+    expect(parsePubmedQuery("não é json", "busque artigos sobre adesão em idosos")).toBe("adesão em idosos");
+    expect(parsePubmedQuery('{"query":""}', "pubmed semaglutida")).toBe("semaglutida");
+  });
+  it("escolhe o agente de pesquisa para a busca", () => {
+    const ag: ChatAgent[] = [
+      { id: "d", slug: "diretora", name: "Helena", role: "Diretora" },
+      { id: "l", slug: "lia", name: "Lia", role: "Literatura e evidências" },
+      { id: "b", slug: "bia", name: "Bia", role: "Redação científica" },
+    ];
+    expect(pickToolAgent(ag, "busca artigos")).toBe("l");
+    expect(pickToolAgent([ag[0], ag[2]], "busca artigos")).toBeTruthy();
+  });
+  it("a ata ao vivo só atualiza com conversa nova suficiente", () => {
+    expect(shouldUpdateMinutes({ newMessages: 2, lastUpdateAt: null, now: 1000 })).toBe(false);
+    expect(shouldUpdateMinutes({ newMessages: 3, lastUpdateAt: null, now: 1000 })).toBe(true);
+  });
+  it("o prompt da ata ao vivo preserva edições e a final usa o rascunho", () => {
+    const agenda: AgendaItem[] = [{ title: "Vídeo", done: false }];
+    const p = buildLiveMinutesPrompt({ title: "T", agenda, current: 0, minutes: "## Resumo\nX", newTranscript: "[Dono]: oi" });
+    expect(p.system).toContain("respeite edições do dono");
+    expect(p.user).toContain("Ata atual:\n## Resumo\nX");
+    expect(p.user).toContain("Conversa nova:\n[Dono]: oi");
+    const f = buildMinutesPrompt({ title: "T", agenda, transcript: "x", draft: "## Resumo\nY" });
+    expect(f.user).toContain("Rascunho da ata ao vivo");
+    expect(f.user).toContain("## Resumo\nY");
+    expect(buildMinutesPrompt({ title: "T", agenda, transcript: "x" }).user).not.toContain("Rascunho");
   });
 });

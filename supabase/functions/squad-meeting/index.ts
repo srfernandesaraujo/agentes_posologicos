@@ -12,6 +12,7 @@ import { getTemplate } from "../_shared/squadTemplates.ts";
 import { getOrderedKeysForUser, callWithFallback, estimateCost, logAiUsage } from "../_shared/llmProvider.ts";
 import { HttpError } from "../_shared/squadRunner.ts";
 import { emitChatEvent, loadMissionContext, type AgentRow } from "../_shared/squadChatRunner.ts";
+import { searchPubmed, formatPubmedForPrompt, scrubUnknownPmids } from "../_shared/pubmedSearch.ts";
 import {
   CHAT_RATE_LIMIT_PER_MIN, TEAM_THREAD, buildChatSystemPrompt, capCrossing, chatBudget, cleanChatText,
   meetingModerator, parseMentions, pickMeetingParticipants, monthStartIso, type ChatAgent,
@@ -20,7 +21,8 @@ import {
   MEETING_DEFAULT_CAP_USD, MEETING_HARD_MAX_AGENT_MESSAGES, MEETING_LIVE_RULES, MEETING_LOCK_SECONDS, MEETING_SPEAK_TOKENS, PROACTIVITY_LIMITS,
   applyBrakes, facilitatorDue, isOpenCall, pickByLeastRecent, buildEvaluatorPrompt, buildLiveUserMessage, buildMinutesPrompt, clampMeetingCap, isPass, isSilenced,
   minutesFallback, nextItemMessage, normalizeProactivity, openingMessage, parseAgenda, parseEvaluatorReply, parseMeetingCommand,
-  proposalMessage, shouldNudge, transcriptBlock, type AgendaItem, type EvaluatorPick, type LiveLine, type Proactivity,
+  proposalMessage, shouldNudge, transcriptBlock, detectToolIntent, buildPubmedQueryPrompt, parsePubmedQuery, pickToolAgent, shouldUpdateMinutes,
+  buildLiveMinutesPrompt, MINUTES_LIVE_MAX_CHARS, type AgendaItem, type EvaluatorPick, type LiveLine, type Proactivity,
 } from "../_shared/squadMeetingCore.ts";
 
 const corsHeaders = {
@@ -28,6 +30,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const FUNCTION_DEADLINE_MS = 80_000;
+const MEETING_TOOL_SPEAK_TOKENS = 900;
 const EVALUATOR_DEADLINE_MS = 12_000;
 // Avaliador barato: onde o provedor tem um modelo pequeno conhecido, usa-o; nos demais vale o modelo padrão.
 const EVALUATOR_MODELS: Record<string, string> = { openai: "gpt-4o-mini", anthropic: "claude-3-5-haiku-20241022" };
@@ -40,6 +43,7 @@ interface MeetingRow {
   id: string; squad_id: string; owner_id: string; title: string; agenda: AgendaItem[]; current_item: number;
   proactivity: Proactivity; participants: string[]; status: "open" | "ended"; cap_usd: number | string;
   silenced_until: string | null; lock_until: string | null; minutes: string | null;
+  minutes_live: string | null; minutes_live_at: string | null; minutes_live_version: number;
 }
 
 Deno.serve(async (req) => {
@@ -129,7 +133,10 @@ Deno.serve(async (req) => {
       squad: any; template: any; meeting: MeetingRow; agents: AgentRow[]; keys: any[];
       insert: (row: Record<string, unknown>) => Promise<any>;
     }
-    const runTurn = async (c: TurnCtx, opts: { quiet: boolean; mentions: string[]; userText?: string }): Promise<{ cost: number; spoke: number }> => {
+    /** Resultado de uma ferramenta (hoje, a busca no PubMed) entregue ao agente que vai responder. */
+    interface ToolCtx { name: "pubmed"; query: string; block: string; pmids: string[]; sources: PubmedSource[]; error: string | null }
+    interface PubmedSource { pmid: string; title: string; authors: string; journal: string; year: string; url: string }
+    const runTurn = async (c: TurnCtx, opts: { quiet: boolean; mentions: string[]; userText?: string; tool?: ToolCtx }): Promise<{ cost: number; spoke: number }> => {
       const { squad, meeting, agents, keys, insert } = c;
       const meetingId = meeting.id;
       const cap = Number(meeting.cap_usd);
@@ -228,7 +235,7 @@ Deno.serve(async (req) => {
 
       type Mode = "mention" | "open" | "spontaneous";
       // Uma rodada de falas em paralelo. A conversa que cada agente vê inclui o que as rodadas anteriores acabaram de dizer.
-      const speakRound = async (list: EvaluatorPick[], mode: Mode, facilitate: boolean): Promise<{ agentId: string; content: string }[]> => {
+      const speakRound = async (list: EvaluatorPick[], mode: Mode, facilitate: boolean, tool?: ToolCtx): Promise<{ agentId: string; content: string }[]> => {
         if (!list.length) return [];
         const transcript = transcriptBlock(lines);
         await Promise.all(list.map((p) => emitChatEvent(admin, {
@@ -241,10 +248,10 @@ Deno.serve(async (req) => {
           }) + "\n\n" + MEETING_LIVE_RULES;
           const userMessage = buildLiveUserMessage({
             agenda, current, transcript, why: p.why, mentioned: mode === "mention", quiet: opts.quiet && !facilitate, openCall: mode === "open", facilitate,
-          });
+          }) + (tool ? `\n\n${tool.block}` : "");
           const res = await callWithFallback(admin, keys, {
             systemPrompt: system, messages: [{ role: "user", content: userMessage }], temperature: 0.5, mode: "text",
-            maxTokens: MEETING_SPEAK_TOKENS, deadlineAt: Math.min(deadlineAt, Date.now() + 45_000),
+            maxTokens: tool ? MEETING_TOOL_SPEAK_TOKENS : MEETING_SPEAK_TOKENS, deadlineAt: Math.min(deadlineAt, Date.now() + 45_000),
           });
           return { agent, pick: p, res };
         }));
@@ -264,14 +271,23 @@ Deno.serve(async (req) => {
             await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_replied", agentId: agent.id, room: agent.room ?? null, text: "Passou a vez" });
             continue;
           }
-          const content = res.output.trim() + (res.finishReason === "length" ? " […]" : "");
+          let content = res.output.trim() + (res.finishReason === "length" ? " […]" : "");
+          let removedPmids = 0;
+          if (tool) {
+            // Citação só com o que a busca devolveu: PMID fora da lista é removido do texto.
+            const s = scrubUnknownPmids(content, tool.pmids);
+            content = s.text;
+            removedPmids = s.removed;
+          }
           await insert({
             author: "agent", agent_id: agent.id, content, cost_usd: c1,
             tokens_input: res.tokensInput, tokens_output: res.tokensOutput, provider: res.provider, model: res.model,
             meta: {
               meeting: {
                 why: pick.why, spontaneous: mode === "spontaneous" && !facilitate, ...(facilitate ? { facilitator: true } : {}), ...(opts.quiet ? { nudge: true } : {}),
+                ...(tool ? { tool: { name: tool.name, query: tool.query, count: tool.sources.length, ...(tool.error ? { error: tool.error } : {}), ...(removedPmids ? { removed_pmids: removedPmids } : {}) } } : {}),
               },
+              ...(tool ? { sources: tool.sources } : {}),
               ...(res.finishReason === "length" ? { truncated: true } : {}),
             },
           });
@@ -286,7 +302,7 @@ Deno.serve(async (req) => {
       // Rodada 1: quem foi chamado (@), quem respondeu ao grupo ou quem entrou por conta própria. Rodada 2: a diretora conduz, vendo o que acabou de ser dito.
       const first = picks.filter((p) => p.id !== moderatorId || forced);
       const lead = picks.filter((p) => p.id === moderatorId && !forced);
-      const said1 = await speakRound(first, forced ? "mention" : openCall ? "open" : "spontaneous", false);
+      const said1 = await speakRound(first, forced ? "mention" : openCall ? "open" : "spontaneous", false, opts.tool);
       const said2 = await speakRound(lead, "spontaneous", true);
 
       // Se a diretora chamou um colega pelo nome (@Bia, ...), o colega responde logo em seguida (um salto só).
@@ -303,6 +319,68 @@ Deno.serve(async (req) => {
       const cross = capCrossing(spent, spent + cost, cap);
       if (cross) await insert({ author: "system", meta: { cap: cross }, content: cross === "exceeded" ? "Teto da reunião atingido. Aumente o teto na reunião para os agentes continuarem." : "A reunião passou de 80% do teto." });
       return { cost, spoke };
+    };
+
+    // ---------- ferramenta: busca no PubMed ----------
+    /** Monta a busca (modelo barato), consulta o PubMed por código e devolve o bloco que o agente vai usar. O custo da montagem fica registrado. */
+    const runPubmedTool = async (c: { squad: any; meeting: MeetingRow; keys: any[]; insert: (row: Record<string, unknown>) => Promise<any> }, request: string, transcript: string): Promise<{ tool: ToolCtx; cost: number }> => {
+      const qp = buildPubmedQueryPrompt({ request, transcript });
+      const res = await callWithFallback(admin, c.keys, {
+        systemPrompt: qp.system, messages: [{ role: "user", content: qp.user }], temperature: 0, mode: "text", maxTokens: 120,
+        modelOverridePerProvider: EVALUATOR_MODELS, deadlineAt: Date.now() + EVALUATOR_DEADLINE_MS,
+      });
+      let cost = 0;
+      let query = parsePubmedQuery("", request);
+      if (res && res.ok && res.output) {
+        cost = estimateCost(res.model!, res.tokensInput, res.tokensOutput);
+        await logAiUsage(admin, { userId: user.id, provider: res.provider!, model: res.model!, tokensInput: res.tokensInput, tokensOutput: res.tokensOutput, promptType: "squad_meeting_pubmed_query" });
+        query = parsePubmedQuery(res.output, request);
+      }
+      await c.insert({ author: "system", content: "montagem da busca", cost_usd: cost, meta: { meeting: { hidden: true, kind: "pubmed_query" } } });
+      const found = await searchPubmed(query);
+      const sources: PubmedSource[] = found.articles.map((a) => ({ pmid: a.pmid, title: a.title, authors: a.authors, journal: a.journal, year: a.year, url: a.url }));
+      return {
+        cost,
+        tool: { name: "pubmed", query: found.query || query, block: formatPubmedForPrompt(found), pmids: found.articles.map((a) => a.pmid), sources, error: found.error },
+      };
+    };
+
+    // ---------- ata ao vivo ----------
+    /** Incorpora à ata a conversa nova (a cada 3 mensagens ou mais). Se você editou a ata no meio do caminho, descarta e refaz na próxima. */
+    const updateLiveMinutes = async (squad: any, meetingId: string, keys: any[]): Promise<void> => {
+      const { data: fresh } = await admin.from("squad_meetings").select("*").eq("id", meetingId).maybeSingle();
+      if (!fresh || fresh.status !== "open") return;
+      const m = fresh as MeetingRow;
+      let q = admin.from("squad_chat_messages").select("author, agent_id, content, meta, created_at")
+        .eq("squad_id", squad.id).eq("thread", TEAM_THREAD).contains("meta", { meeting: { id: meetingId } }).order("created_at");
+      if (m.minutes_live_at) q = q.gt("created_at", m.minutes_live_at);
+      const { data } = await q.limit(60);
+      const msgs = ((data || []) as any[]).filter((x) => !x.meta?.meeting?.hidden && !x.meta?.meeting?.opening && (x.author === "user" || x.author === "agent"));
+      if (!shouldUpdateMinutes({ newMessages: msgs.length, lastUpdateAt: null, now: Date.now() })) return;
+      const agents = await loadAgents(squad.id);
+      const nameById = new Map(agents.map((a) => [a.id, a.name]));
+      const newTranscript = transcriptBlock(msgs.map((x) => ({ author: x.author, agentName: x.agent_id ? nameById.get(x.agent_id) : undefined, content: x.content })), 60, 900);
+      const prompt = buildLiveMinutesPrompt({ title: m.title, agenda: m.agenda || [], current: m.current_item, minutes: m.minutes_live || "", newTranscript });
+      const res = await callWithFallback(admin, keys, {
+        systemPrompt: prompt.system, messages: [{ role: "user", content: prompt.user }], temperature: 0.2, mode: "text", maxTokens: 1100,
+        modelOverridePerProvider: EVALUATOR_MODELS, deadlineAt: Date.now() + 30_000,
+      });
+      if (!res || !res.ok || !res.output) return;
+      const cost = estimateCost(res.model!, res.tokensInput, res.tokensOutput);
+      await logAiUsage(admin, { userId: user.id, provider: res.provider!, model: res.model!, tokensInput: res.tokensInput, tokensOutput: res.tokensOutput, promptType: "squad_meeting_live_minutes" });
+      const text = res.output.trim().slice(0, MINUTES_LIVE_MAX_CHARS);
+      // O custo conta no teto mesmo que a atualização seja descartada.
+      await makeInsert(squad.id, meetingId, [])({ author: "system", content: "atualização da ata", cost_usd: cost, meta: { meeting: { hidden: true, kind: "minutes" } } });
+      await admin.from("squad_meetings").update({
+        minutes_live: text, minutes_live_at: msgs[msgs.length - 1].created_at, minutes_live_version: (m.minutes_live_version || 0) + 1,
+      }).eq("id", meetingId).eq("minutes_live_version", m.minutes_live_version || 0);
+    };
+    /** Roda a atualização da ata em segundo plano e só então solta a trava da reunião (a resposta ao navegador não espera por isso). */
+    const finishInBackground = (meetingId: string, work: Promise<void>) => {
+      const bg = work.catch((e) => console.warn("[squad-meeting] ata ao vivo falhou:", (e as Error).message)).finally(() => releaseLock(meetingId));
+      const rt = (globalThis as any).EdgeRuntime;
+      if (rt?.waitUntil) { rt.waitUntil(bg); return Promise.resolve(); }
+      return bg;
     };
 
     // ---------- start ----------
@@ -354,7 +432,10 @@ Deno.serve(async (req) => {
         patch.silenced_until = null;
         await insert({ author: "system", content: "Silêncio encerrado. Os agentes voltam a participar." });
       } else if (op === "raise_cap") patch.cap_usd = clampMeetingCap(body?.value);
-      else if (op === "dismiss_proposal") {
+      else if (op === "edit_minutes") {
+        patch.minutes_live = String(body?.value ?? "").slice(0, MINUTES_LIVE_MAX_CHARS);
+        patch.minutes_live_version = (meeting.minutes_live_version || 0) + 1;
+      } else if (op === "dismiss_proposal") {
         await insert({ author: "system", content: "proposta recusada", meta: { meeting: { hidden: true, dismissed: meeting.current_item } } });
       } else if (op === "next_item") {
         const agenda = (meeting.agenda || []).map((i) => ({ ...i }));
@@ -407,6 +488,7 @@ Deno.serve(async (req) => {
       if (meeting.current_item >= (meeting.agenda || []).length) return json({ idle: true });
       if (!(await acquireLock(meeting.id))) return json({ idle: true, busy: true });
       const sink: any[] = [];
+      let handoff = false;
       try {
         const { cap, before, keys } = await checkBudgetAndKeys(squad);
         const agents = await loadAgents(squad.id);
@@ -416,12 +498,15 @@ Deno.serve(async (req) => {
         if (!sink.some((m) => m.meta?.meeting?.nudge)) {
           await insert({ author: "system", content: "sala checada", meta: { meeting: { hidden: true, kind: "quiet_check", nudge: true } } });
         }
-        return json({ messages: sink, spoke: run.spoke, usage: usageOf(before + run.cost, cap) });
+        const out = json({ messages: sink, spoke: run.spoke, usage: usageOf(before + run.cost, cap) });
+        handoff = true;
+        await finishInBackground(meeting.id, updateLiveMinutes(squad, meeting.id, keys));
+        return out;
       } catch (e) {
         if (e instanceof HttpError) return json({ idle: true, error: e.message });
         throw e;
       } finally {
-        await releaseLock(meeting.id);
+        if (!handoff) await releaseLock(meeting.id);
       }
     }
 
@@ -437,6 +522,7 @@ Deno.serve(async (req) => {
       if (!(await acquireLock(meeting.id))) throw new HttpError(409, "O time ainda está respondendo à mensagem anterior. Tente de novo em instantes.", "meeting_busy");
 
       const sink: any[] = [];
+      let handoff = false;
       try {
         const agents = await loadAgents(squad.id);
         const insert = makeInsert(squad.id, meeting.id, sink);
@@ -459,8 +545,25 @@ Deno.serve(async (req) => {
           return json({ messages: sink, usage: usageOf(before, cap) });
         }
 
-        const mentions = parseMentions(sec.text, agents as ChatAgent[]);
-        const run = await runTurn({ squad, template, meeting, agents, keys, insert }, { quiet: false, mentions, userText: sec.text });
+        let mentions = parseMentions(sec.text, agents as ChatAgent[]);
+        // Pedido de busca em literatura: a busca é feita por código e o agente indicado (ou chamado com @) comenta só o que voltou.
+        let tool: ToolCtx | undefined;
+        let toolCost = 0;
+        if (detectToolIntent(sec.text) === "pubmed") {
+          const candidates = agents.filter((a) => meeting.participants.includes(a.id) || a.id === meetingModerator(agents, meeting.participants));
+          const target = mentions.length ? mentions : [pickToolAgent(candidates, sec.text)].filter((x): x is string => !!x);
+          if (target.length) {
+            const nameById = new Map(agents.map((a) => [a.id, a.name]));
+            const recent = (await recentMessages(squad.id, meeting.id, 14)).filter((m) => !m.meta?.meeting?.hidden);
+            const ctx = transcriptBlock(recent.map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, content: m.content })), 10, 400);
+            const t = await runPubmedTool({ squad, meeting, keys, insert }, sec.text, ctx);
+            tool = t.tool;
+            toolCost = t.cost;
+            mentions = target;
+          }
+        }
+        const run = await runTurn({ squad, template, meeting, agents, keys, insert }, { quiet: false, mentions, userText: sec.text, tool });
+        run.cost += toolCost;
         const monthAfter = before + run.cost;
         const crossing = capCrossing(before, monthAfter, cap);
         if (crossing) {
@@ -469,9 +572,12 @@ Deno.serve(async (req) => {
             content: crossing === "exceeded" ? "Teto mensal da conversa atingido. Aumente o teto para continuar conversando." : "A conversa deste mês passou de 80% do teto.",
           });
         }
-        return json({ messages: sink, spoke: run.spoke, usage: usageOf(monthAfter, cap) });
+        const out = json({ messages: sink, spoke: run.spoke, usage: usageOf(monthAfter, cap) });
+        handoff = true;
+        await finishInBackground(meeting.id, updateLiveMinutes(squad, meeting.id, keys));
+        return out;
       } finally {
-        await releaseLock(meeting.id);
+        if (!handoff) await releaseLock(meeting.id);
       }
     }
 
@@ -493,7 +599,8 @@ Deno.serve(async (req) => {
         let model: string | null = null;
         try {
           const { keys } = await checkBudgetAndKeys(squad);
-          const prompt = buildMinutesPrompt({ title: meeting.title, agenda, transcript: transcriptBlock(lines, 80, 1200) });
+          const { data: liveRow } = await admin.from("squad_meetings").select("minutes_live").eq("id", meeting.id).maybeSingle();
+          const prompt = buildMinutesPrompt({ title: meeting.title, agenda, transcript: transcriptBlock(lines, 80, 1200), draft: liveRow?.minutes_live || "" });
           const res = await callWithFallback(admin, keys, {
             systemPrompt: prompt.system, messages: [{ role: "user", content: prompt.user }], temperature: 0.2, mode: "text", maxTokens: 1200,
             deadlineAt: Date.now() + 60_000,
