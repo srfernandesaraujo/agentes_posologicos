@@ -81,14 +81,41 @@ async function getJson(url: string): Promise<any> {
   return await r.json();
 }
 
+/**
+ * Versões da busca, da mais exata à mais simples. Buscas com etiquetas de campo ([MeSH], [tiab], [sb]) ou filtros inventados
+ * costumam voltar vazias; sem resultado, tenta sem etiquetas e depois só com as palavras principais.
+ */
+export function queryVariants(query: string): string[] {
+  const q = query.replace(/\s+/g, " ").trim().slice(0, 300);
+  if (!q) return [];
+  const noTags = q.replace(/\[[^\]]*\]/g, " ").replace(/\blatest\b/gi, " ").replace(/\s+/g, " ").trim();
+  const seen = new Set<string>();
+  const words = noTags.replace(/[()"]/g, " ").split(/\s+/)
+    .filter((w) => w && !/^(and|or|not)$/i.test(w))
+    .filter((w) => { const k = w.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  // O PubMed já combina palavras soltas com AND; a versão curta fica como último recurso.
+  const variants = [q, words.join(" "), words.slice(0, 3).join(" ")];
+  return variants.filter((v, i) => v.length >= 3 && variants.indexOf(v) === i);
+}
+
+async function esearchIds(term: string, retmax: number): Promise<string[]> {
+  const es = await getJson(`${EUTILS}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(term)}&retmode=json&retmax=${retmax}&sort=relevance`);
+  return (es?.esearchresult?.idlist || []).map(String);
+}
+
 /** Busca os artigos mais relevantes. Nunca lança: se o PubMed falhar, devolve o erro para o agente dizer isso com clareza. */
 export async function searchPubmed(query: string, retmax = PUBMED_RETMAX): Promise<PubmedResult> {
-  const q = query.replace(/\s+/g, " ").trim().slice(0, 300);
-  if (!q) return { query: q, articles: [], error: "Busca vazia" };
+  const variants = queryVariants(query);
+  if (!variants.length) return { query: query.trim(), articles: [], error: "Busca vazia" };
   try {
-    const es = await getJson(`${EUTILS}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(q)}&retmode=json&retmax=${retmax}&sort=relevance`);
-    const pmids: string[] = (es?.esearchresult?.idlist || []).map(String);
-    if (!pmids.length) return { query: q, articles: [], error: null };
+    let used = variants[0];
+    let pmids: string[] = [];
+    for (const v of variants) {
+      pmids = await esearchIds(v, retmax);
+      used = v;
+      if (pmids.length) break;
+    }
+    if (!pmids.length) return { query: variants[0], articles: [], error: null };
     const ids = pmids.join(",");
     const summary = await getJson(`${EUTILS}/esummary.fcgi?db=pubmed&id=${ids}&retmode=json`);
     let abstracts = new Map<string, string>();
@@ -96,9 +123,9 @@ export async function searchPubmed(query: string, retmax = PUBMED_RETMAX): Promi
       const r = await fetch(`${EUTILS}/efetch.fcgi?db=pubmed&id=${ids}&rettype=abstract&retmode=xml`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
       if (r.ok) abstracts = parsePubmedAbstracts(await r.text());
     } catch { /* sem resumo, o agente trabalha só com o título e os dados do artigo */ }
-    return { query: q, articles: buildArticles(pmids, summary, abstracts), error: null };
+    return { query: used, articles: buildArticles(pmids, summary, abstracts), error: null };
   } catch (e) {
-    return { query: q, articles: [], error: (e as Error).message || "Falha ao consultar o PubMed" };
+    return { query: variants[0], articles: [], error: (e as Error).message || "Falha ao consultar o PubMed" };
   }
 }
 

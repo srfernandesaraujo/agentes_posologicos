@@ -274,7 +274,8 @@ export function detectToolIntent(text: string): ToolIntent {
 
 export function buildPubmedQueryPrompt(p: { request: string; transcript: string }): { system: string; user: string } {
   const system =
-    `Você monta buscas para o PubMed. Transforme o pedido do dono em uma busca curta em inglês, com termos MeSH ou palavras-chave e operadores AND/OR quando ajudar (até 12 palavras). ` +
+    `Você monta buscas para o PubMed. Transforme o pedido do dono em uma busca curta em inglês: apenas palavras-chave simples (até 8 palavras), com AND entre os conceitos principais. ` +
+    `NÃO use etiquetas de campo como [MeSH], [tiab] ou [sb], nem filtros de data ou "latest". Ignore pedidos de "recente": a ordenação já privilegia relevância. ` +
     `Use o contexto da reunião só para entender o assunto. Responda SOMENTE com JSON: {"query":"termos em inglês"}.`;
   const user = `Pedido do dono:\n${p.request}\n\nContexto recente da reunião:\n${p.transcript || "(sem contexto)"}`;
   return { system, user };

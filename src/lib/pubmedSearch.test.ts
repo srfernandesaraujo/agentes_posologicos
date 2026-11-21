@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildArticles, formatPubmedForPrompt, parsePubmedAbstracts, scrubUnknownPmids } from "../../supabase/functions/_shared/pubmedSearch";
+import { buildArticles, formatPubmedForPrompt, parsePubmedAbstracts, queryVariants, scrubUnknownPmids } from "../../supabase/functions/_shared/pubmedSearch";
 
 const xml = `<PubmedArticleSet>
 <PubmedArticle><MedlineCitation><PMID Version="1">111111</PMID><Article><Abstract>
@@ -59,5 +59,20 @@ describe("scrubUnknownPmids", () => {
   });
   it("texto sem PMID fica igual", () => {
     expect(scrubUnknownPmids("Sem citações.", [])).toEqual({ text: "Sem citações.", removed: 0 });
+  });
+});
+
+describe("queryVariants", () => {
+  it("a busca que voltou vazia na reunião ganha versões sem etiquetas e sem repetição", () => {
+    expect(queryVariants("NPH insulin[MeSH] OR NPH insulin[tiab] AND latest[sb]")).toEqual([
+      "NPH insulin[MeSH] OR NPH insulin[tiab] AND latest[sb]", "NPH insulin",
+    ]);
+  });
+  it("busca simples fica só ela mesma; busca longa ganha a versão curta", () => {
+    expect(queryVariants("semaglutide obesity")).toEqual(["semaglutide obesity"]);
+    expect(queryVariants("(metformin AND \"type 2 diabetes\") OR cardiovascular outcomes")).toEqual([
+      "(metformin AND \"type 2 diabetes\") OR cardiovascular outcomes", "metformin type 2 diabetes cardiovascular outcomes", "metformin type 2",
+    ]);
+    expect(queryVariants("   ")).toEqual([]);
   });
 });
