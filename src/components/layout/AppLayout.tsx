@@ -14,6 +14,8 @@ import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { ShellV2 } from "./ShellV2";
 
 function SidebarLink({ to, icon: Icon, label, count, dataTour }: { to: string; icon: any; label: string; count?: number; dataTour?: string }) {
   return (
@@ -35,7 +37,13 @@ function SidebarLink({ to, icon: Icon, label, count, dataTour }: { to: string; i
   );
 }
 
+/** Escolhe a casca: novo visual (chave ?novo-visual=1) ou a atual. */
 export function AppLayout() {
+  const { enabled } = useNewUI();
+  return enabled ? <ShellV2 /> : <LegacyLayout />;
+}
+
+function LegacyLayout() {
   const { user } = useAuth();
   const location = useLocation();
   const isChatPage = location.pathname.startsWith("/chat/");
