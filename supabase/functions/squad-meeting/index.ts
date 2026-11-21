@@ -370,6 +370,20 @@ Deno.serve(async (req) => {
         if (!upd || !upd.length) throw new HttpError(409, "A pauta já avançou");
         const msg = nextItemMessage(agenda, next);
         await insert({ author: "agent", agent_id: moderatorId, content: msg.text, meta: { meeting: { item: next, ...(msg.readyToEnd ? { ready_to_end: true } : {}) } } });
+        // Item novo: alguém da equipe já abre a conversa (a reunião não fica parada esperando você).
+        if (!msg.readyToEnd && !isSilenced(meeting.silenced_until, Date.now()) && (await acquireLock(meeting.id))) {
+          try {
+            const { keys } = await checkBudgetAndKeys(squad);
+            await runTurn(
+              { squad, template, meeting: { ...meeting, agenda, current_item: next }, agents, keys, insert },
+              { quiet: false, mentions: [], userText: `Vamos ao item ${next + 1}: ${agenda[next].title}. Alguém começa?` },
+            );
+          } catch (e) {
+            console.warn("[squad-meeting] abertura do item falhou:", (e as Error).message);
+          } finally {
+            await releaseLock(meeting.id);
+          }
+        }
         return json({ messages: sink });
       } else throw new HttpError(400, "Comando desconhecido");
 
@@ -385,8 +399,9 @@ Deno.serve(async (req) => {
       if (meeting.status !== "open") return json({ idle: true });
       const recent = await recentMessages(squad.id, meeting.id, 20);
       if (!recent.length) return json({ idle: true });
-      const lastUserIdx = (() => { for (let i = recent.length - 1; i >= 0; i--) if (recent[i].author === "user") return i; return -1; })();
-      const nudgesSinceUser = recent.slice(lastUserIdx + 1).filter((m) => m.meta?.meeting?.nudge).length;
+      // A conta de "puxadas" recomeça quando você fala ou quando a pauta muda de item.
+      const lastResetIdx = (() => { for (let i = recent.length - 1; i >= 0; i--) if (recent[i].author === "user" || recent[i].meta?.meeting?.item !== undefined || recent[i].meta?.meeting?.opening) return i; return -1; })();
+      const nudgesSinceUser = recent.slice(lastResetIdx + 1).filter((m) => m.meta?.meeting?.nudge).length;
       const lastAt = new Date(recent[recent.length - 1].created_at).getTime();
       if (!shouldNudge({ lastMessageAt: lastAt, now: Date.now(), nudgesSinceUser, silenced: isSilenced(meeting.silenced_until, Date.now()), proactivity: meeting.proactivity })) return json({ idle: true });
       if (meeting.current_item >= (meeting.agenda || []).length) return json({ idle: true });

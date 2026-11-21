@@ -80,7 +80,7 @@ describe("textos da pauta", () => {
     expect(proposalMessage(0, "Vendas", "Focar em X")).toContain("item 1");
     expect(proposalMessage(0, "Vendas", "Focar em X")).toContain("Decisão registrada: Focar em X");
     expect(proposalMessage(0, "Vendas", "")).not.toContain("Decisão registrada");
-    expect(nextItemMessage(agenda, 1)).toEqual({ text: "Item 2 de 3: Temas. Quem começa?", readyToEnd: false });
+    expect(nextItemMessage(agenda, 1)).toEqual({ text: "Vamos ao item 2 de 3: Temas.", readyToEnd: false });
     expect(nextItemMessage(agenda, 3).readyToEnd).toBe(true);
   });
 });
@@ -166,7 +166,8 @@ describe("silêncio e batimento", () => {
     const ok = { lastMessageAt: now - MEETING_QUIET_MS - 1, now, nudgesSinceUser: 0, silenced: false, proactivity: "balanced" as const };
     expect(shouldNudge(ok)).toBe(true);
     expect(shouldNudge({ ...ok, lastMessageAt: now - 1000 })).toBe(false);
-    expect(shouldNudge({ ...ok, nudgesSinceUser: 1 })).toBe(false);
+    expect(shouldNudge({ ...ok, nudgesSinceUser: 1 })).toBe(true);
+    expect(shouldNudge({ ...ok, nudgesSinceUser: 2 })).toBe(false);
     expect(shouldNudge({ ...ok, silenced: true })).toBe(false);
     expect(shouldNudge({ ...ok, proactivity: "calm" })).toBe(false);
   });

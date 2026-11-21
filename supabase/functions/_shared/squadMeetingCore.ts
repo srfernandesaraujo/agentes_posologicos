@@ -11,6 +11,7 @@ export const MEETING_DEFAULT_CAP_USD = 1;
 export const MEETING_MAX_CAP_USD = 20;
 export const MEETING_LOCK_SECONDS = 100;
 export const MEETING_HARD_MAX_AGENT_MESSAGES = 60;
+export const MEETING_MAX_NUDGES = 2; // puxadas seguidas da diretora sem você falar
 export const MEETING_QUIET_MS = 45_000; // sala parada por tanto tempo: a diretora pode puxar a conversa
 export const MEETING_SPEAK_TOKENS = 450;
 export const MEETING_TRANSCRIPT_LINES = 20;
@@ -85,7 +86,7 @@ export function proposalMessage(index: number, title: string, decision: string):
 
 export function nextItemMessage(agenda: AgendaItem[], next: number): { text: string; readyToEnd: boolean } {
   if (next >= agenda.length) return { text: "Pauta concluída. Posso gerar a ata e encerrar a reunião?", readyToEnd: true };
-  return { text: `Item ${next + 1} de ${agenda.length}: ${agenda[next].title}. Quem começa?`, readyToEnd: false };
+  return { text: `Vamos ao item ${next + 1} de ${agenda.length}: ${agenda[next].title}.`, readyToEnd: false };
 }
 
 // ---------- Transcrição ----------
@@ -200,7 +201,7 @@ export function applyBrakes(picks: EvaluatorPick[], ctx: BrakeContext): Evaluato
 
 /** A diretora pode puxar a conversa quando a sala ficou parada, mas só uma vez por fala do dono. */
 export function shouldNudge(p: { lastMessageAt: number; now: number; nudgesSinceUser: number; silenced: boolean; proactivity: Proactivity }): boolean {
-  if (p.silenced || p.proactivity === "calm" || p.nudgesSinceUser >= 1) return false;
+  if (p.silenced || p.proactivity === "calm" || p.nudgesSinceUser >= MEETING_MAX_NUDGES) return false;
   return p.now - p.lastMessageAt >= MEETING_QUIET_MS;
 }
 
