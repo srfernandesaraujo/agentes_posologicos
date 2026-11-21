@@ -19,8 +19,14 @@ export function useNavCounts(): Record<"agents" | "conversations" | "knowledge" 
         .from("chat_sessions")
         .select("id, messages(id)")
         .eq("user_id", user!.id);
-      if (error) return 0;
-      return (data || []).filter((s: any) => s.messages && s.messages.length > 0).length;
+      const legacy = error ? 0 : (data || []).filter((s: any) => s.messages && s.messages.length > 0).length;
+      // conversas novas vivem em salas pessoais (chat_sessions está congelado)
+      const { count } = await supabase
+        .from("virtual_rooms")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user!.id)
+        .eq("room_type", "personal");
+      return legacy + (count || 0);
     },
     enabled: !!user,
   });

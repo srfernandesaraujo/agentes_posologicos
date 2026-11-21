@@ -187,7 +187,7 @@ export default function UserDashboard() {
 
   return (
     <div className="container max-w-6xl py-8">
-      <RoadmapBanner />
+      <div className={newUI ? "mb-5" : undefined}><RoadmapBanner /></div>
       {newUI && <HomeV2 sessions={sessions} ledger={ledger} balance={balance} />}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-slide-up">
         <div>

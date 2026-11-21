@@ -9,6 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Sparkline } from "@/components/ds/Sparkline";
 import { PkCurve } from "@/components/ds/PkCurve";
 import { TeamPulsePanel } from "./TeamPulsePanel";
+import { useAgents } from "@/hooks/useAgents";
+import { useCustomAgents } from "@/hooks/useCustomAgents";
 
 interface SessionRow { id: string; created_at: string; agent_id: string; agents?: { name?: string } | null }
 interface LedgerRow { amount: number; type: string; created_at: string }
@@ -56,9 +58,35 @@ export function HomeV2({ sessions, ledger, balance }: { sessions: SessionRow[]; 
   });
   const firstName = (profile?.display_name || "").trim().split(/\s+/)[0];
 
-  const recent = sessions.slice(0, 3);
+  // Desde que o Chat virou "sala pessoal", as conversas novas vivem em virtual_rooms (chat_sessions ficou congelado).
+  const { data: rooms = [] } = useQuery({
+    queryKey: ["home-personal-rooms", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("virtual_rooms")
+        .select("id, agent_id, name, updated_at, created_at")
+        .eq("user_id", user!.id)
+        .eq("room_type", "personal")
+        .order("updated_at", { ascending: false })
+        .limit(200);
+      return (data || []) as { id: string; agent_id: string | null; name: string; updated_at: string; created_at: string }[];
+    },
+    enabled: !!user,
+  });
+  const { data: nativeAgents = [] } = useAgents();
+  const { data: customAgents = [] } = useCustomAgents();
+  const agentName = (id: string | null) =>
+    (id && (nativeAgents.find((a) => a.id === id)?.name || (customAgents as any[]).find((a) => a.id === id)?.name)) || null;
+
+  // sala pessoal (atual) + sessões antigas, da mais recente para a mais antiga
+  const recent = useMemo(() => {
+    const fromRooms = rooms.filter((r) => r.agent_id).map((r) => ({ id: r.id, to: `/chat/${r.agent_id}?room=${r.id}`, title: agentName(r.agent_id) || r.name || "Conversa", subtitle: r.name, at: r.updated_at }));
+    const fromSessions = sessions.map((s) => ({ id: s.id, to: `/chat/${s.agent_id}?session=${s.id}`, title: s.agents?.name || "Conversa", subtitle: "", at: s.created_at }));
+    return [...fromRooms, ...fromSessions].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rooms, sessions, nativeAgents, customAgents]);
   const usage = useMemo(() => ledger.filter((l) => l.type === "usage"), [ledger]);
-  const convSeries = useMemo(() => dailySeries(sessions.map((s) => s.created_at), 14), [sessions]);
+  const convSeries = useMemo(() => dailySeries([...rooms.map((r) => r.updated_at), ...sessions.map((s) => s.created_at)], 14), [rooms, sessions]);
   const creditSeries = useMemo(() => dailySeries(usage.map((u) => u.created_at), 14, (i) => Math.abs(usage[i].amount)), [usage]);
   const conv14 = convSeries.reduce((a, b) => a + b, 0);
   const cred14 = creditSeries.reduce((a, b) => a + b, 0);
@@ -66,8 +94,10 @@ export function HomeV2({ sessions, ledger, balance }: { sessions: SessionRow[]; 
   return (
     <section className="mb-10 animate-slide-up" aria-label="Central de comando">
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[hsl(var(--dom-inicio)/0.10)] via-pos-base to-pos-base p-6 md:p-8">
-        <PkCurve height={120} className="pointer-events-none absolute inset-x-0 bottom-0 w-full opacity-30" />
-        <div className="relative">
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[58%] md:block [mask-image:linear-gradient(90deg,transparent,#000_45%)]" aria-hidden="true">
+          <PkCurve height={260} preserve="xMaxYMax slice" className="absolute bottom-0 right-0 h-full w-full opacity-40" />
+        </div>
+        <div className="relative z-10">
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--dom-inicio))]">Central de comando</p>
           <h1 className="mt-2 font-brand text-3xl font-extrabold tracking-tight text-white md:text-4xl">
             {greeting()}{firstName ? `, ${firstName}` : ""}.
@@ -107,10 +137,11 @@ export function HomeV2({ sessions, ledger, balance }: { sessions: SessionRow[]; 
           ) : (
             <div className="grid gap-3 sm:grid-cols-3">
               {recent.map((s) => (
-                <button key={s.id} onClick={() => navigate(`/chat/${s.agent_id}?session=${s.id}`)} className="group flex flex-col items-start gap-2 rounded-xl border border-white/10 bg-pos-base p-3.5 text-left transition hover:-translate-y-0.5 hover:border-[hsl(var(--dom-clinica))]">
+                <button key={s.id} onClick={() => navigate(s.to)} className="group flex flex-col items-start gap-2 rounded-xl border border-white/10 bg-pos-base p-3.5 text-left transition hover:-translate-y-0.5 hover:border-[hsl(var(--dom-clinica))]">
                   <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(var(--dom-clinica)/0.15)] text-[hsl(var(--dom-clinica))]"><MessageSquare className="h-4 w-4" /></span>
-                  <span className="line-clamp-2 text-sm font-semibold text-white">{s.agents?.name || "Conversa"}</span>
-                  <span className="text-xs text-white/40">{formatDistanceToNow(new Date(s.created_at), { addSuffix: true, locale: ptBR })}</span>
+                  <span className="line-clamp-2 text-sm font-semibold text-white">{s.title}</span>
+                  {s.subtitle && s.subtitle !== s.title && <span className="line-clamp-1 text-xs text-white/50">{s.subtitle}</span>}
+                  <span className="text-xs text-white/40">{formatDistanceToNow(new Date(s.at), { addSuffix: true, locale: ptBR })}</span>
                 </button>
               ))}
             </div>
@@ -130,7 +161,7 @@ export function HomeV2({ sessions, ledger, balance }: { sessions: SessionRow[]; 
 
         <div className="grid gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/40">Conversas, 14 dias</h2>
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/40">Conversas ativas, 14 dias</h2>
             <div className="mt-2 flex items-end justify-between">
               <p className="font-brand text-3xl font-extrabold text-white">{conv14}</p>
               <Sparkline values={convSeries} color="hsl(var(--dom-clinica))" />

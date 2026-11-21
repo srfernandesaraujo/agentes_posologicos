@@ -9,10 +9,12 @@ interface Props {
   window?: [number, number];
   className?: string;
   height?: number;
+  /** valor de preserveAspectRatio; padrão estica na largura toda */
+  preserve?: string;
 }
 
 /** Curva farmacocinética de doses repetidas (1 compartimento, via oral). Elemento decorativo e informativo. */
-export function PkCurve({ tau = 6, doses = 6, window: win = [0.55, 0.9], className, height = 160 }: Props) {
+export function PkCurve({ tau = 6, doses = 6, window: win = [0.55, 0.9], className, height = 160, preserve = "none" }: Props) {
   const gid = useId();
   const [lo, hi] = win;
   const { d, yTop, yBottom } = useMemo(() => {
@@ -41,7 +43,7 @@ export function PkCurve({ tau = 6, doses = 6, window: win = [0.55, 0.9], classNa
       className={className}
       role="img"
       aria-label="Curva de concentração ao longo de doses repetidas, dentro da janela terapêutica"
-      preserveAspectRatio="none"
+      preserveAspectRatio={preserve}
     >
       <defs>
         <linearGradient id={gid} x1="0" x2="1">
