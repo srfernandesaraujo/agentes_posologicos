@@ -374,7 +374,8 @@ export default function Agents() {
                       <div
                         key={agent.id}
                         onClick={() => navigate(`/chat/${agent.id}`)}
-                        className="group flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5 cursor-pointer transition-all hover:border-white/20 hover:-translate-y-0.5"
+                        className="pos-agent-card group flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5 cursor-pointer transition-all hover:border-white/20 hover:-translate-y-0.5"
+                        style={{ "--c": `var(--cat-${catVar})` } as React.CSSProperties}
                       >
                         <div
                           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
@@ -404,7 +405,7 @@ export default function Agents() {
                           <p className="text-xs text-white/50 line-clamp-2 mt-0.5">{agent.description}</p>
                         </div>
                         <div className="flex flex-col items-end gap-2 shrink-0">
-                          <div className="flex items-center gap-1 text-[10px] text-white/30">
+                          <div className="pos-cost flex items-center gap-1 text-[10px] text-white/30">
                             <Coins className="h-3 w-3" />
                             {agent.credit_cost}
                           </div>

@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgents } from "@/hooks/useAgents";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { OMNIBAR_CALC_DISCLAIMER, parseOmnibarCalc } from "@/lib/omnibarCalc";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 import {
@@ -36,9 +38,12 @@ import {
 interface CommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** texto pré-preenchido ao abrir (ex.: sugestão clicada no Início) */
+  initialQuery?: string;
 }
 
-export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
+export function CommandPalette({ open, onOpenChange, initialQuery }: CommandPaletteProps) {
+  const { enabled: newUI } = useNewUI();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [query, setQuery] = useState("");
@@ -79,8 +84,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   });
 
   useEffect(() => {
-    if (!open) setQuery("");
-  }, [open]);
+    setQuery(open ? initialQuery ?? "" : "");
+  }, [open, initialQuery]);
+
+  // Novo visual: frases com números viram cálculo direto na omnibar (determinístico, sem LLM)
+  const calc = useMemo(() => (newUI ? parseOmnibarCalc(query) : null), [newUI, query]);
 
   const go = (path: string) => {
     onOpenChange(false);
@@ -92,11 +100,26 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput
-        placeholder="Buscar agentes, conversas, projetos... ou digite uma ação"
+        placeholder={newUI ? "Pergunte, calcule ou busque. Ex.: 70 kg 5 mg/kg" : "Buscar agentes, conversas, projetos... ou digite uma ação"}
         value={query}
         onValueChange={setQuery}
       />
       <CommandList className="max-h-[480px]">
+        {calc && calc.kind === "hint" && (
+          <div className="mx-2 mt-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs text-white/60">{calc.message}</div>
+        )}
+        {calc && calc.kind !== "hint" && (
+          <div className="mx-2 mt-2 rounded-xl border border-[hsl(var(--dom-inicio)/0.4)] bg-[hsl(var(--dom-inicio)/0.08)] p-3.5">
+            <div className="flex items-center justify-between text-[11px] uppercase tracking-widest text-[hsl(var(--dom-inicio))]">
+              <span className="flex items-center gap-1.5"><Sparkles className="h-3 w-3" />{calc.title}</span>
+              <button className="normal-case tracking-normal text-white/50 hover:text-white" onClick={() => { onOpenChange(false); navigate("/calculadora"); }}>Abrir calculadora</button>
+            </div>
+            <div className="mt-2 font-mono text-3xl font-medium text-white">{calc.value} <span className="text-base text-white/50">{calc.unit}</span></div>
+            {calc.details.map((d) => <div key={d} className="mt-1 text-xs text-white/70">{d}</div>)}
+            <div className="mt-2 font-mono text-[10.5px] leading-snug text-white/40">{calc.formula}</div>
+            <div className="mt-1 text-[10.5px] text-white/35">{OMNIBAR_CALC_DISCLAIMER}</div>
+          </div>
+        )}
         <CommandEmpty>Nada encontrado.</CommandEmpty>
 
         <CommandGroup heading="Ações rápidas">
@@ -271,15 +294,20 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
 export function CommandPaletteProvider() {
   const [open, setOpen] = useState(false);
+  const [initialQuery, setInitialQuery] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        setInitialQuery(undefined);
         setOpen((o) => !o);
       }
     };
-    const openHandler = () => setOpen(true);
+    const openHandler = (e: Event) => {
+      setInitialQuery((e as CustomEvent<{ query?: string } | undefined>).detail?.query);
+      setOpen(true);
+    };
     window.addEventListener("keydown", handler);
     window.addEventListener("open-command-palette", openHandler);
     return () => {
@@ -288,5 +316,5 @@ export function CommandPaletteProvider() {
     };
   }, []);
 
-  return <CommandPalette open={open} onOpenChange={setOpen} />;
+  return <CommandPalette open={open} onOpenChange={setOpen} initialQuery={initialQuery} />;
 }

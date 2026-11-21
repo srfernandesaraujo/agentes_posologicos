@@ -124,6 +124,12 @@
     --input: 195 20% 24%;
     --radius: 0.875rem;
   }
+  /* catálogo de agentes: cartão ganha a cor da categoria ao passar o mouse */
+  [data-ui="v2"] .pos-agent-card:hover {
+    border-color: hsl(var(--c) / 0.6);
+    box-shadow: 0 14px 32px -18px hsl(var(--c) / 0.7);
+  }
+  [data-ui="v2"] .pos-cost { font-family: "JetBrains Mono", ui-monospace, monospace; }
   [data-ui="v2"] .font-display {
     font-family: "Bricolage Grotesque", "Space Grotesk", system-ui, sans-serif;
     letter-spacing: -0.02em;

@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState, useMemo } from "react";
 import { Coins, BarChart3, Activity, Bot, FileText, TrendingDown, Calendar, GraduationCap } from "lucide-react";
 import { RoadmapBanner } from "@/components/admin/RoadmapBanner";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { HomeV2 } from "@/components/dashboard/HomeV2";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -38,6 +40,7 @@ export default function UserDashboard() {
   const { user } = useAuth();
   const { balance } = useCredits();
   const [period, setPeriod] = useState("30");
+  const { enabled: newUI } = useNewUI();
 
   const periodStart = useMemo(() => {
     if (period === "all") return null;
@@ -185,11 +188,12 @@ export default function UserDashboard() {
   return (
     <div className="container max-w-6xl py-8">
       <RoadmapBanner />
+      {newUI && <HomeV2 sessions={sessions} ledger={ledger} balance={balance} />}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between animate-slide-up">
         <div>
           <h1 className="font-display text-3xl font-bold text-white flex items-center gap-3">
             <BarChart3 className="h-8 w-8 text-[hsl(174,62%,47%)]" />
-            Meu Dashboard
+            {newUI ? "Análises" : "Meu Dashboard"}
           </h1>
           <p className="text-white/50 mt-1">Acompanhe seu uso, créditos e interações com os agentes</p>
         </div>
