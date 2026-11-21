@@ -9,11 +9,13 @@ const corsHeaders = {
 };
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const SCOPES = [
+const BASE_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/userinfo.email",
   "openid",
 ].join(" ");
+// Gmail e Agenda só entram quando o pedido vem do cartão de ação da Reunião Viva (menor privilégio para quem só usa o Meet).
+const ACTION_SCOPES = " https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar.events";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -39,6 +41,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Google OAuth não configurado" }), { status: 500, headers: corsHeaders });
     }
 
+    const body = await req.json().catch(() => ({}));
+    const scope = body?.withActions === true ? BASE_SCOPES + ACTION_SCOPES : BASE_SCOPES;
     const state = await signOAuthState(authUser.id, stateSecret);
 
     const params = new URLSearchParams({
@@ -48,7 +52,7 @@ serve(async (req) => {
       access_type: "offline",
       prompt: "consent",
       include_granted_scopes: "true",
-      scope: SCOPES,
+      scope,
       state,
     });
 

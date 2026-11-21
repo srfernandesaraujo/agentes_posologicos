@@ -27,7 +27,7 @@ serve(async (req) => {
     const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: conn } = await supabaseAdmin
       .from("google_connections")
-      .select("google_email, status, last_error, created_at")
+      .select("google_email, status, last_error, created_at, scopes")
       .eq("user_id", authUser.id)
       .maybeSingle();
 
@@ -37,6 +37,7 @@ serve(async (req) => {
         googleEmail: conn?.google_email || null,
         status: conn?.status || null,
         lastError: conn?.last_error || null,
+        scopes: conn?.scopes || null,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

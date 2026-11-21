@@ -7,9 +7,10 @@ describe("returnTo (volta ao link da reunião depois do login)", () => {
   it("aceita só caminhos de reunião", () => {
     expect(isSafeReturnTo("/reuniao-viva/convite/abc_DEF-123")).toBe(true);
     expect(isSafeReturnTo("/reuniao-viva/0b1c2d3e-0000-4000-8000-000000000000")).toBe(true);
+    expect(isSafeReturnTo("/squads/0b1c2d3e-0000-4000-8000-000000000000")).toBe(true);
   });
   it("recusa endereço externo, outras rotas e tentativas de escapar do caminho", () => {
-    for (const p of ["https://evil.com", "//evil.com", "/agentes", "/reuniao-viva/../admin", "/reuniao-viva/a/b/c", "/reuniao-viva/", "javascript:alert(1)", "/reuniao-viva/a?x=1", "", null, 5]) {
+    for (const p of ["https://evil.com", "//evil.com", "/agentes", "/reuniao-viva/../admin", "/reuniao-viva/a/b/c", "/reuniao-viva/", "javascript:alert(1)", "/reuniao-viva/a?x=1", "/squads/abc", "/squads/0b1c2d3e-0000-4000-8000-000000000000/../x", "", null, 5]) {
       expect(isSafeReturnTo(p as any)).toBe(false);
     }
   });

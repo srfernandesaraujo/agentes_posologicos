@@ -17,6 +17,7 @@ import type { MinutesDoc as MinutesDocData } from "@/lib/minutesDocPdf";
 import { useLiveMeeting, useLiveMeetingActions, useMeetingFiles, FILE_ACCEPT, MEETING_MAX_FILES, PROACTIVITY_OPTIONS, type LiveMeeting, type MeetingFile, type Proactivity } from "@/hooks/useSquadMeeting";
 import { OfficeSection } from "./office/OfficeSection";
 import { MeetingInviteButton } from "./MeetingInviteDialog";
+import { MeetingActions } from "./MeetingActions";
 import { QuestionCard } from "./MissionPanel";
 
 const MEETING_MAX = 4;
@@ -647,6 +648,7 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
             <LiveMeetingBar meeting={liveMeeting} spent={liveSpent} busy={liveBusy} onControl={liveControl} onEnd={endLiveMeeting}
               files={meetingFiles} sensitivity={squad.sensitivity} uploading={live.uploadFile.isPending} onUpload={uploadMeetingFile} onDeleteFile={deleteMeetingFile} />
           )}
+          {inLive && liveMeeting && <MeetingActions meetingId={liveMeeting.id} squadId={squad.id} agentNames={new Map(agents.map((a) => [a.id, a.name]))} />}
 
           <div className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4" style={{ maxHeight: "58vh" }} aria-live="polite">
             {isLoading ? (

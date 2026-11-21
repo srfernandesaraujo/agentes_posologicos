@@ -14,7 +14,7 @@ export const GUEST_NAME_MAX = 40;
 const ALLOWED: Record<MeetingRole, ReadonlySet<string>> = {
   host: new Set([
     "view", "say", "tick", "control", "end", "upload_file", "delete_file",
-    "create_invite", "revoke_invite", "list_members", "remove_member",
+    "create_invite", "revoke_invite", "list_members", "remove_member", "approve_action", "discard_action",
   ]),
   participant: new Set(["view", "say", "leave"]),
   observer: new Set(["view", "leave"]),

@@ -4,6 +4,7 @@
 //   view     { meetingId }                                             → leitura segura da reunião (convidado e anfitrião)
 //   create_invite { meetingId, role } | revoke_invite { inviteId } | list_members | remove_member { userId }   → só o anfitrião
 //   leave    { meetingId }                                             → convidado sai
+//   approve_action { meetingId, actionId, edits? } | discard_action { meetingId, actionId }   → só o anfitrião: executa (Gmail/Agenda) ou descarta uma ação proposta por um agente
 // Ações do anfitrião (Fase 1):
 //   start    { squadId, title, agenda?, participants?, proactivity? }  → abre a reunião com a pauta
 //   say      { meetingId, text }                                       → fala do dono; os agentes escolhidos respondem
@@ -37,11 +38,17 @@ import {
   MEETING_MAX_GUESTS, INVITE_TTL_MS, canDo, resolveRole, normalizeInviteRole, newInviteToken, hashInviteToken, looksLikeInviteToken,
   checkInvite, canAddGuest, guestDisplayName, guestSafeMessage, type MeetingRole,
 } from "../_shared/squadMeetingAccess.ts";
+import {
+  MAX_ACTIONS_PER_MEETING, buildCalendarEvent, buildInviteEmail, buildRawEmail, canDecide, describeAction, detectActionIntent, emailFooter, extractActionProposals,
+  hasScope, neededScope, validateCandidate, type ActionPayload, type Extracted,
+} from "../_shared/squadMeetingActions.ts";
+import { getValidAccessToken, GoogleNotConnectedError, GoogleReauthRequiredError } from "../_shared/googleOAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+const APP_URL = Deno.env.get("APP_URL") || "https://agentes-ai.posologia.app";
 const FUNCTION_DEADLINE_MS = 80_000;
 const MEETING_TOOL_SPEAK_TOKENS = 900;
 const EVALUATOR_DEADLINE_MS = 12_000;
@@ -252,6 +259,45 @@ Deno.serve(async (req) => {
       }
       if (!picks.length) return { cost, spoke };
 
+      // Pedido de e-mail, agenda ou convite: o agente precisa de espaço para o texto do bloco [[ACAO]] (o corpo do e-mail não cabe em 90 palavras).
+      const actionIntent = !!opts.userText && detectActionIntent(opts.userText);
+      /** Valida e guarda as propostas de ação da fala de um agente. Nada é executado aqui: o dono aprova depois, num cartão. */
+      const saveProposals = async (agent: AgentRow, ex: Extracted): Promise<number> => {
+        if (!ex.proposals.length && !ex.incomplete && !ex.dropped) return 0;
+        const { count } = await admin.from("squad_meeting_actions").select("id", { count: "exact", head: true }).eq("meeting_id", meetingId).neq("status", "discarded");
+        let room = MAX_ACTIONS_PER_MEETING - (count || 0);
+        const notes: string[] = [];
+        let saved = 0;
+        for (const pr of ex.proposals) {
+          if (room <= 0) { notes.push(`limite de ${MAX_ACTIONS_PER_MEETING} ações por reunião`); break; }
+          const v = validateCandidate(pr.fields, Date.now());
+          if (!v.ok) { notes.push(v.reason); continue; }
+          // Mesmos filtros das mensagens: dados pessoais conforme a sensibilidade do squad e, nos squads de código, segredos.
+          const found = new Map<string, number>();
+          const note = (fs: { type: string; count: number }[]) => fs.forEach((f) => found.set(f.type, (found.get(f.type) ?? 0) + f.count));
+          const mask = (t: string): string => {
+            let out = t;
+            if (squad.sensitivity !== "normal" && /[d@]/.test(out)) { const r = screenInput(out, squad.sensitivity); out = r.text; note(r.findings); }
+            if (template.maskSecrets && out.length >= 8) { const r = maskSecrets(out); out = r.text; note(r.findings); }
+            return out;
+          };
+          const pl = v.payload;
+          const payload: ActionPayload = pl.type === "email" ? { ...pl, subject: mask(pl.subject), body: mask(pl.body) }
+            : pl.type === "evento" ? { ...pl, title: mask(pl.title), description: mask(pl.description) }
+            : { ...pl, note: mask(pl.note) };
+          const { error } = await admin.from("squad_meeting_actions").insert({
+            meeting_id: meetingId, squad_id: squad.id, owner_id: user.id, agent_id: agent.id, type: payload.type, payload,
+            masked: [...found.entries()].map(([type, n]) => ({ type, count: n })),
+          });
+          if (error) { notes.push("não consegui guardar a proposta"); continue; }
+          saved++; room--;
+        }
+        if (ex.incomplete) notes.push("a proposta veio cortada");
+        if (ex.dropped) notes.push(`só uma ação por fala é registrada (${ex.dropped} ignorada)`);
+        if (notes.length) await insert({ author: "system", content: `${agent.name} propôs uma ação que não pôde ser registrada: ${notes.join("; ")}.`, meta: { meeting: { action_rejected: true } } });
+        return saved;
+      };
+
       const memRows = (await admin.from("squad_memories").select("id, kind, content, pinned, status, created_at")
         .eq("squad_id", squad.id).eq("owner_id", user.id).eq("status", "active")).data;
       const memoryContext = buildMemoryContext(squad.memory || "", (memRows || []) as MemoryItem[]);
@@ -297,7 +343,7 @@ Deno.serve(async (req) => {
           }) + (tool ? `\n\n${tool.block}` : filesOverview ? `\n\n${filesOverview}` : "");
           const res = await callWithFallback(admin, keys, {
             systemPrompt: system, messages: [{ role: "user", content: userMessage }], temperature: 0.5, mode: "text",
-            maxTokens: tool ? MEETING_TOOL_SPEAK_TOKENS : MEETING_SPEAK_TOKENS, deadlineAt: Math.min(deadlineAt, Date.now() + 45_000),
+            maxTokens: tool || actionIntent ? MEETING_TOOL_SPEAK_TOKENS : MEETING_SPEAK_TOKENS, deadlineAt: Math.min(deadlineAt, Date.now() + 45_000),
           });
           return { agent, pick: p, res };
         }));
@@ -317,7 +363,10 @@ Deno.serve(async (req) => {
             await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_replied", agentId: agent.id, room: agent.room ?? null, text: "Passou a vez" });
             continue;
           }
-          let content = res.output.trim() + (res.finishReason === "length" ? " […]" : "");
+          // Blocos [[ACAO]] saem do texto da fala e viram propostas (cartões para o dono aprovar).
+          const extracted = extractActionProposals(res.output.trim());
+          let content = extracted.text + (res.finishReason === "length" ? " […]" : "");
+          if (!extracted.text && (extracted.proposals.length || extracted.incomplete)) content = "Preparei uma ação para você aprovar (veja o cartão da reunião).";
           let removedPmids = 0;
           if (tool && tool.name === "pubmed") {
             // Citação só com o que a busca devolveu: PMID fora da lista é removido do texto.
@@ -338,6 +387,7 @@ Deno.serve(async (req) => {
               ...(res.finishReason === "length" ? { truncated: true } : {}),
             },
           });
+          await saveProposals(agent, extracted);
           said.push({ agentId: agent.id, content });
           lines.push({ author: "agent", agentName: agent.name, content });
           spoke++;
@@ -553,6 +603,103 @@ Deno.serve(async (req) => {
       const { data: gone } = await admin.from("squad_meeting_members").delete().eq("meeting_id", meeting.id).eq("user_id", authUser.id).select("display_name");
       if (gone && gone.length) await makeInsert(squad.id, meeting.id, [])({ author: "system", content: `${gone[0].display_name} saiu da reunião.` });
       return json({ ok: true });
+    }
+
+    // ---------- ações propostas pelos agentes (só o anfitrião decide) ----------
+    if (action === "discard_action") {
+      const { data: gone } = await admin.from("squad_meeting_actions").update({ status: "discarded", decided_at: new Date().toISOString() })
+        .eq("id", String(body?.actionId || "")).eq("meeting_id", meeting.id).in("status", ["proposed", "failed"]).select("id");
+      if (!gone || !gone.length) throw new HttpError(409, "Esta ação não pode mais ser descartada.");
+      return json({ ok: true });
+    }
+    if (action === "approve_action") {
+      requireOpen(meeting);
+      const { data: row } = await admin.from("squad_meeting_actions").select("*").eq("id", String(body?.actionId || "")).eq("meeting_id", meeting.id).maybeSingle();
+      if (!row) throw new HttpError(404, "Ação não encontrada");
+      if (!canDecide(row.status)) throw new HttpError(409, "Esta ação já foi decidida.", "action_decided");
+
+      // Edições do anfitrião: só os campos conhecidos, e o tipo nunca muda. Tudo passa pela mesma validação das propostas.
+      const EDITABLE = ["to", "subject", "body", "title", "start", "durationMin", "attendees", "description", "role", "note"];
+      const edits = body?.edits && typeof body.edits === "object" ? body.edits as Record<string, unknown> : {};
+      const candidate: Record<string, unknown> = { ...(row.payload as Record<string, unknown>), type: row.type };
+      for (const k of EDITABLE) if (k in edits) candidate[k] = edits[k];
+      const v = validateCandidate(candidate, Date.now());
+      if (!v.ok) throw new HttpError(400, `Não dá para executar: ${v.reason}.`, "action_invalid");
+      const payload = v.payload;
+
+      // Conta Google conectada e com a permissão certa; o token é obtido antes de reservar a ação (sem efeito colateral se falhar).
+      const { data: conn } = await admin.from("google_connections").select("scopes, status").eq("user_id", user.id).maybeSingle();
+      if (!conn) throw new HttpError(409, "Conecte sua conta Google para executar esta ação.", "google_not_connected");
+      if (!hasScope(conn.scopes, neededScope(payload.type))) throw new HttpError(409, "Falta a permissão do Google para esta ação. Reconecte sua conta.", "google_scopes_missing");
+      let accessToken: string;
+      try {
+        accessToken = await getValidAccessToken(admin, user.id);
+      } catch (e) {
+        if (e instanceof GoogleNotConnectedError) throw new HttpError(409, "Conecte sua conta Google para executar esta ação.", "google_not_connected");
+        if (e instanceof GoogleReauthRequiredError) throw new HttpError(409, "O acesso ao Google expirou. Reconecte sua conta.", "google_reauth");
+        throw e;
+      }
+
+      // Reserva atômica: só uma chamada passa de proposed/failed para executing (duplo clique ou duas abas não enviam duas vezes).
+      const { data: claimed } = await admin.from("squad_meeting_actions")
+        .update({ status: "executing", payload, decided_at: new Date().toISOString(), error: null })
+        .eq("id", row.id).in("status", ["proposed", "failed"]).select("id");
+      if (!claimed || !claimed.length) throw new HttpError(409, "Esta ação já foi decidida.", "action_decided");
+
+      const hostName = await displayNameOf();
+      const gfetch = async (url: string, payloadBody: unknown): Promise<{ ok: boolean; status: number; data: any }> => {
+        const r = await fetch(url, {
+          method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(payloadBody), signal: AbortSignal.timeout(20_000),
+        });
+        const data = await r.json().catch(() => ({}));
+        return { ok: r.ok, status: r.status, data };
+      };
+      const sendMail = async (to: string[], subject: string, text: string) => gfetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { raw: buildRawEmail({ to, subject, body: text }) });
+      const googleError = (who: string, r: { status: number; data: any }) => who + " recusou (" + r.status + "): " + String(r.data?.error?.message || "erro desconhecido").slice(0, 200);
+
+      let result: Record<string, unknown> | null = null;
+      let errorText = "";
+      try {
+        if (payload.type === "email") {
+          const r = await sendMail(payload.to, payload.subject, payload.body + emailFooter(hostName, meeting.title));
+          if (r.ok) result = { id: r.data?.id ?? null }; else errorText = googleError("O Gmail", r);
+        } else if (payload.type === "evento") {
+          const r = await gfetch("https://www.googleapis.com/calendar/v3/calendars/primary/events" + (payload.attendees.length ? "?sendUpdates=all" : ""), buildCalendarEvent(payload, hostName, meeting.title));
+          if (r.ok) result = { id: r.data?.id ?? null, link: r.data?.htmlLink ?? null }; else errorText = googleError("A Agenda", r);
+        } else {
+          const { count: activeInvites } = await admin.from("squad_meeting_invites").select("id", { count: "exact", head: true })
+            .eq("meeting_id", meeting.id).is("revoked_at", null).gt("expires_at", new Date().toISOString());
+          if ((activeInvites || 0) >= 10) errorText = "Já existem 10 convites ativos. Revogue algum e tente de novo.";
+          else {
+            const token = newInviteToken();
+            const { data: inv, error: invErr } = await admin.from("squad_meeting_invites").insert({
+              meeting_id: meeting.id, token_hash: await hashInviteToken(token), role: payload.role, created_by: authUser.id, expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+            }).select("id").single();
+            if (invErr) throw invErr;
+            const mail = buildInviteEmail({ hostName, meetingTitle: meeting.title, url: APP_URL + "/reuniao-viva/convite/" + token, role: payload.role, note: payload.note });
+            const r = await sendMail(payload.to, mail.subject, mail.body);
+            if (r.ok) result = { id: r.data?.id ?? null, invite_id: inv.id };
+            else {
+              await admin.from("squad_meeting_invites").update({ revoked_at: new Date().toISOString() }).eq("id", inv.id); // o link não chegou a ninguém
+              errorText = googleError("O Gmail", r);
+            }
+          }
+        }
+      } catch (e) {
+        // Sem resposta do Google: pode ter saído mesmo assim. Não dá para saber, então o cartão manda conferir antes de tentar de novo.
+        console.warn("[squad-meeting] ação sem confirmação:", (e as Error).message);
+        errorText = "Não consegui confirmar a resposta do Google. Confira a pasta Enviados ou a Agenda antes de tentar de novo.";
+      }
+
+      const sink: any[] = [];
+      if (result) {
+        await admin.from("squad_meeting_actions").update({ status: "done", result, executed_at: new Date().toISOString(), error: null }).eq("id", row.id);
+        await makeInsert(squad.id, meeting.id, sink)({ author: "system", content: "Feito por aprovação do anfitrião: " + describeAction(payload) + ".", meta: { meeting: { action_done: row.id } } });
+        return json({ ok: true, result, messages: sink });
+      }
+      await admin.from("squad_meeting_actions").update({ status: "failed", error: errorText }).eq("id", row.id);
+      throw new HttpError(502, errorText, "action_failed");
     }
 
     // ---------- control (sem chamada ao modelo) ----------

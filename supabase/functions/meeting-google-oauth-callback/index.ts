@@ -72,6 +72,7 @@ serve(async (req) => {
         access_token_encrypted: accessTokenEncrypted,
         access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
         status: "connected",
+        scopes: tokens.scope ?? null,
         last_error: null,
       },
       { onConflict: "user_id" },
