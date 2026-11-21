@@ -60,6 +60,8 @@ import OSCEExamEditor from "./pages/OSCEExamEditor";
 import OSCEJoin from "./pages/OSCEJoin";
 import OSCESessionTeacher from "./pages/OSCESessionTeacher";
 import OSCESessionStudent from "./pages/OSCESessionStudent";
+import MeetingInvite from "./pages/MeetingInvite";
+import MeetingGuest from "./pages/MeetingGuest";
 import { CookieConsent } from "./components/cookies/CookieConsent";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -93,6 +95,8 @@ const App = () => (
             <Route path="/cookies" element={<CookiePolicy />} />
             <Route path="/verificar" element={<VerifyCertificate />} />
             <Route path="/briefing/:id" element={<Briefing />} />
+            {/* Reunião Viva: convidado entra pelo link (a página pede login e volta) */}
+            <Route path="/reuniao-viva/convite/:token" element={<MeetingInvite />} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
@@ -126,6 +130,7 @@ const App = () => (
               <Route path="/squads/:squadId" element={<SquadDetail />} />
               <Route path="/fluxos/:flowId" element={<FlowEditor />} />
               <Route path="/reunioes" element={<Meetings />} />
+              <Route path="/reuniao-viva/:meetingId" element={<MeetingGuest />} />
               <Route path="/projetos" element={<Projects />} />
               <Route path="/projetos/:projectId" element={<ProjectDetail />} />
               <Route path="/osce" element={<OSCE />} />

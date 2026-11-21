@@ -91,11 +91,12 @@ export function nextItemMessage(agenda: AgendaItem[], next: number): { text: str
 
 // ---------- Transcrição ----------
 
-export interface LiveLine { author: "user" | "agent" | "system"; agentName?: string; content: string }
+/** `userName`: nome do convidado que falou (sem ele, quem falou é o dono). */
+export interface LiveLine { author: "user" | "agent" | "system"; agentName?: string; userName?: string; content: string }
 
 export function transcriptBlock(lines: LiveLine[], max = MEETING_TRANSCRIPT_LINES, chars = MEETING_TRANSCRIPT_CHARS): string {
   return lines.filter((l) => l.author !== "system").slice(-max)
-    .map((l) => `[${l.author === "user" ? "Dono" : l.agentName || "Colega"}]: ${clip(l.content, chars)}`).join("\n");
+    .map((l) => `[${l.author === "user" ? l.userName || "Dono" : l.agentName || "Colega"}]: ${clip(l.content, chars)}`).join("\n");
 }
 
 // ---------- Avaliador de turno ----------

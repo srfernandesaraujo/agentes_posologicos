@@ -16,6 +16,7 @@ import { driveMission, useSquadActions, useSquadMemories, type MemoryKind, type 
 import type { MinutesDoc as MinutesDocData } from "@/lib/minutesDocPdf";
 import { useLiveMeeting, useLiveMeetingActions, useMeetingFiles, FILE_ACCEPT, MEETING_MAX_FILES, PROACTIVITY_OPTIONS, type LiveMeeting, type MeetingFile, type Proactivity } from "@/hooks/useSquadMeeting";
 import { OfficeSection } from "./office/OfficeSection";
+import { MeetingInviteButton } from "./MeetingInviteDialog";
 import { QuestionCard } from "./MissionPanel";
 
 const MEETING_MAX = 4;
@@ -98,11 +99,13 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
   const action = "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-white/40 hover:bg-white/10 hover:text-white/80";
   if (m.author === "user") {
     const masked = (m.meta?.masked_pii?.length || m.meta?.masked_secrets?.length) as number | undefined;
+    const guestName = (m.meta?.meeting?.author_name as string | undefined) || null;
     return (
       <div className="flex justify-end">
         <div className="max-w-[88%] space-y-1">
           {m.meta?.cited && <div className="flex justify-end"><span className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[11px] text-white/60"><FileText className="h-3 w-3" /> {m.meta.cited.title} · v{m.meta.cited.version}</span></div>}
-          <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tr-sm bg-teal-600 px-3.5 py-2 text-sm text-white">{m.content}</div>
+          {guestName && <div className="text-right text-xs text-white/50">{guestName} · convidado</div>}
+          <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm text-white ${guestName ? "bg-sky-700/70" : "bg-teal-600"}`}>{m.content}</div>
           {masked ? <div className="text-right text-[11px] text-amber-300/80">Dados pessoais ou segredos foram mascarados antes do envio ao modelo.</div> : null}
           <div className="flex justify-end"><button type="button" className={action} onClick={() => onMemory(m.content)}><BookMarked className="h-3 w-3" /> Guardar na memória</button></div>
         </div>
@@ -161,7 +164,7 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
 }
 
 /** Ata da reunião pronta: resumo na conversa, PDF para baixar e o texto completo sob demanda (nada de texto bruto despejado no chat). */
-function MinutesCard({ doc, markdown }: { doc: MinutesDocData; markdown: string }) {
+export function MinutesCard({ doc, markdown }: { doc: MinutesDocData; markdown: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const download = async () => {
@@ -342,6 +345,7 @@ function LiveMeetingBar({ meeting, spent, busy, onControl, onEnd, files, sensiti
           ) : (
             <Button size="sm" variant="outline" className="h-8 gap-1 border-white/20 bg-transparent text-xs" disabled={busy} onClick={() => onControl("silence", 10)}><BellOff className="h-3.5 w-3.5" /> Silêncio 10 min</Button>
           )}
+          <MeetingInviteButton meetingId={meeting.id} />
           <Button size="sm" className="h-8 gap-1 text-xs" disabled={busy} onClick={onEnd}>Encerrar e gerar ata</Button>
         </div>
       </div>

@@ -1,4 +1,10 @@
-// Reunião Viva (Fase 1). Ações (POST JSON, sempre autenticado como o dono do squad):
+// Reunião Viva. Ações (POST JSON, sempre autenticado). Fase 3: o papel de quem pede (anfitrião, participante, observador) é conferido
+// em `canDo` (squadMeetingAccess.ts) antes de qualquer ação; convidado só pode view, say e leave, e o custo/chaves são do anfitrião.
+//   join     { token }                                                 → convidado entra pelo link (conta obrigatória)
+//   view     { meetingId }                                             → leitura segura da reunião (convidado e anfitrião)
+//   create_invite { meetingId, role } | revoke_invite { inviteId } | list_members | remove_member { userId }   → só o anfitrião
+//   leave    { meetingId }                                             → convidado sai
+// Ações do anfitrião (Fase 1):
 //   start    { squadId, title, agenda?, participants?, proactivity? }  → abre a reunião com a pauta
 //   say      { meetingId, text }                                       → fala do dono; os agentes escolhidos respondem
 //   tick     { meetingId }                                             → batimento da tela: se a sala ficou parada, a diretora puxa a conversa
@@ -27,6 +33,10 @@ import {
   proposalMessage, shouldNudge, transcriptBlock, detectToolIntent, buildPubmedQueryPrompt, parsePubmedQuery, pickToolAgent, shouldUpdateMinutes,
   buildLiveMinutesPrompt, MINUTES_LIVE_MAX_CHARS, detectFileIntent, needsCalc, pickFilesForRequest, buildFileBlock, pickFileAgent, FILE_RULES, MEETING_MAX_FILES, type AgendaItem, type EvaluatorPick, type LiveLine, type Proactivity,
 } from "../_shared/squadMeetingCore.ts";
+import {
+  MEETING_MAX_GUESTS, INVITE_TTL_MS, canDo, resolveRole, normalizeInviteRole, newInviteToken, hashInviteToken, looksLikeInviteToken,
+  checkInvite, canAddGuest, guestDisplayName, guestSafeMessage, type MeetingRole,
+} from "../_shared/squadMeetingAccess.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,8 +67,11 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: req.headers.get("Authorization") || "" } } });
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user) return json({ error: "Não autenticado" }, 401);
+    const { data: { user: authUser } } = await userClient.auth.getUser();
+    if (!authUser) return json({ error: "Não autenticado" }, 401);
+    // `authUser` é quem fez o pedido. `user` é de quem é o contexto (chaves de API, custo, dono das linhas): igual a `authUser` para o
+    // anfitrião e trocado pelo anfitrião quando um convidado faz uma ação permitida (ver o controle de papel mais abaixo).
+    let user = authUser;
 
     const admin = createClient(supabaseUrl, serviceKey);
     const body = await req.json().catch(() => ({}));
@@ -72,10 +85,20 @@ Deno.serve(async (req) => {
       if (!template) throw new HttpError(400, "Template do squad não existe mais");
       return { squad, template };
     };
-    const loadMeeting = async (meetingId: string): Promise<MeetingRow> => {
+    /** Carrega a reunião e o papel de quem pede. Quem não é anfitrião nem membro recebe o mesmo 404 de uma reunião que não existe. */
+    const loadMeetingWithRole = async (meetingId: string): Promise<{ meeting: MeetingRow; role: MeetingRole }> => {
+      if (!/^[0-9a-f-]{36}$/i.test(meetingId)) throw new HttpError(404, "Reunião não encontrada");
       const { data } = await admin.from("squad_meetings").select("*").eq("id", meetingId).maybeSingle();
-      if (!data || data.owner_id !== user.id) throw new HttpError(404, "Reunião não encontrada");
-      return data as MeetingRow;
+      if (!data) throw new HttpError(404, "Reunião não encontrada");
+      const { data: members } = await admin.from("squad_meeting_members").select("user_id, role").eq("meeting_id", meetingId);
+      const role = resolveRole(authUser.id, data.owner_id, (members || []) as { user_id: string; role: string }[]);
+      return { meeting: data as MeetingRow, role };
+    };
+    /** Nome mostrado na conversa: o perfil, depois os metadados da conta; nunca o e-mail. */
+    const displayNameOf = async (): Promise<string> => {
+      const { data: prof } = await admin.from("profiles").select("display_name").eq("user_id", authUser.id).maybeSingle();
+      const md = (authUser.user_metadata || {}) as Record<string, unknown>;
+      return guestDisplayName(prof?.display_name, md.full_name, md.name);
     };
     const loadAgents = async (squadId: string): Promise<AgentRow[]> => {
       const { data } = await admin.from("squad_agents").select("id, slug, name, role, room, system_prompt, sort_order").eq("squad_id", squadId).order("sort_order");
@@ -146,7 +169,7 @@ Deno.serve(async (req) => {
       const nameById = new Map(agents.map((a) => [a.id, a.name]));
       const recent = await recentMessages(squad.id, meetingId);
       const visible = recent.filter((m) => !m.meta?.meeting?.hidden);
-      const lines: LiveLine[] = visible.map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, content: m.content }));
+      const lines: LiveLine[] = visible.map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, userName: m.meta?.meeting?.author_name, content: m.content }));
 
       const spent = await meetingSpend(squad.id, meetingId);
       if (budgetState(spent, cap) === "exceeded") {
@@ -383,7 +406,7 @@ Deno.serve(async (req) => {
       if (!shouldUpdateMinutes({ newMessages: msgs.length, lastUpdateAt: null, now: Date.now() })) return;
       const agents = await loadAgents(squad.id);
       const nameById = new Map(agents.map((a) => [a.id, a.name]));
-      const newTranscript = transcriptBlock(msgs.map((x) => ({ author: x.author, agentName: x.agent_id ? nameById.get(x.agent_id) : undefined, content: x.content })), 60, 900);
+      const newTranscript = transcriptBlock(msgs.map((x) => ({ author: x.author, agentName: x.agent_id ? nameById.get(x.agent_id) : undefined, userName: x.meta?.meeting?.author_name, content: x.content })), 60, 900);
       const prompt = buildLiveMinutesPrompt({ title: m.title, agenda: m.agenda || [], current: m.current_item, minutes: m.minutes_live || "", newTranscript });
       const res = await callWithFallback(admin, keys, {
         systemPrompt: prompt.system, messages: [{ role: "user", content: prompt.user }], temperature: 0.2, mode: "text", maxTokens: 1100,
@@ -433,9 +456,104 @@ Deno.serve(async (req) => {
       return json({ meeting: row, messages: sink });
     }
 
-    // Daqui em diante a ação é sobre uma reunião existente.
-    const meeting = await loadMeeting(String(body?.meetingId || ""));
+    // ---------- join (convidado entra pelo link; basta ter conta) ----------
+    if (action === "join") {
+      const token = body?.token;
+      if (!looksLikeInviteToken(token)) throw new HttpError(404, "Este convite não é válido ou expirou.", "invite_invalid");
+      const { data: inv } = await admin.from("squad_meeting_invites").select("meeting_id, role, revoked_at, expires_at, created_by")
+        .eq("token_hash", await hashInviteToken(token)).maybeSingle();
+      const { data: mt } = inv ? await admin.from("squad_meetings").select("*").eq("id", inv.meeting_id).maybeSingle() : { data: null };
+      const check = checkInvite(inv, mt, Date.now());
+      if (!check.ok) throw new HttpError(check.status, check.message, check.code);
+      const m = mt as MeetingRow;
+      // O anfitrião abrindo o próprio link só volta para a reunião.
+      if (m.owner_id === authUser.id) return json({ meetingId: m.id, role: "host", title: m.title });
+
+      const { data: members } = await admin.from("squad_meeting_members").select("user_id, role").eq("meeting_id", m.id);
+      const existing = (members || []).find((x: any) => x.user_id === authUser.id);
+      if (!canAddGuest((members || []).length, !!existing)) throw new HttpError(409, `Esta reunião já tem ${MEETING_MAX_GUESTS} convidados.`, "meeting_full");
+      if (existing) return json({ meetingId: m.id, role: existing.role, title: m.title });
+
+      const name = await displayNameOf();
+      const { error: insErr } = await admin.from("squad_meeting_members").insert({ meeting_id: m.id, user_id: authUser.id, role: check.role, display_name: name });
+      if (insErr) throw insErr;
+      user = { ...authUser, id: m.owner_id };
+      const sink: any[] = [];
+      await makeInsert(m.squad_id, m.id, sink)({ author: "system", content: `${name} entrou na reunião como ${check.role === "participant" ? "participante" : "observador"}.` });
+      return json({ meetingId: m.id, role: check.role, title: m.title });
+    }
+
+    // Daqui em diante a ação é sobre uma reunião existente, e o papel de quem pede decide se pode.
+    const { meeting, role } = await loadMeetingWithRole(String(body?.meetingId || ""));
+    if (!canDo(role, action)) {
+      if (role === "none") throw new HttpError(404, "Reunião não encontrada");
+      throw new HttpError(403, "Você não tem permissão para isso nesta reunião.", "forbidden");
+    }
+    const isGuest = role !== "host";
+    // Convidado: as chaves, o custo e a autoria das linhas são do anfitrião. Só ações da lista de permissão chegam até aqui.
+    if (isGuest) user = { ...authUser, id: meeting.owner_id };
     const { squad, template } = await loadSquad(meeting.squad_id);
+
+    // ---------- ver a reunião (única leitura do convidado: só campos seguros) ----------
+    if (action === "view") {
+      const agents = await loadAgents(squad.id);
+      const recent = (await recentMessages(squad.id, meeting.id, 200)).filter((m) => !m.meta?.meeting?.hidden);
+      const { data: files } = await admin.from("squad_meeting_files").select("id, name, kind, rows, cols, pages, truncated, created_at").eq("meeting_id", meeting.id).order("created_at");
+      const { data: members } = await admin.from("squad_meeting_members").select("display_name, role").eq("meeting_id", meeting.id).order("joined_at");
+      const { data: hostProf } = await admin.from("profiles").select("display_name").eq("user_id", meeting.owner_id).maybeSingle();
+      return json({
+        role,
+        meeting: {
+          id: meeting.id, title: meeting.title, agenda: meeting.agenda, current_item: meeting.current_item, proactivity: meeting.proactivity,
+          status: meeting.status, silenced_until: meeting.silenced_until, minutes_live: meeting.minutes_live, minutes_live_version: meeting.minutes_live_version,
+          created_at: meeting.created_at,
+        },
+        agents: agents.map((a) => ({ id: a.id, name: a.name, role: a.role })),
+        messages: recent.map((m) => guestSafeMessage(m, authUser.id)),
+        files: files || [],
+        people: [{ name: guestDisplayName(hostProf?.display_name, "Anfitrião"), role: "host" }, ...((members || []) as any[]).map((x) => ({ name: x.display_name, role: x.role }))],
+      });
+    }
+
+    // ---------- convites e membros (só o anfitrião) ----------
+    if (action === "create_invite") {
+      requireOpen(meeting);
+      const { count } = await admin.from("squad_meeting_invites").select("id", { count: "exact", head: true })
+        .eq("meeting_id", meeting.id).is("revoked_at", null).gt("expires_at", new Date().toISOString());
+      if ((count || 0) >= 10) throw new HttpError(409, "Já existem 10 convites ativos. Revogue algum para criar outro.");
+      const token = newInviteToken();
+      const role = normalizeInviteRole(body?.role);
+      const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
+      const { data: row, error } = await admin.from("squad_meeting_invites").insert({
+        meeting_id: meeting.id, token_hash: await hashInviteToken(token), role, created_by: authUser.id, expires_at: expiresAt,
+      }).select("id").single();
+      if (error) throw error;
+      return json({ invite: { id: row.id, token, role, expires_at: expiresAt } });
+    }
+    if (action === "revoke_invite") {
+      const { data: gone } = await admin.from("squad_meeting_invites").update({ revoked_at: new Date().toISOString() })
+        .eq("id", String(body?.inviteId || "")).eq("meeting_id", meeting.id).select("id");
+      if (!gone || !gone.length) throw new HttpError(404, "Convite não encontrado");
+      return json({ ok: true });
+    }
+    if (action === "list_members") {
+      const { data: members } = await admin.from("squad_meeting_members").select("user_id, display_name, role, joined_at").eq("meeting_id", meeting.id).order("joined_at");
+      const { data: invites } = await admin.from("squad_meeting_invites").select("id, role, expires_at, created_at")
+        .eq("meeting_id", meeting.id).is("revoked_at", null).gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false });
+      return json({ members: members || [], invites: invites || [] });
+    }
+    if (action === "remove_member") {
+      const { data: gone } = await admin.from("squad_meeting_members").delete().eq("meeting_id", meeting.id).eq("user_id", String(body?.userId || "")).select("display_name");
+      if (!gone || !gone.length) throw new HttpError(404, "Convidado não encontrado");
+      const sink: any[] = [];
+      await makeInsert(squad.id, meeting.id, sink)({ author: "system", content: `${gone[0].display_name} saiu da reunião.` });
+      return json({ messages: sink });
+    }
+    if (action === "leave") {
+      const { data: gone } = await admin.from("squad_meeting_members").delete().eq("meeting_id", meeting.id).eq("user_id", authUser.id).select("display_name");
+      if (gone && gone.length) await makeInsert(squad.id, meeting.id, [])({ author: "system", content: `${gone[0].display_name} saiu da reunião.` });
+      return json({ ok: true });
+    }
 
     // ---------- control (sem chamada ao modelo) ----------
     if (action === "control") {
@@ -618,7 +736,8 @@ Deno.serve(async (req) => {
       if (!text) throw new HttpError(400, "Escreva uma mensagem");
       const { cap, before, keys } = await checkBudgetAndKeys(squad);
       const { count: recentUser } = await admin.from("squad_chat_messages").select("id", { count: "exact", head: true })
-        .eq("squad_id", squad.id).eq("author", "user").gte("created_at", new Date(Date.now() - 60_000).toISOString());
+        .eq("squad_id", squad.id).eq("author", "user").contains("meta", { meeting: { id: meeting.id, author_id: authUser.id } })
+        .gte("created_at", new Date(Date.now() - 60_000).toISOString());
       if ((recentUser || 0) >= CHAT_RATE_LIMIT_PER_MIN) throw new HttpError(429, "Muitas mensagens em pouco tempo. Aguarde um minuto.", "chat_rate_limit");
       if (!(await acquireLock(meeting.id))) throw new HttpError(409, "O time ainda está respondendo à mensagem anterior. Tente de novo em instantes.", "meeting_busy");
 
@@ -632,9 +751,12 @@ Deno.serve(async (req) => {
         const meta: Record<string, unknown> = {};
         if (pii.findings.length) meta.masked_pii = pii.findings;
         if (sec.findings.length) meta.masked_secrets = sec.findings;
+        // Autoria: o anfitrião aparece como "Dono" (sem nome); convidado leva nome e papel. `author_id` serve ao limite por pessoa.
+        meta.meeting = { author_id: authUser.id, ...(isGuest ? { author_name: await displayNameOf(), author_role: role } : {}) };
         await insert({ author: "user", content: sec.text, meta });
 
-        const cmd = parseMeetingCommand(sec.text);
+        // Comandos de silêncio ("silêncio 10 min") são controle da reunião: só o anfitrião.
+        const cmd = isGuest ? null : parseMeetingCommand(sec.text);
         if (cmd) {
           if (cmd.kind === "silence") {
             await admin.from("squad_meetings").update({ silenced_until: new Date(Date.now() + cmd.minutes * 60_000).toISOString() }).eq("id", meeting.id);
@@ -656,7 +778,7 @@ Deno.serve(async (req) => {
           if (target.length) {
             const nameById = new Map(agents.map((a) => [a.id, a.name]));
             const recent = (await recentMessages(squad.id, meeting.id, 14)).filter((m) => !m.meta?.meeting?.hidden);
-            const ctx = transcriptBlock(recent.map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, content: m.content })), 10, 400);
+            const ctx = transcriptBlock(recent.map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, userName: m.meta?.meeting?.author_name, content: m.content })), 10, 400);
             const t = await runPubmedTool({ squad, meeting, keys, insert }, sec.text, ctx);
             tool = t.tool;
             toolCost = t.cost;
@@ -745,7 +867,7 @@ Deno.serve(async (req) => {
         const nameById = new Map(agents.map((a) => [a.id, a.name]));
         const recent = await recentMessages(squad.id, meeting.id, 250);
         const visible = recent.filter((m) => !m.meta?.meeting?.hidden && !m.meta?.meeting?.minutes);
-        const lines: LiveLine[] = visible.map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, content: m.content }));
+        const lines: LiveLine[] = visible.map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, userName: m.meta?.meeting?.author_name, content: m.content }));
         const agenda = meeting.agenda || [];
         const moderatorId = meetingModerator(agents, meeting.participants);
         const moderator = agents.find((a) => a.id === moderatorId);

@@ -1,8 +1,18 @@
-import { Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { takeReturnTo } from "@/lib/returnTo";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  // Convidado que entrou pelo link de uma reunião volta para ela depois do login (qualquer forma de login).
+  useEffect(() => {
+    if (!user) return;
+    const back = takeReturnTo();
+    if (back) navigate(back, { replace: true });
+  }, [user, navigate]);
 
   if (loading) {
     return (
