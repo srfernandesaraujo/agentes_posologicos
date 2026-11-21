@@ -115,11 +115,18 @@
     --pos-realce: 205 33% 15%;
   }
   [data-ui="v2"] {
+    color-scheme: dark;
     --background: 208 46% 4%;
+    --foreground: 190 25% 94%;
     --card: 208 36% 8%;
+    --card-foreground: 190 25% 94%;
     --popover: 205 34% 11%;
+    --popover-foreground: 190 25% 94%;
     --secondary: 205 33% 15%;
+    --secondary-foreground: 190 25% 92%;
     --muted: 205 34% 11%;
+    --muted-foreground: 195 14% 66%;
+    --accent-foreground: 208 46% 6%;
     --border: 195 20% 24%;
     --input: 195 20% 24%;
     --radius: 0.875rem;
