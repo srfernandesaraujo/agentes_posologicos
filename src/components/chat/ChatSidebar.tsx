@@ -125,7 +125,7 @@ export function ChatSidebar({
 
   if (collapsed) {
     return (
-      <div className="flex flex-col items-center py-3 px-1 border-r border-white/10 bg-[hsl(220,25%,6%)]">
+      <div className="flex flex-col items-center py-3 px-1 border-r border-white/10 bg-pos-base">
         <Button variant="ghost" size="icon" onClick={onToggle} className="text-white/50 hover:bg-white/10 hover:text-white mb-2">
           <PanelLeft className="h-4 w-4" />
         </Button>
@@ -138,7 +138,7 @@ export function ChatSidebar({
 
   return (
     <>
-      <div className="flex w-64 flex-col border-r border-white/10 bg-[hsl(220,25%,6%)]">
+      <div className="flex w-64 flex-col border-r border-white/10 bg-pos-base">
         <div className="flex items-center justify-between px-3 py-3 border-b border-white/10">
           <Button
             onClick={onNewConversation}

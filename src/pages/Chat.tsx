@@ -33,6 +33,8 @@ import { DoseCalculator } from "@/components/chat/DoseCalculator";
 import { extractPubmedIds, usePubmedEvidenceGrades, makeCitationLinkComponent } from "@/components/chat/EvidenceCitation";
 import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { PkCurve } from "@/components/ds/PkCurve";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
@@ -272,6 +274,7 @@ export default function Chat() {
   const { hasUnlimitedAccess } = useUnlimitedAccess();
   const hasFreeAccess = isAdmin || hasUnlimitedAccess;
   const navigate = useNavigate();
+  const newUI = useNewUI();
   const queryClient = useQueryClient();
   const [input, setInput] = useState("");
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -705,6 +708,7 @@ export default function Chat() {
   }
 
   const AgentIcon = getIcon(agent.icon || "Bot");
+  const v2 = newUI.enabled;
 
   return (
     <>
@@ -801,17 +805,17 @@ export default function Chat() {
       {/* Main chat area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Chat header */}
-        <div className="border-b border-white/10 bg-[hsl(220,25%,8%)]/80 backdrop-blur-xl px-4 py-3">
+        <div className={`border-b border-white/10 backdrop-blur-xl px-4 py-3 ${v2 ? "bg-[hsl(var(--pos-base))]/85" : "bg-[hsl(220,25%,8%)]/80"}`}>
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" aria-label="Voltar para agentes" onClick={() => navigate("/agentes")} className="text-white/60 hover:bg-white/10 hover:text-white">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
-              <AgentIcon className={`h-5 w-5 ${isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${v2 ? "border border-[hsl(var(--dom-clinica))]/40 bg-[hsl(var(--dom-clinica))]/15" : isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
+              <AgentIcon className={`h-5 w-5 ${v2 ? "text-[hsl(var(--dom-clinica))]" : isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="font-display font-semibold truncate text-white text-base">{agent.name}</h1>
-              <p className="text-xs text-white/40 truncate">{agent.category}</p>
+              <p className={`truncate text-xs ${v2 ? "font-mono uppercase tracking-[0.12em] text-[hsl(var(--dom-clinica))]" : "text-white/40"}`}>{v2 ? `Clínica · ${agent.category}` : agent.category}</p>
             </div>
             <div className="flex items-center gap-2">
               {!isCustom && builtInAgent?.slug === "especialista-pubmed" && (
@@ -832,7 +836,7 @@ export default function Chat() {
                   </SheetContent>
                 </Sheet>
               )}
-              <div className="flex items-center gap-1 text-sm text-white/50">
+              <div className={`flex items-center gap-1 text-sm text-white/50 ${v2 ? "font-mono text-xs" : ""}`}>
                 <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
                 {isCustom ? `${CUSTOM_AGENT_INTERACTION_COST}` : agent.credit_cost} crédito/uso
               </div>
@@ -868,8 +872,9 @@ export default function Chat() {
           <div className="mx-auto max-w-3xl space-y-4">
             {displayMessages.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className={`flex h-16 w-16 items-center justify-center rounded-2xl mb-4 ${isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
-                  <AgentIcon className={`h-8 w-8 ${isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
+                {v2 && <PkCurve className="mb-6 w-full max-w-md opacity-70" height={80} />}
+                <div className={`flex h-16 w-16 items-center justify-center rounded-2xl mb-4 ${v2 ? "border border-[hsl(var(--dom-clinica))]/40 bg-[hsl(var(--dom-clinica))]/15" : isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
+                  <AgentIcon className={`h-8 w-8 ${v2 ? "text-[hsl(var(--dom-clinica))]" : isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
                 </div>
                 <h3 className="text-lg font-display font-semibold text-white mb-2">{agent.name}</h3>
                 <p className="text-sm text-white/40 max-w-md">{agent.description}</p>
@@ -891,8 +896,8 @@ export default function Chat() {
                   className={`flex gap-3 animate-fade-in ${msg.role === "user" ? "justify-end" : ""}`}
                 >
                   {msg.role === "assistant" && (
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
-                      <Bot className={`h-4 w-4 ${isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${v2 ? "bg-[hsl(var(--dom-clinica))]/15" : isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
+                      <Bot className={`h-4 w-4 ${v2 ? "text-[hsl(var(--dom-clinica))]" : isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
                     </div>
                   )}
                   <div className={`relative group ${msg.role === "assistant" ? "max-w-[85%]" : ""}`}>
@@ -903,8 +908,8 @@ export default function Chat() {
                       ref={msg.role === "assistant" ? contentRef : undefined}
                       className={`rounded-2xl px-4 py-3 text-sm ${
                         msg.role === "user"
-                          ? "gradient-primary text-white rounded-br-md whitespace-pre-wrap max-w-[75%] ml-auto"
-                          : "bg-white/[0.05] border border-white/10 text-white/80 rounded-bl-md max-w-none"
+                          ? `${v2 ? "bg-gradient-to-br from-[#2DD4BF] to-[#38BDF8] font-medium text-[#04141a]" : "gradient-primary text-white"} rounded-br-md whitespace-pre-wrap max-w-[75%] ml-auto`
+                          : `${v2 ? "bg-[hsl(var(--pos-base))] text-white/90" : "bg-white/[0.05] text-white/80"} border border-white/10 rounded-bl-md max-w-none`
                       }`}
                     >
                       {msg.role === "assistant" ? (
@@ -967,7 +972,7 @@ export default function Chat() {
         )}
 
         {/* Input */}
-        <div className="border-t border-white/10 bg-[hsl(220,25%,8%)]/80 backdrop-blur-xl px-4 py-4">
+        <div className={`border-t border-white/10 backdrop-blur-xl px-4 py-4 ${v2 ? "bg-[hsl(var(--pos-base))]/85" : "bg-[hsl(220,25%,8%)]/80"}`}>
           <div className="mx-auto max-w-3xl flex gap-3 items-end">
             <input
               ref={fileInputRef}
@@ -1025,7 +1030,7 @@ export default function Chat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Descreva sua solicitação..."
-              className="min-h-[52px] max-h-32 resize-none border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 focus-visible:ring-white/20"
+              className={`min-h-[52px] max-h-32 resize-none border-white/10 bg-white/[0.05] text-white placeholder:text-white/30 focus-visible:ring-white/20 ${v2 ? "rounded-2xl" : ""}`}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -1036,7 +1041,7 @@ export default function Chat() {
             <Button
               onClick={handleSend}
               disabled={(!input.trim() && attachedFiles.length === 0 && attachedConversations.length === 0) || sendMutation.isPending}
-              className="shrink-0 gap-2 bg-[hsl(14,90%,58%)] hover:bg-[hsl(14,90%,52%)] text-white border-0"
+              className={`shrink-0 gap-2 border-0 ${v2 ? "rounded-2xl bg-gradient-to-br from-[#2DD4BF] to-[#38BDF8] font-semibold text-[#04141a] hover:opacity-90" : "bg-[hsl(14,90%,58%)] text-white hover:bg-[hsl(14,90%,52%)]"}`}
             >
               {sendMutation.isPending ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
