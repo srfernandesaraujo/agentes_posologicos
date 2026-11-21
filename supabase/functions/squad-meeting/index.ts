@@ -19,8 +19,8 @@ import {
 } from "../_shared/squadChatCore.ts";
 import {
   MEETING_DEFAULT_CAP_USD, MEETING_HARD_MAX_AGENT_MESSAGES, MEETING_LIVE_RULES, MEETING_LOCK_SECONDS, MEETING_SPEAK_TOKENS, PROACTIVITY_LIMITS,
-  applyBrakes, facilitatorDue, isOpenCall, pickByLeastRecent, buildEvaluatorPrompt, buildLiveUserMessage, buildMinutesPrompt, clampMeetingCap, isPass, isSilenced,
-  minutesFallback, nextItemMessage, normalizeProactivity, openingMessage, parseAgenda, parseEvaluatorReply, parseMeetingCommand,
+  applyBrakes, facilitatorDue, isOpenCall, pickByLeastRecent, buildEvaluatorPrompt, buildLiveUserMessage, buildMinutesDocPrompt, parseMinutesDoc, composeMinutesDoc, renderMinutesMarkdown, clampMeetingCap, isPass, isSilenced,
+  nextItemMessage, normalizeProactivity, openingMessage, parseAgenda, parseEvaluatorReply, parseMeetingCommand,
   proposalMessage, shouldNudge, transcriptBlock, detectToolIntent, buildPubmedQueryPrompt, parsePubmedQuery, pickToolAgent, shouldUpdateMinutes,
   buildLiveMinutesPrompt, MINUTES_LIVE_MAX_CHARS, type AgendaItem, type EvaluatorPick, type LiveLine, type Proactivity,
 } from "../_shared/squadMeetingCore.ts";
@@ -42,7 +42,7 @@ function json(body: unknown, status = 200) {
 interface MeetingRow {
   id: string; squad_id: string; owner_id: string; title: string; agenda: AgendaItem[]; current_item: number;
   proactivity: Proactivity; participants: string[]; status: "open" | "ended"; cap_usd: number | string;
-  silenced_until: string | null; lock_until: string | null; minutes: string | null;
+  silenced_until: string | null; lock_until: string | null; minutes: string | null; created_at: string;
   minutes_live: string | null; minutes_live_at: string | null; minutes_live_version: number;
 }
 
@@ -590,23 +590,40 @@ Deno.serve(async (req) => {
         const agents = await loadAgents(squad.id);
         const insert = makeInsert(squad.id, meeting.id, sink);
         const nameById = new Map(agents.map((a) => [a.id, a.name]));
-        const recent = await recentMessages(squad.id, meeting.id, 80);
-        const lines: LiveLine[] = recent.filter((m) => !m.meta?.meeting?.hidden).map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, content: m.content }));
+        const recent = await recentMessages(squad.id, meeting.id, 250);
+        const visible = recent.filter((m) => !m.meta?.meeting?.hidden && !m.meta?.meeting?.minutes);
+        const lines: LiveLine[] = visible.map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, content: m.content }));
         const agenda = meeting.agenda || [];
         const moderatorId = meetingModerator(agents, meeting.participants);
-        let minutes = "";
+        const moderator = agents.find((a) => a.id === moderatorId);
+
+        // Participantes: quem foi convidado e quem de fato falou. Referências: só o que a busca do PubMed devolveu durante a reunião.
+        const spoke = new Set(visible.filter((m) => m.author === "agent" && m.agent_id).map((m) => m.agent_id as string));
+        const partAgents = agents.filter((a) => meeting.participants.includes(a.id) || a.id === moderatorId || spoke.has(a.id));
+        const refMap = new Map<string, { pmid: string; title: string; journal: string; year: string }>();
+        for (const m of visible) for (const s of (m.meta?.sources || []) as any[]) {
+          if (s?.pmid && !refMap.has(String(s.pmid))) refMap.set(String(s.pmid), { pmid: String(s.pmid), title: String(s.title || ""), journal: String(s.journal || ""), year: String(s.year || "") });
+        }
+        const references = [...refMap.values()];
+
+        let content: ReturnType<typeof parseMinutesDoc> = null;
         let cost = 0;
         let model: string | null = null;
+        const { data: liveRow } = await admin.from("squad_meetings").select("minutes_live").eq("id", meeting.id).maybeSingle();
+        const draft = liveRow?.minutes_live || "";
         try {
           const { keys } = await checkBudgetAndKeys(squad);
-          const { data: liveRow } = await admin.from("squad_meetings").select("minutes_live").eq("id", meeting.id).maybeSingle();
-          const prompt = buildMinutesPrompt({ title: meeting.title, agenda, transcript: transcriptBlock(lines, 80, 1200), draft: liveRow?.minutes_live || "" });
+          const prompt = buildMinutesDocPrompt({
+            title: meeting.title, agenda, transcript: transcriptBlock(lines, 250, 1400), draft,
+            participants: ["Anfitrião (dono do squad)", ...partAgents.map((a) => `${a.name} (${a.role})`)].join("\n"),
+            sources: references.map((r) => `PMID ${r.pmid}: ${r.title} (${r.journal}, ${r.year})`).join("\n"),
+          });
           const res = await callWithFallback(admin, keys, {
-            systemPrompt: prompt.system, messages: [{ role: "user", content: prompt.user }], temperature: 0.2, mode: "text", maxTokens: 1200,
-            deadlineAt: Date.now() + 60_000,
+            systemPrompt: prompt.system, messages: [{ role: "user", content: prompt.user }], temperature: 0.2, mode: "text", maxTokens: 6000,
+            deadlineAt: Date.now() + 100_000,
           });
           if (res && res.ok && res.output) {
-            minutes = res.output.trim();
+            content = parseMinutesDoc(res.output);
             cost = estimateCost(res.model!, res.tokensInput, res.tokensOutput);
             model = res.model!;
             await logAiUsage(admin, { userId: user.id, provider: res.provider!, model: res.model!, tokensInput: res.tokensInput, tokensOutput: res.tokensOutput, promptType: "squad_meeting_minutes" });
@@ -615,13 +632,18 @@ Deno.serve(async (req) => {
           // Sem chave, teto estourado ou provedor fora do ar: a ata mínima por código garante que a reunião sempre fecha.
           console.warn("[squad-meeting] ata sem modelo:", (e as Error).message);
         }
-        const fallback = !minutes;
-        if (fallback) minutes = minutesFallback(meeting.title, agenda);
-        await insert({
-          author: "agent", agent_id: moderatorId, content: minutes, cost_usd: cost, model,
-          meta: { meeting: { minutes: true, ...(fallback ? { fallback: true } : {}) } },
+        const fallback = !content;
+        const doc = composeMinutesDoc(content, {
+          title: meeting.title, startedAt: meeting.created_at, endedAt: new Date().toISOString(),
+          moderator: moderator ? { name: moderator.name, role: moderator.role } : null,
+          participants: partAgents.map((a) => ({ name: a.name, role: a.role })), references, agenda, draft,
         });
-        await admin.from("squad_meetings").update({ status: "ended", ended_at: new Date().toISOString(), minutes, silenced_until: null }).eq("id", meeting.id);
+        const markdown = renderMinutesMarkdown(doc);
+        await insert({
+          author: "agent", agent_id: moderatorId, content: markdown, cost_usd: cost, model,
+          meta: { meeting: { minutes: true, doc: true, ...(fallback ? { fallback: true } : {}) }, minutes_doc: doc },
+        });
+        await admin.from("squad_meetings").update({ status: "ended", ended_at: new Date().toISOString(), minutes: markdown, silenced_until: null }).eq("id", meeting.id);
         await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "meeting_ended", text: "Reunião encerrada" });
         return json({ messages: sink, fallback });
       } finally {

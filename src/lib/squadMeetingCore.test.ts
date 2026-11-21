@@ -3,7 +3,8 @@ import {
   MEETING_HARD_MAX_AGENT_MESSAGES, MEETING_QUIET_MS, MEETING_LIVE_RULES, agendaText, applyBrakes, buildEvaluatorPrompt, buildLiveUserMessage,
   buildMinutesPrompt, clampMeetingCap, isPass, isSilenced, minutesFallback, nextItemMessage, normalizeProactivity, openingMessage, parseAgenda,
   parseEvaluatorReply, parseMeetingCommand, proposalMessage, isOpenCall, pickByLeastRecent, facilitatorDue,
-  detectToolIntent, parsePubmedQuery, pickToolAgent, shouldUpdateMinutes, buildLiveMinutesPrompt, shouldNudge, transcriptBlock, type AgendaItem,
+  detectToolIntent, parsePubmedQuery, pickToolAgent, shouldUpdateMinutes, buildLiveMinutesPrompt,
+  buildMinutesDocPrompt, parseMinutesDoc, composeMinutesDoc, renderMinutesMarkdown, shouldNudge, transcriptBlock, type AgendaItem,
 } from "../../supabase/functions/_shared/squadMeetingCore";
 import type { ChatAgent } from "../../supabase/functions/_shared/squadChatCore";
 
@@ -303,5 +304,75 @@ describe("ferramentas e ata ao vivo (fase 2)", () => {
     expect(f.user).toContain("Rascunho da ata ao vivo");
     expect(f.user).toContain("## Resumo\nY");
     expect(buildMinutesPrompt({ title: "T", agenda, transcript: "x" }).user).not.toContain("Rascunho");
+  });
+});
+
+describe("ata institucional", () => {
+  const agenda: AgendaItem[] = [{ title: "Vendas", done: true, decision: "Focar em anticoagulação" }, { title: "Temas", done: false }];
+  const header = {
+    title: "Tema do livro", startedAt: "2026-11-21T08:19:00Z", endedAt: "2026-11-21T09:02:00Z",
+    moderator: { name: "Helena", role: "Diretora" }, participants: [{ name: "Lia", role: "Estrutura" }],
+    references: [{ pmid: "1234567", title: "Artigo X.", journal: "J Y", year: "2020" }], agenda, draft: "",
+  };
+  const llm = JSON.stringify({
+    purpose: "Definir o tema.", executiveSummary: "Resumo da reunião.", nature: "Planejamento", agenda: ["Vendas", "Temas"],
+    discussions: [{ title: "Vendas", body: "A Lia apresentou.\n\nO anfitrião pediu mais." }, { title: "vazio", body: "" }],
+    deliberations: ["Seguir com X", "", "Revisar Y"],
+    actionPlan: [{ action: "Esboçar estrutura", owner: "Lia" }, { action: "", owner: "Z" }],
+    pending: [{ item: "Dados", validation: "Conferir" }], nextMeeting: "",
+  });
+
+  it("o prompt exige fidelidade, JSON e traz participantes e fontes", () => {
+    const p = buildMinutesDocPrompt({ title: "Tema", agenda, transcript: "[Dono]: oi", participants: "Anfitrião\nLia (Estrutura)", sources: "PMID 1: Artigo" });
+    expect(p.system).toContain("Não invente");
+    expect(p.system).toContain("Responda SOMENTE com JSON");
+    expect(p.user).toContain("Lia (Estrutura)");
+    expect(p.user).toContain("PMID 1: Artigo");
+    expect(p.user).toContain("[Dono]: oi");
+  });
+  it("lê o JSON do modelo, com cerca de código, e limpa itens vazios", () => {
+    const c = parseMinutesDoc("```json\n" + llm + "\n```")!;
+    expect(c.executiveSummary).toBe("Resumo da reunião.");
+    expect(c.discussions).toHaveLength(1);
+    expect(c.deliberations).toEqual(["Seguir com X", "Revisar Y"]);
+    expect(c.actionPlan).toEqual([{ action: "Esboçar estrutura", owner: "Lia", deadline: "A definir", product: "Não informado" }]);
+  });
+  it("resposta inválida ou vazia vira null", () => {
+    expect(parseMinutesDoc("não é json")).toBeNull();
+    expect(parseMinutesDoc("{quebrado")).toBeNull();
+    expect(parseMinutesDoc('{"purpose":"x"}')).toBeNull();
+  });
+  it("o documento junta conteúdo do modelo com cabeçalho e textos fixos do código", () => {
+    const doc = composeMinutesDoc(parseMinutesDoc(llm), header);
+    expect(doc.date).toBe("21 de novembro de 2026");
+    expect(doc.start).toBe("05:19");
+    expect(doc.end).toBe("06:02");
+    expect(doc.coordination).toBe("Helena (Diretora)");
+    expect(doc.participants.map((p) => p.name)).toEqual(["Anfitrião", "Lia"]);
+    expect(doc.references).toHaveLength(1);
+    expect(doc.nextMeeting).toBe("Não definida na reunião");
+    expect(doc.closing).toContain("Nada mais havendo a registrar");
+    expect(doc.validationNote).toContain("inteligência artificial");
+  });
+  it("sem conteúdo do modelo, monta a ata mínima pela pauta", () => {
+    const doc = composeMinutesDoc(null, header);
+    expect(doc.discussions.map((d) => d.title)).toEqual(["Vendas", "Temas"]);
+    expect(doc.deliberations).toEqual(["Vendas: Focar em anticoagulação"]);
+    expect(doc.pending.map((p) => p.item)).toEqual(["Temas"]);
+    expect(doc.discussions[1].body).toContain("não concluído");
+  });
+  it("o texto da ata segue a estrutura do registro institucional", () => {
+    const md = renderMinutesMarkdown(composeMinutesDoc(parseMinutesDoc(llm), header));
+    for (const s of ["## Finalidade do encontro", "## Síntese executiva", "## 1 Identificação da reunião", "## 2 Pauta consolidada", "## 3 Discussões e consensos",
+      "### 3.1 Vendas", "## 4 Deliberações", "01 Seguir com X", "## 5 Plano de ação", "| Esboçar estrutura | Lia | A definir | Não informado |",
+      "## 6 Referências consultadas (PubMed)", "PMID 1234567", "## 7 Pontos pendentes de validação", "## 8 Próxima reunião", "## 9 Encerramento"]) {
+      expect(md).toContain(s);
+    }
+  });
+  it("sem referências a numeração das seções seguintes sobe", () => {
+    const md = renderMinutesMarkdown(composeMinutesDoc(parseMinutesDoc(llm), { ...header, references: [] }));
+    expect(md).not.toContain("Referências consultadas");
+    expect(md).toContain("## 6 Pontos pendentes de validação");
+    expect(md).toContain("## 8 Encerramento");
   });
 });

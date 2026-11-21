@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BellOff, BookMarked, ExternalLink, ScrollText, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
+import { BellOff, BookMarked, Download, ExternalLink, ScrollText, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useChatActions, useChatMessages, useChatOfficeEvents, useChatUsage, useCitableDeliverables, useOpenQuestions, TEAM_THREAD, type ChatMessage } from "@/hooks/useSquadChat";
 import { agentLook } from "@/lib/squadOffice";
 import { driveMission, useSquadActions, useSquadMemories, type MemoryKind, type Squad, type SquadAgent, type SquadMemory, type SquadMission } from "@/hooks/useSquads";
+import type { MinutesDoc as MinutesDocData } from "@/lib/minutesDocPdf";
 import { useLiveMeeting, useLiveMeetingActions, PROACTIVITY_OPTIONS, type LiveMeeting, type Proactivity } from "@/hooks/useSquadMeeting";
 import { OfficeSection } from "./office/OfficeSection";
 import { QuestionCard } from "./MissionPanel";
@@ -123,7 +124,9 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
           <span><span className="font-semibold text-white/80">{agent?.name || "Agente"}</span>{agent ? ` · ${agent.role}` : ""}</span>
           {meetingTag && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${highlighted ? "bg-teal-500/25 text-teal-200" : "bg-white/10 text-white/60"}`}>{meetingTag}</span>}
         </div>
-        <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm px-3.5 py-2 text-sm text-white/90 ${highlighted ? "border border-teal-400/40 bg-teal-500/10" : "bg-white/10"}`}>{m.content}</div>
+        {m.meta?.minutes_doc ? <MinutesCard doc={m.meta.minutes_doc as MinutesDocData} markdown={m.content} /> : (
+          <div className={`whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm px-3.5 py-2 text-sm text-white/90 ${highlighted ? "border border-teal-400/40 bg-teal-500/10" : "bg-white/10"}`}>{m.content}</div>
+        )}
         {why && <div className="font-mono text-[10px] text-amber-300/80">Entrou por conta própria: {why}</div>}
         {tool && (
           <div className="space-y-1.5 rounded-lg border border-white/10 bg-black/20 p-2.5 text-xs" aria-label="Fontes da busca no PubMed">
@@ -152,6 +155,44 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
           <button type="button" className={action} onClick={() => onAdjust(m.content)}><Wand2 className="h-3 w-3" /> Pedir ajuste</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Ata da reunião pronta: resumo na conversa, PDF para baixar e o texto completo sob demanda (nada de texto bruto despejado no chat). */
+function MinutesCard({ doc, markdown }: { doc: MinutesDocData; markdown: string }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    try {
+      const { downloadMinutesPdf } = await import("@/lib/minutesDocPdf");
+      downloadMinutesPdf(doc);
+    } catch (e: any) {
+      toast.error(e?.message || "Não foi possível gerar o PDF");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-3 rounded-2xl rounded-tl-sm border border-teal-400/40 bg-teal-500/10 px-3.5 py-3 text-sm text-white/90">
+      <div>
+        <div className="font-semibold text-white">Ata de Reunião: {doc.title}</div>
+        <div className="font-mono text-[11px] text-white/50">{doc.date} · {doc.start} às {doc.end} · {doc.discussions.length} {doc.discussions.length === 1 ? "tema" : "temas"} · {doc.deliberations.length} {doc.deliberations.length === 1 ? "deliberação" : "deliberações"} · {doc.actionPlan.length} {doc.actionPlan.length === 1 ? "ação" : "ações"}</div>
+      </div>
+      <p className="whitespace-pre-wrap break-words text-white/80">{doc.executiveSummary}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" className="h-8 gap-1.5" onClick={download} disabled={busy}>
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Baixar ata em PDF
+        </Button>
+        <Button size="sm" variant="outline" className="h-8 border-white/20 bg-transparent" onClick={() => setOpen((o) => !o)} aria-expanded={open}>{open ? "Esconder o texto" : "Ver o texto da ata"}</Button>
+      </div>
+      {open && (
+        <div className="prose prose-invert prose-sm max-w-none border-t border-white/10 pt-3 prose-headings:text-white prose-p:text-white/80 prose-li:text-white/80 prose-table:text-white/80">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+        </div>
+      )}
+      <p className="text-[11px] text-white/40">Ata elaborada com apoio de IA a partir da conversa. Confira os dados antes de assinar.</p>
     </div>
   );
 }
