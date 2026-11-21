@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -62,6 +63,7 @@ export default function OSCE() {
     <div className="container py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
+<DomainEyebrow domain="ensino" section="OSCE" />
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Stethoscope className="h-7 w-7 text-[hsl(174,62%,47%)]" /> OSCE Virtual
           </h1>

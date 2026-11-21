@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +49,22 @@ export default function Conversations() {
     enabled: !!user,
   });
 
+  // Desde que o Chat virou "sala pessoal", as conversas novas vivem em virtual_rooms (chat_sessions está congelado).
+  const { data: rooms = [], isLoading: loadingRooms } = useQuery({
+    queryKey: ["all-conversations-rooms", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("virtual_rooms")
+        .select("id, agent_id, name, created_at, updated_at, room_messages(count)")
+        .eq("user_id", user!.id)
+        .eq("room_type", "personal")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+    enabled: !!user,
+  });
+
   const agentNameMap = useMemo(() => {
     const map = new Map<string, string>();
     nativeAgents.forEach((a) => {
@@ -71,7 +88,17 @@ export default function Conversations() {
     return "Conversa sem título";
   };
 
-  const sessionsWithMessages = sessions.filter((s: any) => s.messages && s.messages.length > 0);
+  // Lista única: salas pessoais (atuais) + sessões antigas, da mais recente para a mais antiga.
+  const sessionsWithMessages = useMemo(() => {
+    const legacy = sessions
+      .filter((s: any) => s.messages && s.messages.length > 0)
+      .map((s: any) => ({ ...s, kind: "session", count: s.messages.length, sortAt: s.created_at }));
+    const fromRooms = rooms
+      .filter((r: any) => r.agent_id && (r.room_messages?.[0]?.count ?? 0) > 0)
+      .map((r: any) => ({ id: r.id, agent_id: r.agent_id, created_at: r.updated_at, title: r.name, kind: "room", count: r.room_messages[0].count, messages: null, sortAt: r.updated_at }));
+    return [...fromRooms, ...legacy].sort((a, b) => b.sortAt.localeCompare(a.sortAt));
+  }, [sessions, rooms]);
+  const openSession = (s: any) => navigate(s.kind === "room" ? `/chat/${s.agent_id}?room=${s.id}` : `/chat/${s.agent_id}?session=${s.id}`);
 
   const agents = Array.from(
     new Map(
@@ -92,9 +119,17 @@ export default function Conversations() {
 
   const handleDelete = async (sessionId: string) => {
     try {
-      await supabase.from("messages").delete().eq("session_id", sessionId);
-      await supabase.from("chat_sessions").delete().eq("id", sessionId);
+      if (rooms.some((r: any) => r.id === sessionId)) {
+        await supabase.from("room_messages").delete().eq("room_id", sessionId);
+        await supabase.from("virtual_rooms").delete().eq("id", sessionId);
+        queryClient.invalidateQueries({ queryKey: ["all-conversations-rooms", user?.id] });
+        queryClient.invalidateQueries({ queryKey: ["home-personal-rooms", user?.id] });
+      } else {
+        await supabase.from("messages").delete().eq("session_id", sessionId);
+        await supabase.from("chat_sessions").delete().eq("id", sessionId);
+      }
       queryClient.invalidateQueries({ queryKey: ["all-conversations", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["conversation-count", user?.id] });
       toast.success("Conversa excluída");
     } catch {
       toast.error("Erro ao excluir conversa");
@@ -102,7 +137,14 @@ export default function Conversations() {
     setDeleteSessionId(null);
   };
 
-  const handleExport = (session: any) => {
+  const handleExport = async (session: any) => {
+    if (session.kind === "room") {
+      const { data } = await supabase.from("room_messages").select("content, role, created_at").eq("room_id", session.id).order("created_at", { ascending: true });
+      if (!data || data.length === 0) { toast.error("Conversa sem mensagens"); return; }
+      exportConversationPdf(getAgentName(session.agent_id), data as any);
+      toast.success("PDF exportado com sucesso");
+      return;
+    }
     if (!session.messages || session.messages.length === 0) {
       toast.error("Conversa sem mensagens");
       return;
@@ -127,11 +169,16 @@ export default function Conversations() {
       return;
     }
     try {
-      await supabase
-        .from("chat_sessions")
-        .update({ title: editTitle.trim() } as any)
-        .eq("id", editingId);
-      queryClient.invalidateQueries({ queryKey: ["all-conversations", user?.id] });
+      if (rooms.some((r: any) => r.id === editingId)) {
+        await supabase.from("virtual_rooms").update({ name: editTitle.trim() }).eq("id", editingId);
+        queryClient.invalidateQueries({ queryKey: ["all-conversations-rooms", user?.id] });
+      } else {
+        await supabase
+          .from("chat_sessions")
+          .update({ title: editTitle.trim() } as any)
+          .eq("id", editingId);
+        queryClient.invalidateQueries({ queryKey: ["all-conversations", user?.id] });
+      }
       toast.success("Título atualizado");
     } catch {
       toast.error("Erro ao atualizar título");
@@ -139,7 +186,7 @@ export default function Conversations() {
     setEditingId(null);
   };
 
-  if (isLoading) {
+  if (isLoading || loadingRooms) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -150,6 +197,7 @@ export default function Conversations() {
   return (
     <div className="container max-w-4xl py-8">
       <div className="mb-8 animate-slide-up">
+<DomainEyebrow domain="clinica" section="Conversas" />
         <h1 className="mb-2 font-display text-3xl font-bold text-white">Conversas</h1>
         <p className="text-white/50">Acompanhe todas as interações</p>
       </div>
@@ -212,7 +260,7 @@ export default function Conversations() {
               ) : (
                 <>
                   <button
-                    onClick={() => navigate(`/chat/${session.agent_id}?session=${session.id}`)}
+                    onClick={() => openSession(session)}
                     className="flex-1 text-left p-4 min-w-0"
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -228,7 +276,7 @@ export default function Conversations() {
                     </p>
                     <div className="mt-1 flex items-center gap-2">
                       <span className="text-xs text-white/30">
-                        {session.messages?.length || 0} mensagens
+                        {session.count} mensagens
                       </span>
                     </div>
                   </button>
@@ -257,9 +305,11 @@ export default function Conversations() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <div className="mr-2">
-                    <AddToProjectMenu itemType="conversation" itemId={session.id} size="icon" />
-                  </div>
+                  {session.kind !== "room" && (
+                    <div className="mr-2">
+                      <AddToProjectMenu itemType="conversation" itemId={session.id} size="icon" />
+                    </div>
+                  )}
                 </>
               )}
             </div>

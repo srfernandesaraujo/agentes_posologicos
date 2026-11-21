@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useNavigate } from "react-router-dom";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ export default function Knowledge() {
   return (
     <div className="container py-8">
       <div className="mb-6">
+<DomainEyebrow domain="acervo" section="Conteúdos" />
         <h1 className="font-display text-2xl font-bold text-white">Conteúdos</h1>
         <p className="text-sm text-white/40">Organize e acesse o seu banco de dados</p>
       </div>

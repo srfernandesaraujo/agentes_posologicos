@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -359,6 +360,7 @@ export default function VirtualRooms() {
     <div className="container max-w-4xl py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
+<DomainEyebrow domain="ensino" section="Salas virtuais" />
           <h1 className="font-display text-2xl font-bold text-white">Salas Virtuais</h1>
           <p className="text-sm text-white/40">
             {activeTab === "personal" ? "Suas conversas persistentes com os agentes" : "Gerencie salas para pacientes virtuais acessarem via PIN"}

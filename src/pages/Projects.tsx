@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { Link } from "react-router-dom";
 import { FolderKanban, Plus, Archive, Users, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ export default function Projects() {
     <div className="container max-w-6xl py-8">
       <div className="mb-8 flex items-start justify-between gap-4 animate-slide-up">
         <div>
+<DomainEyebrow domain="acervo" section="Projetos" />
           <h1 className="mb-2 font-display text-3xl font-bold text-white flex items-center gap-3">
             <FolderKanban className="h-8 w-8 text-[hsl(174,62%,47%)]" />
             Projetos

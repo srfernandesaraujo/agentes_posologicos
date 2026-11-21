@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useAgents, CATEGORIES, CATEGORY_COLORS } from "@/hooks/useAgents";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { usePurchasedAgents, useMarketplaceAgents } from "@/hooks/useMarketplace";
@@ -105,6 +106,7 @@ export default function Agents() {
     <div className="container max-w-7xl py-6">
       {/* Header */}
       <div className="mb-6 animate-slide-up">
+<DomainEyebrow domain="clinica" section="Agentes" />
         <h1 className="mb-1 font-display text-3xl font-bold text-white">
           {t("agents.title")}
         </h1>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useMarketplaceAgents, useAgentReviews, useSubmitReview, usePurchasedAgents, usePurchaseAgent, MarketplaceAgent } from "@/hooks/useMarketplace";
 import { Search, Bot, Star, Store, MessageSquare, User, Coins, ShoppingCart, Check, TrendingUp, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -230,6 +231,7 @@ export default function Marketplace() {
   return (
     <div className="container max-w-6xl py-6">
       {/* Header */}
+<DomainEyebrow domain="acervo" section="Marketplace" />
       <div className="mb-6 animate-slide-up">
         <div className="flex items-center gap-3 mb-1">
           <Store className="h-7 w-7 text-primary" />
