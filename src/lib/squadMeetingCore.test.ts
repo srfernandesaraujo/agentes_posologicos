@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MEETING_HARD_MAX_AGENT_MESSAGES, MEETING_QUIET_MS, MEETING_LIVE_RULES, agendaText, applyBrakes, buildEvaluatorPrompt, buildLiveUserMessage,
   buildMinutesPrompt, clampMeetingCap, isPass, isSilenced, minutesFallback, nextItemMessage, normalizeProactivity, openingMessage, parseAgenda,
-  parseEvaluatorReply, parseMeetingCommand, proposalMessage, shouldNudge, transcriptBlock, type AgendaItem,
+  parseEvaluatorReply, parseMeetingCommand, proposalMessage, isOpenCall, pickByLeastRecent, facilitatorDue, shouldNudge, transcriptBlock, type AgendaItem,
 } from "../../supabase/functions/_shared/squadMeetingCore";
 import type { ChatAgent } from "../../supabase/functions/_shared/squadChatCore";
 
@@ -210,5 +210,57 @@ describe("ata", () => {
     expect(t).toContain("- Vendas: Focar em X");
     expect(t).toContain("## Pendências e perguntas em aberto\n- Temas");
     expect(minutesFallback("L", [{ title: "A", done: true }])).toContain("## Decisões\nNada registrado");
+  });
+});
+
+describe("chamada ao grupo e condução da diretora", () => {
+  it("reconhece perguntas ao grupo", () => {
+    expect(isOpenCall("Mais alguem tem alguma ideia?")).toBe(true);
+    expect(isOpenCall("O que vocês acham do roteiro?")).toBe(true);
+    expect(isOpenCall("Pessoal, preciso de sugestões de título")).toBe(true);
+    expect(isOpenCall("Vocês conseguem fechar isso até sexta?")).toBe(true);
+  });
+  it("conversa comum não é chamada ao grupo", () => {
+    expect(isOpenCall("Vamos seguir com a opção dois")).toBe(false);
+    expect(isOpenCall("O time de vendas fechou o mês")).toBe(false);
+    expect(isOpenCall("Obrigado")).toBe(false);
+  });
+  it("escolhe quem falou há mais tempo e nunca quem está excluído", () => {
+    const picks = pickByLeastRecent(team, ["a2", "a3", "a2"], ["a2"], 2);
+    expect(picks.map((p) => p.id)).toEqual(["a1", "a3"]);
+    expect(pickByLeastRecent(team, [], [], 1)).toHaveLength(1);
+    expect(pickByLeastRecent(team, [], ["a1", "a2", "a3"], 2)).toEqual([]);
+  });
+  it("a diretora conduz depois de conversa demais sem ela", () => {
+    const msgs = [
+      { author: "agent", agentId: "a1" },
+      { author: "user" }, { author: "agent", agentId: "a2" }, { author: "user" }, { author: "agent", agentId: "a3" },
+    ];
+    expect(facilitatorDue(msgs, "a1", "balanced")).toBe(true);
+    expect(facilitatorDue(msgs.slice(0, 4), "a1", "balanced")).toBe(false);
+    expect(facilitatorDue(msgs.slice(0, 3), "a1", "balanced")).toBe(false);
+    expect(facilitatorDue(msgs.slice(0, 4), "a1", "active")).toBe(true);
+    expect(facilitatorDue(msgs, "a1", "calm")).toBe(false);
+    expect(facilitatorDue(msgs, null, "balanced")).toBe(false);
+  });
+  it("não conduz se só o dono falou e ignora mensagens do sistema", () => {
+    expect(facilitatorDue([{ author: "user" }, { author: "user" }, { author: "user" }, { author: "user" }], "a1", "balanced")).toBe(false);
+    expect(facilitatorDue([{ author: "agent", agentId: "a1" }, { author: "system" }, { author: "user" }], "a1", "balanced")).toBe(false);
+  });
+  it("o avaliador de chamada aberta exige resposta e o ativo antecipa", () => {
+    const agenda: AgendaItem[] = [{ title: "Vídeo", done: false }];
+    const p = buildEvaluatorPrompt({ agents: team, agenda, current: 0, transcript: "", maxSpeakers: 2, quiet: false, allowResolve: true, proactivity: "balanced", openCall: true });
+    expect(p.system).toContain("Nunca deixe essa pergunta sem resposta");
+    expect(p.system).not.toContain("Na dúvida, não escolha ninguém");
+    const a = buildEvaluatorPrompt({ agents: team, agenda, current: 0, transcript: "", maxSpeakers: 2, quiet: false, allowResolve: true, proactivity: "active" });
+    expect(a.system).toContain("Prefira escolher 2 agentes a nenhum");
+  });
+  it("mensagens de chamada ao grupo e de condução", () => {
+    const agenda: AgendaItem[] = [{ title: "Vídeo", done: false }];
+    const base = { agenda, current: 0, transcript: "x", why: "", mentioned: false, quiet: false };
+    expect(buildLiveUserMessage({ ...base, openCall: true })).toContain("Não responda PASS");
+    const f = buildLiveUserMessage({ ...base, facilitate: true });
+    expect(f).toContain("coordenação");
+    expect(f).toContain("@Bia");
   });
 });

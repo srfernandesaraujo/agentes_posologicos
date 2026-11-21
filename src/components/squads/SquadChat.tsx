@@ -106,11 +106,11 @@ function Bubble({ m, agent, onMemory, onAdjust, children }: { m: ChatMessage; ag
       </div>
     );
   }
-  const meeting = m.meta?.meeting as { round?: number; summary?: boolean; minutes?: boolean; live?: boolean; why?: string; spontaneous?: boolean } | undefined;
+  const meeting = m.meta?.meeting as { round?: number; summary?: boolean; minutes?: boolean; live?: boolean; why?: string; spontaneous?: boolean; facilitator?: boolean } | undefined;
   const highlighted = !!(meeting?.summary || meeting?.minutes);
   const meetingTag = meeting?.minutes ? "Ata da reunião" : meeting?.summary ? "Resumo da reunião" : meeting?.round ? `Reunião · rodada ${meeting.round}` : null;
   // Por que o agente entrou sem ser chamado: aparece para você entender e ajustar a proatividade.
-  const why = meeting?.spontaneous && meeting?.why ? meeting.why : null;
+  const why = (meeting?.spontaneous || meeting?.facilitator) && meeting?.why ? meeting.why : null;
   return (
     <div className="flex gap-2.5">
       <Avatar name={agent?.name || "?"} />

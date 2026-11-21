@@ -17,8 +17,8 @@ import {
   meetingModerator, parseMentions, pickMeetingParticipants, monthStartIso, type ChatAgent,
 } from "../_shared/squadChatCore.ts";
 import {
-  MEETING_DEFAULT_CAP_USD, MEETING_LIVE_RULES, MEETING_LOCK_SECONDS, MEETING_SPEAK_TOKENS, PROACTIVITY_LIMITS,
-  applyBrakes, buildEvaluatorPrompt, buildLiveUserMessage, buildMinutesPrompt, clampMeetingCap, isPass, isSilenced,
+  MEETING_DEFAULT_CAP_USD, MEETING_HARD_MAX_AGENT_MESSAGES, MEETING_LIVE_RULES, MEETING_LOCK_SECONDS, MEETING_SPEAK_TOKENS, PROACTIVITY_LIMITS,
+  applyBrakes, facilitatorDue, isOpenCall, pickByLeastRecent, buildEvaluatorPrompt, buildLiveUserMessage, buildMinutesPrompt, clampMeetingCap, isPass, isSilenced,
   minutesFallback, nextItemMessage, normalizeProactivity, openingMessage, parseAgenda, parseEvaluatorReply, parseMeetingCommand,
   proposalMessage, shouldNudge, transcriptBlock, type AgendaItem, type EvaluatorPick, type LiveLine, type Proactivity,
 } from "../_shared/squadMeetingCore.ts";
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
       squad: any; template: any; meeting: MeetingRow; agents: AgentRow[]; keys: any[];
       insert: (row: Record<string, unknown>) => Promise<any>;
     }
-    const runTurn = async (c: TurnCtx, opts: { quiet: boolean; mentions: string[] }): Promise<{ cost: number; spoke: number }> => {
+    const runTurn = async (c: TurnCtx, opts: { quiet: boolean; mentions: string[]; userText?: string }): Promise<{ cost: number; spoke: number }> => {
       const { squad, meeting, agents, keys, insert } = c;
       const meetingId = meeting.id;
       const cap = Number(meeting.cap_usd);
@@ -137,7 +137,6 @@ Deno.serve(async (req) => {
       const recent = await recentMessages(squad.id, meetingId);
       const visible = recent.filter((m) => !m.meta?.meeting?.hidden);
       const lines: LiveLine[] = visible.map((m) => ({ author: m.author, agentName: m.agent_id ? nameById.get(m.agent_id) : undefined, content: m.content }));
-      const transcript = transcriptBlock(lines);
 
       const spent = await meetingSpend(squad.id, meetingId);
       if (budgetState(spent, cap) === "exceeded") {
@@ -147,6 +146,7 @@ Deno.serve(async (req) => {
       }
 
       let cost = 0;
+      let spoke = 0;
       const moderatorId = meetingModerator(agents, meeting.participants);
       const candidateIds = new Set([...meeting.participants, ...(moderatorId ? [moderatorId] : [])]);
       const candidates = agents.filter((a) => candidateIds.has(a.id));
@@ -154,20 +154,23 @@ Deno.serve(async (req) => {
       const agenda = meeting.agenda || [];
       const current = meeting.current_item;
 
-      let picks: EvaluatorPick[] = [];
       const forced = opts.mentions.length > 0;
+      // "Alguém tem ideia?": o dono perguntou ao grupo, então alguém responde, mesmo no modo calmo.
+      const openCall = !forced && !!opts.userText && isOpenCall(opts.userText);
+      let picks: EvaluatorPick[] = [];
       if (forced) {
         picks = opts.mentions.map((id) => ({ id, why: "chamado por @" }));
-      } else if (!silenced && meeting.proactivity !== "calm") {
+      } else if (!silenced && (openCall || meeting.proactivity !== "calm")) {
         const lastAgentMsg = [...visible].reverse().find((m) => m.author === "agent");
+        const lastAgentId: string | null = lastAgentMsg?.agent_id ?? null;
         const spontaneousLastMinute = visible.filter((m) => m.author === "agent" && m.meta?.meeting?.spontaneous && Date.now() - new Date(m.created_at).getTime() < 60_000).length;
         const { count: agentCount } = await admin.from("squad_chat_messages").select("id", { count: "exact", head: true })
           .eq("squad_id", squad.id).eq("author", "agent").contains("meta", { meeting: { id: meetingId } });
         const proposedRecently = visible.slice(-8).some((m) => m.meta?.meeting?.propose_next === current);
         const lim = PROACTIVITY_LIMITS[meeting.proactivity];
         const prompt = buildEvaluatorPrompt({
-          agents: candidates, agenda, current, transcript, maxSpeakers: Math.max(1, lim.perTurn), quiet: opts.quiet,
-          allowResolve: !opts.quiet && !proposedRecently && current < agenda.length,
+          agents: candidates, agenda, current, transcript: transcriptBlock(lines), maxSpeakers: openCall ? 2 : Math.max(1, lim.perTurn), quiet: opts.quiet,
+          allowResolve: !opts.quiet && !proposedRecently && current < agenda.length, proactivity: meeting.proactivity, openCall,
         });
         const ev = await callWithFallback(admin, keys, {
           systemPrompt: prompt.system, messages: [{ role: "user", content: prompt.user }], temperature: 0, mode: "text", maxTokens: 220,
@@ -182,7 +185,10 @@ Deno.serve(async (req) => {
         }
         cost += evCost;
         // Mensagem oculta: guarda o custo do avaliador no teto e marca que a sala já foi checada (evita checar de novo a cada batimento).
-        await insert({ author: "system", content: "avaliação do turno", cost_usd: evCost, meta: { meeting: { hidden: true, kind: "evaluator", ...(opts.quiet ? { nudge: true } : {}) } } });
+        await insert({
+          author: "system", content: "avaliação do turno", cost_usd: evCost,
+          meta: { meeting: { hidden: true, kind: "evaluator", picked: parsed.speakers.length, ...(opts.quiet ? { nudge: true } : {}) } },
+        });
 
         if (parsed.itemResolved && !opts.quiet && !proposedRecently && moderatorId && current < agenda.length) {
           await insert({
@@ -190,63 +196,111 @@ Deno.serve(async (req) => {
             meta: { meeting: { propose_next: current, decision: parsed.decision } },
           });
         }
-        picks = applyBrakes(parsed.speakers, {
-          proactivity: meeting.proactivity, lastAgentId: lastAgentMsg?.agent_id ?? null, spontaneousLastMinute, agentMessageCount: agentCount || 0,
-        });
-        if (opts.quiet) picks = picks.slice(0, 1);
+
+        if (openCall) {
+          picks = parsed.speakers.filter((p) => p.id !== lastAgentId).slice(0, 2);
+          if (!picks.length) {
+            // O avaliador não escolheu ninguém, mas o dono perguntou ao grupo: quem falou há mais tempo responde.
+            const spokeOrder = visible.filter((m) => m.author === "agent" && m.agent_id).map((m) => m.agent_id as string);
+            const others = candidates.filter((a) => a.id !== moderatorId);
+            picks = pickByLeastRecent(others.length ? others : candidates, spokeOrder, lastAgentId ? [lastAgentId] : [], 2);
+          }
+        } else {
+          picks = applyBrakes(parsed.speakers, {
+            proactivity: meeting.proactivity, lastAgentId, spontaneousLastMinute, agentMessageCount: agentCount || 0,
+          });
+          if (opts.quiet) picks = picks.slice(0, 1);
+          // A diretora conduz quando já houve conversa demais desde a última fala dela.
+          if (!opts.quiet && moderatorId && !picks.some((p) => p.id === moderatorId) && (agentCount || 0) < MEETING_HARD_MAX_AGENT_MESSAGES
+            && facilitatorDue(visible.map((m) => ({ author: m.author, agentId: m.agent_id })), moderatorId, meeting.proactivity)) {
+            picks.push({ id: moderatorId, why: "conduzir a pauta" });
+          }
+        }
       }
-      if (!picks.length) return { cost, spoke: 0 };
+      if (!picks.length) return { cost, spoke };
 
       const memRows = (await admin.from("squad_memories").select("id, kind, content, pinned, status, created_at")
         .eq("squad_id", squad.id).eq("owner_id", user.id).eq("status", "active")).data;
       const memoryContext = buildMemoryContext(squad.memory || "", (memRows || []) as MemoryItem[]);
       const contextFor = await loadMissionContext(admin, squad.id, user.id);
       const team = agents.map((a) => ({ name: a.name, role: a.role }));
-      const userMessage = (p: EvaluatorPick) => buildLiveUserMessage({ agenda, current, transcript, why: p.why, mentioned: forced, quiet: opts.quiet });
       const deadlineAt = Date.now() + FUNCTION_DEADLINE_MS;
 
-      await Promise.all(picks.map((p) => emitChatEvent(admin, {
-        squadId: squad.id, ownerId: user.id, type: "chat_thinking", agentId: p.id, room: agents.find((a) => a.id === p.id)?.room ?? null, text: "Na reunião",
-      })));
-      const results = await Promise.all(picks.map(async (p) => {
-        const agent = agents.find((a) => a.id === p.id)!;
-        const system = buildChatSystemPrompt({
-          agentSystemPrompt: agent.system_prompt, agentName: agent.name, team, memoryContext, missionContext: contextFor(p.id), channel: "team",
-        }) + "\n\n" + MEETING_LIVE_RULES;
-        const res = await callWithFallback(admin, keys, {
-          systemPrompt: system, messages: [{ role: "user", content: userMessage(p) }], temperature: 0.5, mode: "text",
-          maxTokens: MEETING_SPEAK_TOKENS, deadlineAt: Math.min(deadlineAt, Date.now() + 45_000),
-        });
-        return { agent, pick: p, res };
-      }));
+      type Mode = "mention" | "open" | "spontaneous";
+      // Uma rodada de falas em paralelo. A conversa que cada agente vê inclui o que as rodadas anteriores acabaram de dizer.
+      const speakRound = async (list: EvaluatorPick[], mode: Mode, facilitate: boolean): Promise<{ agentId: string; content: string }[]> => {
+        if (!list.length) return [];
+        const transcript = transcriptBlock(lines);
+        await Promise.all(list.map((p) => emitChatEvent(admin, {
+          squadId: squad.id, ownerId: user.id, type: "chat_thinking", agentId: p.id, room: agents.find((a) => a.id === p.id)?.room ?? null, text: "Na reunião",
+        })));
+        const results = await Promise.all(list.map(async (p) => {
+          const agent = agents.find((a) => a.id === p.id)!;
+          const system = buildChatSystemPrompt({
+            agentSystemPrompt: agent.system_prompt, agentName: agent.name, team, memoryContext, missionContext: contextFor(p.id), channel: "team",
+          }) + "\n\n" + MEETING_LIVE_RULES;
+          const userMessage = buildLiveUserMessage({
+            agenda, current, transcript, why: p.why, mentioned: mode === "mention", quiet: opts.quiet && !facilitate, openCall: mode === "open", facilitate,
+          });
+          const res = await callWithFallback(admin, keys, {
+            systemPrompt: system, messages: [{ role: "user", content: userMessage }], temperature: 0.5, mode: "text",
+            maxTokens: MEETING_SPEAK_TOKENS, deadlineAt: Math.min(deadlineAt, Date.now() + 45_000),
+          });
+          return { agent, pick: p, res };
+        }));
+        const said: { agentId: string; content: string }[] = [];
+        for (const { agent, pick, res } of results) {
+          if (!res || !res.ok || !res.output) {
+            if (mode !== "spontaneous") await insert({ author: "system", agent_id: agent.id, content: `${agent.name} não conseguiu responder agora (provedor de IA indisponível).`, meta: { error: true } });
+            await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_failed", agentId: agent.id, room: agent.room ?? null, text: "Sem resposta" });
+            continue;
+          }
+          const c1 = estimateCost(res.model!, res.tokensInput, res.tokensOutput);
+          cost += c1;
+          await logAiUsage(admin, { userId: user.id, provider: res.provider!, model: res.model!, tokensInput: res.tokensInput, tokensOutput: res.tokensOutput, promptType: "squad_meeting_live" });
+          if (mode === "spontaneous" && isPass(res.output)) {
+            // O agente decidiu não falar: some da tela, mas o custo fica registrado.
+            await insert({ author: "system", agent_id: agent.id, content: "passou a vez", cost_usd: c1, tokens_input: res.tokensInput, tokens_output: res.tokensOutput, meta: { meeting: { hidden: true, kind: "pass" } } });
+            await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_replied", agentId: agent.id, room: agent.room ?? null, text: "Passou a vez" });
+            continue;
+          }
+          const content = res.output.trim() + (res.finishReason === "length" ? " […]" : "");
+          await insert({
+            author: "agent", agent_id: agent.id, content, cost_usd: c1,
+            tokens_input: res.tokensInput, tokens_output: res.tokensOutput, provider: res.provider, model: res.model,
+            meta: {
+              meeting: {
+                why: pick.why, spontaneous: mode === "spontaneous" && !facilitate, ...(facilitate ? { facilitator: true } : {}), ...(opts.quiet ? { nudge: true } : {}),
+              },
+              ...(res.finishReason === "length" ? { truncated: true } : {}),
+            },
+          });
+          said.push({ agentId: agent.id, content });
+          lines.push({ author: "agent", agentName: agent.name, content });
+          spoke++;
+          await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_replied", agentId: agent.id, room: agent.room ?? null, text: "Falou na reunião" });
+        }
+        return said;
+      };
 
-      let spoke = 0;
-      for (const { agent, pick, res } of results) {
-        if (!res || !res.ok || !res.output) {
-          if (forced) await insert({ author: "system", agent_id: agent.id, content: `${agent.name} não conseguiu responder agora (provedor de IA indisponível).`, meta: { error: true } });
-          await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_failed", agentId: agent.id, room: agent.room ?? null, text: "Sem resposta" });
-          continue;
+      // Rodada 1: quem foi chamado (@), quem respondeu ao grupo ou quem entrou por conta própria. Rodada 2: a diretora conduz, vendo o que acabou de ser dito.
+      const first = picks.filter((p) => p.id !== moderatorId || forced);
+      const lead = picks.filter((p) => p.id === moderatorId && !forced);
+      const said1 = await speakRound(first, forced ? "mention" : openCall ? "open" : "spontaneous", false);
+      const said2 = await speakRound(lead, "spontaneous", true);
+
+      // Se a diretora chamou um colega pelo nome (@Bia, ...), o colega responde logo em seguida (um salto só).
+      const chain: EvaluatorPick[] = [];
+      for (const s of [...said1, ...said2]) {
+        if (s.agentId !== moderatorId) continue;
+        for (const id of parseMentions(s.content, agents.filter((a) => a.id !== moderatorId) as ChatAgent[])) {
+          if (!chain.some((x) => x.id === id)) chain.push({ id, why: "chamado pela coordenação" });
         }
-        const c1 = estimateCost(res.model!, res.tokensInput, res.tokensOutput);
-        cost += c1;
-        await logAiUsage(admin, { userId: user.id, provider: res.provider!, model: res.model!, tokensInput: res.tokensInput, tokensOutput: res.tokensOutput, promptType: "squad_meeting_live" });
-        if (!forced && isPass(res.output)) {
-          // O agente decidiu não falar: some da tela, mas o custo fica registrado.
-          await insert({ author: "system", agent_id: agent.id, content: "passou a vez", cost_usd: c1, tokens_input: res.tokensInput, tokens_output: res.tokensOutput, meta: { meeting: { hidden: true, kind: "pass" } } });
-          await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_replied", agentId: agent.id, room: agent.room ?? null, text: "Passou a vez" });
-          continue;
-        }
-        await insert({
-          author: "agent", agent_id: agent.id, content: res.output.trim() + (res.finishReason === "length" ? " […]" : ""), cost_usd: c1,
-          tokens_input: res.tokensInput, tokens_output: res.tokensOutput, provider: res.provider, model: res.model,
-          meta: { meeting: { why: pick.why, spontaneous: !forced, ...(opts.quiet ? { nudge: true } : {}) }, ...(res.finishReason === "length" ? { truncated: true } : {}) },
-        });
-        spoke++;
-        await emitChatEvent(admin, { squadId: squad.id, ownerId: user.id, type: "chat_replied", agentId: agent.id, room: agent.room ?? null, text: "Falou na reunião" });
       }
+      if (chain.length && budgetState(spent + cost, cap) !== "exceeded") await speakRound(chain.slice(0, 2), "mention", false);
+
       // Aviso aos 80% do teto da reunião.
-      const after = spent + cost;
-      const cross = capCrossing(spent, after, cap);
+      const cross = capCrossing(spent, spent + cost, cap);
       if (cross) await insert({ author: "system", meta: { cap: cross }, content: cross === "exceeded" ? "Teto da reunião atingido. Aumente o teto na reunião para os agentes continuarem." : "A reunião passou de 80% do teto." });
       return { cost, spoke };
     };
@@ -391,7 +445,7 @@ Deno.serve(async (req) => {
         }
 
         const mentions = parseMentions(sec.text, agents as ChatAgent[]);
-        const run = await runTurn({ squad, template, meeting, agents, keys, insert }, { quiet: false, mentions });
+        const run = await runTurn({ squad, template, meeting, agents, keys, insert }, { quiet: false, mentions, userText: sec.text });
         const monthAfter = before + run.cost;
         const crossing = capCrossing(before, monthAfter, cap);
         if (crossing) {
