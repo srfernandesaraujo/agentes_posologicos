@@ -73,7 +73,7 @@ export interface MeetingFile {
   created_at: string;
 }
 
-export const FILE_ACCEPT = ".csv,.tsv,.txt,.md,.xlsx,.xls,.xlsm,.ods,.docx,.pdf";
+export const FILE_ACCEPT = ".csv,.tsv,.txt,.md,.xlsx,.xlsm,.docx,.pdf";
 export const FILE_MAX_BYTES = 4 * 1024 * 1024;
 export const MEETING_MAX_FILES = 5;
 
