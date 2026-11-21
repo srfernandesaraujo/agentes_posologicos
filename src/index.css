@@ -136,6 +136,19 @@
     border-color: hsl(var(--c) / 0.6);
     box-shadow: 0 14px 32px -18px hsl(var(--c) / 0.7);
   }
+  /* acessibilidade: foco visível por teclado e respeito a "reduzir movimento" */
+  [data-ui="v2"] :focus-visible {
+    outline: 2px solid hsl(var(--dom-inicio));
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-ui="v2"] *, [data-ui="v2"] *::before, [data-ui="v2"] *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
   [data-ui="v2"] .pos-cost { font-family: "JetBrains Mono", ui-monospace, monospace; }
   [data-ui="v2"] .font-display {
     font-family: "Bricolage Grotesque", "Space Grotesk", system-ui, sans-serif;

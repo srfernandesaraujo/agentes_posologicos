@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { ArrowUp, BookOpen, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,6 +29,7 @@ export default function Documentation() {
             <BookOpen className="h-5 w-5 text-white" />
           </div>
           <div>
+            <DomainEyebrow domain="ajuda" section="Documentação" />
             <h1 className="font-display text-2xl font-bold text-white">Documentação</h1>
             <p className="text-sm text-white/40">Guia completo da plataforma Agentes Posológicos</p>
           </div>

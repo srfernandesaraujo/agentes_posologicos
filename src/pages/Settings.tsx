@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { Navigate } from "react-router-dom";
 import { useApiKeys, LLM_PROVIDERS } from "@/hooks/useApiKeys";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -95,6 +96,7 @@ export default function Settings() {
   return (
     <div className="container max-w-3xl py-8">
       <div className="mb-8 animate-slide-up">
+        <DomainEyebrow domain="ajuda" section="Configurações" />
         <h1 className="mb-2 font-display text-3xl font-bold text-white">Configurações</h1>
         <p className="text-white/50">Gerencie suas chaves de API</p>
       </div>

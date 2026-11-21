@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -89,6 +90,7 @@ export default function Support() {
     <div className="container max-w-3xl py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
+          <DomainEyebrow domain="ajuda" section="Suporte" />
           <div className="flex items-center gap-2 mb-1">
             <LifeBuoy className="h-5 w-5 text-[hsl(174,62%,47%)]" />
             <h1 className="font-display text-2xl font-bold text-white">Suporte Técnico</h1>

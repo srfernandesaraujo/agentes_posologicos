@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pill, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { AuthMark, AuthCurve } from "@/components/ds/AuthMark";
 import { LanguageSelector } from "@/components/LanguageSelector";
 
 export default function Login() {
@@ -40,11 +41,10 @@ export default function Login() {
     <div className="flex min-h-screen bg-[hsl(220,25%,5%)]">
       <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-12 border-r border-white/10">
         <div className="max-w-md text-center">
-          <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl gradient-primary">
-            <Pill className="h-10 w-10 text-white" />
-          </div>
+          <div className="mx-auto mb-8 w-fit"><AuthMark big /></div>
           <h2 className="mb-4 font-display text-4xl font-bold text-white">Agentes Posológicos</h2>
           <p className="text-lg text-white/60">{t("login.branding")}</p>
+          <AuthCurve />
         </div>
       </div>
 
@@ -52,9 +52,7 @@ export default function Login() {
         <div className="w-full max-w-md animate-fade-in">
           <div className="mb-8 flex items-center justify-between">
             <div className="lg:hidden flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary">
-                <Pill className="h-5 w-5 text-white" />
-              </div>
+              <AuthMark />
               <span className="font-display text-xl font-bold gradient-text">Agentes Posológicos</span>
             </div>
             <LanguageSelector />

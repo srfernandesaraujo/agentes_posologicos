@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -292,6 +293,7 @@ export default function Admin() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(14,90%,58%)]">
             <Shield className="h-5 w-5 text-white" />
           </div>
+          <DomainEyebrow domain="ajuda" section="Admin" />
           <h1 className="font-display text-3xl font-bold text-white">Painel Admin</h1>
         </div>
         <p className="text-white/50">Gerencie agentes, usuários, assinaturas e analise métricas de uso</p>

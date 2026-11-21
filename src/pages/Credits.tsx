@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useCredits } from "@/hooks/useCredits";
 import { useSubscription, SUBSCRIPTION_TIERS, TierKey } from "@/hooks/useSubscription";
 import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
@@ -122,6 +123,7 @@ export default function Credits() {
   return (
     <div className="container max-w-5xl py-8">
       <div className="mb-8 animate-slide-up">
+        <DomainEyebrow domain="ajuda" section="Créditos" />
         <h1 className="mb-2 font-display text-3xl font-bold text-white">{t("credits.title")}</h1>
         <p className="text-white/50">{t("credits.desc")}</p>
       </div>

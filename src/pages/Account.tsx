@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
 import { BriefingSettings } from "@/components/briefing/BriefingSettings";
 import { NotificationPreferences } from "@/components/account/NotificationPreferences";
@@ -118,6 +119,7 @@ export default function Account() {
   return (
     <div className="container max-w-2xl py-8">
       <div className="mb-8 animate-slide-up">
+        <DomainEyebrow domain="ajuda" section="Conta" />
         <h1 className="mb-2 font-display text-3xl font-bold text-white">{t("account.title")}</h1>
       </div>
 
