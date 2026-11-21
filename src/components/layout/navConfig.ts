@@ -13,7 +13,7 @@ export interface NavItem {
   /** prefixos de rota extras que também ativam este item */
   match?: string[];
   /** chave de contagem exibida ao lado (preenchida por useNavCounts) */
-  countKey?: "agents" | "conversations" | "knowledge" | "tickets";
+  countKey?: "agents" | "conversations" | "knowledge" | "tickets" | "awaiting";
   dataTour?: string;
   adminOnly?: boolean;
 }
@@ -44,7 +44,7 @@ export const DOMAINS: Domain[] = [
   {
     id: "equipes", label: "Equipes", icon: Users, tagline: "Agentes trabalhando juntos",
     items: [
-      { to: "/squads", label: "Squads", icon: Users },
+      { to: "/squads", label: "Squads", icon: Users, countKey: "awaiting" },
       { to: "/reunioes", label: "Reuniões", icon: Video, match: ["/reuniao-viva"] },
       { to: "/fluxos", label: "Fluxos", icon: Workflow, match: ["/orquestrador"] },
     ],

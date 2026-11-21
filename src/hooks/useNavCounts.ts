@@ -3,12 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCustomAgents } from "@/hooks/useCustomAgents";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
+import { awaitingCount, useTeamPulse } from "@/hooks/useTeamPulse";
 
 /** Contagens exibidas nos itens do menu (mesmas consultas do menu antigo, mesmas chaves de cache). */
-export function useNavCounts(): Record<"agents" | "conversations" | "knowledge" | "tickets", number> {
+export function useNavCounts(): Record<"agents" | "conversations" | "knowledge" | "tickets" | "awaiting", number> {
   const { user } = useAuth();
   const { data: customAgents = [] } = useCustomAgents();
   const { data: knowledgeBases = [] } = useKnowledgeBases();
+  const { data: pulse } = useTeamPulse();
 
   const { data: conversations = 0 } = useQuery({
     queryKey: ["conversation-count", user?.id],
@@ -38,5 +40,5 @@ export function useNavCounts(): Record<"agents" | "conversations" | "knowledge" 
     refetchInterval: 30_000,
   });
 
-  return { agents: customAgents.length, conversations, knowledge: knowledgeBases.length, tickets };
+  return { agents: customAgents.length, conversations, knowledge: knowledgeBases.length, tickets, awaiting: awaitingCount(pulse) };
 }

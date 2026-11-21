@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSquadActions, useSquadTemplates, useSquads, type SquadTemplateInfo } from "@/hooks/useSquads";
 import { fmtUsd } from "@/components/squads/CostCapField";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { useTeamPulse } from "@/hooks/useTeamPulse";
 
 const SENSITIVITY_LABEL: Record<SquadTemplateInfo["sensitivity"], string | null> = {
   normal: null,
@@ -22,6 +24,8 @@ export default function Squads() {
   const { createSquad } = useSquadActions();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState<string | null>(null);
+  const { enabled: newUI } = useNewUI();
+  const { data: pulse } = useTeamPulse();
 
   const templateBySlug = new Map(templates.map((t) => [t.slug, t]));
 
@@ -64,6 +68,36 @@ export default function Squads() {
         <div className="grid gap-4 sm:grid-cols-2">
           {squads.map((s) => {
             const t = templateBySlug.get(s.template_slug);
+            if (newUI) {
+              const running = pulse?.missions.filter((m) => m.squad_id === s.id && m.status === "running").length ?? 0;
+              const waiting = (pulse?.actions.filter((a) => a.squad_id === s.id).length ?? 0) + (pulse?.questions.filter((q) => q.squad_id === s.id).length ?? 0);
+              return (
+                <button key={s.id} type="button" onClick={() => navigate(`/squads/${s.id}`)}
+                  className="group flex flex-col gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-[hsl(var(--dom-equipes)/0.10)] to-pos-base p-5 text-left transition hover:-translate-y-0.5 hover:border-[hsl(var(--dom-equipes)/0.6)] hover:shadow-[0_18px_40px_-22px_hsl(var(--dom-equipes))]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-brand text-lg font-bold text-white">{s.name}</h3>
+                      <p className="mt-0.5 text-xs text-white/45">{s.kind === "continuous" ? "Contínuo, com agendamento" : "Por missão"}{t ? ` · ${t.agents.length} agentes` : ""}</p>
+                    </div>
+                    {running > 0 ? (
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[hsl(var(--success)/0.4)] px-2.5 py-0.5 text-xs text-[hsl(var(--success))]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />Trabalhando</span>
+                    ) : waiting > 0 ? (
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[hsl(var(--warning)/0.45)] px-2.5 py-0.5 text-xs text-[hsl(var(--warning))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />{waiting} esperando você</span>
+                    ) : (
+                      <span className="shrink-0 rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-white/40">Ocioso</span>
+                    )}
+                  </div>
+                  <div className="flex items-center">
+                    {(t?.agents ?? []).slice(0, 5).map((a, i) => (
+                      <span key={a.slug} title={`${a.name}: ${a.role}`} className="-ml-2 grid h-9 w-9 place-items-center rounded-full border-2 border-pos-base bg-[hsl(var(--dom-equipes)/0.2)] font-brand text-sm font-bold text-[hsl(var(--dom-equipes))] first:ml-0" style={{ zIndex: 5 - i }}>
+                        {a.name.charAt(0)}
+                      </span>
+                    ))}
+                    <span className="ml-auto font-mono text-[11px] text-white/35">criado em {new Date(s.created_at).toLocaleDateString("pt-BR")}</span>
+                  </div>
+                </button>
+              );
+            }
             return (
               <Card key={s.id} onClick={() => navigate(`/squads/${s.id}`)} role="link" tabIndex={0}
                 onKeyDown={(e) => { if (e.key === "Enter") navigate(`/squads/${s.id}`); }}

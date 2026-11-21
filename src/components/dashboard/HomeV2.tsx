@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Sparkline } from "@/components/ds/Sparkline";
 import { PkCurve } from "@/components/ds/PkCurve";
+import { TeamPulsePanel } from "./TeamPulsePanel";
 
 interface SessionRow { id: string; created_at: string; agent_id: string; agents?: { name?: string } | null }
 interface LedgerRow { amount: number; type: string; created_at: string }
@@ -91,6 +92,8 @@ export function HomeV2({ sessions, ledger, balance }: { sessions: SessionRow[]; 
           </div>
         </div>
       </div>
+
+      <TeamPulsePanel />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">

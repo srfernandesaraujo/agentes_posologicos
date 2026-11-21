@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, Trash2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,9 @@ import { MissionPanel, MISSION_STATUS } from "@/components/squads/MissionPanel";
 import { SchedulePanel } from "@/components/squads/SchedulePanel";
 import { SquadChat } from "@/components/squads/SquadChat";
 import { useOpenQuestions } from "@/hooks/useSquadChat";
+import { useNewUI } from "@/contexts/NewUIContext";
+
+const TABS = ["missoes", "nova", "agenda", "conversa", "memoria", "equipe"];
 
 export default function SquadDetail() {
   const { squadId } = useParams();
@@ -33,7 +36,10 @@ export default function SquadDetail() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [cap, setCap] = useState(4);
   const [selected, setSelected] = useState<string | null>(null);
-  const [tab, setTab] = useState("missoes");
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("aba");
+  const [tab, setTab] = useState(initialTab && TABS.includes(initialTab) ? initialTab : "missoes");
+  const { enabled: newUI } = useNewUI();
 
   useEffect(() => { if (squad) { setCap(Number(squad.default_cost_cap_usd)); } }, [squad?.id]);
   // Abre a missão mais recente ao entrar na página.
@@ -77,7 +83,15 @@ export default function SquadDetail() {
         <Link to="/squads" className="mb-3 inline-flex items-center gap-1 text-sm text-white/50 hover:text-white"><ArrowLeft className="h-4 w-4" /> Squads</Link>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">{squad.name}</h1>
+            {newUI && <p className="mb-1 font-mono text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--dom-equipes))]">Equipes · Squad</p>}
+            <h1 className={newUI ? "font-brand text-3xl font-extrabold tracking-tight" : "text-2xl font-bold"}>{squad.name}</h1>
+            {newUI && (
+              <div className="mt-3 flex items-center">
+                {agents.map((a, i) => (
+                  <span key={a.id} title={`${a.name}: ${a.role}`} className="-ml-2 grid h-10 w-10 place-items-center rounded-full border-2 border-pos-vacuo bg-[hsl(var(--dom-equipes)/0.2)] font-brand font-bold text-[hsl(var(--dom-equipes))] first:ml-0" style={{ zIndex: 10 - i }}>{a.name.charAt(0)}</span>
+                ))}
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge variant="outline" className="border-white/20 text-white/60">{squad.kind === "continuous" ? "Contínuo" : "Por missão"}</Badge>
               {agents.map((a) => <Badge key={a.id} variant="outline" className="border-white/10 text-white/50" title={a.role}>{a.name}</Badge>)}
