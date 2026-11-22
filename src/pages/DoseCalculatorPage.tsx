@@ -12,7 +12,7 @@ export default function DoseCalculatorPage() {
     return (
       <div className="container max-w-6xl py-8 space-y-5">
         <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[hsl(var(--dom-clinica)/0.12)] via-pos-base to-pos-base p-6 md:p-8">
-          <PkCurve draw height={110} className="pointer-events-none absolute inset-x-0 bottom-0 w-full opacity-30" />
+          <PkCurve draw height={110} className="pointer-events-none absolute bottom-0 right-0 hidden w-[46%] opacity-40 [mask-image:linear-gradient(to_right,transparent,#000_45%)] md:block" />
           <div className="relative">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--dom-clinica))]">Clínica</p>

@@ -1,6 +1,7 @@
 import { useId, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, Pin, X } from "lucide-react";
+import { AlertTriangle, Pin, Sparkles, X } from "lucide-react";
+import { PkCurve } from "@/components/ds/PkCurve";
 import { CountUp } from "@/components/ds/CountUp";
 import { Reveal, RevealItem } from "@/components/ds/Reveal";
 import { EASE, useMotionOn } from "@/lib/motion";
@@ -27,6 +28,13 @@ const MODES: { id: Mode; label: string; hint: string }[] = [
   { id: "renal", label: "Função renal", hint: "Cockcroft-Gault" },
   { id: "ped", label: "Pediatria", hint: "peso estimado" },
 ];
+
+const EXAMPLE_HINT: Record<Mode, string> = {
+  peso: "70 kg · 5 mg/kg",
+  sc: "70 kg · 170 cm · 100 mg/m²",
+  renal: "60 anos · 70 kg · creatinina 1,0",
+  ped: "6 anos (peso estimado) · 10 mg/kg",
+};
 
 const num = (s: string) => (s.trim() === "" ? NaN : parseFloat(s.replace(",", ".")));
 const ok = <T,>(r: CalcResult<T> | null) => (r && !isCalcErr(r) ? r : null);
@@ -251,6 +259,12 @@ export function DoseBench() {
   }, [mode, weight, height, age, creat, sex, dosePerKg, dosePerM2, maxMg, formula]);
 
   const { outcome, error } = computed;
+  const fillExample = () => {
+    if (mode === "peso") { setWeight("70"); setDosePerKg("5"); }
+    else if (mode === "sc") { setWeight("70"); setHeight("170"); setDosePerM2("100"); }
+    else if (mode === "renal") { setAge("60"); setWeight("70"); setCreat("1,0"); setSex("M"); }
+    else { setAge("6"); setWeight(""); setDosePerKg("10"); }
+  };
   const showSim = outcome && outcome.unit === "mg";
   const modeInfo = MODES.find((m) => m.id === mode)!;
 
@@ -283,7 +297,7 @@ export function DoseBench() {
           </div>
         </RevealItem>
 
-        <RevealItem className="space-y-3 rounded-2xl border border-border bg-card p-5">
+        <RevealItem className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-5 [&>*:last-child:nth-child(odd)]:col-span-2">
           {(mode === "peso" || mode === "sc" || mode === "renal" || mode === "ped") && (
             <Field label={mode === "ped" ? "Peso real (deixe vazio para estimar pela idade)" : "Peso"} unit="kg" value={weight} onChange={setWeight} placeholder="70" optional={mode === "ped"} />
           )}
@@ -291,7 +305,7 @@ export function DoseBench() {
           {(mode === "renal" || mode === "ped") && <Field label="Idade" unit="anos" value={age} onChange={setAge} placeholder={mode === "ped" ? "6" : "60"} optional={mode === "ped"} />}
           {mode === "renal" && (
             <>
-              <div>
+              <div className="col-span-2">
                 <span className="mb-1 block text-[11px] text-muted-foreground">Sexo</span>
                 <div className="grid grid-cols-2 gap-2">
                   {([["M", "Masculino"], ["F", "Feminino"]] as const).map(([v, l]) => (
@@ -303,7 +317,7 @@ export function DoseBench() {
             </>
           )}
           {mode === "sc" && (
-            <div>
+            <div className="col-span-2">
               <span className="mb-1 block text-[11px] text-muted-foreground">Fórmula</span>
               <div className="grid grid-cols-2 gap-2">
                 {([["mosteller", "Mosteller"], ["dubois", "Du Bois"]] as const).map(([v, l]) => (
@@ -353,9 +367,18 @@ export function DoseBench() {
               {mode === "renal" && <RenalScale value={outcome.value} />}
             </>
           ) : (
-            <div className="mt-4">
-              <p className="font-display text-3xl font-bold text-muted-foreground/60 md:text-4xl">Preencha os campos ao lado</p>
-              <p className="mt-2 max-w-md text-sm text-muted-foreground">O resultado aparece aqui na hora, sem botão de calcular. Tente 70 kg e 5 mg/kg.</p>
+            <div className="mt-4 flex flex-col gap-5 lg:min-h-[240px]">
+              <div>
+                <p className="font-display text-3xl font-bold text-foreground/70 md:text-4xl">Preencha os campos ao lado</p>
+                <p className="mt-2 max-w-md text-sm text-muted-foreground">O resultado aparece aqui na hora, sem botão de calcular.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button onClick={fillExample} className="inline-flex items-center gap-2 rounded-xl border border-[hsl(var(--dom-clinica)/0.5)] bg-[hsl(var(--dom-clinica)/0.1)] px-3.5 py-2 text-sm font-medium text-foreground transition hover:bg-[hsl(var(--dom-clinica)/0.18)]">
+                  <Sparkles className="h-4 w-4 text-[hsl(var(--dom-clinica))]" /> Preencher com um exemplo
+                </button>
+                <span className="font-mono text-[11px] text-muted-foreground">{EXAMPLE_HINT[mode]}</span>
+              </div>
+              <PkCurve className="pointer-events-none mt-auto w-full opacity-30" height={80} />
             </div>
           )}
         </div>
