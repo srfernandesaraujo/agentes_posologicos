@@ -387,3 +387,13 @@
 [data-ui="v2"][data-theme="light"] .pos-elev { box-shadow: 0 1px 0 hsl(0 0% 100% / .6) inset, 0 14px 30px -22px hsl(208 40% 20% / .35); }
 [data-ui="v2"][data-theme="light"] ::selection { background: hsl(var(--dom-clinica) / .25); }
 
+
+/* texto branco em opacidades que faltavam no atalho do claro */
+[data-ui="v2"][data-theme="light"] .text-white\/85 { color: hsl(var(--foreground) / 0.88); }
+[data-ui="v2"][data-theme="light"] .text-white\/75 { color: hsl(var(--foreground) / 0.79); }
+[data-ui="v2"][data-theme="light"] .text-white\/65 { color: hsl(var(--foreground) / 0.7); }
+[data-ui="v2"][data-theme="light"] .text-white\/55 { color: hsl(var(--foreground) / 0.62); }
+[data-ui="v2"][data-theme="light"] .text-white\/45 { color: hsl(var(--foreground) / 0.54); }
+[data-ui="v2"][data-theme="light"] .text-white\/35 { color: hsl(var(--foreground) / 0.46); }
+[data-ui="v2"][data-theme="light"] .text-white\/25 { color: hsl(var(--foreground) / 0.38); }
+[data-ui="v2"][data-theme="light"] .text-white\/15 { color: hsl(var(--foreground) / 0.3); }
