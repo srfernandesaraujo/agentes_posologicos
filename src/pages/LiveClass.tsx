@@ -43,6 +43,7 @@ export default function LiveClass() {
   const [summarizing, setSummarizing] = useState(false);
   const [broadcasts, setBroadcasts] = useState<RoomMessage[]>([]);
   const [questions, setQuestions] = useState<RoomMessage[]>([]);
+  const [present, setPresent] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: room, isLoading } = useQuery({
@@ -90,6 +91,17 @@ export default function LiveClass() {
         }
       )
       .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [room?.id]);
+
+  // Presença: os alunos se anunciam no mesmo canal ao entrar na sala; aqui só lemos (o professor não se anuncia).
+  useEffect(() => {
+    if (!room?.id) return;
+    const ch = supabase.channel(`room-presence-${room.id}`);
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState() as Record<string, { name?: string }[]>;
+      setPresent(Object.values(state).map((arr) => arr[0]?.name || "Aluno"));
+    }).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [room?.id]);
 
@@ -214,7 +226,7 @@ export default function LiveClass() {
         </div>
       </header>
 
-      {v2 && <LiveClassPulse pin={room.pin} shareUrl={shareUrl} live={!!room.live_mode} questions={questions} broadcasts={broadcasts} />}
+      {v2 && <LiveClassPulse pin={room.pin} shareUrl={shareUrl} live={!!room.live_mode} questions={questions} broadcasts={broadcasts} present={present} />}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Broadcasts */}

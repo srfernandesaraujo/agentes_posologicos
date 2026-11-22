@@ -13,6 +13,8 @@ interface Props {
   live: boolean;
   questions: Msg[];
   broadcasts: Msg[];
+  /** nomes de quem está na sala agora (presença em tempo real) */
+  present: string[];
 }
 
 const BUCKET_MS = 5 * 60_000;
@@ -21,7 +23,7 @@ const BUCKETS = 12; // última hora
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Faixa de pulso da aula: dúvidas chegando, ritmo da última hora, tempo de aula e o código para projetar. */
-export function LiveClassPulse({ pin, shareUrl, live, questions, broadcasts }: Props) {
+export function LiveClassPulse({ pin, shareUrl, live, questions, broadcasts, present }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [project, setProject] = useState(false);
   useEffect(() => {
@@ -46,7 +48,6 @@ export function LiveClassPulse({ pin, shareUrl, live, questions, broadcasts }: P
   }, [questions, now]);
 
   const last10 = questions.filter((q) => now - new Date(q.created_at).getTime() < 10 * 60_000).length;
-  const askers = new Set(questions.filter((q) => !q.is_anonymous && q.sender_name).map((q) => q.sender_name)).size;
   const start = broadcasts.length ? new Date(broadcasts[0].created_at).getTime() : null;
   const elapsed = start ? Math.max(0, Math.floor((now - start) / 1000)) : 0;
   const clock = `${pad(Math.floor(elapsed / 3600))}:${pad(Math.floor((elapsed % 3600) / 60))}:${pad(elapsed % 60)}`;
@@ -70,8 +71,8 @@ export function LiveClassPulse({ pin, shareUrl, live, questions, broadcasts }: P
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{last10} nos últimos 10 min</div>
           </div>
           <div>
-            <div className="flex items-center gap-1.5 font-display text-2xl font-extrabold text-foreground"><Users className="h-4 w-4 text-[hsl(var(--dom-ensino))]" /><CountUp value={askers} duration={0.6} /></div>
-            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">perguntaram com nome</div>
+            <div className="flex items-center gap-1.5 font-display text-2xl font-extrabold text-foreground"><Users className="h-4 w-4 text-[hsl(var(--dom-ensino))]" /><CountUp value={present.length} duration={0.6} /></div>
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground" title={present.join(", ")}>alunos na sala agora</div>
           </div>
           <div className="min-w-0 flex-1">
             <AreaTrend values={series} color="hsl(var(--dom-ensino))" height={44} className="w-full" label="Dúvidas por 5 minutos, última hora" />

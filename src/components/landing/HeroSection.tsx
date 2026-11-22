@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Stethoscope,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import type { LandingCopy } from "./landingCopy";
 import { LANDING_MEDIA } from "./mediaConfig";
 
@@ -40,11 +41,22 @@ export function HeroSection({ c, onOpenShowreel }: HeroSectionProps) {
     return () => window.clearInterval(id);
   }, [c.pulseItems.length]);
 
-  const handlePinSubmit = (e: FormEvent) => {
+  const handlePinSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (pin.trim()) {
-      navigate("/sala/" + encodeURIComponent(pin.trim()));
+    const code = pin.trim();
+    if (!code) return;
+    // PIN de sala virtual vai para a sala; se não houver sala com esse PIN, pode ser uma prova OSCE.
+    try {
+      const { data } = await supabase.rpc("get_room_by_pin", { p_pin: code });
+      const found = Array.isArray(data) ? data.length > 0 : !!data;
+      if (!found) {
+        navigate("/osce/entrar?pin=" + encodeURIComponent(code));
+        return;
+      }
+    } catch {
+      /* sem resposta: segue o caminho de sempre */
     }
+    navigate("/sala/" + encodeURIComponent(code));
   };
 
   const handleSpotlight = (e: MouseEvent<HTMLElement>) => {

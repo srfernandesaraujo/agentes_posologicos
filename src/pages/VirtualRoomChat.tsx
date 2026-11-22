@@ -334,6 +334,11 @@ export default function VirtualRoomChat() {
     return (
       <div className={`flex min-h-screen flex-col items-center justify-center ${bgPage} text-white gap-4`}>
         <p className="text-white/50">{roomExpired ? "Esta sala virtual foi encerrada." : "Sala não encontrada ou inativa."}</p>
+        {!roomExpired && pin && /^\d{4,}$/.test(pin) && (
+          <Button onClick={() => navigate(`/osce/entrar?pin=${encodeURIComponent(pin)}`)} className="bg-[hsl(var(--dom-ensino))] text-[hsl(208_46%_6%)] hover:opacity-90">
+            É um PIN de prova OSCE? Entre aqui
+          </Button>
+        )}
         <Button onClick={() => navigate("/")} variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
           Voltar ao início
         </Button>

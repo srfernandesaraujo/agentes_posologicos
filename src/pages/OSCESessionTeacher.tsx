@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { OsceCircuit } from "@/components/osce/OsceCircuit";
+import { OsceWaitingRoom } from "@/components/osce/OsceWaitingRoom";
 import { useNewUI } from "@/contexts/NewUIContext";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { Link, useParams } from "react-router-dom";
@@ -122,7 +123,7 @@ export default function OSCESessionTeacher() {
           <h1 className="text-2xl font-bold">{exam?.title}</h1>
           <p className="text-sm text-muted-foreground">Sessão ao vivo · {stations.length} estações</p>
         </div>
-        <Card className="border-primary">
+        <Card className={`border-primary ${v2 && session.status === "waiting" ? "hidden" : ""}`}>
           <CardContent className="p-4 text-center">
             <div className="text-xs text-muted-foreground uppercase">PIN da sala</div>
             <div className="text-5xl font-bold font-mono tracking-[0.3em] text-primary">{session.pin}</div>
@@ -130,6 +131,16 @@ export default function OSCESessionTeacher() {
           </CardContent>
         </Card>
       </div>
+
+      {v2 && session.status === "waiting" && (
+        <OsceWaitingRoom
+          pin={session.pin}
+          joinUrl={`${window.location.origin}/osce/entrar?pin=${session.pin}`}
+          people={participants.map((p) => ({ key: participantKey(p), name: participantName(p), guest: !p.user_id }))}
+          busy={busy}
+          onStart={() => act("start", `Iniciar a prova para ${participants.length} aluno(s)?`)}
+        />
+      )}
 
       {v2 && stations.length > 0 && (
         <OsceCircuit stations={stations} currentIdx={currentIdx} elapsed={elapsed} totalSec={totalSec} status={session.status} attempts={attempts} participantsCount={participants.length} />

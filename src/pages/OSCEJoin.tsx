@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import { LogIn, Stethoscope } from "lucide-react";
 
 export default function OSCEJoin() {
-  const [pin, setPin] = useState("");
+  const [searchParams] = useSearchParams();
+  const [pin, setPin] = useState(() => (searchParams.get("pin") || "").replace(/\D/g, "").slice(0, 8));
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
