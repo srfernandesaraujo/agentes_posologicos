@@ -7,11 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Trophy, CheckCircle2, AlertTriangle } from "lucide-react";
 import { RaterReview } from "@/components/osce/RaterReview";
+import { OsceResultHero } from "@/components/osce/OsceResultHero";
+import { useNewUI } from "@/contexts/NewUIContext";
 
 const sb: any = supabase;
 
 export default function OSCEResult() {
   const { attemptId } = useParams();
+  const { enabled: v2 } = useNewUI();
   const [attempt, setAttempt] = useState<any>(null);
   const [station, setStation] = useState<any>(null);
 
@@ -32,8 +35,20 @@ export default function OSCEResult() {
   const pct = attempt.max_score ? (Number(attempt.score) / Number(attempt.max_score)) * 100 : 0;
 
   return (
-    <div className="container max-w-3xl py-8 space-y-4">
+    <div className={`container py-8 space-y-4 ${v2 ? "max-w-4xl" : "max-w-3xl"}`}>
       <Link to="/osce"><Button variant="ghost" size="sm" className="gap-1"><ArrowLeft className="h-4 w-4" /> OSCE</Button></Link>
+      {v2 && (
+        <OsceResultHero
+          title={station?.title || "Resultado"}
+          score={Number(attempt.score || 0)}
+          max={Number(attempt.max_score || 10)}
+          durationMin={Math.round((attempt.duration_seconds || 0) / 60)}
+          credits={Number(attempt.credits_charged || 0)}
+          items={Array.isArray(r.items) ? r.items : []}
+          feedback={attempt.feedback}
+        />
+      )}
+      {!v2 && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-[hsl(174,62%,47%)]" /> {station?.title || "Resultado"}</CardTitle>
@@ -50,6 +65,7 @@ export default function OSCEResult() {
           {attempt.feedback && <p className="text-sm bg-muted p-3 rounded">{attempt.feedback}</p>}
         </CardContent>
       </Card>
+      )}
 
       {Array.isArray(r.items) && r.items.length > 0 && (
         <Card>

@@ -1,5 +1,6 @@
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useNewUI } from "@/contexts/NewUIContext";
+import { LiveClassPulse } from "@/components/liveclass/LiveClassPulse";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -32,7 +33,8 @@ interface RoomMessage {
 export default function LiveClass() {
   const { pin } = useParams<{ pin: string }>();
   const navigate = useNavigate();
-  const bgPage = useNewUI().enabled ? "bg-pos-vacuo" : "bg-[hsl(220,25%,5%)]";
+  const v2 = useNewUI().enabled;
+  const bgPage = v2 ? "bg-pos-vacuo" : "bg-[hsl(220,25%,5%)]";
   const { user } = useAuth();
   const qc = useQueryClient();
   const [prompt, setPrompt] = useState("");
@@ -212,6 +214,8 @@ export default function LiveClass() {
         </div>
       </header>
 
+      {v2 && <LiveClassPulse pin={room.pin} shareUrl={shareUrl} live={!!room.live_mode} questions={questions} broadcasts={broadcasts} />}
+
       <div className="flex flex-1 overflow-hidden">
         {/* Broadcasts */}
         <div className="flex flex-1 flex-col">
@@ -288,7 +292,7 @@ export default function LiveClass() {
               )}
               {questions.length === 0 && <p className="px-2 py-8 text-center text-xs text-white/30">Nenhuma dúvida ainda.</p>}
               {questions.map((q) => (
-                <div key={q.id} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/80">
+                <div key={q.id} className={`rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/80 ${v2 ? "animate-slide-up" : ""}`}>
                   {q.content}
                   <p className="mt-1 text-[10px] text-white/30">{new Date(q.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>
                 </div>

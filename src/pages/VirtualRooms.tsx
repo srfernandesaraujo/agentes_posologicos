@@ -1,5 +1,9 @@
 import { useState, useMemo } from "react";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { Spotlight } from "@/components/ds/Spotlight";
+import { Reveal, RevealItem } from "@/components/ds/Reveal";
+import { RoomActivityStrip, useRoomActivity } from "@/components/rooms/RoomActivityStrip";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -207,6 +211,8 @@ export default function VirtualRooms() {
 
   const personalRooms = rooms.filter((r) => r.room_type === "personal");
   const pinRooms = rooms.filter((r) => r.room_type !== "personal");
+  const { enabled: v2 } = useNewUI();
+  const { data: activity } = useRoomActivity(v2 ? pinRooms.map((r) => r.id) : []);
 
   // Salas pessoais navegam para a experiência rica do Chat (anexos, markdown,
   // certificação, etc.) em vez do fluxo público/anônimo de sala por PIN.
@@ -441,12 +447,15 @@ export default function VirtualRooms() {
           <p>Nenhuma sala virtual criada</p>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <Reveal className="grid gap-4" stagger={0.06}>
           {pinRooms.map((room) => {
             const agentName = findAgentName(room.agent_id);
             const expired = isAgentExpired(room);
             return (
-              <div key={room.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 flex items-start justify-between gap-4 cursor-pointer hover:bg-white/[0.05] transition-colors" onClick={() => setViewingRoom(room)}>
+              <RevealItem key={room.id}>
+              <Spotlight tone="var(--dom-ensino)" className={v2 ? "rounded-2xl border border-border bg-card transition duration-300 hover:-translate-y-0.5 hover:shadow-xl" : "contents"}>
+              {v2 && <RoomActivityStrip pin={room.pin} live={!!(room as any).live_mode} active={!!room.is_active && !isRoomExpired(room)} rows={activity?.get(room.id)} />}
+              <div className={v2 ? "p-5 flex items-start justify-between gap-4 cursor-pointer" : "rounded-xl border border-white/10 bg-white/[0.03] p-5 flex items-start justify-between gap-4 cursor-pointer hover:bg-white/[0.05] transition-colors"} onClick={() => setViewingRoom(room)}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-white truncate">{room.name}</h3>
@@ -508,9 +517,11 @@ export default function VirtualRooms() {
                   </Button>
                 </div>
               </div>
+              </Spotlight>
+              </RevealItem>
             );
           })}
-        </div>
+        </Reveal>
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

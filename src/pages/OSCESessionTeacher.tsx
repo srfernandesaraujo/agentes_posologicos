@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { OsceCircuit } from "@/components/osce/OsceCircuit";
+import { useNewUI } from "@/contexts/NewUIContext";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +19,7 @@ export default function OSCESessionTeacher() {
   const [exam, setExam] = useState<any>(null);
   const [stations, setStations] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
+  const { enabled: v2 } = useNewUI();
   const [attempts, setAttempts] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [elapsed, setElapsed] = useState(0);
@@ -127,6 +130,10 @@ export default function OSCESessionTeacher() {
           </CardContent>
         </Card>
       </div>
+
+      {v2 && stations.length > 0 && (
+        <OsceCircuit stations={stations} currentIdx={currentIdx} elapsed={elapsed} totalSec={totalSec} status={session.status} attempts={attempts} participantsCount={participants.length} />
+      )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
