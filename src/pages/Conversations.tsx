@@ -1,5 +1,9 @@
 import { useState, useMemo } from "react";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { CountUp } from "@/components/ds/CountUp";
+import { Reveal, RevealItem } from "@/components/ds/Reveal";
+import { ActivityHeatmap } from "@/components/ds/ActivityHeatmap";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +24,7 @@ export default function Conversations() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { enabled: v2 } = useNewUI();
   const [search, setSearch] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
@@ -186,57 +191,25 @@ export default function Conversations() {
     setEditingId(null);
   };
 
-  if (isLoading || loadingRooms) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
+  // agrupa por quando a conversa aconteceu (usado no novo visual)
+  const grouped = (() => {
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    const day = 86_400_000;
+    const buckets: { label: string; items: any[] }[] = [
+      { label: "Hoje", items: [] }, { label: "Ontem", items: [] }, { label: "Últimos 7 dias", items: [] }, { label: "Mais antigas", items: [] },
+    ];
+    filtered.forEach((sess: any) => {
+      const age = startOfToday.getTime() - new Date(sess.created_at).setHours(0, 0, 0, 0);
+      buckets[age <= 0 ? 0 : age <= day ? 1 : age <= 7 * day ? 2 : 3].items.push(sess);
+    });
+    return buckets.filter((b) => b.items.length > 0);
+  })();
+  const totalMessages = sessionsWithMessages.reduce((n: number, sess: any) => n + (sess.count || 0), 0);
 
-  return (
-    <div className="container max-w-4xl py-8">
-      <div className="mb-8 animate-slide-up">
-<DomainEyebrow domain="clinica" section="Conversas" />
-        <h1 className="mb-2 font-display text-3xl font-bold text-white">Conversas</h1>
-        <p className="text-white/50">Acompanhe todas as interações</p>
-      </div>
-
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar conversas..."
-            className="pl-10 border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
-          />
-        </div>
-        <Select value={agentFilter} onValueChange={setAgentFilter}>
-          <SelectTrigger className="w-48 border-white/10 bg-white/[0.05] text-white">
-            <Filter className="mr-2 h-4 w-4 text-white/40" />
-            <SelectValue placeholder="Agente" />
-          </SelectTrigger>
-          <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
-            <SelectItem value="all">Todos os agentes</SelectItem>
-            {agents.map(([id, name]) => (
-              <SelectItem key={id} value={id}>{name as string}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-white/40">
-          <MessageSquare className="mb-4 h-12 w-12" />
-          <p>Nenhuma conversa encontrada</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((session: any) => (
+  const renderRow = (session: any) => (
             <div
               key={session.id}
-              className="group flex items-center rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] transition-colors"
+              className={v2 ? "group relative flex items-center overflow-hidden rounded-2xl border border-border bg-card transition duration-300 hover:-translate-y-0.5 hover:border-[hsl(var(--dom-clinica)/0.5)] hover:shadow-lg" : "group flex items-center rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] transition-colors"}
             >
               {editingId === session.id ? (
                 <div className="flex-1 flex items-center gap-2 p-3" onClick={(e) => e.stopPropagation()}>
@@ -313,8 +286,93 @@ export default function Conversations() {
                 </>
               )}
             </div>
-          ))}
+  );
+
+  if (isLoading || loadingRooms) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="container max-w-4xl py-8">
+      {v2 ? (
+        <div className="mb-6">
+          <DomainEyebrow domain="clinica" section="Conversas" />
+          <h1 className="font-display text-4xl font-extrabold tracking-tight text-foreground md:text-5xl">Sua linha do tempo</h1>
+          <dl className="mt-4 grid grid-cols-3 gap-3">
+            {[
+              { n: sessionsWithMessages.length, l: "conversas" },
+              { n: agents.length, l: "agentes consultados" },
+              { n: totalMessages, l: "mensagens" },
+            ].map((x) => (
+              <div key={x.l} className="rounded-2xl border border-border bg-card p-4">
+                <dd className="font-display text-3xl font-extrabold text-foreground"><CountUp value={x.n} /></dd>
+                <dt className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">{x.l}</dt>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-3 rounded-2xl border border-border bg-card p-4">
+            <p className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">Atividade, 18 semanas</p>
+            <ActivityHeatmap dates={sessionsWithMessages.map((sess: any) => sess.created_at)} weeks={18} tone="var(--dom-clinica)" />
+          </div>
         </div>
+      ) : (
+      <div className="mb-8 animate-slide-up">
+<DomainEyebrow domain="clinica" section="Conversas" />
+        <h1 className="mb-2 font-display text-3xl font-bold text-white">Conversas</h1>
+        <p className="text-white/50">Acompanhe todas as interações</p>
+      </div>
+      )}
+
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar conversas..."
+            className="pl-10 border-white/10 bg-white/[0.05] text-white placeholder:text-white/30"
+          />
+        </div>
+        <Select value={agentFilter} onValueChange={setAgentFilter}>
+          <SelectTrigger className="w-48 border-white/10 bg-white/[0.05] text-white">
+            <Filter className="mr-2 h-4 w-4 text-white/40" />
+            <SelectValue placeholder="Agente" />
+          </SelectTrigger>
+          <SelectContent className="border-white/10 bg-[hsl(220,25%,10%)] text-white">
+            <SelectItem value="all">Todos os agentes</SelectItem>
+            {agents.map(([id, name]) => (
+              <SelectItem key={id} value={id}>{name as string}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-white/40">
+          <MessageSquare className="mb-4 h-12 w-12" />
+          <p>Nenhuma conversa encontrada</p>
+        </div>
+      ) : (
+        v2 ? (
+          <Reveal key={`${agentFilter}-${search}`} stagger={0.04} className="space-y-6">
+            {grouped.map((g) => (
+              <RevealItem key={g.label}>
+                <h2 className="mb-2 flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  {g.label}<span className="h-px flex-1 bg-border" /><span>{g.items.length}</span>
+                </h2>
+                <div className="space-y-2">{g.items.map(renderRow)}</div>
+              </RevealItem>
+            ))}
+          </Reveal>
+        ) : (
+        <div className="space-y-2">
+          {filtered.map(renderRow)}
+        </div>
+        )
       )}
 
       <AlertDialog open={!!deleteSessionId} onOpenChange={() => setDeleteSessionId(null)}>

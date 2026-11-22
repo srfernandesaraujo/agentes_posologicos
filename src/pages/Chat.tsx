@@ -35,6 +35,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { useNewUI } from "@/contexts/NewUIContext";
 import { PkCurve } from "@/components/ds/PkCurve";
+import { ChatContextPanel } from "@/components/chat/ChatContextPanel";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
@@ -893,6 +894,7 @@ export default function Chat() {
               return (
                 <div
                   key={msg.id}
+                  id={`msg-${msg.id}`}
                   className={`flex gap-3 animate-fade-in ${msg.role === "user" ? "justify-end" : ""}`}
                 >
                   {msg.role === "assistant" && (
@@ -1053,6 +1055,16 @@ export default function Chat() {
           </div>
         </div>
       </div>
+
+      {v2 && (
+        <ChatContextPanel
+          messages={displayMessages}
+          costPerUse={isCustom ? CUSTOM_AGENT_INTERACTION_COST : agent.credit_cost}
+          balance={balance}
+          unlimited={!!hasFreeAccess}
+          onJump={(id) => document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
+        />
+      )}
     </div>
 
     {/* Conversation Picker */}

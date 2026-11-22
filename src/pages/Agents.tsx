@@ -10,6 +10,8 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Settings2 } from "lucide-react";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { AgentsGalleryV2 } from "@/components/agents/AgentsGalleryV2";
 
 const CATEGORY_ICONS: Record<string, string> = {
   "Prática Clínica e Farmácia": "🏥",
@@ -37,6 +39,7 @@ export default function Agents() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { isAdmin } = useIsAdmin();
+  const { enabled: v2 } = useNewUI();
   const contentRef = useRef<HTMLDivElement>(null);
 
   const lowerSearch = search.toLowerCase();
@@ -99,6 +102,23 @@ export default function Agents() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
+    );
+  }
+
+  if (v2) {
+    return (
+      <AgentsGalleryV2
+        agentsByCategory={agentsByCategory}
+        newestAgents={newestAgents}
+        publishedCustom={publishedCustom}
+        purchasedAgents={purchasedAgents}
+        search={search}
+        setSearch={setSearch}
+        activeCategory={activeCategory}
+        setActiveCategory={setActiveCategory}
+        totalAll={totalAll}
+        isAdmin={isAdmin}
+      />
     );
   }
 

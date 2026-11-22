@@ -19,12 +19,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { invokeFunction } from "@/lib/invokeFunction";
 import { AgentBackupPanel } from "@/components/agents/AgentBackupPanel";
+import { MyAgentsStudioV2 } from "@/components/agents/MyAgentsStudioV2";
+import { useNewUI } from "@/contexts/NewUIContext";
 
 const AGENT_CREATION_COST = 5;
 
 export default function MyAgents() {
   const navigate = useNavigate();
   const { data: agents = [] } = useCustomAgents();
+  const { enabled: v2 } = useNewUI();
   const [creating, setCreating] = useState(false);
   const { balance, refetch: refetchCredits } = useCredits();
   const { isAdmin } = useIsAdmin();
@@ -100,7 +103,13 @@ export default function MyAgents() {
   };
 
   return (
-    <div className="container max-w-4xl py-8">
+    <>
+    {v2 ? (
+      <MyAgentsStudioV2 agents={agents} creationCost={AGENT_CREATION_COST} onCreate={() => setShowCreate(true)} onBackup={() => setShowBackup(true)} onOpen={(id) => navigate(`/meus-agentes/${id}`)} />
+    ) : null}
+    <div className={v2 ? "container max-w-4xl" : "container max-w-4xl py-8"}>
+{!v2 && (
+<>
       <div className="mb-8 flex items-start justify-between gap-4 animate-slide-up">
         <div>
           <h1 className="mb-2 font-display text-3xl font-bold text-white">Meus Agentes</h1>
@@ -167,6 +176,9 @@ export default function MyAgents() {
           ))}
         </div>
       )}
+
+</>
+)}
 
       <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) { setCreateMode("manual"); setAiPrompt(""); } }}>
         <DialogContent className="border-white/10 bg-[hsl(220,25%,8%)] text-white">
@@ -277,5 +289,6 @@ export default function MyAgents() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }
