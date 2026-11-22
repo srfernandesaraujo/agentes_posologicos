@@ -19,11 +19,13 @@ export function CountUp({ value, decimals = 0, prefix = "", suffix = "", duratio
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, margin: "0px 0px -10% 0px" });
   const [shown, setShown] = useState(on ? 0 : value);
+  const from = useRef(on ? 0 : value);
 
   useEffect(() => {
-    if (!on) { setShown(value); return; }
+    if (!on) { setShown(value); from.current = value; return; }
     if (!inView) return;
-    const c = animate(0, value, { duration, ease: [0.2, 0.8, 0.2, 1], onUpdate: setShown });
+    // anima a partir do valor anterior: mudanças seguintes não recomeçam do zero
+    const c = animate(from.current, value, { duration: from.current === 0 ? duration : Math.min(duration, 0.6), ease: [0.2, 0.8, 0.2, 1], onUpdate: (v) => { from.current = v; setShown(v); } });
     return () => c.stop();
   }, [on, inView, value, duration]);
 

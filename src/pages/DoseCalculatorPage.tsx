@@ -3,13 +3,14 @@ import { Badge } from "@/components/ui/badge";
 import { DoseCalculatorPanel } from "@/components/chat/DoseCalculator";
 import { useNewUI } from "@/contexts/NewUIContext";
 import { PkCurve } from "@/components/ds/PkCurve";
+import { DoseBench } from "@/components/calculator/DoseBench";
 
 export default function DoseCalculatorPage() {
   const { enabled: newUI } = useNewUI();
 
   if (newUI) {
     return (
-      <div className="container max-w-3xl py-8 space-y-5">
+      <div className="container max-w-6xl py-8 space-y-5">
         <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[hsl(var(--dom-clinica)/0.12)] via-pos-base to-pos-base p-6 md:p-8">
           <PkCurve draw height={110} className="pointer-events-none absolute inset-x-0 bottom-0 w-full opacity-30" />
           <div className="relative">
@@ -29,9 +30,7 @@ export default function DoseCalculatorPage() {
             </p>
           </div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-pos-base p-5 [&_input]:font-mono">
-          <DoseCalculatorPanel />
-        </div>
+        <DoseBench />
       </div>
     );
   }

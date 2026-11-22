@@ -306,3 +306,8 @@
 [data-ui="v2"][data-theme="light"] .bg-white\/5, [data-ui="v2"][data-theme="light"] .bg-white\/\[0\.03\], [data-ui="v2"][data-theme="light"] .bg-white\/\[0\.02\], [data-ui="v2"][data-theme="light"] .bg-white\/\[0\.04\], [data-ui="v2"][data-theme="light"] .bg-white\/\[0\.05\] { background-color: hsl(var(--foreground) / .045); }
 [data-ui="v2"][data-theme="light"] .bg-white\/10, [data-ui="v2"][data-theme="light"] .hover\:bg-white\/10:hover { background-color: hsl(var(--foreground) / .08); }
 [data-ui="v2"][data-theme="light"] .hover\:text-white:hover { color: hsl(var(--foreground)); }
+
+/* Célula do mapa de atividade surge em onda */
+@keyframes pos-pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
+.pos-pop { animation: pos-pop .45s cubic-bezier(.2,.8,.2,1) both; }
+@media (prefers-reduced-motion: reduce) { .pos-pop { animation: none; } }
