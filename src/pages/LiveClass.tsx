@@ -1,4 +1,5 @@
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { useNewUI } from "@/contexts/NewUIContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,6 +32,7 @@ interface RoomMessage {
 export default function LiveClass() {
   const { pin } = useParams<{ pin: string }>();
   const navigate = useNavigate();
+  const bgPage = useNewUI().enabled ? "bg-pos-vacuo" : "bg-[hsl(220,25%,5%)]";
   const { user } = useAuth();
   const qc = useQueryClient();
   const [prompt, setPrompt] = useState("");
@@ -182,16 +184,16 @@ export default function LiveClass() {
 
   const shareUrl = useMemo(() => `${window.location.origin}/sala/${pin}`, [pin]);
 
-  if (isLoading) return <div className="flex h-screen items-center justify-center bg-[hsl(220,25%,5%)]"><Loader2 className="h-8 w-8 animate-spin text-white/60" /></div>;
+  if (isLoading) return <div className={`flex h-screen items-center justify-center ${bgPage}`}><Loader2 className="h-8 w-8 animate-spin text-white/60" /></div>;
   if (!room) return (
-    <div className="flex h-screen flex-col items-center justify-center gap-3 bg-[hsl(220,25%,5%)] text-white">
+    <div className={`flex h-screen flex-col items-center justify-center gap-3 ${bgPage} text-white`}>
       <p className="text-white/60">Sala não encontrada ou você não é o dono.</p>
       <Button variant="outline" onClick={() => navigate("/salas-virtuais")}>Voltar</Button>
     </div>
   );
 
   return (
-    <div className="flex h-screen flex-col bg-[hsl(220,25%,5%)] text-white">
+    <div className={`flex h-screen flex-col ${bgPage} text-white`}>
       <header className="border-b border-white/10 px-4 py-3 flex items-center gap-3">
         <button onClick={() => navigate("/salas-virtuais")} className="text-white/50 hover:text-white"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/20"><Megaphone className="h-5 w-5 text-red-400" /></div>

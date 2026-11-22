@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -106,6 +107,7 @@ export default function OSCEStationEditor() {
   return (
     <div className="container max-w-3xl py-8 space-y-4">
       <Button variant="ghost" size="sm" onClick={() => navigate("/osce")} className="gap-1"><ArrowLeft className="h-4 w-4" /> Voltar</Button>
+      <DomainEyebrow domain="ensino" section="Estação" />
       <h1 className="text-2xl font-bold">{isNew ? "Nova estação" : "Editar estação"}</h1>
 
       <Card>

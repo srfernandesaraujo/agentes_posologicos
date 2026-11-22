@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,7 @@ export default function OSCESessionTeacher() {
 
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
+          <DomainEyebrow domain="ensino" section="Sessão" />
           <h1 className="text-2xl font-bold">{exam?.title}</h1>
           <p className="text-sm text-muted-foreground">Sessão ao vivo · {stations.length} estações</p>
         </div>

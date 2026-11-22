@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -163,6 +164,7 @@ export default function OSCEAttendance() {
       <div className="mb-3">
         <div className="flex items-center justify-between mb-2">
           <div>
+            <DomainEyebrow domain="ensino" section="Atendimento" />
             <h1 className="text-xl font-bold">{station.title}</h1>
             <p className="text-xs text-muted-foreground whitespace-pre-wrap">{station.scenario_brief}</p>
           </div>

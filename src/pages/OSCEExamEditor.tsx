@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -74,6 +75,7 @@ export default function OSCEExamEditor() {
   return (
     <div className="container max-w-4xl py-8 space-y-4">
       <Link to="/osce"><Button variant="ghost" size="sm" className="gap-1"><ArrowLeft className="h-4 w-4" /> OSCE</Button></Link>
+      <DomainEyebrow domain="ensino" section="Prova" />
       <h1 className="text-2xl font-bold">{isNew ? "Nova prova" : exam.title}</h1>
 
       <Card>

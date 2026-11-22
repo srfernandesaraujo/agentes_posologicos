@@ -1,4 +1,5 @@
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
+import { useNewUI } from "@/contexts/NewUIContext";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -55,6 +56,10 @@ interface RoomMessage {
 export default function VirtualRoomChat() {
   const { pin } = useParams<{ pin: string }>();
   const navigate = useNavigate();
+  const v2 = useNewUI().enabled;
+  const bgPage = v2 ? "bg-pos-vacuo" : "bg-[hsl(220,25%,5%)]";
+  const avatarCls = v2 ? "bg-[hsl(var(--dom-ensino))]/15" : "gradient-primary";
+  const avatarIcon = v2 ? "text-[hsl(var(--dom-ensino))]" : "text-white";
   const [messages, setMessages] = useState<RoomMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -318,7 +323,7 @@ export default function VirtualRoomChat() {
   // Loading state
   if (roomLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[hsl(220,25%,5%)]">
+      <div className={`flex min-h-screen items-center justify-center ${bgPage}`}>
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-[hsl(174,62%,47%)] border-t-transparent" />
       </div>
     );
@@ -327,7 +332,7 @@ export default function VirtualRoomChat() {
   // Room not found or expired
   if (roomError || !room || roomExpired) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[hsl(220,25%,5%)] text-white gap-4">
+      <div className={`flex min-h-screen flex-col items-center justify-center ${bgPage} text-white gap-4`}>
         <p className="text-white/50">{roomExpired ? "Esta sala virtual foi encerrada." : "Sala não encontrada ou inativa."}</p>
         <Button onClick={() => navigate("/")} variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
           Voltar ao início
@@ -339,7 +344,7 @@ export default function VirtualRoomChat() {
   // Name entry screen
   if (!nameConfirmed) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[hsl(220,25%,5%)] text-white gap-6 px-4">
+      <div className={`flex min-h-screen flex-col items-center justify-center ${bgPage} text-white gap-6 px-4`}>
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl gradient-primary">
@@ -399,15 +404,15 @@ export default function VirtualRoomChat() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[hsl(220,25%,5%)]">
+    <div className={`flex flex-col h-screen ${bgPage}`}>
       {/* Header */}
-      <header className="border-b border-white/10 bg-[hsl(220,25%,5%)]/80 backdrop-blur-xl px-4 py-3">
+      <header className={`border-b border-white/10 ${v2 ? "bg-[hsl(var(--pos-vacuo))]/80" : "bg-[hsl(220,25%,5%)]/80"} backdrop-blur-xl px-4 py-3`}>
         <div className="flex items-center gap-3">
           <button onClick={() => navigate("/")} className="text-white/50 hover:text-white transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
-            <Pill className="h-4 w-4 text-white" />
+          <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${avatarCls}`}>
+            <Pill className={`h-4 w-4 ${avatarIcon}`} />
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="font-display text-sm font-bold text-white truncate">{room.name}</h1>
@@ -444,8 +449,8 @@ export default function VirtualRoomChat() {
         {messages.map((msg) => (
           <div key={msg.id} className={`flex gap-3 animate-fade-in ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             {msg.role === "assistant" && (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full gradient-primary">
-                <Bot className="h-4 w-4 text-white" />
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${avatarCls}`}>
+                <Bot className={`h-4 w-4 ${avatarIcon}`} />
               </div>
             )}
             <div className="max-w-[80%]">
@@ -457,7 +462,7 @@ export default function VirtualRoomChat() {
               <div className={`rounded-2xl px-4 py-3 text-sm ${
                 msg.role === "user"
                   ? msg.sender_name === participantName
-                    ? "bg-[hsl(14,90%,58%)] text-white"
+                    ? (v2 ? "bg-[hsl(var(--dom-ensino))] font-medium text-[#1a1203]" : "bg-[hsl(14,90%,58%)] text-white")
                     : "bg-[hsl(199,89%,48%)]/20 border border-[hsl(199,89%,48%)]/30 text-white/90"
                   : "bg-white/[0.05] border border-white/10 text-white/90"
               }`}>
@@ -481,8 +486,8 @@ export default function VirtualRoomChat() {
         ))}
         {loading && (
           <div className="flex gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full gradient-primary">
-              <Bot className="h-4 w-4 text-white" />
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${avatarCls}`}>
+              <Bot className={`h-4 w-4 ${avatarIcon}`} />
             </div>
             <div className="rounded-2xl bg-white/[0.05] border border-white/10 px-4 py-3">
               <Loader2 className="h-4 w-4 animate-spin text-white/50" />
