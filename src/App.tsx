@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { lazyPage } from "@/lib/lazyPage";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,62 +11,62 @@ import { NewUIProvider } from "@/contexts/NewUIContext";
 import { useForceDark } from "@/contexts/NewUIContext";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
+const Login = lazyPage(() => import("./pages/Login"));
+const Signup = lazyPage(() => import("./pages/Signup"));
 import Landing from "./pages/Landing";
-import Agents from "./pages/Agents";
-import Chat from "./pages/Chat";
-import Credits from "./pages/Credits";
-import Account from "./pages/Account";
-import Institution from "./pages/Institution";
-import Admin from "./pages/Admin";
-import Settings from "./pages/Settings";
-import MyAgents from "./pages/MyAgents";
-import AgentEditor from "./pages/AgentEditor";
-import NativeAgentEditor from "./pages/NativeAgentEditor";
-import Conversations from "./pages/Conversations";
-import Knowledge from "./pages/Knowledge";
-import KnowledgeDetail from "./pages/KnowledgeDetail";
-import VirtualRooms from "./pages/VirtualRooms";
-import VirtualRoomChat from "./pages/VirtualRoomChat";
-import LiveClass from "./pages/LiveClass";
-import Marketplace from "./pages/Marketplace";
-import MarketplaceFlows from "./pages/MarketplaceFlows";
-import Orchestrator from "./pages/Orchestrator";
-import NotFound from "./pages/NotFound";
-import Flows from "./pages/Flows";
-import Squads from "./pages/Squads";
-import SquadDetail from "./pages/SquadDetail";
-import Meetings from "./pages/Meetings";
-import FlowEditor from "./pages/FlowEditor";
-import Projects from "./pages/Projects";
-import ProjectDetail from "./pages/ProjectDetail";
-import UserDashboard from "./pages/UserDashboard";
-import DoseCalculatorPage from "./pages/DoseCalculatorPage";
-import VisualLab from "./pages/VisualLab";
-import Contact from "./pages/Contact";
-import Support from "./pages/Support";
-import ResetPassword from "./pages/ResetPassword";
-import Documentation from "./pages/Documentation";
-import PublicCredits from "./pages/PublicCredits";
-import PublicMarketplace from "./pages/PublicMarketplace";
-import PublicDocumentation from "./pages/PublicDocumentation";
-import PublicContact from "./pages/PublicContact";
-import TermsOfService from "./pages/TermsOfService";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import CookiePolicy from "./pages/CookiePolicy";
-import VerifyCertificate from "./pages/VerifyCertificate";
-import Briefing from "./pages/Briefing";
-import OSCE from "./pages/OSCE";
-import OSCEStationEditor from "./pages/OSCEStationEditor";
-import OSCEAttendance from "./pages/OSCEAttendance";
-import OSCEResult from "./pages/OSCEResult";
-import OSCEExamEditor from "./pages/OSCEExamEditor";
-import OSCEJoin from "./pages/OSCEJoin";
-import OSCESessionTeacher from "./pages/OSCESessionTeacher";
-import OSCESessionStudent from "./pages/OSCESessionStudent";
-import MeetingInvite from "./pages/MeetingInvite";
-import MeetingGuest from "./pages/MeetingGuest";
+const Agents = lazyPage(() => import("./pages/Agents"));
+const Chat = lazyPage(() => import("./pages/Chat"));
+const Credits = lazyPage(() => import("./pages/Credits"));
+const Account = lazyPage(() => import("./pages/Account"));
+const Institution = lazyPage(() => import("./pages/Institution"));
+const Admin = lazyPage(() => import("./pages/Admin"));
+const Settings = lazyPage(() => import("./pages/Settings"));
+const MyAgents = lazyPage(() => import("./pages/MyAgents"));
+const AgentEditor = lazyPage(() => import("./pages/AgentEditor"));
+const NativeAgentEditor = lazyPage(() => import("./pages/NativeAgentEditor"));
+const Conversations = lazyPage(() => import("./pages/Conversations"));
+const Knowledge = lazyPage(() => import("./pages/Knowledge"));
+const KnowledgeDetail = lazyPage(() => import("./pages/KnowledgeDetail"));
+const VirtualRooms = lazyPage(() => import("./pages/VirtualRooms"));
+const VirtualRoomChat = lazyPage(() => import("./pages/VirtualRoomChat"));
+const LiveClass = lazyPage(() => import("./pages/LiveClass"));
+const Marketplace = lazyPage(() => import("./pages/Marketplace"));
+const MarketplaceFlows = lazyPage(() => import("./pages/MarketplaceFlows"));
+const Orchestrator = lazyPage(() => import("./pages/Orchestrator"));
+const NotFound = lazyPage(() => import("./pages/NotFound"));
+const Flows = lazyPage(() => import("./pages/Flows"));
+const Squads = lazyPage(() => import("./pages/Squads"));
+const SquadDetail = lazyPage(() => import("./pages/SquadDetail"));
+const Meetings = lazyPage(() => import("./pages/Meetings"));
+const FlowEditor = lazyPage(() => import("./pages/FlowEditor"));
+const Projects = lazyPage(() => import("./pages/Projects"));
+const ProjectDetail = lazyPage(() => import("./pages/ProjectDetail"));
+const UserDashboard = lazyPage(() => import("./pages/UserDashboard"));
+const DoseCalculatorPage = lazyPage(() => import("./pages/DoseCalculatorPage"));
+const VisualLab = lazyPage(() => import("./pages/VisualLab"));
+const Contact = lazyPage(() => import("./pages/Contact"));
+const Support = lazyPage(() => import("./pages/Support"));
+const ResetPassword = lazyPage(() => import("./pages/ResetPassword"));
+const Documentation = lazyPage(() => import("./pages/Documentation"));
+const PublicCredits = lazyPage(() => import("./pages/PublicCredits"));
+const PublicMarketplace = lazyPage(() => import("./pages/PublicMarketplace"));
+const PublicDocumentation = lazyPage(() => import("./pages/PublicDocumentation"));
+const PublicContact = lazyPage(() => import("./pages/PublicContact"));
+const TermsOfService = lazyPage(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = lazyPage(() => import("./pages/PrivacyPolicy"));
+const CookiePolicy = lazyPage(() => import("./pages/CookiePolicy"));
+const VerifyCertificate = lazyPage(() => import("./pages/VerifyCertificate"));
+const Briefing = lazyPage(() => import("./pages/Briefing"));
+const OSCE = lazyPage(() => import("./pages/OSCE"));
+const OSCEStationEditor = lazyPage(() => import("./pages/OSCEStationEditor"));
+const OSCEAttendance = lazyPage(() => import("./pages/OSCEAttendance"));
+const OSCEResult = lazyPage(() => import("./pages/OSCEResult"));
+const OSCEExamEditor = lazyPage(() => import("./pages/OSCEExamEditor"));
+const OSCEJoin = lazyPage(() => import("./pages/OSCEJoin"));
+const OSCESessionTeacher = lazyPage(() => import("./pages/OSCESessionTeacher"));
+const OSCESessionStudent = lazyPage(() => import("./pages/OSCESessionStudent"));
+const MeetingInvite = lazyPage(() => import("./pages/MeetingInvite"));
+const MeetingGuest = lazyPage(() => import("./pages/MeetingGuest"));
 import { CookieConsent } from "./components/cookies/CookieConsent";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -83,6 +85,7 @@ const App = () => (
         <NewUIProvider>
         <LanguageProvider>
         <AuthProvider>
+          <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-background" role="status" aria-label="Carregando"><div className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" /></div>}>
           <Routes>
             <Route path="/" element={<Dark><Landing /></Dark>} />
             <Route path="/login" element={<Dark><Login /></Dark>} />
@@ -149,6 +152,7 @@ const App = () => (
             </Route>
             <Route path="*" element={<Dark><NotFound /></Dark>} />
           </Routes>
+          </Suspense>
         </AuthProvider>
         </LanguageProvider>
         </NewUIProvider>

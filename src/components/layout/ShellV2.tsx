@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { PageTransition } from "@/components/ds/PageTransition";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -303,6 +303,7 @@ export function ShellV2() {
   return (
     <div className="min-h-screen bg-pos-vacuo text-white" style={{ "--aura": auraOf(domain) } as CSSProperties}>
       <div className="pointer-events-none fixed inset-x-0 top-0 z-0 h-[420px] opacity-70 transition-[background] duration-500" style={{ background: "radial-gradient(700px 320px at 62% -8%, color-mix(in srgb, var(--aura) 16%, transparent), transparent 70%)" }} />
+      <a href="#conteudo-principal" className="sr-only z-[100] rounded-md bg-card px-3 py-2 text-sm text-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Pular para o conteúdo</a>
       <OfflineBanner />
       <OnboardingTour />
       <DebugOverlay />
@@ -311,8 +312,8 @@ export function ShellV2() {
         <SidePanel domain={domain} pathname={pathname} collapsed={!open} />
         <div className="min-w-0 flex-1">
           <TopBar domain={domain} itemLabel={item ? label(item) : undefined} collapsed={!open} onToggle={() => setOpen((v) => !v)} isMobile={isMobile} />
-          <main className="pb-20 md:pb-0">
-            <PageTransition><Outlet /></PageTransition>
+          <main id="conteudo-principal" tabIndex={-1} className="pb-20 outline-none md:pb-0">
+            <PageTransition><Suspense fallback={<div className="flex h-64 items-center justify-center" role="status" aria-label="Carregando"><div className="h-7 w-7 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" /></div>}><Outlet /></Suspense></PageTransition>
           </main>
         </div>
       </div>

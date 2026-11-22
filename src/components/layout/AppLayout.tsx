@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
@@ -113,7 +114,7 @@ function LegacyLayout() {
           </div>
         </aside>
         <main className="flex-1 min-w-0 pb-16 md:pb-0">
-          <Outlet />
+          <Suspense fallback={<div className="flex h-64 items-center justify-center" role="status" aria-label="Carregando"><div className="h-7 w-7 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" /></div>}><Outlet /></Suspense>
         </main>
       </div>
       <MobileBottomNav />

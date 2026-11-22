@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { translations, Locale } from "@/i18n/translations";
 
 interface LanguageContextType {
@@ -20,6 +20,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem("app-locale");
     return (saved as Locale) || "pt";
   });
+
+  useEffect(() => {
+    document.documentElement.lang = locale === "pt" ? "pt-BR" : locale;
+  }, [locale]);
 
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
