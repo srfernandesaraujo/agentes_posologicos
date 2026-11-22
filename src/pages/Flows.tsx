@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { FlowThumb, useFlowGraphs } from "@/components/flows/FlowThumb";
+import { Spotlight } from "@/components/ds/Spotlight";
+import { Reveal, RevealItem } from "@/components/ds/Reveal";
 import { useNavigate } from "react-router-dom";
 import { useAgentFlows, useCreateFlow, useDeleteFlow } from "@/hooks/useAgentFlows";
 import { Button } from "@/components/ui/button";
@@ -39,6 +43,8 @@ interface PreflightState {
 export default function Flows() {
   const navigate = useNavigate();
   const { data: flows = [], isLoading } = useAgentFlows();
+  const { enabled: v2 } = useNewUI();
+  const { data: graphs } = useFlowGraphs(v2 ? flows.map((f) => f.id) : []);
   const createFlow = useCreateFlow();
   const deleteFlow = useDeleteFlow();
   const { user } = useAuth();
@@ -304,9 +310,39 @@ export default function Flows() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Reveal className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" stagger={0.05}>
           {flows.map((flow) => {
             const st = STATUS_LABELS[flow.status] || STATUS_LABELS.draft;
+            if (v2) {
+              return (
+                <RevealItem key={flow.id}>
+                  <Spotlight tone="var(--dom-equipes)" className="group h-full cursor-pointer rounded-2xl border border-border bg-card transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                    role="link" tabIndex={0} onClick={() => navigate(`/fluxos/${flow.id}`)} onKeyDown={(e) => { if (e.key === "Enter") navigate(`/fluxos/${flow.id}`); }}>
+                    <div className="border-b border-border bg-[hsl(var(--dom-equipes)/0.06)] px-3 pt-3">
+                      <FlowThumb nodes={graphs?.nodes.get(flow.id)} edges={graphs?.edges.get(flow.id)} />
+                    </div>
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-display text-base font-bold text-foreground">{flow.name}</h3>
+                        <Badge variant={st.variant}>{st.label}</Badge>
+                      </div>
+                      {flow.description && <p className="mt-1 line-clamp-2 min-h-[2.6em] text-[13px] leading-snug text-muted-foreground">{flow.description}</p>}
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="font-mono text-[11px] text-muted-foreground">
+                          {graphs?.nodes.get(flow.id)?.length ?? "…"} etapas · {flow.execution_mode === "parallel" ? "paralelo" : "sequencial"} · {new Date(flow.updated_at).toLocaleDateString("pt-BR")}
+                        </span>
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <AddToProjectMenu itemType="flow" itemId={flow.id} size="icon" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-400" aria-label="Excluir fluxo" onClick={(e) => handleDelete(flow.id, e)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </Spotlight>
+                </RevealItem>
+              );
+            }
             return (
               <Card
                 key={flow.id}
@@ -344,7 +380,7 @@ export default function Flows() {
               </Card>
             );
           })}
-        </div>
+        </Reveal>
       )}
       <ComplexFlowWizard open={complexOpen} onOpenChange={setComplexOpen} />
     </div>

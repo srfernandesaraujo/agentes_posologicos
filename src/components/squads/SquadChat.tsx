@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNewUI } from "@/contexts/NewUIContext";
+import { MeetingTable } from "./MeetingTable";
 import { BellOff, BookMarked, Download, ExternalLink, FileSpreadsheet, Paperclip, ScrollText, Check, FileText, Hash, Loader2, Pencil, Send, Settings2, Trash2, Info, Users, Wand2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -651,6 +652,7 @@ export function SquadChat({ squad, agents, lastMission, onOpenMission, onNewMiss
             <LiveMeetingBar meeting={liveMeeting} spent={liveSpent} busy={liveBusy} onControl={liveControl} onEnd={endLiveMeeting}
               files={meetingFiles} sensitivity={squad.sensitivity} uploading={live.uploadFile.isPending} onUpload={uploadMeetingFile} onDeleteFile={deleteMeetingFile} />
           )}
+          {inLive && liveMeeting && newUI.enabled && <MeetingTable meeting={liveMeeting} agents={agents} messages={all} spent={liveSpent} />}
           {inLive && liveMeeting && <MeetingActions meetingId={liveMeeting.id} squadId={squad.id} agentNames={new Map(agents.map((a) => [a.id, a.name]))} />}
 
           <div className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4" style={{ maxHeight: "58vh" }} aria-live="polite">

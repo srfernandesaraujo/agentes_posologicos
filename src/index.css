@@ -311,3 +311,8 @@
 @keyframes pos-pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
 .pos-pop { animation: pos-pop .45s cubic-bezier(.2,.8,.2,1) both; }
 @media (prefers-reduced-motion: reduce) { .pos-pop { animation: none; } }
+
+/* Ligações de fluxo com pontos correndo */
+@keyframes pos-flow { to { stroke-dashoffset: -16; } }
+.pos-flow-line { animation: pos-flow 1.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .pos-flow-line { animation: none; } }

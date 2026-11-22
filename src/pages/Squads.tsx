@@ -10,6 +10,8 @@ import { useSquadActions, useSquadTemplates, useSquads, type SquadTemplateInfo }
 import { fmtUsd } from "@/components/squads/CostCapField";
 import { useNewUI } from "@/contexts/NewUIContext";
 import { useTeamPulse } from "@/hooks/useTeamPulse";
+import { useSquadsOverview } from "@/hooks/useSquadsOverview";
+import { SquadsOfficeV2 } from "@/components/squads/SquadsOfficeV2";
 
 const SENSITIVITY_LABEL: Record<SquadTemplateInfo["sensitivity"], string | null> = {
   normal: null,
@@ -26,6 +28,7 @@ export default function Squads() {
   const [creating, setCreating] = useState<string | null>(null);
   const { enabled: newUI } = useNewUI();
   const { data: pulse } = useTeamPulse();
+  const { data: overview } = useSquadsOverview();
 
   const templateBySlug = new Map(templates.map((t) => [t.slug, t]));
 
@@ -43,7 +46,11 @@ export default function Squads() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
+    <>
+    {newUI && !isLoading && squads.length > 0 && (
+      <SquadsOfficeV2 squads={squads} templates={templateBySlug} pulse={pulse} overview={overview} onOpen={(id) => navigate(`/squads/${id}`)} onNew={() => setOpen(true)} />
+    )}
+    <div className={`mx-auto max-w-5xl space-y-6 p-4 md:p-8 ${newUI && !isLoading && squads.length > 0 ? "hidden" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Squads de agentes</h1>
@@ -146,5 +153,6 @@ export default function Squads() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }
