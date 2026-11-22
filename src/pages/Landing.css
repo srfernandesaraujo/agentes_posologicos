@@ -2909,3 +2909,54 @@ body:has(.landing-page) {
     animation: none !important;
   }
 }
+
+/* ===== Onda F: calculadora sem cadastro, curva na rolagem, luz nos cartões ===== */
+.lp-dose-section { padding-top: 40px; }
+.lp-dose-card {
+  --mx: 50%; --my: 50%;
+  position: relative; overflow: hidden; margin-top: 40px;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 32px;
+  padding: 28px; border-radius: 20px;
+  border: 1px solid var(--lp-border);
+  background: linear-gradient(160deg, rgba(10, 26, 31, 0.9), rgba(5, 14, 18, 0.92));
+}
+.lp-dose-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(320px circle at var(--mx) var(--my), rgba(94, 234, 212, 0.12), transparent 70%);
+}
+.lp-dose-card:hover::before { opacity: 1; }
+.lp-dose-card > * { position: relative; }
+.lp-dose-form { display: grid; gap: 18px; align-content: start; }
+.lp-dose-field span { display: block; font-size: 12.5px; color: var(--lp-muted); margin-bottom: 6px; }
+.lp-dose-inputs { display: grid; grid-template-columns: 1fr 84px; gap: 12px; align-items: center; }
+.lp-dose-inputs input[type="range"] { width: 100%; accent-color: var(--lp-emerald); }
+.lp-dose-inputs input[type="number"] {
+  width: 84px; padding: 7px 8px; border-radius: 9px; text-align: right;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--lp-border); color: var(--lp-text);
+  font: 600 14px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.lp-dose-inputs input[type="number"]:focus-visible { outline: 2px solid var(--lp-emerald); outline-offset: 1px; }
+.lp-dose-out { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.lp-dose-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lp-dose-kpis > div { padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--lp-border); min-height: 96px; }
+.lp-dose-kpis small { display: block; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--lp-muted); }
+.lp-dose-kpis strong { display: block; margin-top: 6px; font: 600 2rem "Space Grotesk", Inter, sans-serif; color: var(--lp-emerald); letter-spacing: -0.03em; }
+.lp-dose-kpis em { font-style: normal; font-size: .95rem; color: var(--lp-muted); }
+.lp-dose-cap { display: block; margin-top: 4px; font-size: 11.5px; color: var(--lp-amber); }
+.lp-dose-curve { width: 100%; }
+.lp-dose-note { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--lp-muted); margin: 0; }
+.lp-dose-cta { display: flex; justify-content: center; margin-top: 28px; }
+@media (max-width: 860px) { .lp-dose-card { grid-template-columns: 1fr; padding: 20px; } }
+
+/* curva ligada à rolagem */
+.lp-scroll-curve { position: fixed; left: 0; right: 0; bottom: 0; height: 3px; z-index: 60; pointer-events: none; background: rgba(255, 255, 255, 0.05); }
+.lp-scroll-curve > span { display: block; height: 100%; width: 100%; transform-origin: left; transform: scaleX(var(--lp-scroll, 0)); background: linear-gradient(90deg, #2dd4bf, #38bdf8, #a78bfa); }
+
+/* luz no cursor nos cartões dos pilares */
+.lp-pillar-card { --mx: 50%; --my: 50%; overflow: hidden; }
+.lp-pillar-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(240px circle at var(--mx) var(--my), rgba(94, 234, 212, 0.12), transparent 70%);
+}
+.lp-pillar-card:hover::before { opacity: 1; }
+.lp-pillar-card > * { position: relative; }

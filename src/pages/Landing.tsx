@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useEffect, useState, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -23,6 +23,7 @@ import { WorkflowGraphSection } from "@/components/landing/WorkflowGraphSection"
 import { AuthorityVideoSection } from "@/components/landing/AuthorityVideoSection";
 import { ShowreelModal } from "@/components/landing/ShowreelModal";
 import { Reveal } from "@/components/landing/Reveal";
+import { DoseTrySection } from "@/components/landing/DoseTrySection";
 import { LandingSquad } from "./LandingSquad";
 import "./Landing.css";
 
@@ -34,12 +35,40 @@ export default function Landing() {
   const c = landingCopy[safeLocale];
   const [showreelOpen, setShowreelOpen] = useState(false);
 
+  // Barra de curva ligada à rolagem (CSS var, sem re-render)
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const root = document.documentElement;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const max = root.scrollHeight - window.innerHeight;
+      root.style.setProperty("--lp-scroll", String(max > 0 ? Math.min(1, window.scrollY / max) : 0));
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      root.style.removeProperty("--lp-scroll");
+    };
+  }, []);
+
+  const spot = (e: MouseEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+  };
+
   return (
     <div className="landing-page">
       <SEO title={c.seoTitle} description={c.seoDesc} path="/" />
 
       {/* Bio-precision molecular & pharmacokinetic canvas */}
       <MolecularField />
+
+      <div className="lp-scroll-curve" aria-hidden="true"><span /></div>
 
       <header className="lp-header">
         <div className="lp-nav-inner">
@@ -87,7 +116,7 @@ export default function Landing() {
               const Icon = PILLAR_ICONS[i] || Stethoscope;
               return (
                 <Reveal key={item.title} delay={i * 75}>
-                  <article className={`lp-pillar-card lp-pillar-${item.tone}`}>
+                  <article className={`lp-pillar-card lp-pillar-${item.tone}`} onMouseMove={spot}>
                     <div className="lp-pillar-top">
                       <span className="lp-pillar-icon">
                         <Icon size={21} strokeWidth={1.65} />
@@ -111,6 +140,8 @@ export default function Landing() {
             <LandingSquad locale={safeLocale} />
           </Reveal>
         </section>
+
+        <DoseTrySection locale={safeLocale} />
 
         <InteractiveDemoSection c={c.demo} />
 
