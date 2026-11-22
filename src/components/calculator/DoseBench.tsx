@@ -337,9 +337,9 @@ export function DoseBench() {
       </Reveal>
 
       {/* resultado e simulação (embaixo) */}
-      <div className={cn("grid items-stretch gap-5", showSim && "lg:grid-cols-2")}>
-      <div className="flex min-w-0 flex-col gap-5">
-        <div className="pos-elev relative flex-1 overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-[hsl(var(--dom-clinica)/0.12)] via-card to-card p-6 md:p-8">
+      <div className="space-y-5">
+      <div className="min-w-0 space-y-5">
+        <div className="pos-elev relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-[hsl(var(--dom-clinica)/0.12)] via-card to-card p-6 md:p-8">
           <div className="flex items-start justify-between gap-3">
             <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--dom-clinica))]">{outcome ? outcome.title : modeInfo.label}</p>
             {outcome && (
