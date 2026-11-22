@@ -274,11 +274,11 @@ export function DoseBench() {
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-      {/* entrada */}
+    <div className="space-y-5">
+      {/* entrada (em cima) */}
       <Reveal className="space-y-4">
         <RevealItem>
-          <div role="tablist" aria-label="Tipo de cálculo" className="grid grid-cols-2 gap-2">
+          <div role="tablist" aria-label="Tipo de cálculo" className="grid grid-cols-2 gap-2 lg:grid-cols-4">
             {MODES.map((m) => (
               <button
                 key={m.id}
@@ -297,7 +297,7 @@ export function DoseBench() {
           </div>
         </RevealItem>
 
-        <RevealItem className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-5 [&>*:last-child:nth-child(odd)]:col-span-2">
+        <RevealItem className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-5 lg:grid-cols-4">
           {(mode === "peso" || mode === "sc" || mode === "renal" || mode === "ped") && (
             <Field label={mode === "ped" ? "Peso real (deixe vazio para estimar pela idade)" : "Peso"} unit="kg" value={weight} onChange={setWeight} placeholder="70" optional={mode === "ped"} />
           )}
@@ -336,7 +336,8 @@ export function DoseBench() {
         </RevealItem>
       </Reveal>
 
-      {/* resultado */}
+      {/* resultado e simulação (embaixo) */}
+      <div className={cn("grid items-start gap-5", showSim && "lg:grid-cols-2")}>
       <div className="min-w-0 space-y-5">
         <div className="pos-elev relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-[hsl(var(--dom-clinica)/0.12)] via-card to-card p-6 md:p-8">
           <div className="flex items-start justify-between gap-3">
@@ -406,7 +407,8 @@ export function DoseBench() {
           </div>
         )}
 
-        {showSim && <AccumulationLab />}
+      </div>
+      {showSim && <AccumulationLab />}
       </div>
     </div>
   );
