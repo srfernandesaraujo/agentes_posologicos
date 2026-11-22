@@ -217,3 +217,92 @@
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ===== Camada 2 (Onda A): peças de movimento e profundidade ===== */
+/* Cartão com luz que segue o cursor */
+.pos-spot { position: relative; overflow: hidden; --mx: 50%; --my: 50%; --tone: var(--dom-inicio); }
+.pos-spot::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(260px circle at var(--mx) var(--my), hsl(var(--tone) / .22), transparent 70%);
+}
+.pos-spot::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: radial-gradient(200px circle at var(--mx) var(--my), hsl(var(--tone)), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.pos-spot:hover::before, .pos-spot:hover::after { opacity: 1; }
+.pos-spot > * { position: relative; }
+
+/* Avatar com estado */
+.pos-pulse-av {
+  position: relative; display: inline-grid; place-items: center; border-radius: 9999px; flex-shrink: 0;
+  font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; line-height: 1; letter-spacing: -.02em;
+  color: hsl(208 46% 6%); background: hsl(var(--tone));
+}
+.pos-pulse-av.is-working::after {
+  content: ""; position: absolute; inset: -4px; border-radius: inherit; border: 2px solid hsl(var(--tone));
+  animation: pos-ring 1.7s ease-out infinite;
+}
+.pos-pulse-av.is-waiting { outline: 2px dashed hsl(var(--dom-ensino)); outline-offset: 3px; }
+@keyframes pos-ring { 0% { transform: scale(.86); opacity: .9; } 100% { transform: scale(1.4); opacity: 0; } }
+
+/* Esqueleto de carregamento com brilho que corre */
+.pos-shimmer {
+  background: linear-gradient(100deg, hsl(var(--muted)) 30%, hsl(var(--secondary)) 50%, hsl(var(--muted)) 70%);
+  background-size: 220% 100%; animation: pos-shimmer 1.4s linear infinite; border-radius: .6rem;
+}
+@keyframes pos-shimmer { from { background-position: 100% 0; } to { background-position: -120% 0; } }
+
+/* Sombra de profundidade em camadas para superfícies elevadas */
+[data-ui="v2"] .pos-elev { box-shadow: 0 1px 0 hsl(0 0% 100% / .04) inset, 0 18px 40px -24px hsl(208 80% 2% / .9); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-pulse-av.is-working::after, .pos-shimmer { animation: none; }
+}
+
+/* ===== Tema claro do novo visual (infraestrutura; ativado por ?tema=claro enquanto as telas são convertidas) ===== */
+[data-ui="v2"][data-theme="light"] {
+  color-scheme: light;
+  --background: 190 30% 96%;
+  --foreground: 208 40% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 208 40% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 208 40% 10%;
+  --secondary: 195 25% 92%;
+  --secondary-foreground: 208 40% 14%;
+  --muted: 195 25% 94%;
+  --muted-foreground: 200 15% 34%;
+  --accent-foreground: 0 0% 100%;
+  --border: 195 18% 80%;
+  --input: 195 18% 80%;
+  --pos-vacuo: 190 30% 96%;
+  --pos-base: 0 0% 100%;
+  --pos-elevado: 190 25% 94%;
+  --pos-realce: 190 22% 90%;
+  --dom-inicio: 174 80% 28%;
+  --dom-clinica: 199 90% 36%;
+  --dom-equipes: 255 60% 52%;
+  --dom-ensino: 35 90% 36%;
+  --dom-acervo: 142 65% 28%;
+  --dom-ajuda: 351 70% 46%;
+  --destructive-vivid: 351 70% 46%;
+}
+/* Atalho de compatibilidade: telas antigas escrevem branco sobre escuro; no claro viram tinta sobre papel. */
+[data-ui="v2"][data-theme="light"] .text-white { color: hsl(var(--foreground)); }
+[data-ui="v2"][data-theme="light"] .text-white\/90 { color: hsl(var(--foreground) / .92); }
+[data-ui="v2"][data-theme="light"] .text-white\/80 { color: hsl(var(--foreground) / .84); }
+[data-ui="v2"][data-theme="light"] .text-white\/70 { color: hsl(var(--foreground) / .74); }
+[data-ui="v2"][data-theme="light"] .text-white\/60 { color: hsl(var(--foreground) / .66); }
+[data-ui="v2"][data-theme="light"] .text-white\/50 { color: hsl(var(--foreground) / .58); }
+[data-ui="v2"][data-theme="light"] .text-white\/40 { color: hsl(var(--foreground) / .5); }
+[data-ui="v2"][data-theme="light"] .text-white\/30 { color: hsl(var(--foreground) / .42); }
+[data-ui="v2"][data-theme="light"] .text-white\/20 { color: hsl(var(--foreground) / .34); }
+[data-ui="v2"][data-theme="light"] .border-white\/5 { border-color: hsl(var(--foreground) / .07); }
+[data-ui="v2"][data-theme="light"] .border-white\/10 { border-color: hsl(var(--foreground) / .12); }
+[data-ui="v2"][data-theme="light"] .border-white\/15 { border-color: hsl(var(--foreground) / .17); }
+[data-ui="v2"][data-theme="light"] .border-white\/20 { border-color: hsl(var(--foreground) / .22); }
+[data-ui="v2"][data-theme="light"] .bg-white\/5, [data-ui="v2"][data-theme="light"] .bg-white\/\[0\.03\], [data-ui="v2"][data-theme="light"] .bg-white\/\[0\.02\], [data-ui="v2"][data-theme="light"] .bg-white\/\[0\.04\], [data-ui="v2"][data-theme="light"] .bg-white\/\[0\.05\] { background-color: hsl(var(--foreground) / .045); }
+[data-ui="v2"][data-theme="light"] .bg-white\/10, [data-ui="v2"][data-theme="light"] .hover\:bg-white\/10:hover { background-color: hsl(var(--foreground) / .08); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white:hover { color: hsl(var(--foreground)); }

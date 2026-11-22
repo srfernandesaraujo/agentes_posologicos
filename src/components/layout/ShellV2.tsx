@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { PageTransition } from "@/components/ds/PageTransition";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, Coins, LogOut, PanelLeftClose, PanelLeftOpen, Plus, Search, Shield } from "lucide-react";
@@ -309,7 +310,7 @@ export function ShellV2() {
         <div className="min-w-0 flex-1">
           <TopBar domain={domain} itemLabel={item ? label(item) : undefined} collapsed={!open} onToggle={() => setOpen((v) => !v)} isMobile={isMobile} />
           <main className="pb-20 md:pb-0">
-            <Outlet />
+            <PageTransition><Outlet /></PageTransition>
           </main>
         </div>
       </div>

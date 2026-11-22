@@ -19,20 +19,48 @@ function readInitial(): boolean {
   }
 }
 
+/** Tema do novo visual. Escuro por padrão; ?tema=claro / ?tema=escuro troca e fica guardado. */
+export type UITheme = "dark" | "light";
+const THEME_KEY = "pos-tema";
+
+function readTheme(): UITheme {
+  try {
+    const q = new URLSearchParams(window.location.search).get("tema");
+    if (q === "claro") localStorage.setItem(THEME_KEY, "light");
+    if (q === "escuro") localStorage.setItem(THEME_KEY, "dark");
+    return localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
 interface Ctx {
   enabled: boolean;
   setEnabled: (v: boolean) => void;
+  theme: UITheme;
+  setTheme: (t: UITheme) => void;
 }
-const NewUIContext = createContext<Ctx>({ enabled: true, setEnabled: () => {} });
+const NewUIContext = createContext<Ctx>({ enabled: true, setEnabled: () => {}, theme: "dark", setTheme: () => {} });
 
 export function NewUIProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabledState] = useState<boolean>(readInitial);
+  const [theme, setThemeState] = useState<UITheme>(readTheme);
 
   useEffect(() => {
     const root = document.documentElement;
-    if (enabled) root.setAttribute("data-ui", "v2");
-    else root.removeAttribute("data-ui");
-  }, [enabled]);
+    if (enabled) {
+      root.setAttribute("data-ui", "v2");
+      root.setAttribute("data-theme", theme);
+    } else {
+      root.removeAttribute("data-ui");
+      root.removeAttribute("data-theme");
+    }
+  }, [enabled, theme]);
+
+  const setTheme = useCallback((t: UITheme) => {
+    try { localStorage.setItem(THEME_KEY, t); } catch { /* storage bloqueado */ }
+    setThemeState(t);
+  }, []);
 
   const setEnabled = useCallback((v: boolean) => {
     try {
@@ -43,7 +71,7 @@ export function NewUIProvider({ children }: { children: ReactNode }) {
     setEnabledState(v);
   }, []);
 
-  const value = useMemo(() => ({ enabled, setEnabled }), [enabled, setEnabled]);
+  const value = useMemo(() => ({ enabled, setEnabled, theme, setTheme }), [enabled, setEnabled, theme, setTheme]);
   return <NewUIContext.Provider value={value}>{children}</NewUIContext.Provider>;
 }
 

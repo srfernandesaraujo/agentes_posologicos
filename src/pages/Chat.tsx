@@ -872,7 +872,7 @@ export default function Chat() {
           <div className="mx-auto max-w-3xl space-y-4">
             {displayMessages.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                {v2 && <PkCurve className="mb-6 w-full max-w-md opacity-70" height={80} />}
+                {v2 && <PkCurve draw className="mb-6 w-full max-w-md opacity-70" height={80} />}
                 <div className={`flex h-16 w-16 items-center justify-center rounded-2xl mb-4 ${v2 ? "border border-[hsl(var(--dom-clinica))]/40 bg-[hsl(var(--dom-clinica))]/15" : isCustom ? "bg-[hsl(14,90%,58%)]/20" : "gradient-primary"}`}>
                   <AgentIcon className={`h-8 w-8 ${v2 ? "text-[hsl(var(--dom-clinica))]" : isCustom ? "text-[hsl(14,90%,58%)]" : "text-white"}`} />
                 </div>

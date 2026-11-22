@@ -40,6 +40,7 @@ import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import UserDashboard from "./pages/UserDashboard";
 import DoseCalculatorPage from "./pages/DoseCalculatorPage";
+import VisualLab from "./pages/VisualLab";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
 import ResetPassword from "./pages/ResetPassword";
@@ -107,6 +108,7 @@ const App = () => (
               <Route path="/agentes" element={<Agents />} />
               <Route path="/dashboard" element={<UserDashboard />} />
               <Route path="/calculadora" element={<DoseCalculatorPage />} />
+              <Route path="/laboratorio-visual" element={<VisualLab />} />
               <Route path="/chat/:agentId" element={<Chat />} />
               <Route path="/creditos" element={<Credits />} />
               <Route path="/conta" element={<Account />} />

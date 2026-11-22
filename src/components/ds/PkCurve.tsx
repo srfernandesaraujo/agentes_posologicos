@@ -1,4 +1,6 @@
 import { useId, useMemo } from "react";
+import { motion } from "framer-motion";
+import { EASE, useMotionOn } from "@/lib/motion";
 
 interface Props {
   /** Intervalo entre doses (h) */
@@ -11,11 +13,14 @@ interface Props {
   height?: number;
   /** valor de preserveAspectRatio; padrão estica na largura toda */
   preserve?: string;
+  /** a linha se desenha ao aparecer */
+  draw?: boolean;
 }
 
 /** Curva farmacocinética de doses repetidas (1 compartimento, via oral). Elemento decorativo e informativo. */
-export function PkCurve({ tau = 6, doses = 6, window: win = [0.55, 0.9], className, height = 160, preserve = "none" }: Props) {
+export function PkCurve({ tau = 6, doses = 6, window: win = [0.55, 0.9], className, height = 160, preserve = "none", draw = false }: Props) {
   const gid = useId();
+  const motionOn = useMotionOn();
   const [lo, hi] = win;
   const { d, yTop, yBottom } = useMemo(() => {
     const ka = 1.4, ke = 0.17, T = tau * doses + 4, W = 1000, H = 200, pad = 12;
@@ -53,7 +58,12 @@ export function PkCurve({ tau = 6, doses = 6, window: win = [0.55, 0.9], classNa
         </linearGradient>
       </defs>
       <rect x="12" y={yTop} width="976" height={yBottom - yTop} fill="rgba(45,212,191,.09)" stroke="rgba(45,212,191,.35)" strokeDasharray="4 5" />
-      <path d={d} fill="none" stroke={`url(#${gid})`} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      {draw && motionOn ? (
+        <motion.path d={d} fill="none" stroke={`url(#${gid})`} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
+          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.8, ease: EASE }} />
+      ) : (
+        <path d={d} fill="none" stroke={`url(#${gid})`} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      )}
     </svg>
   );
 }

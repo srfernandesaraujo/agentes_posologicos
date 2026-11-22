@@ -95,7 +95,7 @@ export function HomeV2({ sessions, ledger, balance }: { sessions: SessionRow[]; 
     <section className="mb-10 animate-slide-up" aria-label="Central de comando">
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[hsl(var(--dom-inicio)/0.10)] via-pos-base to-pos-base p-6 md:p-8">
         <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[58%] md:block [mask-image:linear-gradient(90deg,transparent,#000_45%)]" aria-hidden="true">
-          <PkCurve height={260} preserve="xMaxYMax slice" className="absolute bottom-0 right-0 h-full w-full opacity-40" />
+          <PkCurve draw height={260} preserve="xMaxYMax slice" className="absolute bottom-0 right-0 h-full w-full opacity-40" />
         </div>
         <div className="relative z-10">
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--dom-inicio))]">Central de comando</p>
