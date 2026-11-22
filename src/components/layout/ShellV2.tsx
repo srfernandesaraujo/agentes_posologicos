@@ -12,6 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavCounts } from "@/hooks/useNavCounts";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { BrandMark } from "@/components/ds/BrandMark";
+import { ThemeToggle } from "@/components/ds/ThemeToggle";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
@@ -155,7 +156,7 @@ function SidePanel({ domain, pathname, collapsed }: { domain: Domain; pathname: 
               to={it.to}
               data-tour={it.dataTour}
               className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors ${
-                on ? "bg-pos-realce text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]" : "text-white/55 hover:bg-white/5 hover:text-white"
+                on ? "bg-pos-realce text-white shadow-[inset_0_0_0_1px_hsl(var(--foreground)/0.1)]" : "text-white/55 hover:bg-white/5 hover:text-white"
               }`}
             >
               <Icon className={`h-4 w-4 shrink-0 ${on ? "text-[var(--aura)]" : ""}`} />
@@ -198,6 +199,7 @@ function TopBar({ domain, itemLabel, collapsed, onToggle, isMobile }: { domain: 
         <span className="flex-1 truncate">Pergunte, calcule ou busque</span>
         <kbd className="hidden rounded border border-white/15 px-1.5 font-mono text-[10px] text-white/40 sm:block">Ctrl K</kbd>
       </button>
+      <ThemeToggle />
       <div className="hidden md:block"><LanguageSelector /></div>
       <Link to="/creditos" data-tour="credits" className="flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1.5 font-mono text-xs text-white/75 hover:bg-white/5">
         <Coins className="h-3.5 w-3.5 text-[hsl(38,92%,50%)]" />{free ? "∞" : balance}
@@ -224,7 +226,7 @@ function MobileNav({ active, pathname }: { active: Domain; pathname: string }) {
         key={d.id}
         onClick={() => (visible(d).length === 1 ? navigate(d.items[0].to) : setSheet(d))}
         className="flex min-w-[56px] flex-col items-center gap-0.5 px-2 py-1.5 text-[10px] font-medium"
-        style={{ color: on ? auraOf(d) : "rgba(255,255,255,0.45)" }}
+        style={{ color: on ? auraOf(d) : "hsl(var(--foreground) / 0.5)" }}
         aria-current={on ? "page" : undefined}
       >
         <Icon className="h-5 w-5" />

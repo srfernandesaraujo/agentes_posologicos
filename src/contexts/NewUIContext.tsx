@@ -76,3 +76,14 @@ export function NewUIProvider({ children }: { children: ReactNode }) {
 }
 
 export const useNewUI = () => useContext(NewUIContext);
+
+/** Páginas feitas só no escuro (landing, convites): fixam data-theme="dark" enquanto estão montadas. */
+export function useForceDark() {
+  const { enabled, theme } = useNewUI();
+  useEffect(() => {
+    if (!enabled || theme !== "light") return;
+    const root = document.documentElement;
+    root.setAttribute("data-theme", "dark");
+    return () => root.setAttribute("data-theme", "light");
+  }, [enabled, theme]);
+}

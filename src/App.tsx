@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { NewUIProvider } from "@/contexts/NewUIContext";
+import { useForceDark } from "@/contexts/NewUIContext";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Login from "./pages/Login";
@@ -69,6 +70,9 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
+/** Páginas públicas e de convidado são desenhadas só no escuro. */
+const Dark = ({ children }: { children: React.ReactNode }) => { useForceDark(); return <>{children}</>; };
+
 const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
@@ -80,26 +84,26 @@ const App = () => (
         <LanguageProvider>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/redefinir-senha" element={<ResetPassword />} />
-            <Route path="/sala/:pin" element={<VirtualRoomChat />} />
+            <Route path="/" element={<Dark><Landing /></Dark>} />
+            <Route path="/login" element={<Dark><Login /></Dark>} />
+            <Route path="/signup" element={<Dark><Signup /></Dark>} />
+            <Route path="/redefinir-senha" element={<Dark><ResetPassword /></Dark>} />
+            <Route path="/sala/:pin" element={<Dark><VirtualRoomChat /></Dark>} />
             {/* Acesso público de alunos por PIN ao OSCE */}
-            <Route path="/osce/entrar" element={<OSCEJoin />} />
-            <Route path="/osce/sala/:sessionId" element={<OSCESessionStudent />} />
-            <Route path="/osce/atendimento/:attemptId" element={<OSCEAttendance />} />
-            <Route path="/precos" element={<PublicCredits />} />
-            <Route path="/vitrine" element={<PublicMarketplace />} />
-            <Route path="/docs" element={<PublicDocumentation />} />
-            <Route path="/fale-conosco" element={<PublicContact />} />
-            <Route path="/termos" element={<TermsOfService />} />
-            <Route path="/privacidade" element={<PrivacyPolicy />} />
-            <Route path="/cookies" element={<CookiePolicy />} />
-            <Route path="/verificar" element={<VerifyCertificate />} />
-            <Route path="/briefing/:id" element={<Briefing />} />
+            <Route path="/osce/entrar" element={<Dark><OSCEJoin /></Dark>} />
+            <Route path="/osce/sala/:sessionId" element={<Dark><OSCESessionStudent /></Dark>} />
+            <Route path="/osce/atendimento/:attemptId" element={<Dark><OSCEAttendance /></Dark>} />
+            <Route path="/precos" element={<Dark><PublicCredits /></Dark>} />
+            <Route path="/vitrine" element={<Dark><PublicMarketplace /></Dark>} />
+            <Route path="/docs" element={<Dark><PublicDocumentation /></Dark>} />
+            <Route path="/fale-conosco" element={<Dark><PublicContact /></Dark>} />
+            <Route path="/termos" element={<Dark><TermsOfService /></Dark>} />
+            <Route path="/privacidade" element={<Dark><PrivacyPolicy /></Dark>} />
+            <Route path="/cookies" element={<Dark><CookiePolicy /></Dark>} />
+            <Route path="/verificar" element={<Dark><VerifyCertificate /></Dark>} />
+            <Route path="/briefing/:id" element={<Dark><Briefing /></Dark>} />
             {/* Reunião Viva: convidado entra pelo link (a página pede login e volta) */}
-            <Route path="/reuniao-viva/convite/:token" element={<MeetingInvite />} />
+            <Route path="/reuniao-viva/convite/:token" element={<Dark><MeetingInvite /></Dark>} />
             <Route element={
               <ProtectedRoute>
                 <AppLayout />
@@ -143,7 +147,7 @@ const App = () => (
               <Route path="/osce/prova/:id" element={<OSCEExamEditor />} />
               <Route path="/osce/sessao/:sessionId" element={<OSCESessionTeacher />} />
             </Route>
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<Dark><NotFound /></Dark>} />
           </Routes>
         </AuthProvider>
         </LanguageProvider>

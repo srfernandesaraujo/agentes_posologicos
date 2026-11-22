@@ -8,6 +8,7 @@ import {
   Pill,
   Stethoscope,
 } from "lucide-react";
+import { useForceDark } from "@/contexts/NewUIContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { FloatingAuth } from "@/components/auth/FloatingAuth";
@@ -30,6 +31,7 @@ import "./Landing.css";
 const PILLAR_ICONS = [Stethoscope, GraduationCap, FlaskConical, Megaphone];
 
 export default function Landing() {
+  useForceDark();
   const { locale } = useLanguage();
   const safeLocale: LandingLocale = locale === "en" || locale === "es" ? locale : "pt";
   const c = landingCopy[safeLocale];

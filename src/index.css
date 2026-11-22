@@ -316,3 +316,74 @@
 @keyframes pos-flow { to { stroke-dashoffset: -16; } }
 .pos-flow-line { animation: pos-flow 3.6s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .pos-flow-line { animation: none; } }
+
+/* ---- Compat completa do claro (gerada): variantes hover/focus/placeholder/prose e fundos escuros fixos ---- */
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white::placeholder { color: hsl(var(--foreground)); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white { color: hsl(var(--foreground)); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/90::placeholder { color: hsl(var(--foreground) / 0.92); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/90:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/90:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/90 { color: hsl(var(--foreground) / 0.92); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/85::placeholder { color: hsl(var(--foreground) / 0.88); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/85:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/85:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/85 { color: hsl(var(--foreground) / 0.88); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/80::placeholder { color: hsl(var(--foreground) / 0.84); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/80:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/80:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/80 { color: hsl(var(--foreground) / 0.84); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/75::placeholder { color: hsl(var(--foreground) / 0.79); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/75:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/75:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/75 { color: hsl(var(--foreground) / 0.79); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/70::placeholder { color: hsl(var(--foreground) / 0.74); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/70:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/70:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/70 { color: hsl(var(--foreground) / 0.74); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/65::placeholder { color: hsl(var(--foreground) / 0.7); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/65:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/65:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/65 { color: hsl(var(--foreground) / 0.7); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/60::placeholder { color: hsl(var(--foreground) / 0.66); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/60:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/60:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/60 { color: hsl(var(--foreground) / 0.66); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/55::placeholder { color: hsl(var(--foreground) / 0.62); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/55:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/55:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/55 { color: hsl(var(--foreground) / 0.62); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/50::placeholder { color: hsl(var(--foreground) / 0.58); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/50:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/50:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/50 { color: hsl(var(--foreground) / 0.58); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/45::placeholder { color: hsl(var(--foreground) / 0.54); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/45:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/45:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/45 { color: hsl(var(--foreground) / 0.54); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/40::placeholder { color: hsl(var(--foreground) / 0.5); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/40:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/40:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/40 { color: hsl(var(--foreground) / 0.5); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/35::placeholder { color: hsl(var(--foreground) / 0.46); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/35:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/35:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/35 { color: hsl(var(--foreground) / 0.46); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/30::placeholder { color: hsl(var(--foreground) / 0.42); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/30:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/30:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/30 { color: hsl(var(--foreground) / 0.42); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/25::placeholder { color: hsl(var(--foreground) / 0.38); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/25:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/25:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/25 { color: hsl(var(--foreground) / 0.38); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/20::placeholder { color: hsl(var(--foreground) / 0.34); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/20:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/20:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/20 { color: hsl(var(--foreground) / 0.34); }
+[data-ui="v2"][data-theme="light"] .placeholder\:text-white\/15::placeholder { color: hsl(var(--foreground) / 0.3); }
+[data-ui="v2"][data-theme="light"] .hover\:text-white\/15:hover, [data-ui="v2"][data-theme="light"] .focus\:text-white\/15:focus, [data-ui="v2"][data-theme="light"] .group:hover .group-hover\:text-white\/15 { color: hsl(var(--foreground) / 0.3); }
+[data-ui="v2"][data-theme="light"] .file\:text-white::file-selector-button { color: hsl(var(--foreground)); }
+[data-ui="v2"][data-theme="light"] .prose-headings\:text-white :is(h1,h2,h3,h4), [data-ui="v2"][data-theme="light"] .prose-strong\:text-white :is(strong,b) { color: hsl(var(--foreground)); }
+[data-ui="v2"][data-theme="light"] .prose-p\:text-white\/80 :is(p,li,td,th) { color: hsl(var(--foreground) / .84); }
+[data-ui="v2"][data-theme="light"] .prose-li\:text-white\/80 :is(p,li,td,th) { color: hsl(var(--foreground) / .84); }
+[data-ui="v2"][data-theme="light"] .prose-table\:text-white\/80 :is(p,li,td,th) { color: hsl(var(--foreground) / .84); }
+[data-ui="v2"][data-theme="light"] .border-white\/5, [data-ui="v2"][data-theme="light"] .hover\:border-white\/5:hover { border-color: hsl(var(--foreground) / 0.07); }
+[data-ui="v2"][data-theme="light"] .border-white\/10, [data-ui="v2"][data-theme="light"] .hover\:border-white\/10:hover { border-color: hsl(var(--foreground) / 0.12); }
+[data-ui="v2"][data-theme="light"] .border-white\/15, [data-ui="v2"][data-theme="light"] .hover\:border-white\/15:hover { border-color: hsl(var(--foreground) / 0.17); }
+[data-ui="v2"][data-theme="light"] .border-white\/20, [data-ui="v2"][data-theme="light"] .hover\:border-white\/20:hover { border-color: hsl(var(--foreground) / 0.22); }
+[data-ui="v2"][data-theme="light"] .border-white\/25, [data-ui="v2"][data-theme="light"] .hover\:border-white\/25:hover { border-color: hsl(var(--foreground) / 0.26); }
+[data-ui="v2"][data-theme="light"] .border-white\/30, [data-ui="v2"][data-theme="light"] .hover\:border-white\/30:hover { border-color: hsl(var(--foreground) / 0.3); }
+[data-ui="v2"][data-theme="light"] .border-white\/40, [data-ui="v2"][data-theme="light"] .hover\:border-white\/40:hover { border-color: hsl(var(--foreground) / 0.4); }
+[data-ui="v2"][data-theme="light"] .border-white\/\[0\.06\], [data-ui="v2"][data-theme="light"] .hover\:border-white\/\[0\.06\]:hover { border-color: hsl(var(--foreground) / 0.09); }
+[data-ui="v2"][data-theme="light"] .border-white { border-color: hsl(var(--foreground)); }
+[data-ui="v2"][data-theme="light"] .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(var(--foreground) / .07); }
+[data-ui="v2"][data-theme="light"] .bg-white\/\[0\.01\], [data-ui="v2"][data-theme="light"] .hover\:bg-white\/\[0\.01\]:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/\[0\.01\]:focus { background-color: hsl(var(--foreground) / 0.02); }
+[data-ui="v2"][data-theme="light"] .bg-white\/\[0\.02\], [data-ui="v2"][data-theme="light"] .hover\:bg-white\/\[0\.02\]:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/\[0\.02\]:focus { background-color: hsl(var(--foreground) / 0.03); }
+[data-ui="v2"][data-theme="light"] .bg-white\/\[0\.03\], [data-ui="v2"][data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/\[0\.03\]:focus { background-color: hsl(var(--foreground) / 0.04); }
+[data-ui="v2"][data-theme="light"] .bg-white\/\[0\.04\], [data-ui="v2"][data-theme="light"] .hover\:bg-white\/\[0\.04\]:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/\[0\.04\]:focus { background-color: hsl(var(--foreground) / 0.045); }
+[data-ui="v2"][data-theme="light"] .bg-white\/\[0\.05\], [data-ui="v2"][data-theme="light"] .hover\:bg-white\/\[0\.05\]:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/\[0\.05\]:focus { background-color: hsl(var(--foreground) / 0.05); }
+[data-ui="v2"][data-theme="light"] .bg-white\/\[0\.06\], [data-ui="v2"][data-theme="light"] .hover\:bg-white\/\[0\.06\]:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/\[0\.06\]:focus { background-color: hsl(var(--foreground) / 0.06); }
+[data-ui="v2"][data-theme="light"] .bg-white\/\[0\.08\], [data-ui="v2"][data-theme="light"] .hover\:bg-white\/\[0\.08\]:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/\[0\.08\]:focus { background-color: hsl(var(--foreground) / 0.07); }
+[data-ui="v2"][data-theme="light"] .bg-white\/\[0\.12\], [data-ui="v2"][data-theme="light"] .hover\:bg-white\/\[0\.12\]:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/\[0\.12\]:focus { background-color: hsl(var(--foreground) / 0.1); }
+[data-ui="v2"][data-theme="light"] .bg-white\/5, [data-ui="v2"][data-theme="light"] .hover\:bg-white\/5:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/5:focus { background-color: hsl(var(--foreground) / 0.05); }
+[data-ui="v2"][data-theme="light"] .bg-white\/10, [data-ui="v2"][data-theme="light"] .hover\:bg-white\/10:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/10:focus { background-color: hsl(var(--foreground) / 0.08); }
+[data-ui="v2"][data-theme="light"] .bg-white\/20, [data-ui="v2"][data-theme="light"] .hover\:bg-white\/20:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/20:focus { background-color: hsl(var(--foreground) / 0.13); }
+[data-ui="v2"][data-theme="light"] .bg-white\/30, [data-ui="v2"][data-theme="light"] .hover\:bg-white\/30:hover, [data-ui="v2"][data-theme="light"] .focus\:bg-white\/30:focus { background-color: hsl(var(--foreground) / 0.2); }
+[data-ui="v2"][data-theme="light"] .bg-white { background-color: hsl(var(--card)); }
+[data-ui="v2"][data-theme="light"] .bg-black\/10 { background-color: hsl(var(--foreground) / .04); }
+[data-ui="v2"][data-theme="light"] .bg-black\/20 { background-color: hsl(var(--foreground) / .05); }
+[data-ui="v2"][data-theme="light"] .bg-black\/40 { background-color: hsl(var(--foreground) / .07); }
+[data-ui="v2"][data-theme="light"] .bg-slate-900 { background-color: hsl(var(--popover)); }
+[data-ui="v2"][data-theme="light"] .pos-elev { box-shadow: 0 1px 0 hsl(0 0% 100% / .6) inset, 0 14px 30px -22px hsl(208 40% 20% / .35); }
+[data-ui="v2"][data-theme="light"] ::selection { background: hsl(var(--dom-clinica) / .25); }
+
