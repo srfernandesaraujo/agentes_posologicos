@@ -39,6 +39,24 @@ export function OrchestratorGraph({ goal, steps, loading }: Props) {
           </g>
         ))}
 
+        {/* durante a espera: informação chega dos dois lados e se encontra nos especialistas */}
+        {on && loading && steps.length === 0 && ys.map((y, i) => {
+          const begin = `${i * 0.45}s`;
+          return (
+            <g key={`p${i}`} aria-hidden="true">
+              <circle r="3.2" fill="hsl(var(--dom-clinica))">
+                <animateMotion dur="3.2s" begin={begin} repeatCount="indefinite" path={curve(gx + 62, cy, mx - 92, y)} />
+              </circle>
+              <circle r="3.2" fill="hsl(var(--dom-acervo))">
+                <animateMotion dur="3.2s" begin={begin} repeatCount="indefinite" path={curve(dx - 62, cy, mx + 92, y)} />
+              </circle>
+              <rect x={mx - 94} y={y - 21} width="188" height="42" rx="12" fill="none" stroke="hsl(var(--dom-equipes))" strokeWidth="3">
+                <animate attributeName="opacity" values="0;0;0.9;0" keyTimes="0;0.7;0.92;1" dur="3.2s" begin={begin} repeatCount="indefinite" />
+              </rect>
+            </g>
+          );
+        })}
+
         <g>
           <rect x={gx - 62} y={cy - 22} width="124" height="44" rx="12" fill="hsl(var(--dom-clinica) / 0.16)" stroke="hsl(var(--dom-clinica))" />
           <text x={gx} y={cy - 3} textAnchor="middle" fontSize="9" fontFamily="JetBrains Mono, monospace" fill="hsl(var(--dom-clinica))" letterSpacing="1.5">OBJETIVO</text>

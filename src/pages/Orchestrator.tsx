@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
 import { useNewUI } from "@/contexts/NewUIContext";
+import { sanitizeMarkdownTables } from "@/lib/markdownTables";
 import { OrchestratorGraph } from "@/components/orchestrator/OrchestratorGraph";
 import { supabase } from "@/integrations/supabase/client";
 import { useCredits } from "@/hooks/useCredits";
@@ -79,8 +80,8 @@ export default function Orchestrator() {
   const handleExport = () => {
     if (!result) return;
     const fullMd = `# Dossiê: ${goal}\n\n## Roteamento\n${result.rationale}\n\n${result.results.map((r, i) =>
-      `## Etapa ${i + 1}: ${r.title}\n*Agente: ${r.agent_name}*\n\n${r.output || `Erro: ${r.error}`}`
-    ).join("\n\n")}\n\n---\n\n## Dossiê Consolidado\n${result.dossier}`;
+      `## Etapa ${i + 1}: ${r.title}\n*Agente: ${r.agent_name}*\n\n${sanitizeMarkdownTables(r.output || `Erro: ${r.error}`)}`
+    ).join("\n\n")}\n\n---\n\n## Dossiê Consolidado\n${sanitizeMarkdownTables(result.dossier)}`;
     exportConversationPdf("Agente Orquestrador", [
       { role: "user", content: goal, created_at: new Date().toISOString() },
       { role: "assistant", content: fullMd, created_at: new Date().toISOString() },
@@ -189,7 +190,7 @@ export default function Orchestrator() {
                           <div className="text-xs text-white/60 italic mb-3 line-clamp-3">{r.prompt}</div>
                           <div className="text-[11px] uppercase tracking-wide text-white/40 mb-1">Resposta</div>
                           <div className="prose prose-sm prose-invert max-w-none text-white/85">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{r.output || `Erro: ${r.error}`}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{sanitizeMarkdownTables(r.output || `Erro: ${r.error}`)}</ReactMarkdown>
                           </div>
                         </div>
                       </CollapsibleContent>
@@ -211,7 +212,7 @@ export default function Orchestrator() {
                 </Button>
               </div>
               <div className="prose prose-sm prose-invert max-w-none text-white/85">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.dossier}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{sanitizeMarkdownTables(result.dossier)}</ReactMarkdown>
               </div>
             </Card>
           </div>

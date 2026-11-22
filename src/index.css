@@ -314,5 +314,5 @@
 
 /* Ligações de fluxo com pontos correndo */
 @keyframes pos-flow { to { stroke-dashoffset: -16; } }
-.pos-flow-line { animation: pos-flow 1.2s linear infinite; }
+.pos-flow-line { animation: pos-flow 3.6s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .pos-flow-line { animation: none; } }

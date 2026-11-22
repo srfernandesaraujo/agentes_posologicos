@@ -14,6 +14,7 @@ import {
 import { CostCapField, fmtUsd } from "./CostCapField";
 import { OfficeSection } from "./office/OfficeSection";
 import { MissionPipeline } from "./MissionPipeline";
+import { sanitizeMarkdownTables } from "@/lib/markdownTables";
 import { Gauge } from "@/components/ds/Gauge";
 import { CountUp } from "@/components/ds/CountUp";
 import { useNewUI } from "@/contexts/NewUIContext";
@@ -99,7 +100,7 @@ export function QuestionCard({ q, agentName, busy, onAnswer }: { q: SquadQuestio
 function Markdown({ children }: { children: string }) {
   return (
     <div className="prose prose-invert max-w-none prose-sm prose-headings:text-white prose-p:text-white/80 prose-li:text-white/80 prose-strong:text-white prose-table:text-white/80">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{sanitizeMarkdownTables(children)}</ReactMarkdown>
     </div>
   );
 }
