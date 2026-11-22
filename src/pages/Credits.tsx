@@ -1,5 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { CreditsWallet } from "@/components/credits/CreditsWallet";
 import { useCredits } from "@/hooks/useCredits";
 import { useSubscription, SUBSCRIPTION_TIERS, TierKey } from "@/hooks/useSubscription";
 import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
@@ -47,6 +49,7 @@ export default function Credits() {
   const { isAdmin } = useIsAdmin();
   const hasFreeAccess = isAdmin || hasUnlimitedAccess;
   const { t } = useLanguage();
+  const { enabled: v2 } = useNewUI();
   const [loadingPack, setLoadingPack] = useState<string | null>(null);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
@@ -145,8 +148,23 @@ export default function Credits() {
         </div>
       )}
 
+      {v2 && (
+        <CreditsWallet
+          balance={balance}
+          unlimited={hasFreeAccess}
+          actions={subscribed && tierInfo ? (
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-[hsl(var(--dom-inicio)/0.4)] bg-[hsl(var(--dom-inicio)/0.1)] px-3 py-1 text-xs font-semibold text-[hsl(var(--dom-inicio))]">Plano {tierInfo.name}</span>
+              <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={loadingPortal} className="h-8 gap-1">
+                {loadingPortal ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Settings className="h-3.5 w-3.5" />} Gerenciar
+              </Button>
+            </div>
+          ) : undefined}
+        />
+      )}
+
       {/* Balance */}
-      <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 animate-fade-in">
+      <div className={`mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 animate-fade-in ${v2 ? "hidden" : ""}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl gradient-primary">

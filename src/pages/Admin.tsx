@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
+import { CountUp } from "@/components/ds/CountUp";
+import { Reveal, RevealItem } from "@/components/ds/Reveal";
+import { Spotlight } from "@/components/ds/Spotlight";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -339,7 +342,7 @@ export default function Admin() {
           ) : analytics ? (
             <>
               {/* KPI Cards */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Reveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" stagger={0.045}>
                 {[
                   { label: "Receita (30d)", value: formatBRL(analytics.stripe.revenueThisMonthCents), icon: CreditCard, color: "hsl(152,60%,42%)" },
                   { label: "MRR", value: formatBRL(analytics.stripe.mrrCents), icon: TrendingUp, color: "hsl(174,62%,47%)" },
@@ -347,18 +350,22 @@ export default function Admin() {
                   { label: "Cancelamentos", value: analytics.stripe.canceledSubscriptions, icon: XCircle, color: "hsl(0,72%,51%)" },
                   { label: "Total de Usuários", value: analytics.users.total, icon: Users, color: "hsl(199,89%,48%)" },
                   { label: "Novos (7 dias)", value: analytics.users.newThisWeek, icon: UserPlus, color: "hsl(152,60%,42%)" },
-                  { label: "Créditos Consumidos", value: analytics.usage.totalCreditsUsed.toFixed(1), icon: Coins, color: "hsl(14,90%,58%)" },
+                  { label: "Créditos Consumidos", value: Number(analytics.usage.totalCreditsUsed.toFixed(1)), decimals: 1, icon: Coins, color: "hsl(14,90%,58%)" },
                   { label: "Sessões de Chat", value: analytics.usage.totalSessions, icon: BarChart3, color: "hsl(280,60%,55%)" },
-                ].map((stat) => (
-                  <div key={stat.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-                    <div className="flex items-center gap-3 mb-2">
-                      <stat.icon className="h-5 w-5" style={{ color: stat.color }} />
-                      <span className="text-sm text-white/50">{stat.label}</span>
-                    </div>
-                    <p className="font-display text-2xl font-bold text-white">{stat.value}</p>
-                  </div>
+                ].map((stat: { label: string; value: string | number; decimals?: number; icon: any; color: string }) => (
+                  <RevealItem key={stat.label}>
+                    <Spotlight tone="var(--dom-ajuda)" className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                      <div className="flex items-center gap-3 mb-2">
+                        <stat.icon className="h-5 w-5" style={{ color: stat.color }} />
+                        <span className="text-sm text-white/50">{stat.label}</span>
+                      </div>
+                      <p className="font-display text-2xl font-bold text-white">
+                        {typeof stat.value === "number" ? <CountUp value={stat.value} decimals={stat.decimals ?? 0} /> : stat.value}
+                      </p>
+                    </Spotlight>
+                  </RevealItem>
                 ))}
-              </div>
+              </Reveal>
 
               {/* Charts Row */}
               <div className="grid gap-6 lg:grid-cols-2">

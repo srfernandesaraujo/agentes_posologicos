@@ -6,10 +6,33 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useProjects } from "@/hooks/useProjects";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { CountUp } from "@/components/ds/CountUp";
+import { Reveal, RevealItem } from "@/components/ds/Reveal";
 
 export default function Projects() {
   const { data: projects = [], isLoading } = useProjects();
   const [createOpen, setCreateOpen] = useState(false);
+  const { enabled: v2 } = useNewUI();
+  const ids = projects.map((p) => p.id);
+  // quantos itens de cada tipo há em cada projeto (uma consulta só)
+  const { data: itemRows = [] } = useQuery({
+    queryKey: ["project-items-overview", [...ids].sort()],
+    enabled: v2 && ids.length > 0,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data } = await supabase.from("project_items" as any).select("project_id, item_type").in("project_id", ids).limit(5000);
+      return (data || []) as unknown as { project_id: string; item_type: string }[];
+    },
+  });
+  const countsOf = (id: string) => {
+    const c: Record<string, number> = {};
+    itemRows.filter((r) => r.project_id === id).forEach((r) => { c[r.item_type] = (c[r.item_type] || 0) + 1; });
+    return c;
+  };
+  const TYPE_LABEL: Record<string, [string, string]> = { conversation: ["conversa", "conversas"], flow: ["fluxo", "fluxos"], knowledge_base: ["conteúdo", "conteúdos"], meeting: ["reunião", "reuniões"] };
 
   const active = projects.filter((p) => !p.archived);
   const archived = projects.filter((p) => p.archived);
@@ -51,12 +74,18 @@ export default function Projects() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {v2 && (
+            <dl className="mb-6 grid max-w-md grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-border bg-card p-4"><dd className="font-display text-3xl font-extrabold text-foreground"><CountUp value={active.length} /></dd><dt className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">projetos ativos</dt></div>
+              <div className="rounded-2xl border border-border bg-card p-4"><dd className="font-display text-3xl font-extrabold text-foreground"><CountUp value={itemRows.length} /></dd><dt className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">itens reunidos</dt></div>
+            </dl>
+          )}
+          <Reveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" stagger={0.05}>
             {active.map((p) => (
+              <RevealItem key={p.id}>
               <Link
-                key={p.id}
                 to={`/projetos/${p.id}`}
-                className="group rounded-2xl border bg-white/[0.03] p-5 transition-all hover:bg-white/[0.06] hover:scale-[1.02]"
+                className="group block h-full rounded-2xl border bg-white/[0.03] p-5 transition-all hover:bg-white/[0.06] hover:-translate-y-1"
                 style={{ borderColor: `${p.color}40`, boxShadow: `0 0 30px -10px ${p.color}30` }}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -80,12 +109,22 @@ export default function Projects() {
                     ))}
                   </div>
                 )}
+                {v2 && (() => {
+                  const c = countsOf(p.id);
+                  const entries = Object.entries(c);
+                  return entries.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-white/60">
+                      {entries.map(([t, n]) => <span key={t}><b className="text-white">{n}</b> {(TYPE_LABEL[t] ?? [t, t])[n === 1 ? 0 : 1]}</span>)}
+                    </div>
+                  ) : <div className="mt-3 font-mono text-[11px] text-white/35">vazio por enquanto</div>;
+                })()}
                 <div className="mt-3 text-[10px] text-white/30">
                   Atualizado {new Date(p.updated_at).toLocaleDateString("pt-BR")}
                 </div>
               </Link>
+              </RevealItem>
             ))}
-          </div>
+          </Reveal>
 
           {archived.length > 0 && (
             <div className="mt-12">

@@ -9,9 +9,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Database, Plus, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AddToProjectMenu } from "@/components/projects/AddToProjectMenu";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { KnowledgeShelfV2 } from "@/components/knowledge/KnowledgeShelfV2";
 
 export default function Knowledge() {
   const navigate = useNavigate();
+  const { enabled: v2 } = useNewUI();
   const { data: bases = [], isLoading, createKB, deleteKB } = useKnowledgeBases();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -59,6 +62,17 @@ export default function Knowledge() {
           </Button>
         </div>
       </div>
+    );
+  }
+
+  if (v2 && !isLoading) {
+    return (
+      <KnowledgeShelfV2
+        bases={bases}
+        onNew={() => setCreating(true)}
+        onOpen={(id) => navigate(`/conteudos/${id}`)}
+        renderMenu={(kb) => <AddToProjectMenu itemType="knowledge_base" itemId={kb.id} size="icon" />}
+      />
     );
   }
 

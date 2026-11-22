@@ -12,6 +12,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { toast } from "sonner";
+import { Spotlight } from "@/components/ds/Spotlight";
+import { PkCurve } from "@/components/ds/PkCurve";
+import { useNewUI } from "@/contexts/NewUIContext";
 
 const PURCHASE_COST = 5;
 const SELLER_EARNING = 3;
@@ -182,6 +185,7 @@ function AgentDetailDialog({ agent, open, onClose, isPurchased, onPurchase, purc
 }
 
 export default function Marketplace() {
+  const { enabled: v2 } = useNewUI();
   const { data: agents = [], isLoading } = useMarketplaceAgents();
   const { data: purchasedSet = new Set<string>() } = usePurchasedAgents();
   const purchaseAgent = usePurchaseAgent();
@@ -268,8 +272,9 @@ export default function Marketplace() {
       {featuredAgent && !search && (
         <div
           onClick={() => setSelectedAgent(featuredAgent)}
-          className="mb-8 cursor-pointer overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-accent/5 to-card p-6 md:p-8 transition-all hover:shadow-lg animate-fade-in"
+          className="relative mb-8 cursor-pointer overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-accent/5 to-card p-6 md:p-8 transition-all hover:shadow-lg animate-fade-in"
         >
+          {v2 && <PkCurve draw height={140} className="pointer-events-none absolute inset-x-0 bottom-0 w-full opacity-25" />}
           <div className="flex items-start gap-5">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl gradient-primary shadow-lg">
               <Bot className="h-8 w-8 text-white" />
@@ -286,6 +291,7 @@ export default function Marketplace() {
                 <span className="flex items-center gap-1">
                   <Star className={`h-3.5 w-3.5 ${featuredAgent.avg_rating > 0 ? "fill-[hsl(var(--warning))] text-[hsl(var(--warning))]" : ""}`} />
                   {featuredAgent.avg_rating > 0 ? featuredAgent.avg_rating.toFixed(1) : "Novo"}
+                  {v2 && featuredAgent.review_count > 0 && <span className="font-mono text-xs">({featuredAgent.review_count})</span>}
                 </span>
                 <span className="flex items-center gap-1"><Coins className="h-3.5 w-3.5 text-[hsl(var(--warning))]" /> {PURCHASE_COST} créditos</span>
               </div>
@@ -352,8 +358,9 @@ export default function Marketplace() {
               const owned = agent.user_id === user?.id;
               const purchased = purchasedSet.has(agent.id);
               return (
-                <div
+                <Spotlight
                   key={agent.id}
+                  tone="var(--dom-acervo)"
                   onClick={() => setSelectedAgent(agent)}
                   className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all hover:shadow-lg hover:-translate-y-1 animate-fade-in"
                 >
@@ -403,7 +410,7 @@ export default function Marketplace() {
                       </Button>
                     )}
                   </div>
-                </div>
+                </Spotlight>
               );
             })}
           </div>

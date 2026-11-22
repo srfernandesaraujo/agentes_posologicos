@@ -1,5 +1,7 @@
 import { useState, useRef } from "react";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { CountUp } from "@/components/ds/CountUp";
 import { ResearchInterestsManager } from "@/components/pubmed/ResearchInterestsManager";
 import { BriefingSettings } from "@/components/briefing/BriefingSettings";
 import { NotificationPreferences } from "@/components/account/NotificationPreferences";
@@ -19,6 +21,7 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
 
 export default function Account() {
+  const { enabled: v2 } = useNewUI();
   const { user } = useAuth();
   const { balance } = useCredits();
   const { t } = useLanguage();
@@ -123,10 +126,10 @@ export default function Account() {
         <h1 className="mb-2 font-display text-3xl font-bold text-white">{t("account.title")}</h1>
       </div>
 
-      <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] p-6 animate-fade-in">
+      <div className={`mb-8 animate-fade-in ${v2 ? "pos-elev overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-[hsl(var(--dom-ajuda)/0.12)] via-card to-card p-6 md:p-8" : "rounded-2xl border border-white/10 bg-white/[0.03] p-6"}`}>
         <div className="flex items-center gap-4">
           <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-            <Avatar className="h-14 w-14 border-2 border-white/20">
+            <Avatar className={`border-2 border-white/20 ${v2 ? "h-20 w-20" : "h-14 w-14"}`}>
               {profile?.avatar_url ? (
                 <AvatarImage src={profile.avatar_url} alt={`Foto de perfil de ${profile?.display_name || user?.email || "usuário"}`} />
               ) : null}
@@ -140,7 +143,12 @@ export default function Account() {
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
           </div>
           <div>
-            <p className="font-display text-lg font-semibold text-white">{profile?.display_name || user?.email}</p>
+            <p className={`font-display font-semibold text-white ${v2 ? "text-2xl" : "text-lg"}`}>{profile?.display_name || user?.email}</p>
+              {v2 && (
+                <p className="mb-1 font-mono text-xs text-white/45">
+                  {profile?.display_name ? `${user?.email} · ` : ""}membro desde {user?.created_at ? new Date(user.created_at).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : "—"}
+                </p>
+              )}
               {isUnlimited ? (
                 <div className="flex items-center gap-2 text-sm text-[hsl(174,62%,47%)]">
                   <Infinity className="h-4 w-4" />
@@ -149,7 +157,7 @@ export default function Account() {
               ) : (
                 <div className="flex items-center gap-2 text-sm text-white/50">
                   <Coins className="h-4 w-4 text-[hsl(38,92%,50%)]" />
-                  {balance} {t("credits.credits")}
+                  {v2 ? <CountUp value={balance} decimals={balance % 1 ? 1 : 0} /> : balance} {t("credits.credits")}
                 </div>
               )}
           </div>
