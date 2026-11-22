@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { DomainEyebrow } from "@/components/ds/DomainEyebrow";
+import { useNewUI } from "@/contexts/NewUIContext";
+import { OrchestratorGraph } from "@/components/orchestrator/OrchestratorGraph";
 import { supabase } from "@/integrations/supabase/client";
 import { useCredits } from "@/hooks/useCredits";
 import { useUnlimitedAccess } from "@/hooks/useUnlimitedAccess";
@@ -44,6 +46,7 @@ export default function Orchestrator() {
   const { hasUnlimitedAccess } = useUnlimitedAccess();
   const { isAdmin } = useIsAdmin();
   const unlimited = hasUnlimitedAccess || isAdmin;
+  const { enabled: v2 } = useNewUI();
   const [goal, setGoal] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<OrchestratorResult | null>(null);
@@ -85,7 +88,7 @@ export default function Orchestrator() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[hsl(220,25%,5%)] p-4 md:p-8">
+    <div className={`min-h-[calc(100vh-4rem)] p-4 md:p-8 ${v2 ? "bg-pos-vacuo" : "bg-[hsl(220,25%,5%)]"}`}>
       <div className="mx-auto max-w-4xl">
         <header className="mb-6">
           <div className="flex items-center gap-3 mb-2">
@@ -139,7 +142,11 @@ export default function Orchestrator() {
           </div>
         </Card>
 
-        {loading && (
+        {v2 && (loading || result) && (
+          <OrchestratorGraph goal={goal} loading={loading} steps={result && !loading ? result.results.map((r) => ({ name: r.agent_name || r.title, error: !!r.error })) : []} />
+        )}
+
+        {loading && !v2 && (
           <Card className="border-white/10 bg-white/[0.03] p-6 text-center text-white/60">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white mb-3" />
             Decompondo o objetivo, roteando para especialistas e consolidando o dossiê...

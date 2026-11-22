@@ -145,8 +145,8 @@ export default function SquadDetail() {
                 {missions.map((m) => (
                   <li key={m.id}>
                     <button type="button" onClick={() => setSelected(m.id)}
-                      className={`w-full rounded-lg border p-3 text-left text-sm transition-colors ${selected === m.id ? "border-white/40 bg-white/10" : "border-white/10 bg-white/5 hover:border-white/25"}`}>
-                      <div className="line-clamp-2 font-medium">{m.briefing}</div>
+                      className={`w-full border p-3 text-left text-sm transition-colors ${newUI ? "rounded-xl" : "rounded-lg"} ${selected === m.id ? (newUI ? "border-[hsl(var(--dom-equipes))] bg-[hsl(var(--dom-equipes)/0.10)]" : "border-white/40 bg-white/10") : "border-white/10 bg-white/5 hover:border-white/25"}`}>
+                      <div className="line-clamp-2 font-medium">{newUI && <i className={`mr-2 inline-block h-2 w-2 rounded-full align-middle ${m.status === "running" ? "animate-pulse bg-[hsl(var(--dom-acervo))]" : m.status === "completed" ? "bg-[hsl(var(--dom-acervo))]" : m.status === "failed" ? "bg-[hsl(var(--destructive-vivid))]" : "bg-[hsl(var(--warning))]"}`} />}{m.briefing}</div>
                       <div className="mt-1.5 flex items-center justify-between gap-2 text-xs">
                         <span className={MISSION_STATUS[m.status].className.split(" ").find((c) => c.startsWith("text-"))}>{MISSION_STATUS[m.status].label}</span>
                         <span className="text-white/40">{new Date(m.created_at).toLocaleDateString("pt-BR")} · {fmtUsd(Number(m.cost_usd))}</span>

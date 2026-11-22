@@ -13,6 +13,10 @@ import {
 } from "@/hooks/useSquads";
 import { CostCapField, fmtUsd } from "./CostCapField";
 import { OfficeSection } from "./office/OfficeSection";
+import { MissionPipeline } from "./MissionPipeline";
+import { Gauge } from "@/components/ds/Gauge";
+import { CountUp } from "@/components/ds/CountUp";
+import { useNewUI } from "@/contexts/NewUIContext";
 
 export const MISSION_STATUS: Record<MissionStatus, { label: string; className: string }> = {
   running: { label: "Trabalhando", className: "border-sky-400/40 text-sky-300" },
@@ -106,6 +110,7 @@ export function MissionPanel({
   const { data, isLoading } = useMissionDetail(missionId);
   useMissionRealtime(missionId, squadId);
   const { decide, raiseCap, answerQuestion } = useSquadActions();
+  const { enabled: v2 } = useNewUI();
   const [changeText, setChangeText] = useState("");
   const [asking, setAsking] = useState(false);
   const [newCap, setNewCap] = useState(0);
@@ -167,6 +172,17 @@ export function MissionPanel({
           <span className="text-sm text-white/50">{doneCount} de {data!.tasks.length} etapas</span>
         </div>
         <h3 className="text-lg font-semibold">{mission.briefing}</h3>
+        {v2 ? (
+          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
+            <Gauge value={pct / 100} size={72} stroke={7} color={pct >= 100 ? "hsl(var(--destructive-vivid))" : pct >= 80 ? "hsl(var(--warning))" : "hsl(var(--dom-equipes))"} label={`${Math.round(pct)}% do teto de custo usado`}>
+              <span className="font-mono text-xs font-bold text-foreground">{Math.round(pct)}%</span>
+            </Gauge>
+            <div className="min-w-0">
+              <div className="font-display text-2xl font-extrabold text-foreground"><CountUp value={cost} decimals={cost > 0 && cost < 0.01 ? 4 : 2} prefix="US$ " /></div>
+              <div className="font-mono text-xs text-muted-foreground">teto {fmtUsd(cap)} · {(Number(mission.tokens_input) + Number(mission.tokens_output)).toLocaleString("pt-BR")} tokens</div>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-white/50">
             <span>Custo estimado {fmtUsdSmall(cost)} · {(Number(mission.tokens_input) + Number(mission.tokens_output)).toLocaleString("pt-BR")} tokens</span><span>Teto {fmtUsd(cap)}</span>
@@ -177,6 +193,7 @@ export function MissionPanel({
             className={`h-2 bg-white/10 ${pct >= 80 ? "[&>div]:bg-amber-400" : "[&>div]:bg-sky-400"}`}
           />
         </div>
+        )}
         {mission.error && (
           <div className="flex items-start gap-2 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">
             <XCircle className="mt-0.5 h-4 w-4 shrink-0" /> {mission.error}
@@ -223,7 +240,9 @@ export function MissionPanel({
         </div>
       )}
 
-      <div>
+      {v2 && <MissionPipeline tasks={data!.tasks} agents={agents} />}
+
+      <div className={v2 ? "hidden" : undefined}>
         <h4 className="mb-2 text-sm font-semibold text-white/70">Equipe</h4>
         <ul className="space-y-1.5">
           {data!.tasks.map((t) => {
