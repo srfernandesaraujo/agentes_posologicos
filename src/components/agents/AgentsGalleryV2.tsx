@@ -78,7 +78,7 @@ function AgentCard({ agent, isAdmin, featured }: { agent: Agent; isAdmin: boolea
           </button>
         )}
       </h3>
-      <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-muted-foreground transition-all duration-300 group-hover:line-clamp-5">{agent.description}</p>
+      <p className="mt-1 line-clamp-2 min-h-[2.6em] text-[13px] leading-snug text-muted-foreground" title={agent.description}>{agent.description}</p>
       <div className="mt-3 flex items-center justify-between font-mono text-[11px]" style={{ color: `hsl(var(--cat-${v}))` }}>
         <span className="uppercase tracking-[0.12em]">{CAT_SHORT[agent.category] ?? agent.category}</span>
         <span className="inline-flex items-center gap-1 opacity-0 transition duration-300 group-hover:opacity-100">conversar <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span>
